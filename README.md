@@ -1,0 +1,156 @@
+# 🧊 Sistema de gestión — Fábrica de hielo y planta de agua
+
+Sistema para la fábrica de hielo de Hunucmá, Yucatán.
+Se construye **por versiones**: cada versión es un pedazo terminado, probado y usable.
+
+**Versión actual: v0.1 — Cimientos**
+
+---
+
+## Cómo lo pruebas (primera vez)
+
+Necesitas [Node.js](https://nodejs.org) versión 20 o más nueva instalado.
+Después, en la carpeta del proyecto:
+
+```bash
+npm install     # solo la primera vez: descarga lo que necesita
+npm start       # arranca el sistema
+```
+
+Verás algo así:
+
+```
+  Fábrica de Hielo — v0.1
+  ------------------------------------------
+  Aplicada: 001_inicial.sql
+
+  Primer arranque: se creó el administrador
+     usuario:    admin
+     contraseña: admin1234
+     PIN:        1234
+
+  Listo. Abre el sistema en:
+     En esta PC:      http://localhost:3000
+     En el celular:   http://192.168.1.50:3000
+```
+
+Abre `http://localhost:3000` en el navegador. Para entrar desde el celular,
+usa la otra dirección (tiene que estar en el mismo WiFi).
+
+Para detener el sistema: `Ctrl + C` en la terminal.
+
+> ⚠️ **Lo primero que debes hacer:** entrar como admin y cambiarle el PIN
+> y la contraseña desde la pantalla de **Usuarios**.
+
+### Comandos disponibles
+
+| Comando | Qué hace |
+|---|---|
+| `npm start` | Arranca el sistema |
+| `npm run dev` | Igual, pero se reinicia solo cuando cambias un archivo |
+| `npm run prueba` | Corre las pruebas automáticas |
+| `npm run respaldo` | Hace una copia de la base de datos a mano |
+
+---
+
+## Qué hay en la v0.1
+
+Lo que **ya funciona y puedes probar**:
+
+- Entrar tocando tu nombre y escribiendo tu PIN (4 a 6 dígitos)
+- Entrar como admin con usuario y contraseña
+- La sesión se queda guardada en el dispositivo (no pide PIN cada rato)
+- Crear, editar y dar de baja usuarios, con sus roles
+- Cada rol ve solo lo suyo (un operario no puede entrar a Usuarios)
+- Pantalla **Sistema**: versión, migraciones aplicadas y bitácora
+- Pantalla **Qué hay de nuevo** con el historial de versiones
+- La base de datos se crea y actualiza sola, con respaldo antes de cada cambio
+
+Lo que **todavía no existe** (aparece en gris en el inicio):
+tanques (v0.2), producción (v0.3), venta (v0.4), caja (v0.5).
+
+---
+
+## Cómo está organizado
+
+```
+src/
+  servidor.js          Arranque: migra, siembra y levanta el servidor
+  version.js           ← El historial de versiones ("Qué hay de nuevo")
+  config.js            Puerto, rutas, admin inicial
+  db/
+    conexion.js        Conexión única a SQLite
+    migrar.js          Aplica las migraciones pendientes
+    respaldar.js       Copia de seguridad
+    migraciones/       001_inicial.sql, 002_..., 003_...  (nunca se editan)
+  lib/
+    fracciones.js      ⭐ Dieciseisavos de marqueta (regla de oro 3.1)
+    seguridad.js       Hash de PIN y contraseñas
+    bitacora.js        Quién ejecutó y quién capturó cada movimiento
+    roles.js           Roles y permisos
+    ids.js             UUID y fechas
+  middleware/
+    sesion.js          Quién está conectado y qué puede hacer
+  modulos/             Un módulo por área. Agregar uno no toca los demás
+    auth/  usuarios/  versiones/  sistema/
+
+public/                La interfaz (HTML, CSS y JavaScript sin librerías)
+  index.html
+  css/estilo.css
+  js/app.js            Navegación
+  js/vistas/           Una pantalla por archivo
+
+pruebas/               Pruebas automáticas
+datos/                 Base de datos y respaldos (no se sube a GitHub)
+```
+
+### La idea de fondo
+
+- **Un módulo = una carpeta.** Agregar tanques no obliga a tocar usuarios.
+- **Las migraciones nunca se editan.** Si algo salió mal, se hace la siguiente
+  que lo corrige. Así la base de la fábrica siempre se puede actualizar sin miedo.
+- **Nada se borra, nada se edita.** Todo son movimientos con fecha y responsable.
+
+---
+
+## Las reglas de oro (del plan)
+
+Están escritas en el código, no solo en el documento:
+
+| # | Regla | Dónde vive |
+|---|---|---|
+| 3.1 | El hielo se guarda en dieciseisavos enteros, nunca decimales | `src/lib/fracciones.js` |
+| 3.2 | Todo es un movimiento inmutable | `src/lib/bitacora.js` |
+| 3.3 | UUID interno estable, nombre editable | `src/lib/ids.js` |
+| 3.4 | Nada se borra: baja con fecha | columnas `activo` / `fecha_baja` |
+| 3.5 | El precio se copia dentro de la venta | llega en v0.4 |
+| 3.6 | Doble responsable: ejecutor y capturista | tabla `bitacora` |
+
+---
+
+## Cómo se agrega una versión nueva
+
+1. Se programa el pedazo (con su migración `00X_...sql` si toca la base).
+2. Se agrega la entrada nueva **hasta arriba** del arreglo en `src/version.js`.
+3. Se actualiza `VERSION_ACTUAL` ahí mismo y `version` en `package.json`.
+4. Se corre `npm run prueba`.
+
+La pantalla "Qué hay de nuevo" se actualiza sola, y a quien no haya visto la
+versión nueva le aparece un punto rojo en el menú.
+
+---
+
+## Camino de versiones
+
+| Versión | Contenido | Estado |
+|---|---|---|
+| **v0.1** | Cimientos, usuarios, roles, PIN, migraciones, novedades | ✅ listo |
+| v0.2 | Configurador de tanques, paños, canastas y moldes | siguiente |
+| v0.3 | Producción: sacada, rellenado, estados de canasta, traspaso a caja | |
+| v0.4 | Punto de venta: fracciones, precios por fracción, tickets | |
+| v0.5 | Caja: sesiones, vales, arqueos y cortes | |
+| v0.6 | Clientes, mayoreo, crédito y autorizaciones | |
+| v0.7 | Mantenimiento: equipos, tareas, insumos, checklists | |
+| v0.8 | Planta de agua y garrafones | |
+| v0.9 | Reparto, mapas y neveras en comodato | |
+| v1.0 | Sistema completo en producción | |

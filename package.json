@@ -1,0 +1,21 @@
+{
+  "name": "fabrica-hielo",
+  "version": "0.1.0",
+  "description": "Sistema de gestion para fabrica de hielo y planta de agua",
+  "private": true,
+  "type": "commonjs",
+  "main": "src/servidor.js",
+  "scripts": {
+    "start": "node src/servidor.js",
+    "dev": "node --watch src/servidor.js",
+    "prueba": "node --test pruebas/*.test.js",
+    "respaldo": "node src/db/respaldar.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "express": "^4.21.2"
+  }
+}
