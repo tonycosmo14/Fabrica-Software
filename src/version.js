@@ -12,9 +12,26 @@
  * tipo: 'nuevo' | 'mejora' | 'arreglo' | 'importante'
  */
 
-const VERSION_ACTUAL = '0.1';
+const VERSION_ACTUAL = '0.1.1';
 
 const VERSIONES = [
+  {
+    numero: '0.1.1',
+    nombre: 'Se ve bien en la PC',
+    fecha: '2026-08-22',
+    resumen:
+      'La interfaz ya estaba pensada para el celular. Esta versión la ajusta ' +
+      'para que en la pantalla grande de la caja y de la oficina se vea igual de bien.',
+    cambios: [
+      { tipo: 'mejora', texto: 'En pantalla grande los accesos se acomodan en cuatro columnas y el contenido queda centrado.' },
+      { tipo: 'mejora', texto: 'La pantalla de entrada se ve como una tarjeta centrada, no como una columna suelta.' },
+      { tipo: 'nuevo',  texto: 'En la PC el PIN se puede escribir con el teclado: números, Retroceso para borrar y Esc para volver.' },
+      { tipo: 'mejora', texto: 'Los botones resaltan al pasar el ratón encima y ya no se estiran de lado a lado.' },
+      { tipo: 'arreglo', texto: 'La versión aparece en la barra superior, sin repetir la letra "v".' },
+      { tipo: 'arreglo', texto: 'Las casillas de verificación ahora son grandes y fáciles de tocar.' }
+    ],
+    siguiente: 'v0.2 — Configurador de tanques, paños, canastas y moldes.'
+  },
   {
     numero: '0.1',
     nombre: 'Cimientos',
@@ -33,8 +50,7 @@ const VERSIONES = [
       { tipo: 'nuevo', texto: 'Bitácora: cada movimiento guarda quién lo ejecutó y quién lo capturó.' },
       { tipo: 'nuevo', texto: 'Pantalla "Qué hay de nuevo" con el historial de versiones.' },
       { tipo: 'importante', texto: 'Motor de fracciones en dieciseisavos, listo para el punto de venta.' }
-    ],
-    siguiente: 'v0.2 — Configurador de tanques, paños, canastas y moldes.'
+    ]
   }
 ];
 

@@ -8,9 +8,18 @@ import { esc, avisar, ETIQUETAS_ROL } from '../util.js';
 
 export async function vistaEntrar(pantalla, { alEntrar }) {
   const { usuarios } = await api.obtener('/auth/usuarios-disponibles');
+
+  // En la PC se escribe el PIN con el teclado fisico. Este es el "apagador"
+  // del escucha de teclas: se llama al salir de la pantalla para no dejarlo colgado.
+  let soltarTeclado = null;
+  function limpiarTeclado() {
+    if (soltarTeclado) { document.removeEventListener('keydown', soltarTeclado); soltarTeclado = null; }
+  }
+
   listaDeUsuarios();
 
   function listaDeUsuarios() {
+    limpiarTeclado();
     pantalla.innerHTML = `
       <div class="entrada">
         <div class="logo">
@@ -40,6 +49,7 @@ export async function vistaEntrar(pantalla, { alEntrar }) {
   }
 
   function pantallaPin(usuario) {
+    limpiarTeclado();
     let pin = '';
 
     pantalla.innerHTML = `
@@ -67,34 +77,45 @@ export async function vistaEntrar(pantalla, { alEntrar }) {
     };
     pintar();
 
-    pantalla.querySelectorAll('.teclado button').forEach((b) => {
-      b.onclick = async () => {
-        const t = b.dataset.t;
-        if (t === 'volver') return listaDeUsuarios();
-        if (t === 'borrar') { pin = pin.slice(0, -1); return pintar(); }
-        if (pin.length >= 6) return;
+    // Una sola funcion para el dedo y para el teclado de la PC.
+    async function tocar(t) {
+      if (t === 'volver') return listaDeUsuarios();
+      if (t === 'borrar') { pin = pin.slice(0, -1); return pintar(); }
+      if (pin.length >= 6) return;
 
-        pin += t;
-        pintar();
+      pin += t;
+      pintar();
 
-        // Con 4 digitos ya se intenta entrar. Si falla, se puede seguir escribiendo.
-        if (pin.length >= 4) {
-          try {
-            const datos = await api.enviar('/auth/entrar-pin', { usuarioId: usuario.id, pin });
-            alEntrar(datos);
-          } catch (e) {
-            if (pin.length === 6) {
-              avisar(e.message, 'error');
-              pin = '';
-              pintar();
-            }
+      // Con 4 digitos ya se intenta entrar. Si falla, se puede seguir escribiendo.
+      if (pin.length >= 4) {
+        try {
+          const datos = await api.enviar('/auth/entrar-pin', { usuarioId: usuario.id, pin });
+          limpiarTeclado();
+          alEntrar(datos);
+        } catch (e) {
+          if (pin.length === 6) {
+            avisar(e.message, 'error');
+            pin = '';
+            pintar();
           }
         }
-      };
+      }
+    }
+
+    pantalla.querySelectorAll('.teclado button').forEach((b) => {
+      b.onclick = () => tocar(b.dataset.t);
     });
+
+    soltarTeclado = (ev) => {
+      if (ev.key >= '0' && ev.key <= '9') { ev.preventDefault(); tocar(ev.key); }
+      else if (ev.key === 'Backspace') { ev.preventDefault(); tocar('borrar'); }
+      else if (ev.key === 'Escape') { ev.preventDefault(); tocar('volver'); }
+    };
+    document.addEventListener('keydown', soltarTeclado);
   }
 
   function pantallaContrasena() {
+    limpiarTeclado();
     pantalla.innerHTML = `
       <div class="entrada">
         <div class="logo"><div class="emoji">🔐</div><h2>Administrador</h2></div>
@@ -116,6 +137,7 @@ export async function vistaEntrar(pantalla, { alEntrar }) {
           usuario: pantalla.querySelector('#u').value,
           contrasena: pantalla.querySelector('#c').value
         });
+        limpiarTeclado();
         alEntrar(datos);
       } catch (e) { avisar(e.message, 'error'); }
     };

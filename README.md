@@ -3,7 +3,7 @@
 Sistema para la fábrica de hielo de Hunucmá, Yucatán.
 Se construye **por versiones**: cada versión es un pedazo terminado, probado y usable.
 
-**Versión actual: v0.1 — Cimientos**
+**Versión actual: v0.1.1**
 
 ---
 
@@ -20,7 +20,7 @@ npm start       # arranca el sistema
 Verás algo así:
 
 ```
-  Fábrica de Hielo — v0.1
+  Fábrica de Hielo — v0.1.1
   ------------------------------------------
   Aplicada: 001_inicial.sql
 
@@ -65,6 +65,8 @@ Lo que **ya funciona y puedes probar**:
 - Pantalla **Sistema**: versión, migraciones aplicadas y bitácora
 - Pantalla **Qué hay de nuevo** con el historial de versiones
 - La base de datos se crea y actualiza sola, con respaldo antes de cada cambio
+- Se ve bien en celular **y** en la pantalla grande de la PC (en la PC el PIN
+  también se escribe con el teclado)
 
 Lo que **todavía no existe** (aparece en gris en el inicio):
 tanques (v0.2), producción (v0.3), venta (v0.4), caja (v0.5).
@@ -145,6 +147,7 @@ versión nueva le aparece un punto rojo en el menú.
 | Versión | Contenido | Estado |
 |---|---|---|
 | **v0.1** | Cimientos, usuarios, roles, PIN, migraciones, novedades | ✅ listo |
+| **v0.1.1** | Ajustes para que se vea bien en PC, PIN con teclado físico | ✅ listo |
 | v0.2 | Configurador de tanques, paños, canastas y moldes | siguiente |
 | v0.3 | Producción: sacada, rellenado, estados de canasta, traspaso a caja | |
 | v0.4 | Punto de venta: fracciones, precios por fracción, tickets | |

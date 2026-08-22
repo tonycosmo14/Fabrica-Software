@@ -7,6 +7,20 @@ Tipos: `nuevo` (funcionalidad nueva) · `mejora` · `arreglo` · `clave` (regla 
 
 ---
 
+## v0.1.1 — Se ve bien en la PC · 22 de agosto de 2026
+
+La interfaz ya estaba pensada para el celular. Esta versión la ajusta para que
+en la pantalla grande de la caja y de la oficina se vea igual de bien.
+
+- **mejora** — En pantalla grande los accesos se acomodan en cuatro columnas y el contenido queda centrado.
+- **mejora** — La pantalla de entrada se ve como una tarjeta centrada, no como una columna suelta.
+- **nuevo** — En la PC el PIN se puede escribir con el teclado: números, Retroceso para borrar y Esc para volver.
+- **mejora** — Los botones resaltan al pasar el ratón encima y ya no se estiran de lado a lado.
+- **arreglo** — La versión aparece en la barra superior, sin repetir la letra "v".
+- **arreglo** — Las casillas de verificación ahora son grandes y fáciles de tocar.
+
+---
+
 ## v0.1 — Cimientos · 22 de agosto de 2026
 
 Arranca el sistema: base de datos, migraciones automáticas, respaldos,

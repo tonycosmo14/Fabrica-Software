@@ -11,9 +11,12 @@
 <body>
 
   <header id="barra" hidden>
-    <button id="btn-atras" class="icono" title="Atrás" hidden>‹</button>
-    <h1 id="titulo">Fábrica de Hielo</h1>
-    <button id="btn-menu" class="icono" title="Menú">☰</button>
+    <div class="barra-interior">
+      <button id="btn-atras" class="icono" title="Atrás" hidden>‹</button>
+      <h1 id="titulo">Fábrica de Hielo</h1>
+      <span class="version-barra"><span class="version">—</span></span>
+      <button id="btn-menu" class="icono" title="Menú">☰</button>
+    </div>
   </header>
 
   <nav id="menu" hidden>
@@ -28,7 +31,7 @@
       <a href="#/sistema" data-permiso="sistema.ver">Sistema</a>
       <a href="#/novedades">Qué hay de nuevo <span id="punto-novedades" class="punto" hidden></span></a>
       <button id="btn-salir" class="peligro">Cerrar sesión</button>
-      <small class="version-menu">versión <span class="version">—</span></small>
+      <small class="version-menu">Fábrica de Hielo · <span class="version">—</span></small>
     </div>
   </nav>
 
