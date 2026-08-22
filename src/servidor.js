@@ -8,6 +8,8 @@
  * Se arranca con:  npm start
  */
 const os = require('node:os');
+const net = require('node:net');
+const { spawn } = require('node:child_process');
 const express = require('express');
 const config = require('./config');
 const { VERSION_ACTUAL } = require('./version');
@@ -44,6 +46,38 @@ function crearApp() {
   return app;
 }
 
+/**
+ * Abre el navegador en la direccion del sistema.
+ * Se usa cuando se arranca con doble clic (bandera --abrir).
+ */
+function abrirNavegador(url) {
+  const comandos = {
+    win32:  ['cmd', ['/c', 'start', '""', url]],
+    darwin: ['open', [url]],
+    linux:  ['xdg-open', [url]]
+  };
+  const elegido = comandos[process.platform] || comandos.linux;
+  try {
+    const p = spawn(elegido[0], elegido[1], { detached: true, stdio: 'ignore' });
+    p.on('error', () => {});   // si no hay navegador, no pasa nada
+    p.unref();
+  } catch { /* sin navegador disponible */ }
+}
+
+/**
+ * Comprueba si el puerto ya esta ocupado ANTES de tocar la base de datos.
+ * Asi un segundo doble clic no aplica migraciones mientras la primera
+ * copia esta trabajando.
+ */
+function puertoOcupado(puerto, host) {
+  return new Promise((resolve) => {
+    const prueba = net.createServer();
+    prueba.once('error', (e) => resolve(e.code === 'EADDRINUSE'));
+    prueba.once('listening', () => prueba.close(() => resolve(false)));
+    prueba.listen(puerto, host);
+  });
+}
+
 function ipsLocales() {
   const salida = [];
   for (const lista of Object.values(os.networkInterfaces())) {
@@ -54,9 +88,20 @@ function ipsLocales() {
   return salida;
 }
 
-function arrancar() {
+async function arrancar() {
   console.log(`\n  Fábrica de Hielo — v${VERSION_ACTUAL}`);
   console.log('  ' + '-'.repeat(42));
+
+  const abrirAlIniciar = process.argv.includes('--abrir');
+  const url = `http://localhost:${config.PUERTO}`;
+
+  if (await puertoOcupado(config.PUERTO, config.HOST)) {
+    console.log('\n  El sistema YA ESTA ABIERTO en otra ventana.');
+    console.log(`  Dirección: ${url}\n`);
+    if (abrirAlIniciar) abrirNavegador(url);
+    setTimeout(() => process.exit(0), 1500);
+    return;
+  }
 
   migrar();
   const admin = sembrar();
@@ -69,17 +114,43 @@ function arrancar() {
     console.log('     >> Cámbialos desde la pantalla de Usuarios.\n');
   }
 
+  // Con --abrir (el doble clic en INICIAR) el navegador se abre solo,
+  // pero hasta que el servidor esta realmente listo.
+  const abrir = abrirAlIniciar;
+  const direccion = url;
+
   const app = crearApp();
-  app.listen(config.PUERTO, config.HOST, () => {
+  const servidor = app.listen(config.PUERTO, config.HOST, () => {
     console.log('\n  Listo. Abre el sistema en:');
-    console.log(`     En esta PC:      http://localhost:${config.PUERTO}`);
+    console.log(`     En esta PC:      ${direccion}`);
     for (const ip of ipsLocales()) {
       console.log(`     En el celular:   http://${ip}:${config.PUERTO}`);
     }
-    console.log('\n  Para detenerlo: Ctrl + C\n');
+    console.log('\n  Para detenerlo: cierra esta ventana o presiona Ctrl + C\n');
+
+    if (abrir) abrirNavegador(direccion);
+  });
+
+  // Si el puerto ya esta ocupado casi siempre es porque el sistema ya estaba
+  // corriendo. Se avisa en español en vez de escupir el error de Node.
+  servidor.on('error', (e) => {
+    if (e.code === 'EADDRINUSE') {
+      console.log('\n  El sistema YA ESTA ABIERTO en otra ventana.');
+      console.log(`  Direccion: ${direccion}\n`);
+      if (abrir) abrirNavegador(direccion);
+      setTimeout(() => process.exit(0), 1500);
+      return;
+    }
+    console.error('\n  No se pudo arrancar el servidor:', e.message, '\n');
+    process.exit(1);
   });
 }
 
 module.exports = { crearApp, arrancar };
 
-if (require.main === module) arrancar();
+if (require.main === module) {
+  arrancar().catch((e) => {
+    console.error('\n  No se pudo arrancar el sistema:', e.message, '\n');
+    process.exit(1);
+  });
+}

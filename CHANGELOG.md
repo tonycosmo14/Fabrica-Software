@@ -7,6 +7,19 @@ Tipos: `nuevo` (funcionalidad nueva) · `mejora` · `arreglo` · `clave` (regla 
 
 ---
 
+## v0.1.2 — Se abre con doble clic · 22 de agosto de 2026
+
+Ya no hace falta escribir comandos: hay un icono en el escritorio.
+
+- **nuevo** — `INICIAR.bat`: arranca el sistema y abre el navegador cuando ya está listo.
+- **nuevo** — `CREAR-ACCESO-DIRECTO.bat`: pone el icono del cubo de hielo en el escritorio.
+- **nuevo** — `DETENER.bat` y `ACTUALIZAR.bat`, también de doble clic. `INICIAR-MAC.command` para Mac y Linux.
+- **nuevo** — La primera vez instala las dependencias solo; si falta Node.js, abre la página de descarga.
+- **nuevo** — Manifiesto web: desde el celular se instala en la pantalla de inicio y se abre sin barra del navegador.
+- **mejora** — Se comprueba el puerto antes de tocar la base: un segundo doble clic avisa que ya está abierto en vez de migrar por segunda vez.
+
+---
+
 ## v0.1.1 — Se ve bien en la PC · 22 de agosto de 2026
 
 La interfaz ya estaba pensada para el celular. Esta versión la ajusta para que

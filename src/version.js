@@ -12,9 +12,26 @@
  * tipo: 'nuevo' | 'mejora' | 'arreglo' | 'importante'
  */
 
-const VERSION_ACTUAL = '0.1.1';
+const VERSION_ACTUAL = '0.1.2';
 
 const VERSIONES = [
+  {
+    numero: '0.1.2',
+    nombre: 'Se abre con doble clic',
+    fecha: '2026-08-22',
+    resumen:
+      'Ya no hace falta escribir comandos. Hay un icono en el escritorio: ' +
+      'doble clic y el sistema arranca y abre el navegador solo.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'INICIAR: arranca el sistema y abre el navegador cuando ya está listo.' },
+      { tipo: 'nuevo', texto: 'CREAR ACCESO DIRECTO: pone el icono del cubo de hielo en el escritorio.' },
+      { tipo: 'nuevo', texto: 'DETENER y ACTUALIZAR, también de doble clic.' },
+      { tipo: 'nuevo', texto: 'La primera vez se prepara solo; si falta Node.js, abre la página de descarga.' },
+      { tipo: 'nuevo', texto: 'Desde el celular se puede instalar en la pantalla de inicio y se ve como una app.' },
+      { tipo: 'mejora', texto: 'Si das doble clic dos veces, avisa que ya está abierto en vez de dar un error.' }
+    ],
+    siguiente: 'v0.2 — Configurador de tanques, paños, canastas y moldes.'
+  },
   {
     numero: '0.1.1',
     nombre: 'Se ve bien en la PC',
@@ -29,8 +46,7 @@ const VERSIONES = [
       { tipo: 'mejora', texto: 'Los botones resaltan al pasar el ratón encima y ya no se estiran de lado a lado.' },
       { tipo: 'arreglo', texto: 'La versión aparece en la barra superior, sin repetir la letra "v".' },
       { tipo: 'arreglo', texto: 'Las casillas de verificación ahora son grandes y fáciles de tocar.' }
-    ],
-    siguiente: 'v0.2 — Configurador de tanques, paños, canastas y moldes.'
+    ]
   },
   {
     numero: '0.1',

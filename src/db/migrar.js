@@ -41,7 +41,10 @@ function migrar({ silencioso = false } = {}) {
   const pendientes = listarArchivos().filter((a) => !aplicadas.has(a));
 
   if (pendientes.length === 0) {
-    if (!silencioso) console.log(`Base de datos al dia (${aplicadas.size} migraciones).`);
+    if (!silencioso) {
+      const n = aplicadas.size;
+      console.log(`  Base de datos al día (${n} ${n === 1 ? 'migración aplicada' : 'migraciones aplicadas'}).`);
+    }
     return { aplicadas: [], respaldo: null };
   }
 

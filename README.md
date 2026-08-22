@@ -3,18 +3,32 @@
 Sistema para la fábrica de hielo de Hunucmá, Yucatán.
 Se construye **por versiones**: cada versión es un pedazo terminado, probado y usable.
 
-**Versión actual: v0.1.1**
+**Versión actual: v0.1.2**
 
 ---
 
-## Cómo lo pruebas (primera vez)
+## Cómo lo arrancas
 
-Necesitas [Node.js](https://nodejs.org) versión 20 o más nueva instalado.
-Después, en la carpeta del proyecto:
+### En Windows — doble clic, sin comandos
+
+| Archivo | Para qué |
+|---|---|
+| **INICIAR.bat** | Arranca el sistema y abre el navegador solo |
+| **CREAR-ACCESO-DIRECTO.bat** | Pone el icono en el escritorio (se hace una vez) |
+| **DETENER.bat** | Apaga el sistema |
+| **ACTUALIZAR.bat** | Baja la versión nueva sin perder los datos |
+
+La primera vez, `INICIAR` instala solo lo que necesita (tarda 1 o 2 minutos).
+Si falta Node.js, te abre la página de descarga.
+
+En Mac o Linux el equivalente es **INICIAR-MAC.command**.
+
+### Desde la terminal
 
 ```bash
-npm install     # solo la primera vez: descarga lo que necesita
-npm start       # arranca el sistema
+npm install     # solo la primera vez
+npm start       # arranca
+npm run iniciar # arranca y abre el navegador
 ```
 
 Verás algo así:
@@ -47,6 +61,7 @@ Para detener el sistema: `Ctrl + C` en la terminal.
 | Comando | Qué hace |
 |---|---|
 | `npm start` | Arranca el sistema |
+| `npm run iniciar` | Arranca y abre el navegador |
 | `npm run dev` | Igual, pero se reinicia solo cuando cambias un archivo |
 | `npm run prueba` | Corre las pruebas automáticas |
 | `npm run respaldo` | Hace una copia de la base de datos a mano |
@@ -102,6 +117,7 @@ public/                La interfaz (HTML, CSS y JavaScript sin librerías)
   js/app.js            Navegación
   js/vistas/           Una pantalla por archivo
 
+herramientas/          Utilidades del proyecto (genera el icono)
 pruebas/               Pruebas automáticas
 datos/                 Base de datos y respaldos (no se sube a GitHub)
 ```
@@ -148,6 +164,7 @@ versión nueva le aparece un punto rojo en el menú.
 |---|---|---|
 | **v0.1** | Cimientos, usuarios, roles, PIN, migraciones, novedades | ✅ listo |
 | **v0.1.1** | Ajustes para que se vea bien en PC, PIN con teclado físico | ✅ listo |
+| **v0.1.2** | Arranque con doble clic, icono en el escritorio, instalable en el celular | ✅ listo |
 | v0.2 | Configurador de tanques, paños, canastas y moldes | siguiente |
 | v0.3 | Producción: sacada, rellenado, estados de canasta, traspaso a caja | |
 | v0.4 | Punto de venta: fracciones, precios por fracción, tickets | |

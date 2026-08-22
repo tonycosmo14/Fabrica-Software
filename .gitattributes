@@ -1,0 +1,4 @@
+# Los archivos de Windows necesitan fin de linea CRLF o el .bat no corre bien.
+*.bat text eol=crlf
+*.command text eol=lf
+*.sh text eol=lf
