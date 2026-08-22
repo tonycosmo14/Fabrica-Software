@@ -12,9 +12,26 @@
  * tipo: 'nuevo' | 'mejora' | 'arreglo' | 'importante'
  */
 
-const VERSION_ACTUAL = '0.1.2';
+const VERSION_ACTUAL = '0.1.3';
 
 const VERSIONES = [
+  {
+    numero: '0.1.3',
+    nombre: 'Se instala sin pelear',
+    fecha: '2026-08-22',
+    resumen:
+      'La instalación fallaba en Windows porque una pieza del sistema venía en ' +
+      'código que hay que compilar y pedía Visual Studio. Esa pieza ya no existe: ' +
+      'ahora se usa la base de datos que Node.js trae incluida.',
+    cambios: [
+      { tipo: 'arreglo', texto: 'Ya no pide Visual Studio ni herramientas de programador para instalarse.' },
+      { tipo: 'importante', texto: 'La base de datos ahora es la que Node.js trae adentro. Nada que compilar, nada que descargar.' },
+      { tipo: 'mejora', texto: 'La instalación pasó de 104 paquetes a 67, y es cuestión de segundos.' },
+      { tipo: 'mejora', texto: 'Si tu Node.js es muy viejo, lo dice en español en vez de soltar un error incomprensible.' },
+      { tipo: 'mejora', texto: 'Si la preparación falla, el mensaje te dice qué mandar para arreglarlo.' }
+    ],
+    siguiente: 'v0.2 — Configurador de tanques, paños, canastas y moldes.'
+  },
   {
     numero: '0.1.2',
     nombre: 'Se abre con doble clic',
@@ -29,8 +46,7 @@ const VERSIONES = [
       { tipo: 'nuevo', texto: 'La primera vez se prepara solo; si falta Node.js, abre la página de descarga.' },
       { tipo: 'nuevo', texto: 'Desde el celular se puede instalar en la pantalla de inicio y se ve como una app.' },
       { tipo: 'mejora', texto: 'Si das doble clic dos veces, avisa que ya está abierto en vez de dar un error.' }
-    ],
-    siguiente: 'v0.2 — Configurador de tanques, paños, canastas y moldes.'
+    ]
   },
   {
     numero: '0.1.1',

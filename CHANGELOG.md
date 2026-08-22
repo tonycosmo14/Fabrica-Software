@@ -7,6 +7,24 @@ Tipos: `nuevo` (funcionalidad nueva) · `mejora` · `arreglo` · `clave` (regla 
 
 ---
 
+## v0.1.3 — Se instala sin pelear · 22 de agosto de 2026
+
+`npm install` fallaba en Windows con Node 24: `better-sqlite3` viene en C y no
+tenía binario precompilado para esa versión, así que intentaba compilarlo y
+exigía Visual Studio con el workload de C++.
+
+- **arreglo** — Ya no pide Visual Studio ni herramientas de programador.
+- **clave** — La base de datos pasa a ser `node:sqlite`, el SQLite que Node.js trae incluido. Cero dependencias nativas en todo el proyecto.
+- **mejora** — De 104 paquetes a 67; la instalación tarda segundos.
+- **mejora** — Aviso en español si la versión de Node es anterior a la 22.5.
+- **mejora** — Mensaje útil cuando la preparación falla.
+
+Nota técnica: el único archivo que cambió fue `src/db/conexion.js`. El resto del
+código no se tocó porque la interfaz (`prepare`/`get`/`all`/`run`/`transaction`)
+se mantuvo igual. Las 14 pruebas pasaron sin modificarse.
+
+---
+
 ## v0.1.2 — Se abre con doble clic · 22 de agosto de 2026
 
 Ya no hace falta escribir comandos: hay un icono en el escritorio.

@@ -35,8 +35,10 @@ if not exist "node_modules\express\package.json" (
   call npm install
   if errorlevel 1 (
     echo.
-    echo   No se pudo preparar el sistema. Revisa que haya internet
-    echo   y vuelve a intentarlo.
+    echo   No se pudo preparar el sistema.
+    echo.
+    echo   Copia el texto rojo de arriba y mandalo, ahi dice el motivo.
+    echo   Lo mas comun es que no haya internet en este momento.
     echo.
     pause
     exit /b

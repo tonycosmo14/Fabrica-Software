@@ -88,9 +88,27 @@ function ipsLocales() {
   return salida;
 }
 
+/**
+ * El sistema usa el SQLite que Node trae adentro, disponible desde la
+ * version 22.5. Con una version mas vieja el error de Node seria
+ * incomprensible, asi que se avisa en claro.
+ */
+function comprobarNode() {
+  const [mayor, menor] = process.versions.node.split('.').map(Number);
+  if (mayor > 22 || (mayor === 22 && menor >= 5)) return true;
+
+  console.log(`\n  Tu version de Node.js es la ${process.versions.node} y es muy vieja.`);
+  console.log('  El sistema necesita la 22.5 o mas nueva.');
+  console.log('\n  Descarga la version LTS desde https://nodejs.org, instalala,');
+  console.log('  y vuelve a abrir el sistema.\n');
+  return false;
+}
+
 async function arrancar() {
   console.log(`\n  Fábrica de Hielo — v${VERSION_ACTUAL}`);
   console.log('  ' + '-'.repeat(42));
+
+  if (!comprobarNode()) { process.exitCode = 1; return; }
 
   const abrirAlIniciar = process.argv.includes('--abrir');
   const url = `http://localhost:${config.PUERTO}`;

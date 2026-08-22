@@ -3,7 +3,7 @@
 Sistema para la fábrica de hielo de Hunucmá, Yucatán.
 Se construye **por versiones**: cada versión es un pedazo terminado, probado y usable.
 
-**Versión actual: v0.1.2**
+**Versión actual: v0.1.3**
 
 ---
 
@@ -165,6 +165,7 @@ versión nueva le aparece un punto rojo en el menú.
 | **v0.1** | Cimientos, usuarios, roles, PIN, migraciones, novedades | ✅ listo |
 | **v0.1.1** | Ajustes para que se vea bien en PC, PIN con teclado físico | ✅ listo |
 | **v0.1.2** | Arranque con doble clic, icono en el escritorio, instalable en el celular | ✅ listo |
+| **v0.1.3** | Se instala sin compilador: base de datos incluida en Node | ✅ listo |
 | v0.2 | Configurador de tanques, paños, canastas y moldes | siguiente |
 | v0.3 | Producción: sacada, rellenado, estados de canasta, traspaso a caja | |
 | v0.4 | Punto de venta: fracciones, precios por fracción, tickets | |

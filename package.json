@@ -1,6 +1,6 @@
 {
   "name": "fabrica-hielo",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Sistema de gestion para fabrica de hielo y planta de agua",
   "private": true,
   "type": "commonjs",
@@ -13,10 +13,9 @@
     "respaldo": "node src/db/respaldar.js"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.5"
   },
   "dependencies": {
-    "better-sqlite3": "^11.10.0",
     "express": "^4.21.2"
   }
 }
