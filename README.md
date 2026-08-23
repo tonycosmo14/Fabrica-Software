@@ -3,7 +3,7 @@
 Sistema para la fábrica de hielo de Hunucmá, Yucatán.
 Se construye **por versiones**: cada versión es un pedazo terminado, probado y usable.
 
-**Versión actual: v0.1.4**
+**Versión actual: v0.2**
 
 ---
 
@@ -109,7 +109,7 @@ src/
   middleware/
     sesion.js          Quién está conectado y qué puede hacer
   modulos/             Un módulo por área. Agregar uno no toca los demás
-    auth/  usuarios/  versiones/  sistema/
+    auth/  usuarios/  tanques/  versiones/  sistema/
 
 public/                La interfaz (HTML, CSS y JavaScript sin librerías)
   index.html
@@ -168,8 +168,8 @@ versión nueva le aparece un punto rojo en el menú.
 | **v0.1.2** | Arranque con doble clic, icono en el escritorio, instalable en el celular | ✅ listo |
 | **v0.1.3** | Se instala sin compilador: base de datos incluida en Node | ✅ listo |
 | **v0.1.4** | Marca Hielo LOLHA, modo oscuro, asistente de primer arranque | ✅ listo |
-| v0.2 | Configurador de tanques, paños, canastas y moldes | siguiente |
-| v0.3 | Producción: sacada, rellenado, estados de canasta, traspaso a caja | |
+| **v0.2** | Configurador de tanques, paños, canastas y moldes | ✅ listo |
+| v0.3 | Producción: sacada, rellenado, estados de canasta, traspaso a caja | siguiente |
 | v0.4 | Punto de venta: fracciones, precios por fracción, tickets | |
 | v0.5 | Caja: sesiones, vales, arqueos y cortes | |
 | v0.6 | Clientes, mayoreo, crédito y autorizaciones | |

@@ -10,6 +10,7 @@ import { iniciarTema } from './tema.js';
 import { vistaBienvenida } from './vistas/bienvenida.js';
 import { vistaEntrar } from './vistas/entrar.js';
 import { vistaInicio } from './vistas/inicio.js';
+import { vistaTanques } from './vistas/tanques.js';
 import { vistaUsuarios } from './vistas/usuarios.js';
 import { vistaNovedades, hayVersionNueva } from './vistas/novedades.js';
 import { vistaSistema } from './vistas/sistema.js';
@@ -22,6 +23,7 @@ const estado = { usuario: null, permisos: [], configurado: true };
 
 const RUTAS = {
   '#/inicio':    { titulo: 'Inicio',            vista: vistaInicio },
+  '#/tanques':   { titulo: 'Tanques',           vista: vistaTanques,   permiso: 'produccion.ver' },
   '#/usuarios':  { titulo: 'Usuarios',          vista: vistaUsuarios,  permiso: 'usuarios.administrar' },
   '#/sistema':   { titulo: 'Sistema',           vista: vistaSistema,   permiso: 'sistema.ver' },
   '#/novedades': { titulo: 'Qué hay de nuevo',  vista: vistaNovedades }
@@ -110,7 +112,15 @@ iniciarTema();
 // --- Eventos de la barra y el menu ---
 document.getElementById('btn-menu').onclick = () => abrirMenu(true);
 menu.querySelector('.menu-fondo').onclick = () => abrirMenu(false);
-menu.querySelectorAll('a').forEach((a) => { a.onclick = () => abrirMenu(false); });
+menu.querySelectorAll('a').forEach((a) => {
+  a.onclick = () => {
+    abrirMenu(false);
+    // Si ya estamos en esa ruta el navegador no avisa del cambio, asi que
+    // se vuelve a dibujar a mano. Si no, tocar "Tanques" estando dentro de
+    // un tanque no haria nada.
+    if (location.hash === a.getAttribute('href')) dibujar();
+  };
+});
 document.getElementById('btn-atras').onclick = () => { location.hash = '#/inicio'; };
 
 document.getElementById('btn-salir').onclick = async () => {

@@ -7,6 +7,24 @@ Tipos: `nuevo` (funcionalidad nueva) · `mejora` · `arreglo` · `clave` (regla 
 
 ---
 
+## v0.2 — Tanques · 23 de agosto de 2026
+
+La jerarquía física de la fábrica: `Tanque → Paño → Canasta → Molde`.
+
+- **nuevo** — Migración `002_tanques.sql` con las cuatro tablas. Cada molde es una fila real con su posición; sin eso es imposible detectar que un molde concreto falla siempre.
+- **nuevo** — Alta de tanque en un solo paso: nombre, número de paños y plantilla de canastas. Se crean tanque, paños, canastas y moldes dentro de una transacción.
+- **nuevo** — Total de moldes calculado en vivo en el asistente, antes de guardar.
+- **nuevo** — Detalle del tanque: un paño por renglón con sus canastas como bloques táctiles (la canasta es la unidad de operación, sección 6.2).
+- **nuevo** — Agregar paños y canastas, ajustar los moldes de una canasta y dar de baja tanques, paños, canastas o moldes sueltos con su motivo.
+- **nuevo** — `horas_congelacion` por tanque como punto de partida; en la v0.3 el sistema empezará a aprender el tiempo real.
+- **clave** — Nada hardcodeado (error 11 del plan): la configuración de la fábrica se captura desde la interfaz.
+- **arreglo** — Tocar en el menú la ruta en la que ya estabas no re-dibujaba la pantalla.
+- **arreglo** — El `pattern` del campo usuario era inválido bajo el modo `v` de expresiones regulares de los navegadores nuevos.
+
+Verificado con los tres tanques reales: 2N = 182, T = 156, N = 234, **572 moldes**.
+
+---
+
 ## v0.1.4 — Hielo LOLHA · 23 de agosto de 2026
 
 - **clave** — Asistente de primer arranque: crea tu cuenta de administrador. Se eliminó el usuario `admin` con PIN `1234` que venía de fábrica; un PIN por omisión es una puerta trasera que nadie cierra.

@@ -28,6 +28,7 @@ function crearApp() {
   // API
   app.use('/api/auth', require('./modulos/auth/rutas'));
   app.use('/api/usuarios', require('./modulos/usuarios/rutas'));
+  app.use('/api/tanques', require('./modulos/tanques/rutas'));
   app.use('/api/versiones', require('./modulos/versiones/rutas'));
   app.use('/api/sistema', require('./modulos/sistema/rutas'));
 

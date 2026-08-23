@@ -29,7 +29,7 @@ export function vistaBienvenida(pantalla, { alEntrar }) {
 
         <label for="usuario">Usuario <small style="font-weight:400">(para entrar desde la PC)</small></label>
         <input id="usuario" required autocapitalize="none" autocomplete="username"
-               placeholder="tony" pattern="[a-zA-Z0-9._-]{3,20}">
+               placeholder="tony" pattern="[a-zA-Z0-9._\\-]{3,20}">
 
         <label for="contrasena">Contraseña <small style="font-weight:400">(mínimo 8 caracteres)</small></label>
         <input id="contrasena" type="password" required minlength="8" autocomplete="new-password">

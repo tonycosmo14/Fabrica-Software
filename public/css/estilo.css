@@ -380,6 +380,102 @@ select { color-scheme: light dark; }
 
 .vacio { text-align: center; color: var(--suave); padding: 40px 16px; }
 
+
+/* ============================================================
+   TANQUES (v0.2)
+   La canasta es el bloque tactil, no el molde: asi los 18 paños
+   de un tanque caben en la pantalla de un celular (seccion 6.2).
+   ============================================================ */
+
+.resumen-fabrica {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px;
+}
+.resumen-fabrica div {
+  background: var(--superficie); border: 1px solid var(--borde); border-radius: var(--radio);
+  padding: 14px 8px; text-align: center;
+}
+.resumen-fabrica strong { display: block; font-size: 26px; color: var(--acento); line-height: 1.1; }
+.resumen-fabrica small { color: var(--suave); font-size: 13px; }
+
+.tanque-tarjeta {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px;
+  width: 100%; min-height: 84px; text-align: left; margin-bottom: 10px;
+  background: var(--superficie); color: var(--texto);
+  border: 1px solid var(--borde); border-radius: var(--radio);
+  padding: 14px 16px; box-shadow: var(--sombra); font-weight: 400;
+}
+.tanque-nombre {
+  font-size: 24px; font-weight: 800; color: var(--primario-texto);
+  background: var(--marca-azul); border-radius: 12px;
+  min-width: 62px; padding: 10px 12px; text-align: center;
+}
+:root[data-tema="oscuro"] .tanque-nombre,
+.tanque-nombre { color: #fff; }
+.tanque-datos { display: flex; flex-direction: column; gap: 2px; font-size: 14px; color: var(--suave); }
+.tanque-datos strong { color: var(--texto); font-size: 15px; }
+.tanque-horas { color: var(--suave); font-size: 14px; white-space: nowrap; }
+
+.cabeza-tanque { margin-bottom: 4px; }
+
+.panos { display: flex; flex-direction: column; gap: 8px; }
+/* Compacto a proposito: los 18 paños de un tanque tienen que caber en la
+   pantalla de un celular sin scroll interminable (seccion 12 del plan).
+   Por eso un paño es una sola fila de bloques, nunca dos. */
+.pano {
+  display: grid; grid-template-columns: 26px 1fr 30px; align-items: center; gap: 8px;
+  background: var(--superficie); border: 1px solid var(--borde);
+  border-radius: 12px; padding: 6px 8px;
+}
+.pano-num {
+  width: 26px; height: 26px; border-radius: 7px;
+  background: var(--superficie-alt); color: var(--suave);
+  display: grid; place-items: center; font-weight: 700; font-size: 13px;
+}
+.pano-total { color: var(--suave); font-size: 14px; text-align: right; font-variant-numeric: tabular-nums; }
+
+.canastas-fila { display: flex; flex-wrap: wrap; gap: 6px; }
+.canasta {
+  width: auto; min-width: 44px; min-height: 46px; padding: 3px 5px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
+  background: var(--superficie-alt); color: var(--texto);
+  border: 2px solid var(--borde); border-radius: 9px;
+}
+.canasta:disabled { opacity: 1; }
+.canasta-num { font-size: 9px; color: var(--suave); font-weight: 700; letter-spacing: .3px; }
+.canasta-moldes { font-size: 18px; font-weight: 800; line-height: 1.15; color: var(--acento); }
+.canasta-etiqueta { font-size: 10px; color: var(--suave); }
+.canasta.agregar {
+  min-width: 30px; padding: 0;
+  border-style: dashed; color: var(--suave); font-size: 18px; font-weight: 400;
+  background: transparent;
+}
+
+/* En el asistente de alta las canastas si van grandes: son el foco. */
+#plantilla .canasta { min-width: 62px; min-height: 66px; padding: 6px 8px; }
+#plantilla .canasta-num { font-size: 11px; }
+#plantilla .canasta-moldes { font-size: 22px; }
+
+.total-vivo {
+  margin: 16px 0 0; padding: 12px; border-radius: 10px;
+  background: var(--superficie-alt); color: var(--suave); font-size: 15px; text-align: center;
+}
+.total-vivo strong { color: var(--texto); }
+.total-vivo .grande { font-size: 22px; color: var(--acento); }
+
+/* En pantalla grande hay sitio de sobra: los bloques crecen. */
+@media (min-width: 620px) {
+  .pano { grid-template-columns: 34px 1fr 40px; gap: 10px; padding: 8px 10px; }
+  .pano-num { width: 30px; height: 30px; font-size: 14px; }
+  .canasta { min-width: 56px; min-height: 56px; }
+  .canasta-num { font-size: 10px; }
+  .canasta-moldes { font-size: 21px; }
+  .canasta.agregar { min-width: 40px; }
+}
+
+@media (min-width: 900px) {
+  .resumen-fabrica, .panos, .tanque-tarjeta { max-width: 760px; }
+}
+
 /* ============================================================
    PANTALLAS GRANDES — la PC de la caja y la oficina
    ============================================================ */
@@ -407,9 +503,12 @@ select { color-scheme: light dark; }
   /* Los botones dejan de ocupar todo el ancho... */
   button, .boton { width: auto; min-width: 200px; }
   /* ...menos estos, que viven dentro de una rejilla y deben respetarla. */
-  button.chico, .icono, .teclado button, .tema-opciones button, .item button {
+  button.chico, .icono, .teclado button, .tema-opciones button, .item button,
+  .canasta {
     min-width: 0;
   }
+  .canasta { min-width: 44px; }
+  .canasta.agregar { min-width: 30px; }
   form button { min-width: 220px; }
 
   .entrada {

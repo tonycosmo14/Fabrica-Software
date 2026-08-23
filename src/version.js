@@ -12,9 +12,29 @@
  * tipo: 'nuevo' | 'mejora' | 'arreglo' | 'importante'
  */
 
-const VERSION_ACTUAL = '0.1.4';
+const VERSION_ACTUAL = '0.2';
 
 const VERSIONES = [
+  {
+    numero: '0.2',
+    nombre: 'Tanques',
+    fecha: '2026-08-23',
+    resumen:
+      'La primera pantalla del negocio de verdad: la estructura física de la ' +
+      'fábrica. Tanques, paños, canastas y moldes, todo creado desde el sistema.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'Pantalla de Tanques con el total de paños, canastas y moldes de toda la fábrica.' },
+      { tipo: 'nuevo', texto: 'Alta de tanque en un solo paso: dices cuántos paños y cómo son sus canastas, y se crea completo.' },
+      { tipo: 'nuevo', texto: 'El total de moldes se calcula en vivo mientras lo capturas, antes de guardar.' },
+      { tipo: 'nuevo', texto: 'Vista del tanque por dentro: cada paño en un renglón, con sus canastas como bloques.' },
+      { tipo: 'nuevo', texto: 'Agregar paños y canastas, cambiar los moldes de una canasta, y dar de baja lo que salga de servicio.' },
+      { tipo: 'importante', texto: 'Cada molde es una fila real con su posición. Así, más adelante, el sistema podrá señalar el molde exacto que siempre falla.' },
+      { tipo: 'importante', texto: 'Nada está escrito en el código: si mañana crece la fábrica, los tanques nuevos los das de alta tú.' },
+      { tipo: 'arreglo', texto: 'Tocar en el menú la pantalla en la que ya estabas no hacía nada.' },
+      { tipo: 'arreglo', texto: 'El campo de usuario del asistente de bienvenida daba un error en los navegadores nuevos.' }
+    ],
+    siguiente: 'v0.3 — Producción: sacar y rellenar canastas, con el reloj de congelación.'
+  },
   {
     numero: '0.1.4',
     nombre: 'Hielo LOLHA',
@@ -28,8 +48,7 @@ const VERSIONES = [
       { tipo: 'nuevo', texto: 'Los colores del logo de Hielo LOLHA en todo el sistema.' },
       { tipo: 'arreglo', texto: 'En la PC el teclado del PIN se salía de la tarjeta y los números no quedaban centrados.' },
       { tipo: 'arreglo', texto: 'El menú mostraba "admin" en vez de "Administrador".' }
-    ],
-    siguiente: 'v0.2 — Configurador de tanques, paños, canastas y moldes.'
+    ]
   },
   {
     numero: '0.1.3',
