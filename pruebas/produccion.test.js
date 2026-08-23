@@ -295,6 +295,82 @@ test('el resumen del día reparte las marquetas por obrero', async () => {
   assert.ok(json.datos.panos.length > 0);
 });
 
+test('el vale de autorización se pide antes y se usa una sola vez', async () => {
+  await entrarPorNombre('Don Chema', '2222');
+
+  const d0 = await estadoTanque();
+  const toca = d0.tanque.siguiente.numero;
+  const otro = d0.tanque.panos.find((p) => p.numero !== toca && p.estado !== 'fuera');
+
+  // Sin vale ni PIN: se rechaza y se avisa que hace falta autorización.
+  const sinNada = await llamar(`/api/produccion/panos/${otro.id}/sacar`, {
+    method: 'POST', cuerpo: { tipoAgua: 'purificada' }
+  });
+  assert.equal(sinNada.estado, 409);
+  assert.equal(sinNada.json.requiereAutorizacion, true);
+
+  // El gerente autoriza por adelantado: se obtiene un vale.
+  const admin = idAdmin();
+  const auth = await llamar('/api/produccion/autorizar', {
+    method: 'POST',
+    cuerpo: { panoId: otro.id, usuarioId: admin, pin: '1111', motivo: 'Se acabó el agua del otro' }
+  });
+  assert.equal(auth.estado, 201);
+  const vale = auth.json.datos.vale;
+  assert.ok(vale);
+
+  // Con el vale sí se saca, y queda firmado por quien autorizó.
+  const conVale = await llamar(`/api/produccion/panos/${otro.id}/sacar`, {
+    method: 'POST', cuerpo: { tipoAgua: 'purificada', vale }
+  });
+  assert.equal(conVale.estado, 201);
+
+  const sp = bd.prepare(
+    'SELECT * FROM sacadas_pano WHERE pano_id = ? ORDER BY iniciada_en DESC LIMIT 1'
+  ).get(otro.id);
+  assert.equal(sp.autorizada_por, admin);
+  assert.equal(sp.motivo_orden, 'Se acabó el agua del otro');
+
+  // El mismo vale ya no sirve para nada.
+  const repetido = await llamar(`/api/produccion/panos/${otro.id}/sacar`, {
+    method: 'POST', cuerpo: { tipoAgua: 'purificada', vale }
+  });
+  assert.equal(repetido.estado, 403);
+});
+
+test('un vale no sirve para un paño distinto del que se pidió', async () => {
+  await entrarAdmin();
+  const d0 = await estadoTanque();
+  const a = d0.tanque.panos[0];
+  const b = d0.tanque.panos[1];
+
+  const auth = await llamar('/api/produccion/autorizar', {
+    method: 'POST',
+    cuerpo: { panoId: a.id, usuarioId: idAdmin(), pin: '1111', motivo: 'Para el A' }
+  });
+
+  const r = await llamar(`/api/produccion/panos/${b.id}/sacar`, {
+    method: 'POST', cuerpo: { tipoAgua: 'purificada', vale: auth.json.datos.vale }
+  });
+  assert.equal(r.estado, 403);
+  assert.match(r.json.error, /otro paño/);
+});
+
+test('pedir un vale con PIN equivocado no da vale', async () => {
+  const d0 = await estadoTanque();
+  const r = await llamar('/api/produccion/autorizar', {
+    method: 'POST',
+    cuerpo: { panoId: d0.tanque.panos[0].id, usuarioId: idAdmin(), pin: '0000', motivo: 'Prueba' }
+  });
+  assert.equal(r.estado, 403);
+  assert.match(r.json.error, /PIN incorrecto/);
+});
+
+test('el estado del tanque trae el orden completo de la rotación', async () => {
+  const d = await estadoTanque();
+  assert.deepEqual(d.tanque.ordenRotacion, [1, 3, 5, 2, 4, 6]);
+});
+
 test('un paño que quedó fuera SE PUEDE RELLENAR (antes no respondía)', async () => {
   await entrarAdmin();
 

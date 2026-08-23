@@ -12,9 +12,25 @@
  * tipo: 'nuevo' | 'mejora' | 'arreglo' | 'importante'
  */
 
-const VERSION_ACTUAL = '0.5';
+const VERSION_ACTUAL = '0.5.1';
 
 const VERSIONES = [
+  {
+    numero: '0.5.1',
+    nombre: 'Autoriza primero, decide después',
+    fecha: '2026-08-23',
+    resumen:
+      'El aviso de "este paño no es el que sigue" ahora sale al primer toque, ' +
+      'no al final. Se autoriza con PIN y enseguida se ven las opciones.',
+    cambios: [
+      { tipo: 'importante', texto: 'Al tocar un paño que no sigue, el aviso sale al instante. Se autoriza con el PIN del gerente y enseguida aparecen las opciones.' },
+      { tipo: 'nuevo', texto: 'En Registrar lo que se sacó la rotación avanza conforme marcas: si sacó el 1, el 3 y el 5, los tres son correctos y no pide nada.' },
+      { tipo: 'nuevo', texto: 'En el detalle del paño ahora se indica quién lo sacó y se cambia el agua ahí mismo.' },
+      { tipo: 'arreglo', texto: 'Al dar de alta un operario ya no se pide contraseña: solo los administradores y gerentes entran desde la PC.' },
+      { tipo: 'mejora', texto: 'Botones de acción centrados en el detalle del paño.' }
+    ],
+    siguiente: 'v0.6 — Respaldos automáticos: que nunca se pierdan los datos de la fábrica.'
+  },
   {
     numero: '0.5',
     nombre: 'Los números a sacar',
@@ -33,8 +49,7 @@ const VERSIONES = [
       { tipo: 'nuevo', texto: 'Cada molde cuenta las veces SEGUIDAS que ha fallado. Si sale bien una vez, la cuenta se borra: así se distingue el molde malo del mal día.' },
       { tipo: 'nuevo', texto: 'El agua potable se ve en morado y la purificada en azul, en las canastas y en el botón.' },
       { tipo: 'nuevo', texto: 'Los números a sacar solo los ven el gerente y el administrador.' }
-    ],
-    siguiente: 'v0.6 — La Existencia: el conteo del cuarto frío a las 3 y a las 8, y el cuadre del día.'
+    ]
   },
   {
     numero: '0.4',

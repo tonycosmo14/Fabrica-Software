@@ -18,6 +18,14 @@ import { api } from '../api.js';
 import { esc, avisar, fecha as formatoFecha } from '../util.js';
 import { confirmar, menu, pedirTexto, pedirAutorizacion } from '../dialogo.js';
 
+/** Siguiente número en una rotación intercalada ya calculada por el servidor. */
+function siguienteEnOrden(orden, ultimo) {
+  if (!orden.length) return null;
+  if (ultimo == null) return orden[0];
+  const i = orden.indexOf(ultimo);
+  return i === -1 ? orden[0] : orden[(i + 1) % orden.length];
+}
+
 export async function vistaProduccion(pantalla, estado) {
   const puedeRegistrar = estado.permisos.includes('*') ||
                          estado.permisos.includes('produccion.registrar');
@@ -121,10 +129,11 @@ export async function vistaProduccion(pantalla, estado) {
       pintar();
     };
 
-    // Tocar un paño entra a su detalle. Ahí está todo: sacar, rellenar,
-    // marcar merma y corregir. Ya no hay callejones sin salida.
+    // Tocar un paño entra a su detalle. Si NO es el que toca, primero se
+    // pide la autorización: así se ve el aviso al instante y no después de
+    // haber marcado todo.
     pantalla.querySelectorAll('[data-pano]').forEach((b) => {
-      b.onclick = () => detallePano(b.dataset.pano);
+      b.onclick = () => abrirPano(b.dataset.pano);
     });
   }
 
@@ -167,14 +176,44 @@ export async function vistaProduccion(pantalla, estado) {
       </div>`;
   }
 
+  /**
+   * Puerta de entrada al paño. Si no es el que toca, pide permiso antes de
+   * enseñar nada: el aviso sale al primer toque, no al final.
+   */
+  async function abrirPano(panoId) {
+    const toca = datos.tanque.siguiente;
+    if (!toca || toca.id === panoId) return detallePano(panoId);
+
+    const pano = datos.tanque.panos.find((p) => p.id === panoId);
+
+    const auth = await pedirAutorizacion({
+      titulo: `El paño ${pano.numero} no es el que sigue`,
+      texto: `Toca el ${toca.numero}. Un gerente o el administrador tiene que ` +
+             'autorizar con su PIN para ver qué se puede hacer con este paño.',
+      responsables: datos.responsables
+    });
+    if (!auth) return;
+
+    try {
+      const r = await api.enviar('/produccion/autorizar', { panoId, ...auth });
+      avisar(`Autorizado por ${r.autorizadaPor}`, 'bien');
+      detallePano(panoId, r.vale);
+    } catch (e) { avisar(e.message, 'error'); }
+  }
+
   // ==========================================================
   // DETALLE DEL PAÑO — aquí se hace todo
   // ==========================================================
-  async function detallePano(panoId) {
+  async function detallePano(panoId, vale) {
     const pano = datos.tanque.panos.find((p) => p.id === panoId);
     const marcas = new Map();          // moldeId -> merma | hueco
     const fuera = pano.canastas.filter((c) => c.estado === 'fuera');
     const dentro = pano.canastas.filter((c) => c.estado !== 'fuera');
+
+    // Quién lo sacó: por omisión el que tiene la sesión, pero casi siempre
+    // es otra persona la que estuvo en la grúa.
+    const { obreros } = await api.obtener('/produccion/obreros');
+    let quienId = obreros.find((o) => o.id === estado.usuario.id)?.id || obreros[0]?.id || null;
 
     const dibujar = () => {
       const buenas = dentro.reduce((n, c) => n + c.moldes.length, 0) - marcas.size;
@@ -189,7 +228,27 @@ export async function vistaProduccion(pantalla, estado) {
             ${pano.horas != null ? `${Math.floor(pano.horas)} h congelando` :
               pano.estado === 'fuera' ? 'fuera del tanque' : 'listo'}
             ${pano.enProceso ? ` · empezado por ${esc(pano.empezadoPor || '—')}` : ''}
+            ${vale ? ' · <strong class="autorizado">autorizado</strong>' : ''}
           </p>
+        </div>
+
+        <div class="tarjeta fila-quien">
+          <div class="campo-quien">
+            <label for="quien">¿Quién lo sacó?</label>
+            <select id="quien">
+              ${obreros.map((o) => `
+                <option value="${esc(o.id)}" ${o.id === quienId ? 'selected' : ''}>
+                  ${esc(o.nombre)}
+                </option>`).join('')}
+            </select>
+          </div>
+          <div class="campo-agua">
+            <label>Agua</label>
+            <button class="agua-boton ${agua}" id="agua-pano">
+              <span class="agua-icono">💧</span>
+              <span>${agua === 'purificada' ? 'Purificada' : 'Potable'}</span>
+            </button>
+          </div>
         </div>
 
         ${fuera.length ? `
@@ -234,14 +293,14 @@ export async function vistaProduccion(pantalla, estado) {
             <small>marquetas buenas</small>
           </div>
 
-          <button id="sacar" style="margin-top:14px">Sacar el paño ${pano.numero}</button>
-          <button class="secundario" id="sacar-fuera" style="margin-top:10px">
-            Sacar y dejarlo fuera
-          </button>` : ''}
+          <div class="acciones-centradas">
+            <button id="sacar">Sacar el paño ${pano.numero}</button>
+            <button class="secundario" id="sacar-fuera">Sacar y dejarlo fuera</button>
+          </div>` : ''}
 
         ${puedeCorregir ? `
           <h3>Corregir</h3>
-          <div class="tarjeta">
+          <div class="tarjeta" style="text-align:center">
             <button class="peligro" id="anular">Anular la última sacada de este paño</button>
             <p class="ayuda" style="margin:14px 0 0">
               Para cuando se equivocaron de paño. No se borra nada: el registro
@@ -252,6 +311,14 @@ export async function vistaProduccion(pantalla, estado) {
         <p class="firma">Los números en rojo son las veces seguidas que ha fallado ese molde.</p>`;
 
       pantalla.querySelector('#volver').onclick = pintar;
+      pantalla.querySelector('#quien').onchange = (e) => { quienId = e.target.value; };
+
+      // El agua se cambia aquí mismo y se queda para las siguientes veces.
+      pantalla.querySelector('#agua-pano').onclick = () => {
+        agua = agua === 'purificada' ? 'potable' : 'purificada';
+        localStorage.setItem('tipo_agua', agua);
+        dibujar();
+      };
 
       pantalla.querySelectorAll('[data-molde]').forEach((b) => {
         b.onclick = () => {
@@ -266,7 +333,8 @@ export async function vistaProduccion(pantalla, estado) {
       const btnRellenar = pantalla.querySelector('#rellenar');
       if (btnRellenar) btnRellenar.onclick = async () => {
         try {
-          const r = await api.enviar(`/produccion/panos/${pano.id}/rellenar`, { tipoAgua: agua });
+          const r = await api.enviar(`/produccion/panos/${pano.id}/rellenar`,
+            { tipoAgua: agua, ejecutorId: quienId });
           avisar(`${r.rellenadas} canastas rellenadas con agua ${agua}`, 'bien');
           pintar();
         } catch (e) { avisar(e.message, 'error'); }
@@ -295,7 +363,7 @@ export async function vistaProduccion(pantalla, estado) {
 
       try {
         const r = await api.enviar(`/produccion/panos/${pano.id}/sacar`, {
-          tipoAgua: agua, resultados, ...opciones, autorizacion
+          tipoAgua: agua, resultados, ejecutorId: quienId, vale, ...opciones, autorizacion
         });
         avisar(
           `Paño ${pano.numero}: ${r.marquetas} marquetas` +
@@ -391,11 +459,43 @@ export async function vistaProduccion(pantalla, estado) {
     const todos = await api.obtener('/produccion/estado');
     let quienId = obreros[0]?.id || null;
     const elegidos = new Set();
+    const valesPorPano = {};           // paños marcados fuera de orden
 
     const porTanque = [];
     for (const t of todos.tanques) {
       const d = await api.obtener(`/produccion/estado?tanque=${encodeURIComponent(t.id)}`);
       porTanque.push(d.tanque);
+    }
+
+    /**
+     * La rotación avanza conforme se marca. Si el obrero sacó el 1, el 3 y
+     * el 5 en ese orden, los tres son correctos: al marcar el 1, el que
+     * sigue pasa a ser el 3, y así. Solo se pide autorización cuando de
+     * verdad se rompió el orden.
+     */
+    function siguienteDe(t) {
+      let ultimo = t.ultimoPanoSacado;
+      const marcadosAqui = t.panos.filter((p) => elegidos.has(p.id)).map((p) => p.numero);
+
+      // Se avanza tantas veces como paños ya marcados haya en este tanque,
+      // saltando los que ya están marcados.
+      for (let i = 0; i < marcadosAqui.length; i++) {
+        ultimo = siguienteEnOrden(t.ordenRotacion, ultimo);
+      }
+      return siguienteEnOrden(t.ordenRotacion, ultimo);
+    }
+
+    /** El primero sin marcar de la rotación: ese es el que se resalta. */
+    function tocaEn(t) {
+      let ultimo = t.ultimoPanoSacado;
+      for (let i = 0; i < t.ordenRotacion.length; i++) {
+        const n = siguienteEnOrden(t.ordenRotacion, ultimo);
+        const pano = t.panos.find((p) => p.numero === n);
+        if (!pano) return null;
+        if (!elegidos.has(pano.id)) return pano;
+        ultimo = n;
+      }
+      return null;
     }
 
     const dibujar = () => {
@@ -423,14 +523,18 @@ export async function vistaProduccion(pantalla, estado) {
           </div>
         </div>
 
-        ${porTanque.map((t) => `
+        ${porTanque.map((t) => {
+          const toca = tocaEn(t);
+          return `
           <h3>${esc(t.nombre)}</h3>
           <div class="rejilla-panos">
             ${t.panos.map((p) => `
               <button class="ficha-pano ${elegidos.has(p.id) ? 'elegido' : ''}
-                              ${t.siguiente && t.siguiente.id === p.id ? 'toca' : ''}"
-                      data-elegir="${esc(p.id)}">${p.numero}</button>`).join('')}
-          </div>`).join('')}
+                              ${toca && toca.id === p.id ? 'toca' : ''}
+                              ${valesPorPano[p.id] ? 'autorizado' : ''}"
+                      data-elegir="${esc(p.id)}" data-tanque-ficha="${esc(t.id)}"
+                      >${p.numero}</button>`).join('')}
+          </div>`; }).join('')}
 
         <div class="total-vivo" style="margin-top:18px">
           <span>paños marcados</span>
@@ -449,23 +553,53 @@ export async function vistaProduccion(pantalla, estado) {
         b.onclick = () => { agua = b.dataset.agua; localStorage.setItem('tipo_agua', agua); dibujar(); };
       });
       pantalla.querySelectorAll('[data-elegir]').forEach((b) => {
-        b.onclick = () => {
-          const id = b.dataset.elegir;
-          if (elegidos.has(id)) elegidos.delete(id); else elegidos.add(id);
-          dibujar();
-        };
+        b.onclick = () => marcar(b.dataset.elegir, b.dataset.tanqueFicha);
       });
 
       pantalla.querySelector('#guardar').onclick = async () => {
         try {
           const r = await api.enviar('/produccion/lote', {
-            ejecutorId: quienId, panos: [...elegidos], tipoAgua: agua
+            ejecutorId: quienId, panos: [...elegidos], tipoAgua: agua, vales: valesPorPano
           });
           avisar(`${r.panos.length} paños · ${r.marquetas} marquetas`, 'bien');
           pintar();
         } catch (e) { avisar(e.message, 'error'); }
       };
     };
+
+    /** Marca o desmarca un paño, pidiendo permiso si rompe la rotación. */
+    async function marcar(panoId, tanqueId) {
+      if (elegidos.has(panoId)) {
+        elegidos.delete(panoId);
+        delete valesPorPano[panoId];
+        return dibujar();
+      }
+
+      const t = porTanque.find((x) => x.id === tanqueId);
+      const esperado = siguienteDe(t);
+      const pano = t.panos.find((p) => p.id === panoId);
+
+      if (pano.numero === esperado) {
+        elegidos.add(panoId);
+        return dibujar();
+      }
+
+      const auth = await pedirAutorizacion({
+        titulo: `El paño ${pano.numero} no es el que sigue`,
+        texto: `En el tanque ${t.nombre} tocaba el ${esperado}. ` +
+               'Un gerente o el administrador tiene que autorizarlo con su PIN.',
+        responsables: todos.responsables
+      });
+      if (!auth) return;
+
+      try {
+        const r = await api.enviar('/produccion/autorizar', { panoId, ...auth });
+        valesPorPano[panoId] = r.vale;
+        elegidos.add(panoId);
+        avisar(`Autorizado por ${r.autorizadaPor}`, 'bien');
+        dibujar();
+      } catch (e) { avisar(e.message, 'error'); }
+    }
 
     function calcular() {
       let n = 0;

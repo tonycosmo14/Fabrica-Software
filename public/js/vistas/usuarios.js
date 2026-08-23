@@ -63,12 +63,23 @@ export async function vistaUsuarios(pantalla) {
           ${esNuevo ? `
             <label for="pin">PIN (4 a 6 dígitos)</label>
             <input id="pin" inputmode="numeric" pattern="[0-9]{4,6}" maxlength="6" required>
+            <p class="ayuda" style="margin:6px 0 0;font-size:14px">
+              Con esto entra desde el celular o la tablet.
+            </p>
 
-            <label for="usuario">Usuario para contraseña <small style="font-weight:400">(opcional, solo admin)</small></label>
-            <input id="usuario" autocapitalize="none">
+            <!-- Solo los que entran desde la PC necesitan contraseña.
+                 A un operario pedírsela es estorbo puro. -->
+            <div id="bloque-contrasena" hidden>
+              <label for="usuario">Usuario</label>
+              <input id="usuario" autocapitalize="none" placeholder="lupita">
 
-            <label for="contrasena">Contraseña <small style="font-weight:400">(mínimo 8 caracteres)</small></label>
-            <input id="contrasena" type="password">
+              <label for="contrasena">Contraseña <small style="font-weight:400">(mínimo 8 caracteres)</small></label>
+              <input id="contrasena" type="password">
+              <p class="ayuda" style="margin:6px 0 0;font-size:14px">
+                Los administradores y gerentes también entran desde la PC con
+                usuario y contraseña.
+              </p>
+            </div>
           ` : ''}
 
           <button type="submit" style="margin-top:20px">Guardar</button>
@@ -98,6 +109,18 @@ export async function vistaUsuarios(pantalla) {
 
     pantalla.querySelector('#cancelar').onclick = pintar;
 
+    // El bloque de contraseña aparece y desaparece según el rol elegido.
+    if (esNuevo) {
+      const selectorRol = pantalla.querySelector('#rol');
+      const bloque = pantalla.querySelector('#bloque-contrasena');
+      const ajustar = () => {
+        const conContrasena = ['admin', 'gerente'].includes(selectorRol.value);
+        bloque.hidden = !conContrasena;
+      };
+      selectorRol.onchange = ajustar;
+      ajustar();
+    }
+
     pantalla.querySelector('#f').onsubmit = async (ev) => {
       ev.preventDefault();
       const cuerpo = {
@@ -107,8 +130,11 @@ export async function vistaUsuarios(pantalla) {
       try {
         if (esNuevo) {
           cuerpo.pin = pantalla.querySelector('#pin').value;
-          cuerpo.usuario = pantalla.querySelector('#usuario').value.trim() || undefined;
-          cuerpo.contrasena = pantalla.querySelector('#contrasena').value || undefined;
+          const conContrasena = ['admin', 'gerente'].includes(cuerpo.rol);
+          cuerpo.usuario = conContrasena
+            ? (pantalla.querySelector('#usuario').value.trim() || undefined) : undefined;
+          cuerpo.contrasena = conContrasena
+            ? (pantalla.querySelector('#contrasena').value || undefined) : undefined;
           await api.enviar('/usuarios', cuerpo);
           avisar('Usuario creado', 'bien');
         } else {

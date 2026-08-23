@@ -7,6 +7,17 @@ Tipos: `nuevo` (funcionalidad nueva) · `mejora` · `arreglo` · `clave` (regla 
 
 ---
 
+## v0.5.1 — Autoriza primero, decide después · 23 de agosto de 2026
+
+- **clave** — La puerta de autorización se mueve al primer toque. Nuevo `POST /produccion/autorizar` + `src/modulos/produccion/vales.js`: el responsable teclea su PIN una vez y el servidor devuelve un **vale** de un solo uso, atado a ese paño y con caducidad de 15 minutos. Así la pantalla puede enseñar las opciones sin guardar el PIN de nadie en memoria.
+- **nuevo** — En "Registrar lo que se sacó" la rotación avanza conforme se marca: 1, 3, 5 seguidos son correctos y no piden nada; solo lo que rompe de verdad el orden pide autorización, y el vale viaja con el lote.
+- **nuevo** — `tanqueConEstado` expone `ordenRotacion` y `ultimoPanoSacado`, para que la pantalla calcule el siguiente sin ir al servidor en cada toque.
+- **nuevo** — El detalle del paño lleva selector de quién lo sacó y el botón del agua, que se recuerda.
+- **arreglo** — El alta de usuarios pedía contraseña a un operario. El bloque de usuario y contraseña solo aparece para admin y gerente.
+- **mejora** — Botones de acción centrados en el detalle del paño.
+
+---
+
 ## v0.5 — Los números a sacar · 23 de agosto de 2026
 
 **Bugs corregidos:**

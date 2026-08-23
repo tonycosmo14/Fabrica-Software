@@ -30,6 +30,7 @@ const { verificar } = require('../../lib/seguridad');
 const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
 const { tanqueConEstado, canastasFuera, horasDesde } = require('./estado');
+const vales = require('./vales');
 
 const router = express.Router();
 
@@ -108,6 +109,45 @@ router.get('/estado', verProduccion, (req, res) => {
     puedeAutorizar: puede(req.usuario.rol, 'produccion.autorizar'),
     responsables: responsables()
   });
+});
+
+/**
+ * PEDIR AUTORIZACIÓN para un paño que no toca.
+ *
+ * Se pide ANTES de ver las opciones: el gerente teclea su PIN una vez y a
+ * partir de ahí la pantalla puede mostrar qué se puede hacer con ese paño.
+ */
+router.post('/autorizar', registrar, (req, res) => {
+  const { panoId, motivo, usuarioId, pin } = req.body || {};
+
+  const pano = datosPano(panoId);
+  if (!pano) return error(res, 'Ese paño no existe.', 404);
+
+  const texto = String(motivo || '').trim();
+  if (!texto) return error(res, 'Escribe por qué se va a sacar este paño.');
+
+  const comprobado = comprobarAutorizacion({ usuarioId, pin });
+  if (comprobado.error) return error(res, comprobado.error, 403);
+
+  const vale = vales.crear({
+    usuarioId: comprobado.usuario.id,
+    usuarioNombre: comprobado.usuario.nombre,
+    panoId: pano.id,
+    motivo: texto
+  });
+
+  bitacora.registrar({
+    accion: 'produccion.autorizacion', entidad: 'pano', entidadId: pano.id,
+    ejecutorId: comprobado.usuario.id, capturistaId: req.usuario.id,
+    detalle: { tanque: pano.tanque_nombre, pano: pano.numero, motivo: texto }
+  });
+
+  return ok(res, {
+    vale: vale.id,
+    autorizadaPor: comprobado.usuario.nombre,
+    motivo: texto,
+    expiraEnMinutos: vale.expiraEnMinutos
+  }, 201);
 });
 
 /**
@@ -198,20 +238,29 @@ router.post('/panos/:id/sacar', registrar, (req, res) => {
   // escrito y el PIN de un gerente o del administrador. Da igual quién esté
   // usando la pantalla; lo que vale es quién autorizó.
   if (!esElQueToca) {
-    const auth = req.body?.autorizacion;
-    if (!auth) {
-      return error(res,
-        `Toca el paño ${toca.numero}, no el ${pano.numero}.`, 409,
-        { requiereAutorizacion: true, tocaPano: toca.numero, porque: toca.porque });
+    // Dos maneras de traer el permiso: un vale pedido antes (lo normal, así
+    // se ven las opciones sin volver a teclear el PIN) o el PIN directo.
+    if (req.body?.vale) {
+      const usado = vales.usar(req.body.vale, pano.id);
+      if (usado.error) return error(res, usado.error, 403, { requiereAutorizacion: true });
+      autorizadaPor = usado.vale.usuarioId;
+      motivo = usado.vale.motivo;
+    } else {
+      const auth = req.body?.autorizacion;
+      if (!auth) {
+        return error(res,
+          `Toca el paño ${toca.numero}, no el ${pano.numero}.`, 409,
+          { requiereAutorizacion: true, tocaPano: toca.numero, porque: toca.porque });
+      }
+
+      const comprobado = comprobarAutorizacion(auth);
+      if (comprobado.error) return error(res, comprobado.error, 403, { requiereAutorizacion: true });
+
+      motivo = String(auth.motivo || motivo).trim();
+      if (!motivo) return error(res, 'Escribe por qué se saca este paño.', 400, { requiereAutorizacion: true });
+
+      autorizadaPor = comprobado.usuario.id;
     }
-
-    const comprobado = comprobarAutorizacion(auth);
-    if (comprobado.error) return error(res, comprobado.error, 403, { requiereAutorizacion: true });
-
-    motivo = String(auth.motivo || motivo).trim();
-    if (!motivo) return error(res, 'Escribe por qué se saca este paño.', 400, { requiereAutorizacion: true });
-
-    autorizadaPor = comprobado.usuario.id;
   }
 
   // --- Qué canastas faltan por sacar en este paño ---
@@ -408,10 +457,18 @@ router.post('/lote', registrar, (req, res) => {
   const hechos = [];
   let marquetas = 0;
 
+  // Los paños que se marcaron fuera de la rotación traen su vale.
+  const autorizados = new Map();
+  for (const [panoId, valeId] of Object.entries(req.body?.vales || {})) {
+    const usado = vales.usar(valeId, panoId);
+    if (!usado.error) autorizados.set(panoId, usado.vale);
+  }
+
   const guardar = bd.transaction(() => {
     for (const panoId of panosIds) {
       const pano = datosPano(panoId);
       if (!pano) continue;
+      const permiso = autorizados.get(panoId);
 
       const estadoTanque = tanqueConEstado(pano.tanque_id);
       const panoActual = estadoTanque.panos.find((p) => p.id === pano.id);
@@ -421,9 +478,11 @@ router.post('/lote', registrar, (req, res) => {
       const sacadaPanoId = nuevoId();
       bd.prepare(`
         INSERT INTO sacadas_pano (id, pano_id, iniciada_en, terminada_en,
-                                  ejecutor_id, capturista_id, notas)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+                                  ejecutor_id, capturista_id, autorizada_por,
+                                  motivo_orden, notas)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(sacadaPanoId, pano.id, fecha, fecha, ejecutorId, req.usuario.id,
+             permiso?.usuarioId || null, permiso?.motivo || null,
              req.body?.notas || 'Capturado en lote al final de la jornada');
 
       for (const c of canastas) {

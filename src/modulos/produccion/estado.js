@@ -13,7 +13,7 @@
  * se pueden reconstruir, porque los eventos nunca cambian.
  */
 const { bd } = require('../../db/conexion');
-const { siguientePano, explicar } = require('./rotacion');
+const { siguientePano, explicar, ordenIntercalado } = require('./rotacion');
 
 const ESTADOS = {
   CONGELANDO: 'congelando',
@@ -225,6 +225,12 @@ function tanqueConEstado(tanqueId) {
   const numeros = panos.map((p) => p.numero);
   const numerosEnProceso = panos.filter((p) => p.enProceso).map((p) => p.numero);
   const toca = siguientePano(numeros, tanque.ultimo_pano_sacado, numerosEnProceso);
+
+  // El orden completo de la rotación viaja a la pantalla: así, al marcar
+  // varios paños seguidos, la pantalla sabe cuál sería el siguiente sin
+  // preguntarle al servidor en cada toque.
+  tanque.ordenRotacion = ordenIntercalado(numeros);
+  tanque.ultimoPanoSacado = tanque.ultimo_pano_sacado;
 
   tanque.siguiente = toca == null ? null : {
     numero: toca,
