@@ -6,9 +6,12 @@
  *
  *     existencia anterior + producido − contado = SALIDAS
  *
- * Hoy las salidas son "lo que se vendió y lo que se perdió", todo junto.
- * Cuando exista el punto de venta, lo vendido saldrá de los tickets y la
- * diferencia que quede es la que hay que explicar.
+ * Desde la v0.8 esas salidas se parten en dos: lo que la caja explicó con
+ * tickets, y el FALTANTE, que es lo que se derritió, lo que se cayó y lo
+ * que se fue sin pagar.
+ *
+ * El conteo se captura en marquetas Y FRACCIONES, porque así lo dictan en
+ * la fábrica: "quedan 14 marquetas y 5/8".
  */
 const express = require('express');
 const { bd } = require('../../db/conexion');
@@ -16,7 +19,8 @@ const { nuevoId, ahora } = require('../../lib/ids');
 const { ok, error } = require('../../lib/respuestas');
 const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
-const { estadoAlmacen, ultimoConteo, deMarquetas, aMarquetas } = require('./calculo');
+const { estadoAlmacen, ultimoConteo } = require('./calculo');
+const { aTexto, DIECISEISAVOS_POR_MARQUETA } = require('../../lib/fracciones');
 
 const router = express.Router();
 
@@ -24,7 +28,28 @@ const verExistencia = exigirPermiso('existencia.ver');
 const contar = exigirPermiso('existencia.contar');
 const configurar = exigirPermiso('sistema.configurar');
 
-const MAX_MARQUETAS = 100000;
+const MAX_DIECISEISAVOS = 100000 * DIECISEISAVOS_POR_MARQUETA;
+
+/**
+ * Lee la cantidad que mandó la pantalla.
+ *
+ * Se acepta en dieciseisavos (que es como los manda el teclado) y también
+ * en marquetas enteras, que es como lo mandaban las pantallas viejas.
+ * Devuelve null si no se entiende: nunca adivina un número de existencia.
+ */
+function leerCantidad(cuerpo) {
+  if (cuerpo?.dieciseisavos !== undefined && cuerpo.dieciseisavos !== null) {
+    const n = Number(cuerpo.dieciseisavos);
+    return Number.isInteger(n) && n >= 0 && n <= MAX_DIECISEISAVOS ? n : null;
+  }
+  if (cuerpo?.marquetas !== undefined && cuerpo.marquetas !== null) {
+    const n = Number(cuerpo.marquetas);
+    if (!Number.isInteger(n) || n < 0) return null;
+    const total = n * DIECISEISAVOS_POR_MARQUETA;
+    return total <= MAX_DIECISEISAVOS ? total : null;
+  }
+  return null;
+}
 
 function almacenesActivos() {
   return bd.prepare('SELECT * FROM almacenes WHERE activo = 1 ORDER BY orden, nombre').all();
@@ -74,11 +99,13 @@ router.get('/', verExistencia, (req, res) => {
     return {
       ...estado,
       pendiente: pendienteDeConteo(a),
-      // En marquetas, que es como lo piensa la gente
-      enMarquetas: {
-        anterior: aMarquetas(estado.existenciaAnterior),
-        producido: aMarquetas(estado.producido),
-        teorico: aMarquetas(estado.teorico)
+      // El mismo número escrito como lo dice la gente: "14 5/8"
+      textos: {
+        anterior: aTexto(estado.existenciaAnterior),
+        producido: aTexto(estado.producido),
+        teorico: aTexto(estado.teorico),
+        vendido: aTexto(estado.vendido),
+        esperado: aTexto(estado.esperado)
       }
     };
   });
@@ -111,19 +138,19 @@ router.get('/conteos', verExistencia, (req, res) => {
 
 router.post('/conteos', contar, (req, res) => {
   const almacen = bd.prepare('SELECT * FROM almacenes WHERE id = ? AND activo = 1')
-    .get(req.body?.almacenId);
+    .get(req.body?.almacenId ?? null);
   if (!almacen) return error(res, 'Ese cuarto frío no existe.', 404);
 
-  const marquetas = Number(req.body?.marquetas);
-  if (!Number.isFinite(marquetas) || marquetas < 0 || marquetas > MAX_MARQUETAS) {
-    return error(res, 'Escribe cuántas marquetas contaste.');
+  const contado = leerCantidad(req.body);
+  if (contado === null) {
+    return error(res, 'Escribe cuánto contaste. Puede llevar fracción: 14 y 5/8.');
   }
 
   // La foto de cómo estaba justo antes de contar: se guarda congelada, para
   // que corregir una sacada vieja no cambie un corte que ya se hizo.
   const estado = estadoAlmacen(almacen);
-  const contado = deMarquetas(marquetas);
   const salidas = estado.teorico - contado;
+  const faltante = salidas - estado.vendido;
 
   const ejecutorId = req.body?.ejecutorId || req.usuario.id;
   const id = nuevoId();
@@ -131,10 +158,10 @@ router.post('/conteos', contar, (req, res) => {
 
   bd.prepare(`
     INSERT INTO conteos (id, almacen_id, fecha, ejecutor_id, capturista_id, contado,
-                         existencia_anterior, producido, salidas, desde, notas)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         existencia_anterior, producido, vendido, salidas, desde, notas)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(id, almacen.id, fecha, ejecutorId, req.usuario.id, contado,
-         estado.existenciaAnterior, estado.producido, salidas,
+         estado.existenciaAnterior, estado.producido, estado.vendido, salidas,
          estado.desde, req.body?.notas || null);
 
   bitacora.registrar({
@@ -142,21 +169,26 @@ router.post('/conteos', contar, (req, res) => {
     ejecutorId, capturistaId: req.usuario.id,
     detalle: {
       almacen: almacen.nombre,
-      contado: aMarquetas(contado),
-      anterior: aMarquetas(estado.existenciaAnterior),
-      producido: aMarquetas(estado.producido),
-      salidas: aMarquetas(salidas)
+      contado: aTexto(contado),
+      anterior: aTexto(estado.existenciaAnterior),
+      producido: aTexto(estado.producido),
+      vendido: aTexto(estado.vendido),
+      salidas: aTexto(salidas),
+      faltante: aTexto(faltante)
     }
   });
 
   return ok(res, {
     conteo: bd.prepare('SELECT * FROM conteos WHERE id = ?').get(id),
     resumen: {
-      anterior: aMarquetas(estado.existenciaAnterior),
-      producido: aMarquetas(estado.producido),
-      teorico: aMarquetas(estado.teorico),
-      contado: aMarquetas(contado),
-      salidas: aMarquetas(salidas),
+      anterior: estado.existenciaAnterior,
+      producido: estado.producido,
+      teorico: estado.teorico,
+      vendido: estado.vendido,
+      esperado: estado.esperado,
+      contado,
+      salidas,
+      faltante,
       primerConteo: !estado.ultimoConteo
     }
   }, 201);
@@ -179,7 +211,7 @@ router.post('/conteos/:id/anular', exigirPermiso('existencia.corregir'), (req, r
 
   bitacora.registrar({
     accion: 'existencia.anulacion', entidad: 'conteo', entidadId: c.id,
-    ejecutorId: req.usuario.id, detalle: { motivo, contado: aMarquetas(c.contado) }
+    ejecutorId: req.usuario.id, detalle: { motivo, contado: aTexto(c.contado) }
   });
 
   return ok(res, { anulado: true });

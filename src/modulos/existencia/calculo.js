@@ -3,10 +3,14 @@
  *
  *      existencia anterior  +  producido  −  contado  =  SALIDAS
  *
- * Las salidas son todo lo que dejó el cuarto frío: lo vendido, lo que se
- * derritió, lo que se cayó y lo que falta sin explicación. Mientras no
- * exista el punto de venta van juntas; cuando llegue, la parte que no
- * cuadre con las ventas registradas es lo que hay que revisar.
+ * Las salidas son todo lo que dejó el cuarto frío. Desde la v0.8 se parten
+ * en dos, que es de lo que se trataba todo:
+ *
+ *      vendido   = lo que dicen los tickets de la caja
+ *      faltante  = salidas − vendido
+ *
+ * El faltante es lo que se derritió, lo que se cayó y lo que se fue sin
+ * pagar. Ese es el número que hay que vigilar.
  *
  * Las cantidades se guardan en dieciseisavos (regla 3.1) aunque se cuenten
  * en marquetas.
@@ -43,6 +47,22 @@ function producidoDesde(desde) {
 }
 
 /**
+ * Marquetas VENDIDAS con ticket desde una fecha, en un almacén.
+ * Las ventas canceladas no cuentan: nunca salieron del cuarto frío.
+ */
+function vendidoDesde(desde, almacenId) {
+  const fila = bd.prepare(`
+    SELECT COALESCE(SUM(vl.dieciseisavos), 0) n
+      FROM venta_lineas vl
+      JOIN ventas v ON v.id = vl.venta_id
+     WHERE v.fecha > ?
+       AND v.cancelada_en IS NULL
+       AND v.almacen_id = ?
+  `).get(desde || '', almacenId);
+  return fila.n;
+}
+
+/**
  * Foto de cómo va un almacén ahora mismo, sin registrar nada.
  * Es lo que se ve en pantalla antes de contar.
  */
@@ -54,14 +74,22 @@ function estadoAlmacen(almacen) {
   const producido = almacen.recibe_produccion ? producidoDesde(desde) : 0;
   const anterior = ultimo?.contado ?? 0;
 
+  // Lo que la caja ya explicó con tickets desde el último conteo.
+  const vendido = vendidoDesde(desde, almacen.id);
+  const teorico = anterior + producido;
+
   return {
     almacen,
     ultimoConteo: ultimo,
     desde,
     existenciaAnterior: anterior,
     producido,
+    vendido,
     // Lo que debería haber si nada hubiera salido.
-    teorico: anterior + producido
+    teorico,
+    // Lo que debería haber ahora ya descontando lo vendido: este es el
+    // número contra el que se compara el conteo físico.
+    esperado: teorico - vendido
   };
 }
 
@@ -76,6 +104,6 @@ function aMarquetas(dieciseisavos) {
 }
 
 module.exports = {
-  ultimoConteo, producidoDesde, estadoAlmacen,
+  ultimoConteo, producidoDesde, vendidoDesde, estadoAlmacen,
   deMarquetas, aMarquetas, DIECISEISAVOS_POR_MARQUETA
 };

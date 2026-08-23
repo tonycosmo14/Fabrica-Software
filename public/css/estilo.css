@@ -1226,3 +1226,188 @@ tr.anulada { opacity: .45; text-decoration: line-through; }
   .menu-panel a:hover { background: var(--superficie-alt); }
   .item:hover { border-color: var(--borde-fuerte); }
 }
+
+
+/* ============================================================
+   EL TECLADO DE FRACCIONES (v0.8)
+
+   Es el mismo control para contar el cuarto frío y para cobrar.
+   Uno solo, aprendido una sola vez.
+
+   En la fábrica se teclea de pie, con prisa y con las manos
+   mojadas: por eso los botones son cuadrados y grandes, y el
+   número que se lleva se ve enorme.
+   ============================================================ */
+
+.teclado-frac { display: grid; gap: 12px; }
+
+.frac-visor {
+  background: var(--superficie-alt); border: 2px solid var(--borde);
+  border-radius: var(--radio); padding: 16px 12px; text-align: center;
+}
+.frac-numero {
+  display: block; font-size: 46px; font-weight: 800; line-height: 1.05;
+  color: var(--texto); font-variant-numeric: tabular-nums;
+}
+.frac-unidad {
+  display: block; color: var(--suave); font-size: 12px;
+  text-transform: uppercase; letter-spacing: .7px; margin-top: 2px;
+}
+.frac-nota {
+  margin-top: 8px; color: var(--suave); font-size: 14px; min-height: 20px;
+}
+.frac-nota strong { color: var(--verde); font-size: 18px; }
+
+.frac-enteras {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center;
+}
+.frac-campo {
+  text-align: center; font-size: 26px; font-weight: 800; margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.frac-ayuda {
+  margin: -4px 0 0; text-align: center; color: var(--suave); font-size: 12.5px;
+}
+
+/* Los cinco botones de fracción, siempre en una sola fila */
+.frac-botones { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.frac-boton {
+  min-width: 0; padding: 0; height: 62px;
+  font-size: 20px; font-weight: 800;
+  background: var(--superficie); color: var(--primario);
+  border: 2px solid var(--primario);
+}
+.frac-boton:hover { background: var(--et-operario-f); }
+.frac-boton:active { transform: scale(.96); }
+
+.frac-acciones { display: flex; gap: 8px; justify-content: space-between; }
+.frac-acciones button { min-width: 0; flex: 1; }
+
+/* El botón de agregar manda en la tarjeta: ancho completo */
+.venta-teclado #agregar { width: 100%; min-width: 0; margin-top: 12px; }
+
+.frac-escrito {
+  text-align: center; font-size: 20px; font-weight: 700; letter-spacing: .5px;
+}
+.etiqueta-chica {
+  display: block; margin: 12px 0 4px; color: var(--suave);
+  font-size: 12.5px; text-transform: uppercase; letter-spacing: .6px;
+}
+.dialogo-error {
+  margin: 8px 0 0; color: var(--rojo); font-size: 13.5px; line-height: 1.5;
+}
+
+
+/* ============================================================
+   PUNTO DE VENTA (v0.8)
+
+   En el celular va uno debajo del otro: primero se marca, luego
+   se cobra. En la PC caben lado a lado, así el cajero ve el
+   ticket completo mientras teclea.
+   ============================================================ */
+
+.venta-cabeza {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 12px; flex-wrap: wrap; margin-bottom: 4px;
+}
+.venta-cabeza h2 { margin: 0; }
+.venta-cabeza-datos { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.etiqueta-folio {
+  background: var(--et-operario-f); color: var(--et-operario-t);
+  padding: 5px 12px; border-radius: 999px; font-size: 13px; font-weight: 700;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+
+.venta-tablero { display: grid; gap: 14px; margin-top: 14px; }
+
+.venta-lineas { width: 100%; border-collapse: collapse; }
+.venta-lineas td { padding: 10px 4px; border-bottom: 1px solid var(--borde); vertical-align: middle; }
+.venta-lineas .cantidad {
+  font-size: 22px; font-weight: 800; white-space: nowrap;
+  font-variant-numeric: tabular-nums; width: 1%;
+}
+.venta-lineas .detalle { color: var(--texto); font-size: 15px; }
+.venta-lineas .detalle small { display: block; color: var(--suave); font-size: 12px; }
+.venta-lineas .importe {
+  text-align: right; font-weight: 700; font-size: 17px; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.venta-lineas .quitar { width: 1%; text-align: right; }
+/* Dentro del ticket la tachita va en su celda, no flotando en la esquina */
+.venta-lineas .tachita { position: static; margin: 0; }
+
+.venta-total {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 12px; margin-top: 14px; padding-top: 14px;
+  border-top: 2px solid var(--borde-fuerte);
+}
+.venta-total span { font-size: 16px; font-weight: 700; }
+.venta-total small { display: block; color: var(--suave); font-size: 12.5px; font-weight: 400; }
+.venta-total strong {
+  font-size: 38px; font-weight: 800; line-height: 1;
+  color: var(--verde); font-variant-numeric: tabular-nums;
+}
+
+.venta-billetes { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.venta-billetes button { min-width: 0; flex: 1 0 auto; }
+.venta-pago {
+  text-align: center; font-size: 28px; font-weight: 800; margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.venta-cambio {
+  margin-top: 12px; padding: 14px; border-radius: var(--radio); text-align: center;
+  background: var(--et-cajero-f); border: 2px solid var(--verde);
+}
+.venta-cambio span {
+  display: block; color: var(--suave); font-size: 13px;
+  text-transform: uppercase; letter-spacing: .6px;
+}
+.venta-cambio strong {
+  display: block; font-size: 40px; font-weight: 800; line-height: 1.1;
+  color: var(--verde); font-variant-numeric: tabular-nums;
+}
+.venta-cambio.grande-cambio { margin: 14px 0 0; }
+.venta-cambio.grande-cambio strong { font-size: 56px; }
+
+.buscador {
+  margin: 14px 0 0; font-size: 17px;
+}
+
+.precios-rejilla {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: 10px; margin-top: 14px;
+}
+.precio-celda { display: grid; gap: 4px; }
+.precio-celda span {
+  text-align: center; font-weight: 800; font-size: 16px; color: var(--primario);
+}
+.precio-celda input {
+  margin: 0; text-align: center; font-size: 17px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.aviso-cancelada { border-left: 5px solid var(--rojo); }
+.tabla td.malo { color: var(--rojo); font-weight: 700; }
+.cuadre-linea.vendido strong { color: var(--primario); }
+
+/* El ticket de venta, pensado para la impresora térmica de 80 mm */
+.ticket-venta { max-width: 302px; }
+.ticket-folio {
+  text-align: center; font-size: 15px; font-weight: 800;
+  letter-spacing: 1px; margin: 0 0 8px; padding: 5px 0;
+  border-bottom: 1px dashed #000;
+}
+.ticket-cancelado {
+  text-align: center; font-size: 20px; font-weight: 800; letter-spacing: 3px;
+  color: var(--rojo); border: 2px solid var(--rojo); padding: 4px; margin-bottom: 8px;
+}
+.ticket-tabla td small { display: block; font-size: 10px; opacity: .75; font-weight: 400; }
+.ticket-gracias { text-align: center; margin-top: 8px; font-weight: 700; }
+
+@media (min-width: 900px) {
+  /* En la PC, teclado a la izquierda y ticket a la derecha */
+  .venta-tablero { grid-template-columns: minmax(320px, 420px) 1fr; align-items: start; }
+  .frac-boton { height: 70px; font-size: 22px; }
+  .frac-numero { font-size: 54px; }
+}

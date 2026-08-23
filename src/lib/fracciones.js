@@ -76,11 +76,47 @@ function sumar(lista) {
   return lista.reduce((total, n) => total + validar(n), 0);
 }
 
+/**
+ * Parte una cantidad en las fracciones más grandes posibles.
+ *   6  -> [4, 2]        (1/4 + 1/8)
+ *   20 -> [16, 4]       (1 + 1/4)
+ *   3  -> [2, 1]        (1/8 + 1/16)
+ *
+ * Sirve para cobrar: cada fracción tiene su propio precio (sección 7.2 del
+ * plan), así que el precio de 3/8 es el de 1/4 más el de 1/8. Y como la
+ * descomposición es siempre la misma, tocar seis veces 1/16 cuesta
+ * exactamente lo mismo que tocar 1/4 y 1/8. No hay forma de cobrar de más
+ * ni de menos según cómo se teclee.
+ */
+function descomponer(dieciseisavos) {
+  validar(dieciseisavos);
+  let resto = dieciseisavos;
+  const partes = [];
+
+  for (const paso of [16, 8, 4, 2, 1]) {
+    while (resto >= paso) { partes.push(paso); resto -= paso; }
+  }
+  return partes;
+}
+
+/** El desglose escrito, para el ticket: "14x1 + 1/2 + 1/8". */
+function desglose(dieciseisavos) {
+  const cuenta = new Map();
+  for (const parte of descomponer(dieciseisavos)) {
+    cuenta.set(parte, (cuenta.get(parte) || 0) + 1);
+  }
+  return [...cuenta.entries()]
+    .map(([parte, veces]) => (veces > 1 ? `${veces}×${aTexto(parte)}` : aTexto(parte)))
+    .join(' + ');
+}
+
 module.exports = {
   DIECISEISAVOS_POR_MARQUETA,
   FRACCIONES,
   aTexto,
   deMarquetas,
   validar,
-  sumar
+  sumar,
+  descomponer,
+  desglose
 };

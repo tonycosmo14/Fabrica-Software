@@ -7,6 +7,52 @@ Tipos: `nuevo` (funcionalidad nueva) · `mejora` · `arreglo` · `clave` (regla 
 
 ---
 
+## v0.8 — Punto de venta · 23 de agosto de 2026
+
+Migraciones `007_ventas.sql` y `008_cuadre_ventas.sql`.
+
+Se cerró el círculo: hasta la v0.7 el sistema sabía cuánto salió del cuarto
+frío, pero no cuánto de eso se había cobrado. Ahora sí.
+
+    salidas − vendido = FALTANTE
+
+### El cobro
+
+- **clave** — Precio por fracción, no proporcional (sección 7.2). El precio de una cantidad es la suma de los precios de los pedazos en que se parte: `descomponer(6) = [4, 2]`, o sea 3/8 = 1/4 + 1/8 = $70 + $36 = **$106**. Como la partición es siempre la misma, tocar seis veces 1/16 cuesta exactamente igual que tocar 1/4 y 1/8. Hay prueba.
+- **clave** — El total lo calcula el **servidor**, que vuelve a cotizar cada línea con sus propios precios. Lo que mande la pantalla como importe se ignora. Hay prueba que manda `total_centavos: 1` y recibe $264.
+- **clave** — El dinero se guarda en **centavos enteros** (`src/lib/dinero.js`), por la misma razón que el hielo en dieciseisavos: los decimales acumulan errores que después no cuadran en el corte.
+- **clave** — El precio queda **copiado** dentro de la línea (regla 3.5). Subir precios hoy no cambia un ticket de ayer. Hay prueba.
+- **clave** — Folio consecutivo asignado **dentro de la transacción** (regla 7.3), para que dos cajas cobrando al mismo tiempo no puedan sacar el mismo número. Hay prueba con 8 ventas en paralelo.
+- **clave** — Una venta cobrada **no se edita** (regla 7.4): se cancela, y la cancelación guarda motivo, fecha y responsable. Ni la venta ni sus líneas se borran nunca.
+- **nuevo** — Pantalla de venta: teclado de fracciones, precio en vivo, líneas con su desglose, botones de billete y el cambio en grande.
+- **nuevo** — Ticket de 80 mm con folio, desglose por línea, pago, cambio y quién atendió.
+- **nuevo** — Buscador de tickets por folio, importe u hora.
+- **nuevo** — Pantalla de precios (solo administrador), con el proporcional como **sugerencia**, nunca como valor impuesto.
+- **nuevo** — Permisos: `venta.registrar` (cajero), `venta.cancelar` (gerente y admin), `precios.configurar` (solo admin, vía comodín).
+
+### El conteo con fracciones
+
+- **clave** — `POST /api/existencia/conteos` acepta `dieciseisavos`. Así se captura "quedan 14 marquetas y 5/8" tal cual se dicta en la fábrica. Sigue aceptando `marquetas` enteras por compatibilidad.
+- **nuevo** — `public/js/fracciones.js`: el mismo motor de fracciones del servidor, del lado del navegador, más el **teclado** que se reutiliza en el conteo y en la caja. Un solo control, aprendido una sola vez.
+- **nuevo** — `deTexto()` entiende `14`, `5/8`, `14 5/8` y `14 y 5/8`, y **rechaza** denominadores que no existen físicamente (`1/3`): la marqueta no se parte en tercios.
+- **nuevo** — Diálogo `pedirCantidad()`: los botones y el campo escrito están sincronizados en los dos sentidos.
+
+### El cuadre partido en dos
+
+- **clave** — `vendidoDesde()` suma las líneas de las ventas **no canceladas** de la ventana. Cancelar una venta devuelve el hielo al cuarto frío sin tocar nada más. Hay prueba.
+- **clave** — El conteo guarda `vendido` congelado (columna nueva), igual que los demás números: cancelar una venta vieja no mueve un corte ya firmado.
+- **nuevo** — La tarjeta del cuarto frío y el ticket de conteo muestran `vendido` y `falta` por separado.
+
+### Arreglos
+
+- **arreglo** — `#buscar` tenía asignada la función directamente (`onclick = buscarTickets`), así que el navegador le pasaba el evento del clic como texto de búsqueda y la lista salía siempre vacía.
+- **arreglo** — La tachita de quitar una línea es `position: absolute` (viene de las imágenes) y se escapaba a la esquina de la pantalla. Dentro del ticket va estática, en su celda.
+- **arreglo** — `ARCHIVO_BD` se calculaba siempre desde la raíz del proyecto: mover `CARPETA_DATOS` movía los respaldos y el logo, pero dejaba la base atrás.
+- **arreglo** — Pasar `undefined` a un `WHERE id = ?` revienta en `node:sqlite` (a diferencia de otros motores). Ahora se pasa `null`.
+- **mejora** — `desglose()` junta los repetidos: 14 5/8 se escribe `14×1 + 1/2 + 1/8` en vez de catorce unos seguidos.
+
+---
+
 ## v0.7 — La Existencia · 23 de agosto de 2026
 
 El control que hoy se lleva en libreta. Migración `006_existencia.sql`.

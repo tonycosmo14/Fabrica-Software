@@ -8,6 +8,7 @@
  * En celular aparecen desde abajo (hoja); en PC, centrados.
  * Todos devuelven una promesa: se usan con await.
  */
+import { crearTeclado, aTexto, deTexto } from './fracciones.js';
 
 function cerrar(caja) {
   caja.classList.remove('abierto');
@@ -96,6 +97,71 @@ export function pedirNumero({ titulo, texto = '', valor = 1, min = 1, max = 99, 
 
     caja.querySelector('[data-no]').onclick = () => salir(null);
     caja.querySelector('[data-si]').onclick = () => salir(n);
+  });
+}
+
+/**
+ * PIDE UNA CANTIDAD DE HIELO, CON FRACCIONES.
+ *
+ * En la fábrica el conteo se dicta así: "quedan 14 marquetas y 5/8". Este
+ * diálogo deja capturarlo de las dos formas en que la gente lo hace:
+ *
+ *   · tocando los botones 1, 1/2, 1/4, 1/8, 1/16 (que se van sumando)
+ *   · o escribiéndolo tal cual: 14 5/8
+ *
+ * Devuelve DIECISEISAVOS enteros, o null si se canceló.
+ */
+export function pedirCantidad({ titulo, texto = '', valor = 0, ok = 'Guardar', ayuda = '' }) {
+  return new Promise((resolver) => {
+    const { caja, salir } = montar(`
+      <h3 class="dialogo-titulo">${titulo}</h3>
+      ${texto ? `<p class="dialogo-texto">${texto}</p>` : ''}
+      <div id="teclado"></div>
+      <label for="escrito" class="etiqueta-chica">o escríbelo tal cual</label>
+      <input id="escrito" class="frac-escrito" inputmode="text"
+             placeholder="14 y 5/8" autocomplete="off">
+      <p class="dialogo-error" id="malo" hidden>
+        No se entiende. Escríbelo como <strong>14 5/8</strong>, y en octavos o
+        dieciseisavos: la marqueta no se parte en tercios.
+      </p>
+      ${ayuda ? `<p class="ayuda" style="margin:10px 0 0">${ayuda}</p>` : ''}
+      <div class="dialogo-botones">
+        <button class="secundario" data-no>Cancelar</button>
+        <button data-si>${ok}</button>
+      </div>`, resolver);
+
+    const escrito = caja.querySelector('#escrito');
+    const malo = caja.querySelector('#malo');
+
+    const teclado = crearTeclado(caja.querySelector('#teclado'), {
+      valor,
+      alCambiar: (n) => {
+        // Si tocan los botones, el campo escrito se pone al día solo.
+        if (document.activeElement !== escrito) escrito.value = n ? aTexto(n) : '';
+        malo.hidden = true;
+      }
+    });
+    escrito.value = valor ? aTexto(valor) : '';
+
+    escrito.oninput = () => {
+      const n = deTexto(escrito.value);
+      malo.hidden = escrito.value.trim() === '' || n !== null;
+      if (n !== null) teclado.poner(n);
+    };
+
+    const enviar = () => {
+      // Si escribieron algo a mano y no se entiende, no se guarda nada.
+      if (escrito.value.trim() && deTexto(escrito.value) === null) {
+        malo.hidden = false;
+        escrito.focus();
+        return;
+      }
+      salir(teclado.valor());
+    };
+
+    escrito.onkeydown = (ev) => { if (ev.key === 'Enter') enviar(); };
+    caja.querySelector('[data-no]').onclick = () => salir(null);
+    caja.querySelector('[data-si]').onclick = enviar;
   });
 }
 

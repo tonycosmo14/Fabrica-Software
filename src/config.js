@@ -5,15 +5,18 @@
 const path = require('node:path');
 
 const RAIZ = path.resolve(__dirname, '..');
+const CARPETA_DATOS = process.env.CARPETA_DATOS || path.join(RAIZ, 'datos');
 
 module.exports = {
   RAIZ,
   PUERTO: Number(process.env.PUERTO || 3000),
   // Escuchar en 0.0.0.0 permite que celulares y tablets entren por WiFi local.
   HOST: process.env.HOST || '0.0.0.0',
-  CARPETA_DATOS: process.env.CARPETA_DATOS || path.join(RAIZ, 'datos'),
-  CARPETA_RESPALDOS: path.join(process.env.CARPETA_DATOS || path.join(RAIZ, 'datos'), 'respaldos'),
-  ARCHIVO_BD: process.env.ARCHIVO_BD || path.join(RAIZ, 'datos', 'fabrica.db'),
+  // Si se mueve la carpeta de datos, TODO se mueve con ella: la base, los
+  // respaldos y el logo. Antes la base se quedaba atrás y era un enredo.
+  CARPETA_DATOS: CARPETA_DATOS,
+  CARPETA_RESPALDOS: path.join(CARPETA_DATOS, 'respaldos'),
+  ARCHIVO_BD: process.env.ARCHIVO_BD || path.join(CARPETA_DATOS, 'fabrica.db'),
   CARPETA_PUBLICA: path.join(RAIZ, 'public'),
   CARPETA_MIGRACIONES: path.join(RAIZ, 'src', 'db', 'migraciones'),
   // Cuanto dura la sesion en el dispositivo antes de volver a pedir PIN.

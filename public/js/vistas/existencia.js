@@ -1,18 +1,31 @@
 /**
- * LA EXISTENCIA  (v0.7)
+ * LA EXISTENCIA  (v0.8)
  *
  * Lo que se sacó, lo que salió y lo que sobra. A las 3 y a las 8 alguien
  * cuenta las marquetas del cuarto frío y el sistema hace el cuadre:
  *
  *     existencia anterior + producido − contado = SALIDAS
  *
- * Hoy las salidas son "vendido y perdido" todo junto. Cuando exista el
- * punto de venta, lo vendido saldrá de los tickets y lo que sobre de esa
- * resta es lo que hay que explicar.
+ * Desde la v0.8 esas salidas se parten en dos:
+ *
+ *     vendido   = lo que dicen los tickets de la caja
+ *     faltante  = salidas − vendido
+ *
+ * El faltante es lo que se derritió, lo que se cayó y lo que se fue sin
+ * pagar. Ese es el número que hay que vigilar.
+ *
+ * El conteo se captura con fracciones, porque así se dicta en la fábrica:
+ * "quedan 14 marquetas y 5/8".
  */
 import { api } from '../api.js';
 import { esc, avisar, fecha as formatoFecha } from '../util.js';
-import { pedirTexto, pedirNumero, confirmar } from '../dialogo.js';
+import { pedirTexto, pedirCantidad } from '../dialogo.js';
+import { aTexto } from '../fracciones.js';
+
+/** "+3", "−1/2"... pero un cero se escribe "0" a secas, sin signo. */
+function signo(simbolo, dieciseisavos) {
+  return dieciseisavos ? `${simbolo}${aTexto(dieciseisavos)}` : '0';
+}
 
 export async function vistaExistencia(pantalla, estadoApp) {
   const puedeContar = estadoApp.permisos.includes('*') ||
@@ -53,7 +66,7 @@ export async function vistaExistencia(pantalla, estadoApp) {
 
   /** La tarjeta de un cuarto frío: cómo va y qué debería haber. */
   function tarjetaAlmacen(a) {
-    const m = a.enMarquetas;
+    const t = a.textos;
     const nunca = !a.ultimoConteo;
 
     return `
@@ -73,15 +86,21 @@ export async function vistaExistencia(pantalla, estadoApp) {
         <div class="cuadre">
           <div class="cuadre-linea">
             <span>Había en el último conteo</span>
-            <strong>${m.anterior}</strong>
+            <strong>${t.anterior}</strong>
           </div>
           <div class="cuadre-linea suma">
             <span>+ Salió de los tanques desde entonces</span>
-            <strong>${m.producido}</strong>
+            <strong>${t.producido}</strong>
+          </div>
+          ${a.vendido ? `
+            <div class="cuadre-linea"><span>= Debería haber</span><strong>${t.teorico}</strong></div>` : ''}
+          <div class="cuadre-linea vendido">
+            <span>− Se vendió con ticket</span>
+            <strong>${t.vendido}</strong>
           </div>
           <div class="cuadre-linea total">
             <span>= Debería haber ahora</span>
-            <strong>${m.teorico}</strong>
+            <strong>${t.esperado}</strong>
           </div>
         </div>
 
@@ -97,16 +116,18 @@ export async function vistaExistencia(pantalla, estadoApp) {
   // HACER EL CONTEO
   // ==========================================================
   async function hacerConteo(a) {
-    const marquetas = await pedirNumero({
+    const dieciseisavos = await pedirCantidad({
       titulo: `Contar ${a.almacen.nombre}`,
-      texto: `¿Cuántas marquetas hay físicamente? Deberían ser ${a.enMarquetas.teorico}.`,
-      valor: a.enMarquetas.teorico, min: 0, max: 100000, ok: 'Registrar el conteo'
+      texto: `¿Cuánto hay físicamente? Deberían ser ${a.textos.esperado}.`,
+      valor: a.esperado,
+      ok: 'Registrar el conteo',
+      ayuda: 'Si te dictan "14 marquetas y 5/8", escríbelo tal cual o tócalo con los botones.'
     });
-    if (marquetas === null) return;
+    if (dieciseisavos === null) return;
 
     try {
       const r = await api.enviar('/existencia/conteos', {
-        almacenId: a.almacen.id, marquetas
+        almacenId: a.almacen.id, dieciseisavos
       });
       resultado(a, r.resumen, r.conteo);
     } catch (e) { avisar(e.message, 'error'); }
@@ -114,8 +135,8 @@ export async function vistaExistencia(pantalla, estadoApp) {
 
   /** El cuadre después de contar, con su ticket para imprimir. */
   function resultado(a, r, conteo) {
-    const cuadra = r.salidas === 0;
-    const sobra = r.salidas < 0;
+    const cuadra = r.faltante === 0;
+    const sobra = r.faltante < 0;
 
     pantalla.innerHTML = `
       <button class="secundario chico no-imprimir" id="volver">‹ Existencia</button>
@@ -128,32 +149,38 @@ export async function vistaExistencia(pantalla, estadoApp) {
         ${r.primerConteo ? `
           <p class="ayuda" style="margin:0">
             <strong>Primer conteo.</strong> A partir de ahora, cada vez que cuentes
-            el sistema te dirá cuánto salió del cuarto frío entre un conteo y otro.
+            el sistema te dirá cuánto salió del cuarto frío entre un conteo y otro,
+            cuánto de eso lo explican los tickets, y cuánto falta.
           </p>
           <div class="total-vivo" style="margin-top:14px">
             <span>quedan en el cuarto frío</span>
-            <strong>${r.contado}</strong>
+            <strong>${aTexto(r.contado)}</strong>
             <small>marquetas</small>
           </div>` : `
           <div class="cuadre">
-            <div class="cuadre-linea"><span>Había</span><strong>${r.anterior}</strong></div>
-            <div class="cuadre-linea suma"><span>+ Se produjo</span><strong>${r.producido}</strong></div>
-            <div class="cuadre-linea total"><span>= Debería haber</span><strong>${r.teorico}</strong></div>
-            <div class="cuadre-linea contado"><span>− Contaste</span><strong>${r.contado}</strong></div>
+            <div class="cuadre-linea"><span>Había</span><strong>${aTexto(r.anterior)}</strong></div>
+            <div class="cuadre-linea suma"><span>+ Se produjo</span><strong>${aTexto(r.producido)}</strong></div>
+            ${r.vendido ? `
+              <div class="cuadre-linea"><span>= Debería haber</span><strong>${aTexto(r.teorico)}</strong></div>` : ''}
+            <div class="cuadre-linea vendido"><span>− Se vendió con ticket</span><strong>${aTexto(r.vendido)}</strong></div>
+            <div class="cuadre-linea total"><span>= Debería quedar</span><strong>${aTexto(r.esperado)}</strong></div>
+            <div class="cuadre-linea contado"><span>− Contaste</span><strong>${aTexto(r.contado)}</strong></div>
           </div>
 
           <div class="salidas ${cuadra ? 'exacto' : sobra ? 'sobra' : ''}">
-            <span>${sobra ? 'Sobran' : 'Salieron del cuarto frío'}</span>
-            <strong>${Math.abs(r.salidas)}</strong>
-            <small>marquetas</small>
+            <span>${sobra ? 'Sobra' : 'Falta'}</span>
+            <strong>${aTexto(Math.abs(r.faltante))}</strong>
+            <small>${Math.abs(r.faltante) === 16 ? 'marqueta' : 'marquetas'}</small>
           </div>
 
           <p class="ayuda" style="margin:14px 0 0">
             ${sobra
-              ? 'Hay más marquetas de las que deberían. Puede que falte registrar producción, o que el conteo anterior se quedara corto.'
+              ? 'Hay más hielo del que debería. Puede que falte capturar una venta cancelada, que sobre producción sin registrar, o que el conteo anterior se quedara corto.'
               : cuadra
-                ? 'Cuadra exacto: no salió nada entre un conteo y otro.'
-                : 'Eso es lo que se vendió más lo que se perdió. Cuando entre el punto de venta, esta cifra se partirá en vendido y faltante.'}
+                ? 'Cuadra exacto: todo lo que salió del cuarto frío tiene su ticket.'
+                : r.vendido
+                  ? `Del cuarto frío salieron ${aTexto(r.salidas)} en total. Los tickets explican ${aTexto(r.vendido)}; el resto se derritió, se cayó o se fue sin pagar.`
+                  : 'Eso salió del cuarto frío sin que ningún ticket lo explique: se derritió, se cayó o se fue sin pagar.'}
           </p>`}
       </div>
 
@@ -166,12 +193,13 @@ export async function vistaExistencia(pantalla, estadoApp) {
           <div class="ticket-nombre">${esc(a.almacen.nombre.toUpperCase())}</div>
           <table class="ticket-tabla">
             ${r.primerConteo ? '' : `
-              <tr><td>Había</td><td>${r.anterior}</td></tr>
-              <tr><td>Se produjo</td><td>+${r.producido}</td></tr>
-              <tr><td>Debería haber</td><td>${r.teorico}</td></tr>`}
-            <tr class="fuerte"><td>Contado</td><td>${r.contado}</td></tr>
+              <tr><td>Había</td><td>${aTexto(r.anterior)}</td></tr>
+              <tr><td>Se produjo</td><td>${signo('+', r.producido)}</td></tr>
+              <tr><td>Vendido</td><td>${signo('−', r.vendido)}</td></tr>
+              <tr><td>Debería quedar</td><td>${aTexto(r.esperado)}</td></tr>`}
+            <tr class="fuerte"><td>Contado</td><td>${aTexto(r.contado)}</td></tr>
             ${r.primerConteo ? '' : `
-              <tr class="fuerte"><td>Salidas</td><td>${r.salidas}</td></tr>`}
+              <tr class="fuerte"><td>${sobra ? 'Sobra' : 'Falta'}</td><td>${aTexto(Math.abs(r.faltante))}</td></tr>`}
           </table>
         </div>
         <div class="ticket-pie">
@@ -196,22 +224,23 @@ export async function vistaExistencia(pantalla, estadoApp) {
       <button class="secundario chico" id="volver">‹ Existencia</button>
       <h2 style="margin-top:14px">Historial de conteos</h2>
       <p class="ayuda">
-        Cada renglón es un corte. La columna de salidas es lo que dejó el
-        cuarto frío entre ese conteo y el anterior.
+        Cada renglón es un corte. <strong>Falta</strong> es lo que salió del
+        cuarto frío sin que ningún ticket lo explique.
       </p>
 
       <div class="tarjeta plana">
         <table class="tabla">
-          <tr><th>Cuándo</th><th>Contado</th><th>Salidas</th><th>Quién</th></tr>
+          <tr><th>Cuándo</th><th>Contado</th><th>Vendido</th><th>Falta</th><th>Quién</th></tr>
           ${conteos.map((c) => `
             <tr class="${c.anulado_en ? 'anulada' : ''}"
                 ${puedeCorregir && !c.anulado_en ? `data-anular="${esc(c.id)}"` : ''}
                 style="${puedeCorregir && !c.anulado_en ? 'cursor:pointer' : ''}">
               <td>${esc(formatoFecha(c.fecha))}</td>
-              <td><strong>${c.contado / 16}</strong></td>
-              <td>${c.salidas / 16}</td>
+              <td><strong>${aTexto(c.contado)}</strong></td>
+              <td>${aTexto(c.vendido)}</td>
+              <td class="${c.salidas - c.vendido > 0 ? 'malo' : ''}">${aTexto(c.salidas - c.vendido)}</td>
               <td>${esc(c.ejecutor_nombre || '—')}</td>
-            </tr>`).join('') || '<tr><td colspan="4">Todavía no hay conteos.</td></tr>'}
+            </tr>`).join('') || '<tr><td colspan="5">Todavía no hay conteos.</td></tr>'}
         </table>
       </div>
 

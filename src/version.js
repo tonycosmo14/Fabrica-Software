@@ -12,9 +12,33 @@
  * tipo: 'nuevo' | 'mejora' | 'arreglo' | 'importante'
  */
 
-const VERSION_ACTUAL = '0.7';
+const VERSION_ACTUAL = '0.8';
 
 const VERSIONES = [
+  {
+    numero: '0.8',
+    nombre: 'Punto de venta',
+    fecha: '2026-08-23',
+    resumen:
+      'Ya se puede cobrar. Y como ahora la caja dice qué se vendió, el ' +
+      'cuadre del cuarto frío por fin separa lo vendido de lo que falta.',
+    cambios: [
+      { tipo: 'importante', texto: 'Punto de venta: se marca la cantidad con los botones 1, 1/2, 1/4, 1/8 y 1/16, y el precio sale solo.' },
+      { tipo: 'importante', texto: 'Cada fracción tiene su propio precio. Tocar seis veces 1/16 cuesta exactamente lo mismo que tocar 1/4 y 1/8: no hay forma de cobrar de más ni de menos según quién atienda.' },
+      { tipo: 'importante', texto: 'El total lo calcula el servidor, no la pantalla. Aunque alguien le mueva al navegador, el precio es el que es.' },
+      { tipo: 'nuevo', texto: 'Ticket con folio consecutivo, listo para la impresora térmica de 80 mm.' },
+      { tipo: 'nuevo', texto: 'Botones de billete ($50, $100, $200...) y el cambio en grande, para no equivocarse de vuelto.' },
+      { tipo: 'importante', texto: 'Un ticket cobrado NO se edita: se cancela, con motivo y con nombre de quien lo canceló. El original nunca se borra.' },
+      { tipo: 'nuevo', texto: 'Buscador de tickets por número, por importe o por hora.' },
+      { tipo: 'nuevo', texto: 'Pantalla de precios (solo el administrador), con el proporcional como sugerencia. Cambiar un precio no toca los tickets de ayer.' },
+      { tipo: 'importante', texto: 'EL CONTEO YA ACEPTA FRACCIONES: se captura "14 marquetas y 5/8" tal cual, escrito o con los botones.' },
+      { tipo: 'importante', texto: 'El cuadre del cuarto frío ahora dice VENDIDO y FALTANTE por separado. El faltante es lo que se derritió, se cayó o se fue sin pagar: ese es el número que hay que vigilar.' },
+      { tipo: 'nuevo', texto: 'Una venta cancelada deja de descontar hielo del cuarto frío, automáticamente.' },
+      { tipo: 'nuevo', texto: 'El cajero vende; cancelar es del gerente y del administrador; los precios, solo del administrador.' },
+      { tipo: 'arreglo', texto: 'Mover la carpeta de datos ahora se lleva también la base de datos, no solo los respaldos.' }
+    ],
+    siguiente: 'v0.9 — Caja: vales, arqueo y corte del día.'
+  },
   {
     numero: '0.7',
     nombre: 'La Existencia',
@@ -32,7 +56,6 @@ const VERSIONES = [
       { tipo: 'importante', texto: 'Cada conteo guarda congelados sus números: corregir una sacada vieja no cambia un corte que ya se hizo.' },
       { tipo: 'nuevo', texto: 'El cajero puede contar; anular y configurar es del gerente y del administrador.' }
     ],
-    siguiente: 'v0.8 — Punto de venta: fracciones, precios por fracción y tickets.'
   },
   {
     numero: '0.6',

@@ -3,7 +3,7 @@
 Sistema para la fábrica de hielo de Hunucmá, Yucatán.
 Se construye **por versiones**: cada versión es un pedazo terminado, probado y usable.
 
-**Versión actual: v0.7**
+**Versión actual: v0.8**
 
 ---
 
@@ -70,9 +70,9 @@ Para detener el sistema: `Ctrl + C` en la terminal.
 
 ---
 
-## Qué hay en la v0.1
+## Los cimientos (v0.1)
 
-Lo que **ya funciona y puedes probar**:
+Lo que quedó desde la primera versión y sigue siendo la base de todo:
 
 - Entrar tocando tu nombre y escribiendo tu PIN (4 a 6 dígitos)
 - Entrar como admin con usuario y contraseña
@@ -85,8 +85,7 @@ Lo que **ya funciona y puedes probar**:
 - Se ve bien en celular **y** en la pantalla grande de la PC (en la PC el PIN
   también se escribe con el teclado)
 
-Lo que **todavía no existe** (aparece en gris en el inicio):
-tanques (v0.2), producción (v0.3), venta (v0.4), caja (v0.5).
+Lo que **todavía no existe** (aparece en gris en el inicio): caja (v0.9).
 
 ---
 
@@ -105,6 +104,7 @@ src/
     migraciones/       001_inicial.sql, 002_..., 003_...  (nunca se editan)
   lib/
     fracciones.js      ⭐ Dieciseisavos de marqueta (regla de oro 3.1)
+    dinero.js          Centavos enteros, por la misma razón
     seguridad.js       Hash de PIN y contraseñas
     bitacora.js        Quién ejecutó y quién capturó cada movimiento
     roles.js           Roles y permisos
@@ -112,14 +112,15 @@ src/
   middleware/
     sesion.js          Quién está conectado y qué puede hacer
   modulos/             Un módulo por área. Agregar uno no toca los demás
-    auth/  usuarios/  tanques/  produccion/  existencia/
+    auth/  usuarios/  tanques/  produccion/  existencia/  ventas/
     personalizacion/  versiones/  sistema/
 
 public/                La interfaz (HTML, CSS y JavaScript sin librerías)
   index.html
   css/estilo.css       ← los colores de la marca están al inicio de este archivo
   js/tema.js           Modo claro / oscuro
-  js/dialogo.js        Ventanas del sistema (confirmar, pedir número, menú)
+  js/dialogo.js        Ventanas del sistema (confirmar, pedir cantidad, menú)
+  js/fracciones.js     ⭐ El teclado de fracciones: se usa al contar y al cobrar
   js/marca.js          Logo del negocio
   js/app.js            Navegación
   js/vistas/           Una pantalla por archivo
@@ -138,6 +139,66 @@ datos/                 Base de datos y respaldos (no se sube a GitHub)
 
 ---
 
+## Cómo se cobra (v0.8)
+
+El hielo se vende en pedazos de marqueta, y **cada pedazo tiene su propio
+precio**. No se saca dividiendo: el 1/16 se cobra más caro de lo
+proporcional porque da más trabajo cortarlo.
+
+| Pedazo | Precio de arranque |
+|---|---|
+| 1 marqueta | $264.00 |
+| 1/2 | $135.00 |
+| 1/4 | $70.00 |
+| 1/8 | $36.00 |
+| 1/16 | $18.00 |
+
+Se editan en **Punto de venta → Precios** (solo el administrador).
+
+### Por qué no puede cobrarse de más ni de menos
+
+Para cobrar una cantidad cualquiera, el sistema la parte siempre en los
+pedazos más grandes posibles y suma sus precios:
+
+```
+3/8  →  1/4 + 1/8  →  $70 + $36  =  $106.00
+```
+
+Como la partición es siempre la misma, tocar seis veces 1/16 da exactamente
+el mismo total que tocar 1/4 y 1/8. **El precio no depende de quién atienda
+ni de cómo teclee.** Y el total lo calcula el servidor, no la pantalla.
+
+### El ticket no se corrige, se cancela
+
+Un ticket cobrado nunca se edita ni se borra. Si algo salió mal se
+**cancela**, y la cancelación guarda el motivo, la hora y el nombre de quien
+la hizo. El ticket original sigue existiendo para siempre. Cancelar una
+venta devuelve el hielo al cuarto frío automáticamente.
+
+Cancelar es del **gerente** y del **administrador**; el cajero solo vende.
+
+---
+
+## El cuadre del cuarto frío (v0.7 + v0.8)
+
+A las 3 y a las 8 alguien cuenta lo que queda. El conteo se captura tal como
+se dicta: **"14 marquetas y 5/8"**, escrito así o con los botones
+`1 · 1/2 · 1/4 · 1/8 · 1/16`.
+
+```
+    había  +  se produjo  −  se vendió con ticket  =  debería quedar
+    debería quedar  −  contado  =  FALTA
+```
+
+**Falta** es lo que salió del cuarto frío sin ticket: lo que se derritió, lo
+que se cayó y lo que se fue sin pagar. Ese es el número a vigilar, y hasta
+la v0.8 no existía: iba escondido dentro de "salidas".
+
+Cada conteo guarda esos números **congelados**. Si mañana se cancela una
+venta vieja o se corrige una sacada, el corte que ya se firmó no cambia.
+
+---
+
 ## Las reglas de oro (del plan)
 
 Están escritas en el código, no solo en el documento:
@@ -148,7 +209,7 @@ Están escritas en el código, no solo en el documento:
 | 3.2 | Todo es un movimiento inmutable | `src/modulos/produccion/estado.js` |
 | 3.3 | UUID interno estable, nombre editable | `src/lib/ids.js` |
 | 3.4 | Nada se borra: baja con fecha | columnas `activo` / `fecha_baja` |
-| 3.5 | El precio se copia dentro de la venta | llega en v0.4 |
+| 3.5 | El precio se copia dentro de la venta | `src/modulos/ventas/precios.js`, columna `venta_lineas.precio_centavos` |
 | 3.6 | Doble responsable: ejecutor y capturista | tabla `bitacora` |
 
 ---
@@ -183,11 +244,10 @@ versión nueva le aparece un punto rojo en el menú.
 | **v0.5.1** | Autorización al primer toque con vales, ajustes de formulario | ✅ listo |
 | **v0.6** | Respaldos automáticos dentro y fuera de la PC | ✅ listo |
 | **v0.7** | La Existencia: conteo del cuarto frío y cuadre del día | ✅ listo |
-| v0.8 | Punto de venta: fracciones, precios y tickets | siguiente |
-| v0.4 | Punto de venta: fracciones, precios por fracción, tickets | |
-| v0.5 | Caja: sesiones, vales, arqueos y cortes | |
-| v0.6 | Clientes, mayoreo, crédito y autorizaciones | |
-| v0.7 | Mantenimiento: equipos, tareas, insumos, checklists | |
-| v0.8 | Planta de agua y garrafones | |
-| v0.9 | Reparto, mapas y neveras en comodato | |
-| v1.0 | Sistema completo en producción | |
+| **v0.8** | Punto de venta, conteo con fracciones, vendido vs faltante | ✅ listo |
+| v0.9 | Caja: sesiones, vales, arqueos y cortes | siguiente |
+| v0.10 | Clientes, mayoreo, crédito y autorizaciones | |
+| v0.11 | Mantenimiento: equipos, tareas, insumos, checklists | |
+| v0.12 | Planta de agua y garrafones | |
+| v0.13 | Reparto, mapas y neveras en comodato | |
+| v1.0 | Sistema completo en producción, con manual de ayuda | |

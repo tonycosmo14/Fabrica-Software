@@ -2,6 +2,9 @@
  * Pruebas de la Existencia: el cuadre del cuarto frío.
  *
  *     existencia anterior + producido − contado = SALIDAS
+ *     salidas − vendido = FALTANTE
+ *
+ * Todo viaja en DIECISEISAVOS: 6 marquetas son 96.
  */
 const test = require('node:test');
 const assert = require('node:assert');
@@ -86,18 +89,19 @@ test('lo que sale de los tanques suma a lo que debería haber', async () => {
 
   const { json } = await llamar('/api/existencia');
   const a = json.datos.almacenes[0];
-  assert.equal(a.enMarquetas.anterior, 0);
-  assert.equal(a.enMarquetas.producido, moldes);
-  assert.equal(a.enMarquetas.teorico, moldes);
+  assert.equal(a.existenciaAnterior, 0);
+  assert.equal(a.producido, moldes * 16);
+  assert.equal(a.teorico, moldes * 16);
+  assert.equal(a.textos.teorico, String(moldes));
 });
 
 test('el primer conteo solo fija el punto de partida', async () => {
   const r = await llamar('/api/existencia/conteos', {
-    method: 'POST', cuerpo: { almacenId, marquetas: 6 }
+    method: 'POST', cuerpo: { almacenId, dieciseisavos: 6 * 16 }
   });
   assert.equal(r.estado, 201);
   assert.equal(r.json.datos.resumen.primerConteo, true);
-  assert.equal(r.json.datos.resumen.contado, 6);
+  assert.equal(r.json.datos.resumen.contado, 96);
 });
 
 test('el segundo conteo revela lo que salió del cuarto frío', async () => {
@@ -105,29 +109,74 @@ test('el segundo conteo revela lo que salió del cuarto frío', async () => {
 
   // De las 12 que debería haber, solo quedan 4: salieron 8.
   const r = await llamar('/api/existencia/conteos', {
-    method: 'POST', cuerpo: { almacenId, marquetas: 4 }
+    method: 'POST', cuerpo: { almacenId, dieciseisavos: 4 * 16 }
   });
   const s = r.json.datos.resumen;
 
-  assert.equal(s.anterior, 6);
-  assert.equal(s.producido, 6);
-  assert.equal(s.teorico, 12);
-  assert.equal(s.contado, 4);
-  assert.equal(s.salidas, 8);
+  assert.equal(s.anterior, 6 * 16);
+  assert.equal(s.producido, 6 * 16);
+  assert.equal(s.teorico, 12 * 16);
+  assert.equal(s.contado, 4 * 16);
+  assert.equal(s.salidas, 8 * 16);
+  // Todavía no hay punto de venta en esta prueba: nada explica esas salidas.
+  assert.equal(s.vendido, 0);
+  assert.equal(s.faltante, 8 * 16);
 });
 
 test('si sobran marquetas, las salidas salen en negativo', async () => {
   const r = await llamar('/api/existencia/conteos', {
-    method: 'POST', cuerpo: { almacenId, marquetas: 10 }
+    method: 'POST', cuerpo: { almacenId, dieciseisavos: 10 * 16 }
   });
   // Debería haber 4 (no se produjo nada) y hay 10: sobran 6.
-  assert.equal(r.json.datos.resumen.salidas, -6);
+  assert.equal(r.json.datos.resumen.salidas, -6 * 16);
 });
 
-test('el conteo se guarda en dieciseisavos, aunque se capture en marquetas', () => {
+test('el conteo se guarda en dieciseisavos enteros', () => {
   const c = bd.prepare('SELECT * FROM conteos ORDER BY fecha DESC LIMIT 1').get();
   assert.equal(c.contado, 10 * 16);
   assert.equal(Number.isInteger(c.contado), true);
+});
+
+/**
+ * En la fábrica el conteo se dicta con fracción: "quedan 14 marquetas y 5/8".
+ * Si el sistema solo aceptara enteros, ese 5/8 se perdería todos los días.
+ */
+test('el conteo acepta marquetas con fracción: 14 y 5/8', async () => {
+  const r = await llamar('/api/existencia/conteos', {
+    method: 'POST', cuerpo: { almacenId, dieciseisavos: 14 * 16 + 10 }
+  });
+  assert.equal(r.estado, 201);
+  assert.equal(r.json.datos.resumen.contado, 234);
+
+  const c = bd.prepare('SELECT * FROM conteos ORDER BY fecha DESC LIMIT 1').get();
+  assert.equal(c.contado, 234);
+
+  const { json } = await llamar('/api/existencia');
+  assert.equal(json.datos.almacenes[0].textos.anterior, '14 5/8');
+});
+
+test('otra fracción de las que se dictan: 30 y 11/16', async () => {
+  const r = await llamar('/api/existencia/conteos', {
+    method: 'POST', cuerpo: { almacenId, dieciseisavos: 30 * 16 + 11 }
+  });
+  assert.equal(r.json.datos.resumen.contado, 491);
+
+  const { json } = await llamar('/api/existencia');
+  assert.equal(json.datos.almacenes[0].textos.anterior, '30 11/16');
+});
+
+test('sigue aceptando marquetas enteras, como lo mandaban las pantallas viejas', async () => {
+  const r = await llamar('/api/existencia/conteos', {
+    method: 'POST', cuerpo: { almacenId, marquetas: 7 }
+  });
+  assert.equal(r.json.datos.resumen.contado, 7 * 16);
+});
+
+test('una cantidad que no es entera de dieciseisavos se rechaza', async () => {
+  const r = await llamar('/api/existencia/conteos', {
+    method: 'POST', cuerpo: { almacenId, dieciseisavos: 12.5 }
+  });
+  assert.equal(r.estado, 400);
 });
 
 test('el conteo congela los números: corregir producción vieja no lo cambia', async () => {
@@ -175,7 +224,8 @@ test('se puede dar de alta un segundo cuarto frío que no recibe producción', a
   const { json } = await llamar('/api/existencia');
   const bodega = json.datos.almacenes.find((a) => a.almacen.nombre === 'Bodega chica');
   assert.equal(bodega.producido, 0);          // no recibe lo de los tanques
-  assert.equal(bodega.enMarquetas.teorico, 0);
+  assert.equal(bodega.teorico, 0);
+  assert.equal(bodega.textos.teorico, '0');
 });
 
 test('no se puede dejar la fábrica sin un cuarto que reciba la producción', async () => {
@@ -209,7 +259,7 @@ test('un cajero cuenta pero no configura ni anula', async () => {
   await llamar('/api/auth/entrar-pin', { method: 'POST', cuerpo: { usuarioId: rosa.id, pin: '4444' } });
 
   const cuenta = await llamar('/api/existencia/conteos', {
-    method: 'POST', cuerpo: { almacenId, marquetas: 3 }
+    method: 'POST', cuerpo: { almacenId, dieciseisavos: 3 * 16 }
   });
   assert.equal(cuenta.estado, 201);
 

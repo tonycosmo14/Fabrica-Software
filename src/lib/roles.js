@@ -14,6 +14,7 @@ const PERMISOS_POR_ROL = {
     'caja.ver',
     'caja.operar',
     'venta.registrar',
+    'venta.ver',
     'existencia.ver',
     'existencia.contar'
   ],
@@ -29,6 +30,8 @@ const PERMISOS_POR_ROL = {
     'caja.ver',
     'caja.operar',
     'venta.registrar',
+    'venta.ver',
+    'venta.cancelar',
     'existencia.ver',
     'existencia.contar',
     'existencia.corregir',
