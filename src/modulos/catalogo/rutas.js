@@ -13,6 +13,7 @@ const { aCentavos } = require('../../lib/dinero');
 const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
 const { categoriasActivas, productosActivos } = require('./catalogo');
+const fotos = require('./fotos');
 
 const router = express.Router();
 
@@ -151,7 +152,35 @@ function leerProducto(cuerpo, anterior = null) {
     return { error: 'El código son hasta 12 letras o números, sin espacios.' };
   }
 
-  return { nombre, tipo, dieciseisavos, centavos, codigo };
+  // Costo de compra: sirve para saber la ganancia. Puede quedar vacío.
+  let costo = anterior?.costo_centavos ?? null;
+  if (cuerpo?.costo !== undefined) {
+    const texto = String(cuerpo.costo ?? '').replace(/[^0-9.]/g, '');
+    if (texto === '') costo = null;
+    else {
+      try { costo = aCentavos(texto); }
+      catch { return { error: 'Ese costo no es válido.' }; }
+      if (costo > 100000000) return { error: 'Ese costo es demasiado alto.' };
+    }
+  }
+
+  // Aviso de "ya hay que pedir".
+  let minimo = anterior?.minimo ?? null;
+  if (cuerpo?.minimo !== undefined) {
+    const texto = String(cuerpo.minimo ?? '').replace(/[^0-9]/g, '');
+    minimo = texto === '' ? null : Number(texto);
+    if (minimo !== null && (!Number.isInteger(minimo) || minimo < 0 || minimo > 1000000)) {
+      return { error: 'Ese mínimo no es válido.' };
+    }
+  }
+
+  // El hielo nunca lleva inventario de piezas: se mide en marquetas y ya
+  // tiene su control en la Existencia.
+  let llevaInventario = anterior?.lleva_inventario ?? 0;
+  if (cuerpo?.llevaInventario !== undefined) llevaInventario = cuerpo.llevaInventario ? 1 : 0;
+  if (tipo === 'hielo') llevaInventario = 0;
+
+  return { nombre, tipo, dieciseisavos, centavos, codigo, costo, minimo, llevaInventario };
 }
 
 router.post('/productos', configurar, (req, res) => {
@@ -176,11 +205,13 @@ router.post('/productos', configurar, (req, res) => {
 
   bd.prepare(`
     INSERT INTO productos (id, codigo, nombre, categoria_id, tipo, dieciseisavos,
-                           precio_centavos, color, orden, activo, fecha_alta, creado_por)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                           precio_centavos, color, orden, activo, fecha_alta, creado_por,
+                           costo_centavos, minimo, lleva_inventario)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
   `).run(id, datos.codigo, datos.nombre, categoria.id, datos.tipo,
          datos.dieciseisavos, datos.centavos, req.body?.color || null,
-         orden, ahora(), req.usuario.id);
+         orden, ahora(), req.usuario.id,
+         datos.costo, datos.minimo, datos.llevaInventario);
 
   bitacora.registrar({
     accion: 'producto.alta', entidad: 'producto', entidadId: id,
@@ -213,12 +244,14 @@ router.put('/productos/:id', configurar, (req, res) => {
 
   bd.prepare(`
     UPDATE productos SET codigo = ?, nombre = ?, categoria_id = ?, tipo = ?,
-      dieciseisavos = ?, precio_centavos = ?, color = ?, orden = ?
+      dieciseisavos = ?, precio_centavos = ?, color = ?, orden = ?,
+      costo_centavos = ?, minimo = ?, lleva_inventario = ?
     WHERE id = ?
   `).run(datos.codigo, datos.nombre, categoria.id, datos.tipo,
          datos.dieciseisavos, datos.centavos,
          req.body?.color !== undefined ? req.body.color : p.color,
          req.body?.orden !== undefined ? Number(req.body.orden) || 0 : p.orden,
+         datos.costo, datos.minimo, datos.llevaInventario,
          p.id);
 
   bitacora.registrar({
@@ -227,6 +260,40 @@ router.put('/productos/:id', configurar, (req, res) => {
   });
 
   return ok(res, { producto: bd.prepare('SELECT * FROM productos WHERE id = ?').get(p.id) });
+});
+
+/**
+ * La foto del producto. Llega como texto "data:image/png;base64,..." desde
+ * el navegador, igual que el logo.
+ */
+router.post('/productos/:id/foto', configurar, (req, res) => {
+  const p = bd.prepare('SELECT * FROM productos WHERE id = ?').get(req.params.id);
+  if (!p) return error(res, 'Ese producto no existe.', 404);
+
+  const r = fotos.guardar(p.id, req.body?.archivo);
+  if (r.error) return error(res, r.error);
+
+  bd.prepare('UPDATE productos SET foto = ? WHERE id = ?').run(r.archivo, p.id);
+  bitacora.registrar({
+    accion: 'producto.foto', entidad: 'producto', entidadId: p.id,
+    ejecutorId: req.usuario.id, detalle: { nombre: p.nombre }
+  });
+
+  return ok(res, { producto: bd.prepare('SELECT * FROM productos WHERE id = ?').get(p.id) });
+});
+
+router.post('/productos/:id/foto/quitar', configurar, (req, res) => {
+  const p = bd.prepare('SELECT * FROM productos WHERE id = ?').get(req.params.id);
+  if (!p) return error(res, 'Ese producto no existe.', 404);
+
+  fotos.quitar(p.id);
+  bd.prepare('UPDATE productos SET foto = NULL WHERE id = ?').run(p.id);
+  bitacora.registrar({
+    accion: 'producto.foto.quitada', entidad: 'producto', entidadId: p.id,
+    ejecutorId: req.usuario.id, detalle: { nombre: p.nombre }
+  });
+
+  return ok(res, { quitada: true });
 });
 
 router.post('/productos/:id/baja', configurar, (req, res) => {

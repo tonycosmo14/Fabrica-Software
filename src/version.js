@@ -12,9 +12,30 @@
  * tipo: 'nuevo' | 'mejora' | 'arreglo' | 'importante'
  */
 
-const VERSION_ACTUAL = '0.12';
+const VERSION_ACTUAL = '0.13';
 
 const VERSIONES = [
+  {
+    numero: '0.13',
+    nombre: 'Productos con foto, costo e inventario',
+    fecha: '2026-08-23',
+    resumen:
+      'La pantalla de productos rehecha para la PC, con fotos en los ' +
+      'botones, el costo de cada cosa y el inventario de lo que no es hielo.',
+    cambios: [
+      { tipo: 'importante', texto: 'Productos y precios rehecha: tres columnas a lo ancho y sin desplazar la página. Solo se mueven las listas.' },
+      { tipo: 'importante', texto: 'El hielo va aparte, arriba del todo. No es un producto más: es el 80% del negocio y sus precios se forman de otra manera.' },
+      { tipo: 'nuevo', texto: 'FOTO en cada producto. Con foto el cajero no lee el botón, lo reconoce, y se equivoca menos.' },
+      { tipo: 'nuevo', texto: 'Costo de compra y ganancia por pieza a la vista.' },
+      { tipo: 'importante', texto: 'INVENTARIO de lo que no es hielo: había + entró − se vendió = debería haber. Y al contar, cuánto falta. La misma cuenta que el cuarto frío, pero a otro ritmo: los refrescos se cuentan cuando toca, no dos veces al día.' },
+      { tipo: 'nuevo', texto: 'Aviso de "ya hay que pedir" cuando un producto baja de su mínimo. Arriba dice cuántos van.' },
+      { tipo: 'nuevo', texto: 'Hoja para contar imprimible, con su renglón en blanco para ir apuntando.' },
+      { tipo: 'nuevo', texto: 'El costo de cada compra queda guardado con esa compra: si mañana sube el proveedor, lo que costó ayer no cambia.' },
+      { tipo: 'importante', texto: 'La línea de venta ahora guarda CUÁNTAS PIEZAS. Sin eso, "2 × Coca" habría descontado un solo refresco del inventario.' },
+      { tipo: 'arreglo', texto: 'Escribir −5 piezas se convertía en 5 al limpiar el texto. Ahora se rechaza: borrarle el signo habría metido una entrada que nadie pidió.' }
+    ],
+    siguiente: 'v0.14 — Clientes registrados y crédito.'
+  },
   {
     numero: '0.12',
     nombre: 'Dos clientes a la vez y cambios de ticket',
@@ -31,7 +52,6 @@ const VERSIONES = [
       { tipo: 'arreglo', texto: 'El campo del código se quedaba con el enter durante el cobro, así que el enter que confirma no llegaba. Pasaba solo cuando no había que cobrar nada.' },
       { tipo: 'arreglo', texto: 'La fila de botones de arriba se metía como columna y descuadraba la pantalla.' }
     ],
-    siguiente: 'v0.13 — Productos con foto, inventario y costos.'
   },
   {
     numero: '0.11',

@@ -3,7 +3,7 @@
 Sistema para la fábrica de hielo de Hunucmá, Yucatán.
 Se construye **por versiones**: cada versión es un pedazo terminado, probado y usable.
 
-**Versión actual: v0.12**
+**Versión actual: v0.13**
 
 ---
 
@@ -115,6 +115,7 @@ src/
   modulos/             Un módulo por área. Agregar uno no toca los demás
     auth/  usuarios/  tanques/  produccion/  existencia/  ventas/  caja/
     catalogo/  impresion/  ayuda/  personalizacion/  versiones/  sistema/
+                └ productos, categorías, fotos e inventario
 
 public/                La interfaz (HTML, CSS y JavaScript sin librerías)
   index.html
@@ -128,7 +129,7 @@ public/                La interfaz (HTML, CSS y JavaScript sin librerías)
 
 herramientas/          Utilidades del proyecto (genera el icono)
 pruebas/               Pruebas automáticas
-datos/                 Base de datos y respaldos (no se sube a GitHub)
+datos/                 Base de datos, respaldos, logo y fotos (no se sube a GitHub)
 ```
 
 ### La idea de fondo
@@ -269,6 +270,29 @@ venta vieja o se corrige una sacada, el corte que ya se firmó no cambia.
 
 ---
 
+## Los dos inventarios, y por qué están separados
+
+| | **Existencia** (el hielo) | **Inventario** (lo demás) |
+|---|---|---|
+| Qué contesta | ¿cuadra lo de hoy? | ¿qué hay que pedir? |
+| Cada cuándo | dos veces al día, 3 y 8 | cuando toca |
+| Se mide en | marquetas y fracciones | piezas |
+| Dónde vive | pantalla **Existencia** | **Productos y precios** |
+
+La cuenta es la misma a propósito, para que quien entendió una entienda la
+otra:
+
+```
+    había + entró − salió = debería haber
+    debería haber − contado = FALTA
+```
+
+Lo que cambia es el ritmo. El hielo se cuenta dos veces al día porque se
+derrite y es el 80% del negocio; un refresco se cuenta cuando toca. Meterlos
+en la misma pantalla obligaría a uno de los dos a fingir el ritmo del otro.
+
+---
+
 ## El relevo de turno
 
 En la fábrica la existencia se entrega como a las **2:30** y el cajero que
@@ -386,8 +410,8 @@ versión nueva le aparece un punto rojo en el menú.
 | **v0.10** | Caja táctil: catálogo, teclado rápido, ticket corto | ✅ listo |
 | **v0.11** | Impresión ESC/POS desde el servidor, relevo de turno, reimpresión | ✅ listo |
 | **v0.12** | Ventas en espera y cambios de ticket | ✅ listo |
-| v0.13 | Productos con foto, inventario y costos | siguiente |
-| v0.14 | Clientes registrados y crédito | |
+| **v0.13** | Productos con foto, costo e inventario | ✅ listo |
+| v0.14 | Clientes registrados y crédito | siguiente |
 | v0.15 | Reparto, pedidos y neveras en comodato | |
 | v0.16 | Planta de agua: garrafones, botellas y depósitos | |
 | v0.17 | Mantenimiento: compresores, ósmosis, membranas, horario punta | |

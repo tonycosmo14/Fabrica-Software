@@ -174,6 +174,8 @@ function prepararLineas(lineas, lista) {
       productoId: producto?.id || null,
       concepto: String(c.concepto).slice(0, 40),
       dieciseisavos: c.dieciseisavos,
+      // Cuántas piezas: el inventario descuenta por esto, no por renglones.
+      cantidad,
       centavos: c.centavos,
       desglose: c.desglose
     });
@@ -211,12 +213,13 @@ function crearVenta({ lineas, total, pago, lista, almacenId, cajeroId, capturist
 
     const insertar = bd.prepare(`
       INSERT INTO venta_lineas
-        (id, venta_id, concepto, dieciseisavos, precio_centavos, desglose, producto_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+        (id, venta_id, concepto, dieciseisavos, precio_centavos, desglose,
+         producto_id, cantidad)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
     for (const l of lineas) {
       insertar.run(nuevoId(), id, l.concepto, l.dieciseisavos, l.centavos,
-                   l.desglose, l.productoId);
+                   l.desglose, l.productoId, l.cantidad ?? 1);
     }
     return folio;
   });

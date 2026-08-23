@@ -286,7 +286,7 @@ debería haber − contado = DIFERENCIA</pre>
   {
     id: 'productos',
     titulo: 'Productos y precios: qué aparece en la caja',
-    busca: 'productos categorías catálogo precios códigos alta baja refrescos garrafones botones color impresora ticket térmica imprimir',
+    busca: 'productos categorías catálogo precios códigos alta baja refrescos garrafones botones color impresora ticket térmica imprimir inventario costo ganancia foto pedir mínimo contar existencias piezas',
     cuerpo: `
       <p>Los botones de la caja se dan de alta en <b>Productos y precios</b>,
       sin tocar el programa. Solo el administrador.</p>
@@ -310,6 +310,38 @@ debería haber − contado = DIFERENCIA</pre>
       del hielo vienen puestos: <b>1</b> la marqueta, <b>12</b> la mitad,
       <b>14</b>, <b>18</b> y <b>116</b>. A un refresco le puedes poner
       <b>COCA</b>. Puede quedar vacío si no lo necesitas.</p>
+
+      <h4>La foto</h4>
+      <p>Cada producto puede llevar foto. No es adorno: con foto el cajero no
+      lee el botón, <b>lo reconoce</b>, y se equivoca menos. Se pone desde el
+      producto, en el panel de la derecha.</p>
+
+      <h4>Inventario: ¿qué hay que pedir?</h4>
+      <p>Los refrescos, garrafones y botellas pueden llevar cuenta de piezas.
+      El hielo <b>no</b>: se mide en marquetas y su control es la
+      <b>Existencia</b> del cuarto frío, que se cuenta dos veces al día. Son
+      dos preguntas distintas con dos ritmos distintos.</p>
+
+      <pre class="ayuda-formula">había + entró − se vendió − otras salidas = debería haber
+debería haber − contado = FALTA</pre>
+
+      <ul class="instrucciones">
+        <li><b>Llegó mercancía</b> — cuando surte el proveedor. Se anota
+        cuántas y <b>a cómo salió cada una</b>: ese costo queda guardado tal
+        cual, así que si mañana sube el proveedor, esta compra no cambia.</li>
+        <li><b>Salida</b> — lo que sale sin venderse: se rompió, caducó, se lo
+        llevaron.</li>
+        <li><b>Contar</b> — cuentas lo que hay y el sistema dice si falta.</li>
+      </ul>
+
+      <p>Si pones un <b>mínimo</b>, arriba aparece cuántos productos ya hay que
+      pedir. Y con <b>Hoja para contar</b> sacas la lista impresa, con su
+      renglón en blanco para ir apuntando.</p>
+
+      <h4>Costo y ganancia</h4>
+      <p>Si le pones el costo a un producto, el sistema te dice cuánto ganas
+      por pieza. El costo de cada compra se guarda con esa compra; el del
+      producto es el de la última.</p>
 
       <h4>Quitar un producto</h4>
       <p>Se da de <b>baja</b>: deja de aparecer en la caja, pero

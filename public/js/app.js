@@ -37,7 +37,7 @@ const RUTAS = {
   '#/existencia': { titulo: 'Existencia',       vista: vistaExistencia, permiso: 'existencia.ver' },
   '#/config-tanques': { titulo: 'Configurar tanques', vista: vistaTanques, permiso: 'tanques.configurar' },
   '#/usuarios':  { titulo: 'Usuarios',          vista: vistaUsuarios,  permiso: 'usuarios.administrar' },
-  '#/productos': { titulo: 'Productos y precios', vista: vistaProductos, permiso: 'sistema.configurar' },
+  '#/productos': { titulo: 'Productos y precios', vista: vistaProductos, permiso: 'sistema.configurar', fija: true },
   '#/personalizar': { titulo: 'Personalizar',   vista: vistaPersonalizar, permiso: 'sistema.configurar' },
   '#/sistema':   { titulo: 'Sistema',           vista: vistaSistema,   permiso: 'sistema.ver' },
   '#/ayuda':     { titulo: 'Ayuda',              vista: vistaAyuda },

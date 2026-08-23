@@ -7,6 +7,42 @@ Tipos: `nuevo` (funcionalidad nueva) · `mejora` · `arreglo` · `clave` (regla 
 
 ---
 
+## v0.13 — Productos con foto, costo e inventario · 23 de agosto de 2026
+
+Migración `012_inventario.sql`.
+
+### La pantalla
+
+- **clave** — Rehecha para la PC, que es donde se usa: **tres columnas a lo ancho y sin desplazar la página**. Categorías, productos y el detalle de lo que se está editando. Solo se mueven las listas.
+- **clave** — **El hielo va aparte**, arriba del todo. No es un producto más: es el 80% del negocio, sus precios se forman de otra manera y su inventario es la Existencia del cuarto frío. En la misma lista que los refrescos quedaría escondido.
+- **arreglo** — Las columnas usan flexbox, no rejilla de filas fijas: cada una tiene distinto número de piezas y con filas fijas alguna se estiraba y dejaba un hueco en medio.
+- **arreglo** — Los renglones de lista heredaban el `justify-content: center` del botón normal y salían centrados; una lista se lee de izquierda a derecha.
+
+### Fotos
+
+- **nuevo** — Cada producto puede llevar foto. No es adorno: con foto el cajero **reconoce** el botón en vez de leerlo.
+- **clave** — Viven en `datos/fotos`, no dentro del programa: al actualizar se reemplazan los archivos del programa y ahí se perderían.
+- **clave** — Se acepta PNG, JPG y WEBP, y **se comprueba la firma del archivo**, no lo que diga el navegador. SVG no: es texto que puede traer código dentro, y una foto de producto no tiene por qué serlo.
+- **clave** — El nombre del archivo lleva la hora, así que se puede cachear para siempre y aun así cambiar la foto sin que el navegador enseñe la vieja.
+- **arreglo** — El lector de datos general acepta 1 MB y una foto no cabe. El módulo del catálogo lleva el suyo, de 4 MB, **montado antes** del general: si el general corriera primero, ya habría rechazado la foto.
+
+### Inventario de lo que no es hielo
+
+    había + entró − se vendió − otras salidas = debería haber
+    debería haber − contado = FALTA
+
+- **clave** — La misma cuenta que la existencia del cuarto frío, a propósito, pero **a otro ritmo**: el hielo se cuenta dos veces al día porque se derrite; un refresco se cuenta cuando toca, y lo que se quiere saber de él es qué hay que pedir. Por eso vive en Productos y no en Existencia.
+- **clave** — No hay columna con "cuántos hay": se **calcula de los movimientos** (regla 3.2). Un número guardado se desincroniza el día que algo se corte a la mitad.
+- **clave** — `venta_lineas` guarda ahora **cuántas piezas**. Hasta hoy no hacía falta —al hielo lo cuentan los dieciseisavos— pero sin eso, "2 × Coca" habría descontado un solo refresco.
+- **nuevo** — Entradas con su costo, salidas con su motivo, y conteos que fijan el nuevo punto de partida.
+- **clave** — El costo se **copia en el movimiento** (regla 3.5): si mañana sube el proveedor, lo que costó la compra de ayer no cambia.
+- **nuevo** — Mínimo por producto y aviso de "ya hay que pedir", con la cuenta arriba.
+- **nuevo** — **Hoja para contar** imprimible, con su renglón en blanco.
+- **nuevo** — Costo y **ganancia por pieza** a la vista en el producto.
+- **arreglo** — `leerPiezas` limpiaba el texto quitando lo que no fueran dígitos, así que `-5` se convertía en una entrada de 5 piezas que nadie pidió. Ahora lo que no sea un entero se rechaza.
+
+---
+
 ## v0.12 — Dos clientes a la vez y cambios de ticket · 23 de agosto de 2026
 
 Migración `011_cambios.sql`.

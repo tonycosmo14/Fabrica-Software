@@ -1908,3 +1908,115 @@ body.pantalla-fija main {
   border-radius: 8px; padding: 10px 12px; margin-bottom: 14px;
   font-size: 14px; font-weight: 600; text-align: center;
 }
+
+
+/* ============================================================
+   PRODUCTOS, PRECIOS E INVENTARIO (v0.13)
+
+   Se usa casi siempre en la PC: tres columnas a lo ancho y sin
+   desplazar la página. Solo las listas se mueven.
+   ============================================================ */
+
+.cfg { display: grid; grid-template-rows: auto 1fr; height: 100%; min-height: 0; padding: 12px; gap: 10px; }
+
+.cfg-cabeza {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 12px; flex-wrap: wrap;
+}
+.cfg-cabeza h2 { margin: 0; }
+.cfg-cabeza-acciones { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+.cfg-tablero { display: grid; gap: 10px; min-height: 0; }
+
+ /* Flexbox y no rejilla: cada columna tiene un número distinto de piezas
+   (la de la izquierda lleva el hielo encima), y con filas fijas alguna se
+   estiraba y dejaba un hueco en medio. Lo que crece es la lista. */
+.cfg-columna {
+  display: flex; flex-direction: column; gap: 8px; min-height: 0;
+  background: var(--superficie); border: 1px solid var(--borde);
+  border-radius: var(--radio); padding: 12px;
+}
+.cfg-columna > .cfg-lista { flex: 1; }
+.cfg-detalle { overflow-y: auto; display: block; }
+
+.cfg-titulo {
+  margin: 0; font-size: 12.5px; font-weight: 700; color: var(--suave);
+  text-transform: uppercase; letter-spacing: .7px;
+  display: flex; align-items: center; gap: 8px;
+}
+.cfg-subtitulo { margin: 20px 0 8px; font-size: 15px; color: var(--primario); }
+
+.cfg-lista { overflow-y: auto; min-height: 0; display: grid; gap: 4px; align-content: start; }
+
+/* El botón normal centra su contenido; un renglón de lista no: se lee de
+   izquierda a derecha y las fotos tienen que quedar alineadas entre sí. */
+.cfg-item {
+  display: flex; align-items: center; justify-content: flex-start;
+  gap: 10px; text-align: left;
+  min-width: 0; min-height: 0; padding: 9px 10px; font-size: 15px; font-weight: 500;
+  background: transparent; color: var(--texto); border: 2px solid transparent;
+  border-radius: 10px;
+}
+.cfg-item:hover { background: var(--superficie-alt); }
+.cfg-item.activo { background: var(--et-operario-f); border-color: var(--primario); }
+.cfg-item strong { display: block; font-size: 15px; font-weight: 700; }
+.cfg-item small { display: block; color: var(--suave); font-size: 12.5px; font-weight: 400; }
+.cfg-item .crece { min-width: 0; }
+
+.cfg-foto {
+  width: 38px; height: 38px; flex: none; border-radius: 8px; object-fit: cover;
+  background: var(--superficie-alt);
+}
+.cfg-foto-vacia {
+  display: grid; place-items: center; font-size: 18px; opacity: .5;
+  border: 1px dashed var(--borde-fuerte);
+}
+.cfg-foto-vacia.grande { width: 100%; height: 100%; font-size: 40px; }
+
+.cfg-stock {
+  font-variant-numeric: tabular-nums; font-weight: 700 !important;
+  color: var(--suave) !important; font-size: 15px !important;
+}
+.cfg-stock.bajo { color: var(--rojo) !important; }
+
+.cfg-hielo {
+  display: block; text-align: left; min-width: 0; padding: 12px 14px;
+  width: 100%;
+  background: var(--et-operario-f); color: var(--et-operario-t);
+  border: 2px solid transparent;
+}
+.cfg-hielo.activo { border-color: var(--primario); }
+.cfg-hielo strong { display: block; font-size: 16px; }
+.cfg-hielo small { display: block; font-size: 12.5px; opacity: .8; font-weight: 400; }
+
+.cfg-detalle-cabeza { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 16px; }
+.cfg-foto-grande {
+  position: relative; width: 96px; height: 96px; flex: none;
+  border-radius: 12px; overflow: hidden; background: var(--superficie-alt);
+}
+.cfg-foto-grande img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cfg-foto-grande .tachita { width: 28px; min-width: 28px; height: 28px; min-height: 28px;
+  top: 4px; right: 4px; font-size: 13px; padding: 0; }
+
+.subir.chico {
+  min-height: 0; padding: 8px 14px; font-size: 13.5px; display: inline-flex;
+}
+.enlace {
+  min-width: 0; min-height: 0; padding: 0; background: none; border: 0;
+  color: var(--acento); font-size: 12px; font-weight: 700; text-decoration: underline;
+  text-transform: none; letter-spacing: 0;
+}
+.cuadre-linea strong.malo { color: var(--rojo); }
+button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; padding: 9px 14px; font-size: 13.5px; }
+
+@media (min-width: 1000px) {
+  .cfg-tablero { grid-template-columns: 230px minmax(280px, 1fr) minmax(320px, 1.2fr); }
+}
+@media (max-width: 999px) {
+  /* En pantalla angosta la página vuelve a desplazarse: tres columnas
+     apiladas no caben en un alto fijo. */
+  body.pantalla-fija:has(.cfg) { height: auto; overflow: auto; }
+  body.pantalla-fija:has(.cfg) main { overflow: visible; }
+  .cfg { height: auto; }
+  .cfg-lista { max-height: 320px; }
+}

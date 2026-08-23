@@ -27,13 +27,18 @@ function crearApp() {
   app.disable('x-powered-by');
   app.use(cargarUsuario);
 
-  // El logo puede pesar más que el resto de peticiones, así que este módulo
-  // lleva su propio lector de datos, con un límite mayor, y va antes que el
-  // general para que sea el suyo el que aplique.
+  // Las imágenes (el logo, las fotos de producto) pesan más que el resto de
+  // peticiones. Estos módulos llevan su propio lector de datos, con un
+  // límite mayor, y van ANTES que el general para que sea el suyo el que
+  // aplique: si el general corriera primero, ya habría rechazado la foto.
   const personalizacion = require('./modulos/personalizacion/rutas');
   app.use('/api/personalizacion', express.json({ limit: '5mb' }), personalizacion.router);
+  app.use('/api/catalogo', express.json({ limit: '4mb' }),
+          require('./modulos/catalogo/rutas'));
+
   app.get('/marca/logo', personalizacion.servirLogo('logo_claro'));
   app.get('/marca/logo-oscuro', personalizacion.servirLogo('logo_oscuro'));
+  app.get('/fotos/:archivo', require('./modulos/catalogo/fotos').servir);
 
   app.use(express.json({ limit: '1mb' }));
 
@@ -44,7 +49,7 @@ function crearApp() {
   app.use('/api/produccion', require('./modulos/produccion/rutas'));
   app.use('/api/existencia', require('./modulos/existencia/rutas'));
   app.use('/api/impresion', require('./modulos/impresion/rutas'));
-  app.use('/api/catalogo', require('./modulos/catalogo/rutas'));
+  app.use('/api/inventario', require('./modulos/catalogo/rutas-inventario'));
   app.use('/api/caja', require('./modulos/caja/rutas'));
   app.use('/api/ventas', require('./modulos/ventas/rutas'));
   app.use('/api/ayuda', require('./modulos/ayuda/rutas'));
