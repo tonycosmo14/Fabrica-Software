@@ -14,11 +14,12 @@ process.env.CARPETA_DATOS = carpeta;
 process.env.ARCHIVO_BD = path.join(carpeta, 'prueba.db');
 
 const { migrar } = require('../src/db/migrar');
-const { sembrar } = require('../src/semillas');
 const { crearApp } = require('../src/servidor');
 
 migrar({ silencioso: true });
-const admin = sembrar();
+
+// El sistema arranca sin usuarios: el admin se crea desde el asistente.
+const admin = { nombre: 'Tony', usuario: 'tony', contrasena: 'clavelarga1', pin: '1234' };
 
 let servidor, base, cookie = '';
 
@@ -44,6 +45,39 @@ test.after(() => {
   fs.rmSync(carpeta, { recursive: true, force: true });
 });
 
+test('un sistema recien instalado se reporta como no configurado', async () => {
+  const { json } = await llamar('/api/auth/estado-inicial');
+  assert.equal(json.datos.configurado, false);
+});
+
+test('el asistente rechaza una contraseña corta', async () => {
+  const r = await llamar('/api/auth/configuracion-inicial', {
+    method: 'POST', cuerpo: { ...admin, contrasena: 'corta' }
+  });
+  assert.equal(r.estado, 400);
+});
+
+test('el asistente crea el primer administrador y deja la sesion abierta', async () => {
+  const r = await llamar('/api/auth/configuracion-inicial', { method: 'POST', cuerpo: admin });
+  assert.equal(r.estado, 201);
+  assert.equal(r.json.datos.usuario.rol, 'admin');
+
+  const yo = await llamar('/api/auth/yo');
+  assert.equal(yo.json.datos.usuario.nombre, 'Tony');
+});
+
+test('el asistente no se puede usar dos veces', async () => {
+  const r = await llamar('/api/auth/configuracion-inicial', {
+    method: 'POST', cuerpo: { ...admin, usuario: 'otro' }
+  });
+  assert.equal(r.estado, 409);
+});
+
+test('ya configurado, el estado inicial cambia', async () => {
+  const { json } = await llamar('/api/auth/estado-inicial');
+  assert.equal(json.datos.configurado, true);
+});
+
 test('el servidor responde y reporta su version', async () => {
   const { json } = await llamar('/api/sistema/salud');
   assert.ok(json.ok);
@@ -51,7 +85,10 @@ test('el servidor responde y reporta su version', async () => {
 });
 
 test('sin sesion no se pueden ver los usuarios', async () => {
+  const guardada = cookie;
+  cookie = '';
   const { estado } = await llamar('/api/usuarios');
+  cookie = guardada;
   assert.equal(estado, 401);
 });
 

@@ -3,21 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0b4f6c">
-  <title>Fábrica de Hielo</title>
+  <meta name="theme-color" content="#0f4f7f" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#101b25" media="(prefers-color-scheme: dark)">
+  <title>Hielo LOLHA</title>
   <link rel="stylesheet" href="/css/estilo.css">
   <link rel="icon" href="/icono.png">
   <link rel="apple-touch-icon" href="/icono.png">
   <link rel="manifest" href="/manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Fábrica">
+  <meta name="apple-mobile-web-app-title" content="LOLHA">
 </head>
 <body>
 
   <header id="barra" hidden>
     <div class="barra-interior">
       <button id="btn-atras" class="icono" title="Atrás" hidden>‹</button>
-      <h1 id="titulo">Fábrica de Hielo</h1>
+      <h1 id="titulo">Hielo LOLHA</h1>
       <span class="version-barra"><span class="version">—</span></span>
       <button id="btn-menu" class="icono" title="Menú">☰</button>
     </div>
@@ -34,8 +35,17 @@
       <a href="#/usuarios" data-permiso="usuarios.administrar">Usuarios</a>
       <a href="#/sistema" data-permiso="sistema.ver">Sistema</a>
       <a href="#/novedades">Qué hay de nuevo <span id="punto-novedades" class="punto" hidden></span></a>
-      <button id="btn-salir" class="peligro">Cerrar sesión</button>
-      <small class="version-menu">Fábrica de Hielo · <span class="version">—</span></small>
+      <div class="tema-selector">
+        <p>Apariencia</p>
+        <div class="tema-opciones" id="tema-opciones">
+          <button data-tema="claro"  aria-pressed="false">☀️ Claro</button>
+          <button data-tema="oscuro" aria-pressed="false">🌙 Oscuro</button>
+          <button data-tema="auto"   aria-pressed="false">🔄 Auto</button>
+        </div>
+      </div>
+
+      <button id="btn-salir" class="peligro" style="margin-top:14px">Cerrar sesión</button>
+      <small class="version-menu">Hielo LOLHA · <span class="version">—</span></small>
     </div>
   </nav>
 

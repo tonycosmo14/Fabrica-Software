@@ -14,7 +14,7 @@ const express = require('express');
 const config = require('./config');
 const { VERSION_ACTUAL } = require('./version');
 const { migrar } = require('./db/migrar');
-const { sembrar } = require('./semillas');
+const { bd } = require('./db/conexion');
 const { cargarUsuario } = require('./middleware/sesion');
 const { error } = require('./lib/respuestas');
 
@@ -122,14 +122,13 @@ async function arrancar() {
   }
 
   migrar();
-  const admin = sembrar();
 
-  if (admin) {
-    console.log('\n  Primer arranque: se creó el administrador');
-    console.log(`     usuario:    ${admin.usuario}`);
-    console.log(`     contraseña: ${admin.contrasena}`);
-    console.log(`     PIN:        ${admin.pin}`);
-    console.log('     >> Cámbialos desde la pantalla de Usuarios.\n');
+  // El sistema no trae ningun usuario de fabrica. Si la base esta vacia,
+  // la propia aplicacion pide crear la cuenta del administrador al abrirla.
+  const sinUsuarios = bd.prepare('SELECT COUNT(*) n FROM usuarios').get().n === 0;
+  if (sinUsuarios) {
+    console.log('\n  Primer arranque: al abrir el sistema te pedirá crear');
+    console.log('  la cuenta del administrador.\n');
   }
 
   // Con --abrir (el doble clic en INICIAR) el navegador se abre solo,

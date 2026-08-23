@@ -5,7 +5,9 @@
  * asi funciona igual abierta desde la PC o desde el celular.
  */
 import { api } from './api.js';
-import { avisar, esc } from './util.js';
+import { avisar, esc, ETIQUETAS_ROL } from './util.js';
+import { iniciarTema } from './tema.js';
+import { vistaBienvenida } from './vistas/bienvenida.js';
 import { vistaEntrar } from './vistas/entrar.js';
 import { vistaInicio } from './vistas/inicio.js';
 import { vistaUsuarios } from './vistas/usuarios.js';
@@ -16,7 +18,7 @@ const pantalla = document.getElementById('pantalla');
 const barra = document.getElementById('barra');
 const menu = document.getElementById('menu');
 
-const estado = { usuario: null, permisos: [] };
+const estado = { usuario: null, permisos: [], configurado: true };
 
 const RUTAS = {
   '#/inicio':    { titulo: 'Inicio',            vista: vistaInicio },
@@ -29,17 +31,24 @@ function puede(permiso) {
   return !permiso || estado.permisos.includes('*') || estado.permisos.includes(permiso);
 }
 
+function entrar(datos) {
+  Object.assign(estado, datos);
+  estado.configurado = true;
+  location.hash = '#/inicio';
+  iniciar();
+}
+
 async function dibujar() {
-  // Sin sesion: siempre la pantalla de entrada.
+  // Sistema recien instalado: primero se crea la cuenta del administrador.
+  if (!estado.configurado) {
+    barra.hidden = true;
+    return vistaBienvenida(pantalla, { alEntrar: entrar });
+  }
+
+  // Sin sesion: pantalla de entrada.
   if (!estado.usuario) {
     barra.hidden = true;
-    return vistaEntrar(pantalla, {
-      alEntrar: (datos) => {
-        Object.assign(estado, datos);
-        location.hash = '#/inicio';
-        iniciar();
-      }
-    });
+    return vistaEntrar(pantalla, { alEntrar: entrar });
   }
 
   barra.hidden = false;
@@ -68,7 +77,7 @@ function abrirMenu(abierto) {
   menu.hidden = !abierto;
   if (!abierto) return;
   document.getElementById('menu-nombre').textContent = estado.usuario?.nombre || '—';
-  document.getElementById('menu-rol').textContent = estado.usuario?.rol || '';
+  document.getElementById('menu-rol').textContent = ETIQUETAS_ROL[estado.usuario?.rol] || '';
   menu.querySelectorAll('[data-permiso]').forEach((a) => { a.hidden = !puede(a.dataset.permiso); });
 }
 
@@ -79,15 +88,24 @@ async function actualizarPuntoNovedades() {
 
 async function iniciar() {
   try {
-    const datos = await api.obtener('/auth/yo');
-    Object.assign(estado, datos);
-  } catch { /* sin sesion */ }
+    const inicial = await api.obtener('/auth/estado-inicial');
+    estado.configurado = inicial.configurado;
+  } catch { estado.configurado = true; }
+
+  if (estado.configurado) {
+    try {
+      const datos = await api.obtener('/auth/yo');
+      Object.assign(estado, datos);
+    } catch { /* sin sesion */ }
+  }
 
   const { version } = await api.obtener('/sistema/salud');
   document.querySelectorAll('.version').forEach((e) => { e.textContent = 'v' + version; });
 
   await dibujar();
 }
+
+iniciarTema();
 
 // --- Eventos de la barra y el menu ---
 document.getElementById('btn-menu').onclick = () => abrirMenu(true);

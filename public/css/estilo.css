@@ -1,21 +1,119 @@
 /* ============================================================
-   Estilo general. Mobile-first (seccion 12 del plan):
-   botones grandes, mucho color, poco texto.
+   HIELO LOLHA — hoja de estilo
+   ------------------------------------------------------------
+   Mobile-first (seccion 12 del plan): botones grandes, mucho
+   color, poco texto. Funciona igual en celular y en la PC.
+
+   LOS COLORES DE LA MARCA VIVEN AQUI ABAJO, EN UN SOLO LUGAR.
+   Cambiar un color de toda la aplicacion = cambiar una linea.
    ============================================================ */
 
 :root {
-  --azul:        #0b4f6c;
-  --azul-claro:  #1789b8;
-  --hielo:       #e8f4f8;
-  --blanco:      #ffffff;
-  --texto:       #16232b;
-  --suave:       #667a85;
-  --borde:       #d6e4ea;
-  --verde:       #17864f;
-  --ambar:       #c67c00;
-  --rojo:        #b3261e;
-  --sombra:      0 2px 10px rgba(11, 79, 108, .10);
-  --radio:       14px;
+  /* --- Colores de la marca, tomados del logo --- */
+  --marca-cian:   #29abe2;   /* el cubo de hielo y la sombra de LOLHA */
+  --marca-azul:   #1c75bc;   /* la foca */
+  --marca-hondo:  #0f4f7f;   /* derivado, para barras y fondos */
+  --marca-negro:  #111820;
+
+  /* --- Modo claro (por defecto) --- */
+  --fondo:          #eff7fb;
+  --superficie:     #ffffff;
+  --superficie-alt: #f6fbfd;
+  --borde:          #d3e5f0;
+  --borde-fuerte:   #b3d3e6;
+  --texto:          var(--marca-negro);
+  --suave:          #5d7383;
+
+  --primario:       var(--marca-azul);
+  --primario-texto: #ffffff;
+  --acento:         var(--marca-cian);
+
+  --barra-fondo:    var(--marca-hondo);
+  --barra-texto:    #ffffff;
+
+  --verde: #17864f;
+  --ambar: #b87400;
+  --rojo:  #c02a20;
+  --peligro-f: #c02a20;
+  --peligro-t: #ffffff;
+
+  --et-admin-f: #ede4ff;  --et-admin-t: #5b2ec9;
+  --et-cajero-f: #d9f0e5; --et-cajero-t: #0f6f41;
+  --et-operario-f: #d8eefa; --et-operario-t: #135b8f;
+  --et-repartidor-f: #ffeccc; --et-repartidor-t: #91560a;
+  --et-baja-f: #f7e0de; --et-baja-t: var(--rojo);
+
+  --sombra:      0 2px 10px rgba(16, 60, 90, .10);
+  --sombra-alta: 0 10px 34px rgba(16, 60, 90, .14);
+  --radio: 14px;
+}
+
+/* --- Modo oscuro automatico (sigue al sistema) --- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema="claro"]) {
+    --fondo:          #0b131b;
+    --superficie:     #141f2a;
+    --superficie-alt: #1a2734;
+    --borde:          #26384a;
+    --borde-fuerte:   #36536d;
+    --texto:          #e7f1f8;
+    --suave:          #93aabb;
+
+    --primario:       #35b4e8;
+    --primario-texto: #06121b;
+    --acento:         #35b4e8;
+
+    --barra-fondo:    #101b25;
+    --barra-texto:    #eaf4fa;
+
+    --verde: #35c47f;
+    --ambar: #e8b25a;
+    --rojo:  #ff6b5f;
+    --peligro-f: #7f251d;
+    --peligro-t: #ffe9e6;
+
+    --et-admin-f: #2e2450;  --et-admin-t: #c3a9ff;
+    --et-cajero-f: #123a29; --et-cajero-t: #5fd6a0;
+    --et-operario-f: #10344c; --et-operario-t: #7cc7f0;
+    --et-repartidor-f: #3d2c10; --et-repartidor-t: #f2bb62;
+    --et-baja-f: #40201e; --et-baja-t: #ff8b81;
+
+    --sombra:      0 2px 10px rgba(0, 0, 0, .45);
+    --sombra-alta: 0 10px 34px rgba(0, 0, 0, .55);
+  }
+}
+
+/* --- Modo oscuro elegido a mano en el menu --- */
+:root[data-tema="oscuro"] {
+  --fondo:          #0b131b;
+  --superficie:     #141f2a;
+  --superficie-alt: #1a2734;
+  --borde:          #26384a;
+  --borde-fuerte:   #36536d;
+  --texto:          #e7f1f8;
+  --suave:          #93aabb;
+
+  --primario:       #35b4e8;
+  --primario-texto: #06121b;
+  --acento:         #35b4e8;
+
+  --barra-fondo:    #101b25;
+  --barra-texto:    #eaf4fa;
+
+  --verde: #35c47f;
+  --ambar: #e8b25a;
+  --rojo:  #ff6b5f;
+  --peligro-f: #7f251d;
+  --peligro-t: #ffe9e6;
+
+  --et-admin-f: #2e2450;  --et-admin-t: #c3a9ff;
+  --et-cajero-f: #123a29; --et-cajero-t: #5fd6a0;
+  --et-operario-f: #10344c; --et-operario-t: #7cc7f0;
+  --et-repartidor-f: #3d2c10; --et-repartidor-t: #f2bb62;
+  --et-baja-f: #40201e; --et-baja-t: #ff8b81;
+
+  --sombra:      0 2px 10px rgba(0, 0, 0, .45);
+  --sombra-alta: 0 10px 34px rgba(0, 0, 0, .55);
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -26,17 +124,37 @@
 body {
   margin: 0;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  background: var(--hielo);
+  background: var(--fondo);
   color: var(--texto);
   font-size: 17px;
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+/* ============================================================
+   LOGOTIPO
+   Reproduce el logo con texto: "Hielo" fino y "LOLHA" grueso
+   con la sombra cian desplazada, igual que la marca impresa.
+   ============================================================ */
+.marca { text-align: center; line-height: 1; }
+.marca-hielo {
+  display: block;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 26px; letter-spacing: .5px; color: var(--texto);
+}
+.marca-lolha {
+  display: block;
+  font-size: 40px; font-weight: 900; letter-spacing: 2px;
+  color: var(--texto);
+  text-shadow: 3px 3px 0 var(--marca-cian);
+  margin-top: 2px;
+}
+.marca-cubo { font-size: 30px; }
+
 /* ---------- Barra superior ---------- */
 header {
   position: sticky; top: 0; z-index: 20;
-  background: var(--azul); color: #fff;
-  box-shadow: 0 2px 8px rgba(0,0,0,.15);
+  background: var(--barra-fondo); color: var(--barra-texto);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .18);
   padding-top: env(safe-area-inset-top);
 }
 .barra-interior {
@@ -44,22 +162,24 @@ header {
   max-width: 720px; margin: 0 auto; padding: 12px 14px;
 }
 header h1 { flex: 1; margin: 0; font-size: 19px; font-weight: 600; }
-.version-barra { font-size: 13px; opacity: .65; margin-right: 4px; }
+.version-barra { font-size: 13px; opacity: .7; margin-right: 4px; }
 .icono {
-  background: rgba(255,255,255,.14); color: #fff; border: 0;
-  width: 42px; height: 42px; border-radius: 10px;
+  background: rgba(255, 255, 255, .14); color: var(--barra-texto); border: 0;
+  width: 42px; height: 42px; min-width: 42px; border-radius: 10px;
   font-size: 22px; line-height: 1; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
 }
-.icono:active { background: rgba(255,255,255,.28); }
+.icono:active { background: rgba(255, 255, 255, .3); }
 
 /* ---------- Menú lateral ---------- */
 #menu { position: fixed; inset: 0; z-index: 40; }
-.menu-fondo { position: absolute; inset: 0; background: rgba(0,0,0,.45); }
+.menu-fondo { position: absolute; inset: 0; background: rgba(0, 0, 0, .5); }
 .menu-panel {
-  position: absolute; top: 0; right: 0; bottom: 0; width: min(290px, 84vw);
-  background: #fff; padding: 22px 18px; padding-top: calc(22px + env(safe-area-inset-top));
-  display: flex; flex-direction: column; gap: 6px;
-  box-shadow: -4px 0 20px rgba(0,0,0,.2);
+  position: absolute; top: 0; right: 0; bottom: 0; width: min(300px, 86vw);
+  background: var(--superficie); padding: 22px 18px;
+  padding-top: calc(22px + env(safe-area-inset-top));
+  display: flex; flex-direction: column; gap: 4px; overflow-y: auto;
+  box-shadow: -4px 0 22px rgba(0, 0, 0, .3);
 }
 .menu-usuario { padding-bottom: 14px; border-bottom: 1px solid var(--borde); margin-bottom: 10px; }
 .menu-usuario span { display: block; font-weight: 700; font-size: 18px; }
@@ -69,30 +189,42 @@ header h1 { flex: 1; margin: 0; font-size: 19px; font-weight: 600; }
   padding: 15px 12px; border-radius: 10px;
   color: var(--texto); text-decoration: none; font-weight: 500;
 }
-.menu-panel a:active { background: var(--hielo); }
-.menu-panel button { margin-top: auto; }
-.version-menu { color: var(--suave); text-align: center; padding-top: 12px; }
+.menu-panel a:active { background: var(--superficie-alt); }
 .punto { width: 9px; height: 9px; border-radius: 50%; background: var(--rojo); display: inline-block; }
+.version-menu { color: var(--suave); text-align: center; padding-top: 12px; }
+
+/* Selector de tema dentro del menú */
+.tema-selector { margin-top: auto; padding-bottom: 2px; padding-top: 16px; border-top: 1px solid var(--borde); }
+.tema-selector p { margin: 0 0 8px; font-size: 13px; color: var(--suave);
+  text-transform: uppercase; letter-spacing: .4px; font-weight: 700; }
+.tema-opciones { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.tema-opciones button {
+  min-height: 44px; padding: 8px 4px; font-size: 13px; font-weight: 600; min-width: 0;
+  background: var(--superficie-alt); color: var(--suave);
+  border: 2px solid var(--borde); border-radius: 10px; width: 100%;
+}
+.tema-opciones button[aria-pressed="true"] {
+  border-color: var(--acento); color: var(--texto); background: var(--superficie);
+}
 
 /* ---------- Contenido ---------- */
 main { padding: 16px 14px 40px; max-width: 720px; margin: 0 auto; }
 .cargando { text-align: center; color: var(--suave); padding: 60px 0; }
 
 h2 { font-size: 20px; margin: 4px 0 14px; }
-h3 { font-size: 16px; margin: 22px 0 10px; color: var(--azul); }
+h3 { font-size: 16px; margin: 22px 0 10px; color: var(--acento); }
 p.ayuda { color: var(--suave); font-size: 15px; line-height: 1.45; margin: 0 0 16px; }
 
 /* ---------- Tarjetas ---------- */
 .tarjeta {
-  background: #fff; border: 1px solid var(--borde); border-radius: var(--radio);
+  background: var(--superficie); border: 1px solid var(--borde); border-radius: var(--radio);
   padding: 16px; margin-bottom: 12px; box-shadow: var(--sombra);
 }
 .tarjeta.plana { box-shadow: none; }
 
-/* Cuadrícula de accesos del inicio */
 .rejilla { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 .acceso {
-  background: #fff; border: 1px solid var(--borde); border-radius: var(--radio);
+  background: var(--superficie); border: 1px solid var(--borde); border-radius: var(--radio);
   padding: 20px 14px; text-align: center; text-decoration: none; color: var(--texto);
   box-shadow: var(--sombra); min-height: 118px;
   display: flex; flex-direction: column; justify-content: center; gap: 8px;
@@ -101,40 +233,46 @@ p.ayuda { color: var(--suave); font-size: 15px; line-height: 1.45; margin: 0 0 1
 .acceso .emoji { font-size: 34px; }
 .acceso strong { font-size: 16px; }
 .acceso small { color: var(--suave); }
-.acceso.proximo { opacity: .5; }
+.acceso.proximo { opacity: .45; }
 
 /* ---------- Botones ---------- */
 button, .boton {
   font: inherit; font-weight: 600;
   padding: 15px 18px; min-height: 52px;
   border: 0; border-radius: 12px;
-  background: var(--azul-claro); color: #fff;
+  background: var(--primario); color: var(--primario-texto);
   cursor: pointer; width: 100%;
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   text-decoration: none;
 }
 button:active { filter: brightness(.92); }
-button:disabled { opacity: .5; }
-button.secundario { background: #fff; color: var(--azul); border: 2px solid var(--borde); }
-button.peligro    { background: var(--rojo); }
-button.chico      { min-height: 40px; padding: 8px 14px; font-size: 15px; width: auto; }
+button:disabled { opacity: .5; cursor: default; }
+button.secundario {
+  background: var(--superficie); color: var(--texto); border: 2px solid var(--borde);
+}
+button.peligro { background: var(--peligro-f); color: var(--peligro-t); }
+button.chico { min-height: 40px; padding: 8px 14px; font-size: 15px; width: auto; }
 .fila-botones { display: flex; gap: 10px; }
 
 /* ---------- Formularios ---------- */
 label { display: block; font-weight: 600; font-size: 15px; margin: 14px 0 6px; }
+
 input[type="checkbox"] {
-  width: 22px; height: 22px; accent-color: var(--azul-claro); flex: 0 0 22px;
+  width: 22px; height: 22px; accent-color: var(--acento); flex: 0 0 22px;
 }
 
 input:not([type="checkbox"]), select {
   font: inherit; width: 100%; padding: 14px;
-  border: 2px solid var(--borde); border-radius: 12px; background: #fff; color: var(--texto);
+  border: 2px solid var(--borde); border-radius: 12px;
+  background: var(--superficie); color: var(--texto);
 }
-input:focus, select:focus { outline: 0; border-color: var(--azul-claro); }
+input:focus, select:focus { outline: 0; border-color: var(--acento); }
+/* Las flechas del desplegable deben verse en modo oscuro */
+select { color-scheme: light dark; }
 
-/* ---------- Teclado de PIN ---------- */
+/* ---------- Pantalla de entrada y teclado de PIN ---------- */
 .entrada { max-width: 380px; margin: 0 auto; }
-.logo { text-align: center; margin: 26px 0 18px; }
+.logo { text-align: center; margin: 26px 0 20px; }
 .logo .emoji { font-size: 56px; }
 .logo h2 { margin: 8px 0 2px; }
 .logo small { color: var(--suave); }
@@ -142,33 +280,48 @@ input:focus, select:focus { outline: 0; border-color: var(--azul-claro); }
 .lista-usuarios { display: grid; gap: 10px; }
 .usuario-boton {
   display: flex; align-items: center; gap: 14px;
-  background: #fff; border: 2px solid var(--borde); border-radius: var(--radio);
+  background: var(--superficie); border: 2px solid var(--borde); border-radius: var(--radio);
   padding: 14px 16px; min-height: 68px; text-align: left; color: var(--texto);
 }
 .inicial {
   width: 44px; height: 44px; border-radius: 50%; flex: 0 0 44px;
-  background: var(--azul); color: #fff;
+  background: var(--marca-azul); color: #fff;
   display: grid; place-items: center; font-weight: 700; font-size: 19px;
 }
 .usuario-boton .datos { display: flex; flex-direction: column; align-items: flex-start; }
 .usuario-boton strong { font-size: 17px; }
 .usuario-boton small { color: var(--suave); font-weight: 500; }
 
-.puntos-pin { display: flex; justify-content: center; gap: 14px; margin: 22px 0; height: 20px; }
-.puntos-pin i { width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 2px solid var(--borde); }
-.puntos-pin i.lleno { background: var(--azul); border-color: var(--azul); }
-
-.teclado { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-.teclado button {
-  min-height: 68px; font-size: 26px; font-weight: 600;
-  background: #fff; color: var(--texto); border: 2px solid var(--borde);
+.puntos-pin {
+  display: flex; justify-content: center; align-items: center;
+  gap: 14px; margin: 24px 0; height: 22px;
 }
-.teclado button.accion { font-size: 18px; background: transparent; border-color: transparent; color: var(--azul); }
+.puntos-pin i {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--superficie); border: 2px solid var(--borde-fuerte);
+}
+.puntos-pin i.lleno { background: var(--acento); border-color: var(--acento); }
+
+/* El teclado SIEMPRE es de 3 columnas iguales y centrado.
+   Ojo: los botones de aqui no heredan el ancho minimo de PC. */
+.teclado {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 12px; max-width: 330px; margin: 0 auto;
+}
+.teclado button {
+  min-height: 68px; min-width: 0; width: 100%;
+  font-size: 26px; font-weight: 600;
+  background: var(--superficie); color: var(--texto);
+  border: 2px solid var(--borde);
+}
+.teclado button.accion {
+  font-size: 16px; background: transparent; border-color: transparent; color: var(--acento);
+}
 
 /* ---------- Listas ---------- */
 .item {
   display: flex; align-items: center; gap: 12px;
-  background: #fff; border: 1px solid var(--borde); border-radius: var(--radio);
+  background: var(--superficie); border: 1px solid var(--borde); border-radius: var(--radio);
   padding: 14px; margin-bottom: 10px;
 }
 .item .crece { flex: 1; min-width: 0; }
@@ -180,17 +333,17 @@ input:focus, select:focus { outline: 0; border-color: var(--azul-claro); }
   display: inline-block; padding: 3px 10px; border-radius: 999px;
   font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px;
 }
-.etiqueta.admin       { background: #ede4ff; color: #5b2ec9; }
-.etiqueta.cajero      { background: #dcf1e6; color: var(--verde); }
-.etiqueta.operario    { background: #d9edf7; color: var(--azul); }
-.etiqueta.repartidor  { background: #ffeccc; color: var(--ambar); }
-.etiqueta.baja        { background: #f3e3e2; color: var(--rojo); }
+.etiqueta.admin      { background: var(--et-admin-f);      color: var(--et-admin-t); }
+.etiqueta.cajero     { background: var(--et-cajero-f);     color: var(--et-cajero-t); }
+.etiqueta.operario   { background: var(--et-operario-f);   color: var(--et-operario-t); }
+.etiqueta.repartidor { background: var(--et-repartidor-f); color: var(--et-repartidor-t); }
+.etiqueta.baja       { background: var(--et-baja-f);       color: var(--et-baja-t); }
 
 /* ---------- Novedades ---------- */
-.version-bloque { border-left: 4px solid var(--azul-claro); padding-left: 14px; margin-bottom: 26px; }
+.version-bloque { border-left: 4px solid var(--acento); padding-left: 14px; margin-bottom: 26px; }
 .version-cabeza { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .version-num {
-  background: var(--azul); color: #fff; font-weight: 700;
+  background: var(--marca-azul); color: #fff; font-weight: 700;
   padding: 4px 12px; border-radius: 999px; font-size: 15px;
 }
 .version-cabeza h3 { margin: 0; color: var(--texto); font-size: 18px; }
@@ -201,32 +354,34 @@ input:focus, select:focus { outline: 0; border-color: var(--azul-claro); }
   flex: 0 0 auto; font-size: 11px; font-weight: 700; text-transform: uppercase;
   padding: 3px 8px; border-radius: 6px; margin-top: 2px; letter-spacing: .3px;
 }
-.tipo.nuevo      { background: #dcf1e6; color: var(--verde); }
-.tipo.mejora     { background: #d9edf7; color: var(--azul); }
-.tipo.arreglo    { background: #ffeccc; color: var(--ambar); }
-.tipo.importante { background: #f3e3e2; color: var(--rojo); }
-.siguiente { margin-top: 14px; padding: 12px; background: var(--hielo); border-radius: 10px; font-size: 15px; color: var(--azul); }
+.tipo.nuevo      { background: var(--et-cajero-f);     color: var(--et-cajero-t); }
+.tipo.mejora     { background: var(--et-operario-f);   color: var(--et-operario-t); }
+.tipo.arreglo    { background: var(--et-repartidor-f); color: var(--et-repartidor-t); }
+.tipo.importante { background: var(--et-baja-f);       color: var(--et-baja-t); }
+.siguiente {
+  margin-top: 14px; padding: 12px; background: var(--superficie-alt);
+  border-radius: 10px; font-size: 15px; color: var(--acento);
+}
 
 /* ---------- Tabla simple ---------- */
 .tabla { width: 100%; border-collapse: collapse; font-size: 15px; }
 .tabla th, .tabla td { text-align: left; padding: 9px 6px; border-bottom: 1px solid var(--borde); }
 .tabla th { color: var(--suave); font-size: 13px; text-transform: uppercase; letter-spacing: .3px; }
+.tabla td.ruta { font-size: 12px; word-break: break-all; font-family: ui-monospace, monospace; }
 
 /* ---------- Aviso flotante ---------- */
 #aviso {
   position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
-  background: var(--texto); color: #fff; padding: 14px 20px; border-radius: 12px;
-  z-index: 90; max-width: 90vw; text-align: center; box-shadow: 0 6px 24px rgba(0,0,0,.3);
+  background: var(--marca-negro); color: #fff; padding: 14px 20px; border-radius: 12px;
+  z-index: 90; max-width: 90vw; text-align: center; box-shadow: 0 6px 24px rgba(0, 0, 0, .4);
 }
-#aviso.error { background: var(--rojo); }
-#aviso.bien  { background: var(--verde); }
+#aviso.error { background: var(--rojo); color: #fff; }
+#aviso.bien  { background: var(--verde); color: #fff; }
 
 .vacio { text-align: center; color: var(--suave); padding: 40px 16px; }
 
 /* ============================================================
-   PANTALLAS GRANDES — la PC de la caja y la oficina.
-   Mismo sistema, mas aire: la rejilla crece, el contenido se
-   ensancha y aparecen los efectos de raton.
+   PANTALLAS GRANDES — la PC de la caja y la oficina
    ============================================================ */
 
 @media (min-width: 620px) {
@@ -247,39 +402,38 @@ input:focus, select:focus { outline: 0; border-color: var(--azul-claro); }
   .acceso .emoji { font-size: 40px; }
   .acceso strong { font-size: 17px; }
 
-  /* Los formularios y listas no se estiran de lado a lado: cansa leerlos. */
-  .tarjeta, .item { max-width: 760px; }
-  .tabla { max-width: 760px; }
+  .tarjeta, .item, .tabla { max-width: 760px; }
 
-  /* Los botones dejan de ocupar todo el ancho: en PC se ve mejor asi. */
+  /* Los botones dejan de ocupar todo el ancho... */
   button, .boton { width: auto; min-width: 200px; }
-  button.chico, .icono { min-width: 0; }
-  .item button { min-width: 0; }
+  /* ...menos estos, que viven dentro de una rejilla y deben respetarla. */
+  button.chico, .icono, .teclado button, .tema-opciones button, .item button {
+    min-width: 0;
+  }
   form button { min-width: 220px; }
 
-  /* Pantalla de entrada: tarjeta centrada en vez de columna suelta. */
   .entrada {
     max-width: 430px; margin: 46px auto 0;
-    background: #fff; border: 1px solid var(--borde); border-radius: 20px;
-    padding: 34px 30px 38px; box-shadow: 0 10px 34px rgba(11, 79, 108, .12);
+    background: var(--superficie); border: 1px solid var(--borde); border-radius: 20px;
+    padding: 34px 30px 38px; box-shadow: var(--sombra-alta);
   }
   .entrada button { width: 100%; }
   .logo { margin-top: 0; }
 }
 
-/* Efectos solo donde hay raton. En el celular estorban. */
+/* Efectos solo donde hay ratón. En el celular estorban. */
 @media (hover: hover) {
   .acceso, .usuario-boton, .item, button, .menu-panel a { transition: all .12s ease; }
   .acceso:hover:not(.proximo) {
-    border-color: var(--azul-claro);
-    box-shadow: 0 6px 18px rgba(11, 79, 108, .16);
+    border-color: var(--acento);
+    box-shadow: var(--sombra-alta);
     transform: translateY(-2px);
   }
   .acceso.proximo { cursor: default; }
-  .usuario-boton:hover { border-color: var(--azul-claro); background: #fbfeff; }
-  .teclado button:hover { border-color: var(--azul-claro); }
-  button:hover:not(:disabled) { filter: brightness(1.06); }
-  button.secundario:hover { border-color: var(--azul-claro); background: var(--hielo); }
-  .menu-panel a:hover { background: var(--hielo); }
-  .item:hover { border-color: #bcd6e0; }
+  .usuario-boton:hover { border-color: var(--acento); }
+  .teclado button:hover { border-color: var(--acento); }
+  button:hover:not(:disabled) { filter: brightness(1.08); }
+  button.secundario:hover { border-color: var(--acento); background: var(--superficie-alt); }
+  .menu-panel a:hover { background: var(--superficie-alt); }
+  .item:hover { border-color: var(--borde-fuerte); }
 }

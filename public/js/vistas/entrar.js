@@ -23,9 +23,11 @@ export async function vistaEntrar(pantalla, { alEntrar }) {
     pantalla.innerHTML = `
       <div class="entrada">
         <div class="logo">
-          <div class="emoji">🧊</div>
-          <h2>Fábrica de Hielo</h2>
-          <small>Toca tu nombre para entrar</small>
+          <div class="marca">
+            <span class="marca-hielo">Hielo</span>
+            <span class="marca-lolha">LOLHA</span>
+          </div>
+          <small style="display:block;margin-top:16px">Toca tu nombre para entrar</small>
         </div>
         <div class="lista-usuarios">
           ${usuarios.map((u) => `

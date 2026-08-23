@@ -12,9 +12,25 @@
  * tipo: 'nuevo' | 'mejora' | 'arreglo' | 'importante'
  */
 
-const VERSION_ACTUAL = '0.1.3';
+const VERSION_ACTUAL = '0.1.4';
 
 const VERSIONES = [
+  {
+    numero: '0.1.4',
+    nombre: 'Hielo LOLHA',
+    fecha: '2026-08-23',
+    resumen:
+      'El sistema toma la identidad de la marca, estrena modo oscuro y ya no ' +
+      'trae ninguna cuenta de fábrica: la primera vez te pide crear la tuya.',
+    cambios: [
+      { tipo: 'importante', texto: 'Al abrirlo por primera vez te pide crear tu cuenta de administrador. Ya no existe el PIN 1234 de fábrica.' },
+      { tipo: 'nuevo', texto: 'Modo oscuro. En el menú eliges Claro, Oscuro o Auto, y cada dispositivo guarda el suyo.' },
+      { tipo: 'nuevo', texto: 'Los colores del logo de Hielo LOLHA en todo el sistema.' },
+      { tipo: 'arreglo', texto: 'En la PC el teclado del PIN se salía de la tarjeta y los números no quedaban centrados.' },
+      { tipo: 'arreglo', texto: 'El menú mostraba "admin" en vez de "Administrador".' }
+    ],
+    siguiente: 'v0.2 — Configurador de tanques, paños, canastas y moldes.'
+  },
   {
     numero: '0.1.3',
     nombre: 'Se instala sin pelear',
@@ -29,8 +45,7 @@ const VERSIONES = [
       { tipo: 'mejora', texto: 'La instalación pasó de 104 paquetes a 67, y es cuestión de segundos.' },
       { tipo: 'mejora', texto: 'Si tu Node.js es muy viejo, lo dice en español en vez de soltar un error incomprensible.' },
       { tipo: 'mejora', texto: 'Si la preparación falla, el mensaje te dice qué mandar para arreglarlo.' }
-    ],
-    siguiente: 'v0.2 — Configurador de tanques, paños, canastas y moldes.'
+    ]
   },
   {
     numero: '0.1.2',

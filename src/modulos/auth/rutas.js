@@ -6,7 +6,7 @@
 const express = require('express');
 const { bd } = require('../../db/conexion');
 const { nuevoId, ahora } = require('../../lib/ids');
-const { verificar, nuevoToken, hashToken } = require('../../lib/seguridad');
+const { hashear, verificar, nuevoToken, hashToken, esPinValido } = require('../../lib/seguridad');
 const { permisosDe } = require('../../lib/roles');
 const { ok, error } = require('../../lib/respuestas');
 const bitacora = require('../../lib/bitacora');
@@ -14,6 +14,64 @@ const { exigirSesion, ponerCookie, borrarCookie, NOMBRE_COOKIE } = require('../.
 const config = require('../../config');
 
 const router = express.Router();
+
+function hayUsuarios() {
+  return bd.prepare('SELECT COUNT(*) n FROM usuarios').get().n > 0;
+}
+
+/**
+ * ¿El sistema ya esta configurado?
+ * Si la base esta vacia, la aplicacion muestra el asistente de primer
+ * arranque en vez de la pantalla de entrada.
+ */
+router.get('/estado-inicial', (req, res) =>
+  ok(res, { configurado: hayUsuarios() }));
+
+/**
+ * PRIMER ARRANQUE — crear la cuenta del administrador.
+ *
+ * El sistema NO trae ningun usuario de fabrica: un PIN por omision seria
+ * una puerta trasera que nadie se acuerda de cerrar. La primera cuenta la
+ * crea quien enciende el sistema, y esta ruta solo funciona mientras no
+ * exista ningun usuario.
+ */
+router.post('/configuracion-inicial', (req, res) => {
+  if (hayUsuarios()) {
+    return error(res, 'El sistema ya está configurado.', 409);
+  }
+
+  const { nombre, usuario, contrasena, pin } = req.body || {};
+
+  if (!nombre || !String(nombre).trim()) return error(res, 'Escribe tu nombre.');
+  if (!usuario || !/^[a-zA-Z0-9._-]{3,20}$/.test(String(usuario).trim())) {
+    return error(res, 'El usuario debe tener de 3 a 20 caracteres, sin espacios ni acentos.');
+  }
+  if (!contrasena || String(contrasena).length < 8) {
+    return error(res, 'La contraseña debe tener al menos 8 caracteres.');
+  }
+  if (!esPinValido(pin)) return error(res, 'El PIN debe ser de 4 a 6 dígitos.');
+
+  const id = nuevoId();
+  const p = hashear(pin);
+  const c = hashear(contrasena);
+
+  bd.prepare(`
+    INSERT INTO usuarios (id, nombre, usuario, rol, pin_hash, pin_sal,
+                          contrasena_hash, contrasena_sal, activo, fecha_alta)
+    VALUES (?, ?, ?, 'admin', ?, ?, ?, ?, 1, ?)
+  `).run(id, String(nombre).trim(), String(usuario).trim().toLowerCase(),
+         p.hash, p.sal, c.hash, c.sal, ahora());
+
+  const creado = bd.prepare('SELECT * FROM usuarios WHERE id = ?').get(id);
+
+  crearSesion(res, creado, req.headers['user-agent']);
+  bitacora.registrar({
+    accion: 'sistema.configuracion_inicial', entidad: 'usuario', entidadId: id,
+    ejecutorId: id, detalle: { nombre: creado.nombre }
+  });
+
+  return ok(res, datosSesion(creado), 201);
+});
 
 /** Lista de caras para la pantalla de entrada. Publica a proposito: solo nombres. */
 router.get('/usuarios-disponibles', (req, res) => {

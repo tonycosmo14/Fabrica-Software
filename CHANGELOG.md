@@ -7,6 +7,17 @@ Tipos: `nuevo` (funcionalidad nueva) · `mejora` · `arreglo` · `clave` (regla 
 
 ---
 
+## v0.1.4 — Hielo LOLHA · 23 de agosto de 2026
+
+- **clave** — Asistente de primer arranque: crea tu cuenta de administrador. Se eliminó el usuario `admin` con PIN `1234` que venía de fábrica; un PIN por omisión es una puerta trasera que nadie cierra.
+- **nuevo** — Modo oscuro con selector Claro / Oscuro / Auto en el menú, guardado por dispositivo.
+- **nuevo** — Paleta de la marca Hielo LOLHA (cian `#29abe2`, azul `#1c75bc`) en un solo bloque de variables CSS, y el logotipo reproducido en texto.
+- **arreglo** — En pantallas grandes el teclado del PIN se desbordaba de la tarjeta: la regla de ancho mínimo de la v0.1.1 también afectaba a los botones del teclado.
+- **arreglo** — El menú mostraba el rol en crudo (`admin`).
+- **arreglo** — Contraste del botón de peligro en modo oscuro.
+
+---
+
 ## v0.1.3 — Se instala sin pelear · 22 de agosto de 2026
 
 `npm install` fallaba en Windows con Node 24: `better-sqlite3` viene en C y no

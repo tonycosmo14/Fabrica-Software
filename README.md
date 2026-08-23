@@ -1,9 +1,9 @@
-# 🧊 Sistema de gestión — Fábrica de hielo y planta de agua
+# 🧊 Hielo LOLHA — sistema de gestión
 
 Sistema para la fábrica de hielo de Hunucmá, Yucatán.
 Se construye **por versiones**: cada versión es un pedazo terminado, probado y usable.
 
-**Versión actual: v0.1.3**
+**Versión actual: v0.1.4**
 
 ---
 
@@ -53,8 +53,8 @@ usa la otra dirección (tiene que estar en el mismo WiFi).
 
 Para detener el sistema: `Ctrl + C` en la terminal.
 
-> ⚠️ **Lo primero que debes hacer:** entrar como admin y cambiarle el PIN
-> y la contraseña desde la pantalla de **Usuarios**.
+> La primera vez, el sistema te pide crear tu cuenta de administrador:
+> nombre, usuario, contraseña y PIN. No hay ninguna cuenta de fábrica.
 
 ### Comandos disponibles
 
@@ -113,7 +113,8 @@ src/
 
 public/                La interfaz (HTML, CSS y JavaScript sin librerías)
   index.html
-  css/estilo.css
+  css/estilo.css       ← los colores de la marca están al inicio de este archivo
+  js/tema.js           Modo claro / oscuro
   js/app.js            Navegación
   js/vistas/           Una pantalla por archivo
 
@@ -166,6 +167,7 @@ versión nueva le aparece un punto rojo en el menú.
 | **v0.1.1** | Ajustes para que se vea bien en PC, PIN con teclado físico | ✅ listo |
 | **v0.1.2** | Arranque con doble clic, icono en el escritorio, instalable en el celular | ✅ listo |
 | **v0.1.3** | Se instala sin compilador: base de datos incluida en Node | ✅ listo |
+| **v0.1.4** | Marca Hielo LOLHA, modo oscuro, asistente de primer arranque | ✅ listo |
 | v0.2 | Configurador de tanques, paños, canastas y moldes | siguiente |
 | v0.3 | Producción: sacada, rellenado, estados de canasta, traspaso a caja | |
 | v0.4 | Punto de venta: fracciones, precios por fracción, tickets | |
