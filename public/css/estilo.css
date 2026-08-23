@@ -43,6 +43,7 @@
   --et-repartidor-f: #ffeccc; --et-repartidor-t: #91560a;
   --et-baja-f: #f7e0de; --et-baja-t: var(--rojo);
 
+  --ancho: 1180px;              /* ancho útil en pantallas grandes */
   --sombra:      0 2px 10px rgba(16, 60, 90, .10);
   --sombra-alta: 0 10px 34px rgba(16, 60, 90, .14);
   --radio: 14px;
@@ -170,34 +171,53 @@ header {
   box-shadow: 0 2px 8px rgba(0, 0, 0, .18);
   padding-top: env(safe-area-inset-top);
 }
+/* Un solo renglón: reloj a la izquierda, logo justo en medio, quién está
+   dentro y el menú a la derecha. Las dos columnas laterales miden lo mismo
+   para que el logo quede centrado de verdad. */
 .barra-interior {
-  display: grid; grid-template-columns: 42px 1fr 42px; align-items: center; gap: 8px;
-  max-width: 720px; margin: 0 auto; padding: 10px 14px 8px;
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px;
+  max-width: 720px; margin: 0 auto; padding: 8px 12px;
 }
+.barra-izq { display: flex; align-items: center; gap: 8px; justify-self: start; min-width: 0; }
+.barra-der { display: flex; align-items: center; gap: 10px; justify-self: end; min-width: 0; }
 
 /* El logo va en medio del encabezado. Si no hay logo puesto, sale el
    nombre en letras. */
-.barra-marca { display: flex; align-items: center; justify-content: center; min-height: 34px; }
-.barra-marca img { max-height: 34px; max-width: 190px; object-fit: contain; }
-.barra-marca .barra-marca-texto { font-weight: 700; font-size: 17px; letter-spacing: .4px; }
+.barra-marca {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 36px; min-width: 0; overflow: hidden;
+}
+.barra-marca img { max-height: 36px; max-width: 120px; object-fit: contain; }
+@media (min-width: 460px) { .barra-marca img { max-height: 38px; max-width: 165px; } }
+@media (min-width: 620px) { .barra-marca img { max-height: 42px; max-width: 220px; } }
+.barra-marca .barra-marca-texto {
+  font-weight: 700; font-size: 15px; letter-spacing: .3px; white-space: nowrap;
+}
+.solo-ancho { display: none; }
+@media (min-width: 460px) { .solo-ancho { display: inline; } }
+@media (min-width: 620px) { .barra-marca .barra-marca-texto { font-size: 18px; } }
 .barra-marca .barra-marca-texto b { color: var(--marca-cian); }
 
 /* Renglón fino de abajo: reloj a la izquierda, quién está dentro a la derecha. */
-.barra-inferior {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  max-width: 720px; margin: 0 auto; padding: 0 14px 9px;
+.reloj {
   font-size: 12px; color: rgba(255, 255, 255, .72);
+  font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1.25;
+  display: flex; flex-direction: column;
 }
-.reloj { font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* En pantallas angostas solo cabe la hora; la fecha aparece a partir de
+   un tamaño en el que no pelea con el logo. */
+.reloj-fecha { display: none; font-size: 10.5px; opacity: .8; }
+@media (min-width: 460px) { .reloj-fecha { display: block; } }
 .barra-usuario {
-  justify-self: end; display: flex; flex-direction: column; align-items: flex-end;
+  display: flex; flex-direction: column; align-items: flex-end;
   line-height: 1.2; overflow: hidden;
 }
 .barra-usuario strong {
-  font-size: 12.5px; color: #fff; font-weight: 600;
-  max-width: 32vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 12px; color: #fff; font-weight: 600;
+  max-width: 22vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.barra-usuario small { font-size: 10.5px; opacity: .7; }
+@media (min-width: 460px) { .barra-usuario strong { font-size: 12.5px; max-width: 30vw; } }
+.barra-usuario small { font-size: 10.5px; opacity: .7; color: rgba(255,255,255,.85); }
 .icono {
   background: rgba(255, 255, 255, .14); color: var(--barra-texto); border: 0;
   width: 42px; height: 42px; min-width: 42px; border-radius: 10px;
@@ -208,13 +228,47 @@ header {
 
 /* ---------- Menú lateral ---------- */
 #menu { position: fixed; inset: 0; z-index: 40; }
-.menu-fondo { position: absolute; inset: 0; background: rgba(0, 0, 0, .5); }
+.menu-fondo {
+  position: absolute; inset: 0; background: rgba(0, 0, 0, .5);
+  opacity: 0; transition: opacity .18s ease;
+}
+#menu.abierto .menu-fondo { opacity: 1; }
+
 .menu-panel {
   position: absolute; top: 0; right: 0; bottom: 0; width: min(300px, 86vw);
   background: var(--superficie); padding: 22px 18px;
   padding-top: calc(22px + env(safe-area-inset-top));
   display: flex; flex-direction: column; gap: 4px; overflow-y: auto;
   box-shadow: -4px 0 22px rgba(0, 0, 0, .3);
+  /* Entra deslizándose desde la derecha en vez de aparecer de golpe. */
+  transform: translateX(100%); transition: transform .22s cubic-bezier(.2, .8, .3, 1);
+}
+#menu.abierto .menu-panel { transform: translateX(0); }
+
+/* Los enlaces entran escalonados, un pelín después del panel. */
+#menu.abierto .menu-panel > * {
+  animation: entrar-menu .26s ease both;
+}
+#menu.abierto .menu-panel > *:nth-child(2) { animation-delay: .04s; }
+#menu.abierto .menu-panel > *:nth-child(3) { animation-delay: .07s; }
+#menu.abierto .menu-panel > *:nth-child(4) { animation-delay: .10s; }
+#menu.abierto .menu-panel > *:nth-child(5) { animation-delay: .13s; }
+#menu.abierto .menu-panel > *:nth-child(6) { animation-delay: .16s; }
+#menu.abierto .menu-panel > *:nth-child(7) { animation-delay: .18s; }
+
+@keyframes entrar-menu {
+  from { opacity: 0; transform: translateX(12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* El botón del menú gira al abrirlo. */
+#btn-menu { transition: transform .22s ease; }
+#btn-menu.abierto { transform: rotate(90deg); }
+
+/* Quien pidió menos movimiento en su sistema, no lo tiene. */
+@media (prefers-reduced-motion: reduce) {
+  .menu-panel, #btn-menu, .menu-fondo { transition: none; }
+  #menu.abierto .menu-panel > * { animation: none; }
 }
 .menu-usuario { padding-bottom: 14px; border-bottom: 1px solid var(--borde); margin-bottom: 10px; }
 .menu-usuario span { display: block; font-weight: 700; font-size: 18px; }
@@ -455,6 +509,72 @@ select { color-scheme: light dark; }
 .subir:active { filter: brightness(.92); }
 
 
+
+/* ============================================================
+   BLOQUES DE AYUDA
+   Van plegados para no robar espacio, pero siempre a mano.
+   Son la base del manual de ayuda.
+   ============================================================ */
+
+.ayuda-bloque {
+  background: var(--superficie); border: 1px solid var(--borde);
+  border-radius: var(--radio); margin-bottom: 14px; overflow: hidden;
+}
+.ayuda-bloque summary {
+  padding: 13px 16px; cursor: pointer; font-weight: 600; font-size: 15px;
+  color: var(--acento); list-style: none; display: flex; align-items: center; gap: 8px;
+}
+.ayuda-bloque summary::-webkit-details-marker { display: none; }
+.ayuda-bloque summary::before { content: '？'; font-size: 13px; opacity: .8; }
+.ayuda-bloque summary::after { content: '▾'; margin-left: auto; transition: transform .18s ease; }
+.ayuda-bloque[open] summary::after { transform: rotate(180deg); }
+.ayuda-bloque[open] summary { border-bottom: 1px solid var(--borde); }
+.ayuda-cuerpo { padding: 16px; }
+
+.instrucciones { margin: 0; padding-left: 20px; color: var(--suave); font-size: 15px; line-height: 1.6; }
+.instrucciones li { margin-bottom: 8px; }
+.instrucciones b { color: var(--texto); }
+.instrucciones em { color: var(--acento); font-style: normal; font-weight: 600; }
+
+/* Esquema visual: tanque -> paño -> canasta -> molde */
+.esquema { display: grid; gap: 18px; }
+.esquema-tanque {
+  position: relative; padding: 22px 12px 12px;
+  border: 2px solid var(--marca-azul); border-radius: 12px;
+  background: var(--superficie-alt); display: grid; gap: 6px;
+}
+.esquema-etiqueta {
+  position: absolute; top: -10px; left: 12px; padding: 2px 10px; border-radius: 999px;
+  font-size: 10px; font-weight: 800; letter-spacing: .6px;
+  background: var(--marca-azul); color: #fff;
+}
+.esquema-pano {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 6px; border: 1px dashed var(--borde-fuerte); border-radius: 8px;
+}
+.esquema-num { font-size: 11px; font-weight: 700; color: var(--suave); width: 14px; }
+.esquema-canasta {
+  display: flex; gap: 2px; padding: 3px;
+  border: 2px solid var(--est-lista); border-radius: 6px; background: var(--superficie);
+}
+.esquema-canasta.senalada { border-color: var(--acento); box-shadow: 0 0 0 3px var(--et-operario-f); }
+.esquema-canasta i { width: 9px; height: 15px; border-radius: 2px; background: var(--est-lista); display: block; }
+.esquema-canasta.senalada i { background: var(--acento); }
+
+.esquema-notas p { margin: 0 0 10px; font-size: 14.5px; color: var(--suave); line-height: 1.5; }
+.esquema-notas strong { color: var(--texto); }
+.esquema-punto {
+  display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px;
+}
+.esquema-punto.tanque { background: var(--marca-azul); }
+.esquema-punto.pano { background: var(--borde-fuerte); }
+.esquema-punto.canasta { background: var(--est-lista); }
+.esquema-punto.molde { background: var(--acento); }
+
+@media (min-width: 760px) {
+  .esquema { grid-template-columns: auto 1fr; align-items: start; gap: 26px; }
+}
+
 /* ============================================================
    PRODUCCIÓN (v0.3)
    Cada canasta es un bloque de cuadritos: un cuadrito = un molde
@@ -483,7 +603,16 @@ select { color-scheme: light dark; }
 }
 
 /* Pestañas de tanque */
-.pestanas { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+/* Centradas. Si algún día hay más tanques de los que caben, se desplazan
+   de lado en vez de amontonarse en varios renglones. */
+.pestanas {
+  display: flex; gap: 8px; margin-bottom: 12px;
+  justify-content: center; flex-wrap: nowrap;
+  overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+}
+.pestanas::-webkit-scrollbar { display: none; }
+.pestana { flex: 0 0 auto; text-align: center; }
 .pestana {
   width: auto; min-width: 62px; min-height: 44px; padding: 8px 18px;
   font-size: 16px; font-weight: 700;
@@ -495,20 +624,30 @@ select { color-scheme: light dark; }
   border-color: var(--borde-fuerte);
 }
 
-/* Barra del turno */
-.turno-barra {
+/* Barra: qué paño toca y con qué agua se está rellenando */
+.barra-produccion {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  padding: 10px 12px; margin-bottom: 12px; border-radius: 10px;
+  padding: 8px 10px 8px 12px; margin-bottom: 10px; border-radius: 10px;
   background: var(--superficie); border: 1px solid var(--borde);
-  font-size: 14px; color: var(--suave);
 }
-.turno-barra.sin-turno { border-color: var(--est-fuera); background: var(--est-fuera-f); }
-.turno-barra button { width: auto; }
-.sugerencia {
-  background: var(--et-cajero-f); color: var(--et-cajero-t);
-  padding: 5px 12px; border-radius: 999px; font-weight: 700; font-size: 13px;
-  white-space: nowrap;
+.toca { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.toca-etiqueta {
+  font-size: 10px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase;
+  background: var(--verde); color: #fff; padding: 3px 8px; border-radius: 999px;
 }
+.toca strong { font-size: 16px; color: var(--texto); }
+.toca small { font-size: 12px; color: var(--suave); width: 100%; }
+
+/* El agua se cambia con un toque, sin entrar a ningún menú. */
+.agua-boton {
+  width: auto; min-width: 0; min-height: 42px; padding: 6px 14px; gap: 6px;
+  font-size: 14px; border-radius: 10px; white-space: nowrap;
+  border: 2px solid var(--acento); background: var(--et-operario-f); color: var(--et-operario-t);
+}
+.agua-boton.potable { border-color: var(--est-fuera); background: var(--est-fuera-f); color: var(--est-fuera); }
+.agua-icono { font-size: 15px; }
+
+.boton-lote { margin-bottom: 12px; }
 .alerta-fuera {
   padding: 10px 12px; margin-bottom: 12px; border-radius: 10px;
   background: var(--est-fuera-f); color: var(--est-fuera);
@@ -518,10 +657,18 @@ select { color-scheme: light dark; }
 /* Un paño */
 .panos-produccion { display: flex; flex-direction: column; gap: 6px; }
 .pano-prod {
-  display: grid; grid-template-columns: 20px 1fr auto 24px; align-items: center; gap: 6px;
-  padding: 3px 4px; border-radius: 10px; border: 2px solid transparent;
+  display: grid; grid-template-columns: 1fr 24px; align-items: center; gap: 4px;
+  border-radius: 10px; border: 2px solid transparent;
 }
-.pano-prod.sugerido { border-color: var(--verde); background: var(--superficie); }
+/* Toda la fila es el botón: el objetivo táctil más grande posible. */
+.pano-prod-cuerpo {
+  display: grid; grid-template-columns: 20px 1fr auto; align-items: center; gap: 6px;
+  width: 100%; min-width: 0; min-height: 40px; padding: 3px 4px;
+  background: transparent; border: 0; color: var(--texto); border-radius: 8px;
+}
+.pano-prod-cuerpo:disabled { opacity: 1; }
+.pano-prod.toca-este { border-color: var(--verde); background: var(--superficie); }
+.pano-prod.en-proceso { border-color: var(--ambar); background: var(--est-fuera-f); }
 .pano-prod-num {
   color: var(--suave); font-size: 13px; font-weight: 700; text-align: center;
 }
@@ -531,6 +678,7 @@ select { color-scheme: light dark; }
 }
 .pano-prod-horas.congelando { color: var(--est-congelando); }
 .pano-prod-horas.fuera { color: var(--est-fuera); }
+.pano-prod-horas.proceso { color: var(--ambar); }
 
 .canastas-prod { display: flex; gap: 5px; align-items: center; flex-wrap: nowrap; overflow: hidden; }
 
@@ -549,7 +697,18 @@ select { color-scheme: light dark; }
 .canasta-prod.congelando .molde { background: var(--est-congelando); }
 .canasta-prod.fuera { border-color: var(--est-fuera); background: var(--est-fuera-f); }
 .canasta-prod.fuera .molde { background: var(--est-fuera); }
-.canasta-prod:active { transform: scale(.94); }
+.canasta-prod.proceso { border-color: var(--ambar); background: var(--est-fuera-f); }
+.canasta-prod.proceso .molde { background: var(--ambar); }
+
+/* Un molde que falló la última vez se marca. Si uno aparece marcado
+   siempre, hay un problema físico en ese molde concreto. */
+.canasta-prod .molde.fallo {
+  background: var(--rojo) !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .35);
+}
+
+.pano-prod-cuerpo:active .canastas-prod { transform: scale(.97); }
+.canastas-prod { transition: transform .1s ease; }
 
 .mas-canasta {
   width: 24px; min-width: 24px; height: 32px; padding: 0;
@@ -566,6 +725,8 @@ select { color-scheme: light dark; }
 .punto-estado.congelando { background: var(--est-congelando); }
 .punto-estado.lista { background: var(--est-lista); }
 .punto-estado.fuera { background: var(--est-fuera); }
+.punto-estado.proceso { background: var(--ambar); }
+.punto-estado.merma { background: var(--rojo); }
 
 /* Marcar merma molde por molde */
 .moldes-detalle { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -579,9 +740,43 @@ select { color-scheme: light dark; }
 .molde-boton.ok { border-color: var(--verde); background: var(--et-cajero-f); color: var(--et-cajero-t); }
 .molde-boton.merma { border-color: var(--est-fuera); background: var(--est-fuera-f); color: var(--est-fuera); }
 .molde-boton.hueco { border-color: var(--rojo); background: var(--et-baja-f); color: var(--et-baja-t); }
+.molde-boton { position: relative; }
+.molde-aviso {
+  position: absolute; top: -6px; right: -6px; width: 18px; height: 18px;
+  border-radius: 50%; background: var(--rojo); color: #fff;
+  font-size: 11px; font-weight: 800; display: grid; place-items: center;
+}
+
+/* Fichas de paño para la captura en lote */
+.rejilla-panos {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  gap: 8px; margin-bottom: 16px;
+}
+.ficha-pano {
+  width: 100%; min-width: 0; min-height: 52px; padding: 0;
+  font-size: 18px; font-weight: 700;
+  background: var(--superficie); color: var(--texto);
+  border: 2px solid var(--borde); border-radius: 10px;
+}
+.ficha-pano.elegido {
+  background: var(--verde); color: #fff; border-color: var(--verde);
+}
+
+.marca-orden {
+  display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px;
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  background: var(--est-fuera-f); color: var(--est-fuera);
+}
+tr.anulada { opacity: .45; text-decoration: line-through; }
+
+@media (min-width: 760px) {
+  .canastas-merma { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .canastas-merma .tarjeta { max-width: none; margin-bottom: 0; }
+}
 
 @media (min-width: 620px) {
-  .pano-prod { grid-template-columns: 28px 1fr auto 32px; gap: 10px; padding: 5px 8px; }
+  .pano-prod { grid-template-columns: 1fr 32px; }
+  .pano-prod-cuerpo { grid-template-columns: 28px 1fr auto; gap: 10px; padding: 5px 8px; min-height: 46px; }
   .canasta-prod .molde { width: 16px; height: 26px; }
   .canasta-prod { min-height: 36px; }
   .pano-prod-horas { font-size: 13px; }
@@ -778,8 +973,16 @@ select { color-scheme: light dark; }
 }
 
 @media (min-width: 900px) {
-  .resumen-fabrica, .panos, .tanque-fila { max-width: 760px; }
+  .resumen-fabrica, .panos { max-width: 820px; }
   .tanque-tarjeta { max-width: none; }
+
+  /* Los tanques en rejilla: en una pantalla ancha caben varios de frente
+     en vez de uno debajo de otro. */
+  .lista-tanques { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .lista-tanques .tanque-fila { margin-bottom: 0; max-width: none; }
+}
+@media (min-width: 1240px) {
+  .lista-tanques { grid-template-columns: repeat(3, 1fr); }
 }
 
 /* ============================================================
@@ -791,12 +994,14 @@ select { color-scheme: light dark; }
 }
 
 @media (min-width: 900px) {
-  .barra-interior { max-width: 1060px; padding: 12px 24px 8px; }
-  .barra-inferior { max-width: 1060px; padding: 0 24px 10px; font-size: 13px; }
-  .barra-marca img { max-height: 40px; max-width: 240px; }
-  .barra-usuario strong { font-size: 13.5px; max-width: none; }
+  .barra-interior { max-width: var(--ancho); padding: 10px 24px; }
+  main { max-width: var(--ancho); }
+  .barra-marca img { max-height: 46px; max-width: 260px; }
+  .reloj { font-size: 13px; }
+  .reloj-fecha { font-size: 11.5px; }
+  .barra-usuario strong { font-size: 14px; max-width: none; }
 
-  main { max-width: 1060px; padding: 28px 24px 60px; }
+  main { max-width: var(--ancho); padding: 24px 24px 60px; }
 
   h2 { font-size: 26px; margin-bottom: 6px; }
   p.ayuda { font-size: 16px; max-width: 70ch; margin-bottom: 22px; }
@@ -806,7 +1011,8 @@ select { color-scheme: light dark; }
   .acceso .emoji { font-size: 40px; }
   .acceso strong { font-size: 17px; }
 
-  .tarjeta, .item, .tabla { max-width: 760px; }
+  .tarjeta, .item, .tabla { max-width: 820px; }
+  .ayuda-bloque { max-width: 820px; }
 
   /* Los botones dejan de ocupar todo el ancho... */
   button, .boton { width: auto; min-width: 200px; }
@@ -814,7 +1020,7 @@ select { color-scheme: light dark; }
   button.chico, .icono, .teclado button, .tema-opciones button, .item button,
   .canasta, .pano-menu, .contador-boton, .dialogo-botones button, .dialogo-opcion,
   .tanque-acciones, .tachita, .tanque-tarjeta, .canasta-prod, .mas-canasta,
-  .molde-boton, .pestana {
+  .molde-boton, .pestana, .pano-prod-cuerpo, .agua-boton, .ficha-pano {
     min-width: 0;
   }
   .pestana { min-width: 74px; }

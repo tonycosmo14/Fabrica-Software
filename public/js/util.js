@@ -36,5 +36,6 @@ export const ETIQUETAS_ROL = {
   operario: 'Operario',
   cajero: 'Cajero',
   repartidor: 'Repartidor',
+  gerente: 'Gerente de turno',
   admin: 'Administrador'
 };

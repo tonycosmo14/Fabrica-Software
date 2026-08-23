@@ -1,7 +1,12 @@
 /**
- * Pruebas de Producción.
- * Lo importante: el estado de la canasta se DEDUCE de sus eventos, y sacar
- * y rellenar son dos cosas distintas que no se acoplan.
+ * Pruebas de Producción con el modelo real de la fábrica.
+ *
+ * Lo que se comprueba:
+ *  - La rotación intercalada (1, 3, 5... luego 2, 4, 6...) es regla.
+ *  - Sacar un paño lo rellena en el mismo movimiento.
+ *  - Un paño a medias queda en proceso y otro lo puede terminar.
+ *  - Solo gerente o admin se saltan la rotación, y con motivo.
+ *  - La captura en lote registra la jornada completa de un obrero.
  */
 const test = require('node:test');
 const assert = require('node:assert');
@@ -19,7 +24,7 @@ const { bd } = require('../src/db/conexion');
 
 migrar({ silencioso: true });
 
-let servidor, base, cookie = '', tanqueId, panos;
+let servidor, base, cookie = '', tanqueId, panos, operarioId;
 
 async function llamar(ruta, opciones = {}) {
   const r = await fetch(base + ruta, {
@@ -32,26 +37,15 @@ async function llamar(ruta, opciones = {}) {
   return { estado: r.status, json: await r.json() };
 }
 
-/**
- * Mueve hacia atrás en el tiempo los eventos de una canasta, para simular
- * que pasaron horas sin tener que esperarlas.
- *
- * Ojo: hay que envejecer TODOS sus eventos manteniendo el orden. Si solo se
- * retrasa el rellenado, queda por detrás de la sacada y el último evento
- * pasa a ser la sacada, que es justo lo contrario de lo que se quiere probar.
- */
-function envejecer(canastaId, horasDelUltimo) {
-  const eventos = [
-    ...bd.prepare("SELECT id, fecha, 'sacadas' AS tabla FROM sacadas WHERE canasta_id = ?").all(canastaId),
-    ...bd.prepare("SELECT id, fecha, 'rellenados' AS tabla FROM rellenados WHERE canasta_id = ?").all(canastaId)
-  ].sort((a, b) => a.fecha.localeCompare(b.fecha));
+async function entrarComo(pin) {
+  const { json } = await llamar('/api/auth/usuarios-disponibles');
+  const u = json.datos.usuarios.find((x) => x.pin === pin) || null;
+  return u;
+}
 
-  // El último queda a "horasDelUltimo" de ahora; los anteriores, una hora
-  // antes cada uno, conservando el orden original.
-  eventos.reverse().forEach((e, i) => {
-    const fecha = new Date(Date.now() - (horasDelUltimo + i) * 3600000).toISOString();
-    bd.prepare(`UPDATE ${e.tabla} SET fecha = ? WHERE id = ?`).run(fecha, e.id);
-  });
+async function estadoTanque() {
+  const { json } = await llamar(`/api/produccion/estado?tanque=${tanqueId}`);
+  return json.datos;
 }
 
 test.before(async () => {
@@ -61,15 +55,20 @@ test.before(async () => {
 
   await llamar('/api/auth/configuracion-inicial', {
     method: 'POST',
-    cuerpo: { nombre: 'Tony', usuario: 'tony', contrasena: 'clavelarga1', pin: '1234' }
+    cuerpo: { nombre: 'Tony', usuario: 'tony', contrasena: 'clavelarga1', pin: '1111' }
   });
 
   const r = await llamar('/api/tanques', {
     method: 'POST',
-    cuerpo: { nombre: '2N', panos: 3, plantilla: [3, 3], horasCongelacion: 24 }
+    cuerpo: { nombre: '2N', panos: 6, plantilla: [3, 3], horasCongelacion: 24 }
   });
   tanqueId = r.json.datos.tanque.id;
   panos = r.json.datos.tanque.panos;
+
+  const o = await llamar('/api/usuarios', {
+    method: 'POST', cuerpo: { nombre: 'Don Chema', rol: 'operario', pin: '2222' }
+  });
+  operarioId = o.json.datos.usuario.id;
 });
 
 test.after(() => {
@@ -77,169 +76,236 @@ test.after(() => {
   fs.rmSync(carpeta, { recursive: true, force: true });
 });
 
-test('sin turno abierto no se puede registrar nada', async () => {
-  const c = panos[0].canastas[0].id;
-  const r = await llamar('/api/produccion/sacar', { method: 'POST', cuerpo: { canastaId: c } });
-  assert.equal(r.estado, 409);
-  assert.match(r.json.error, /turno/);
+test('el primero de la rotación es el paño 1', async () => {
+  const d = await estadoTanque();
+  assert.equal(d.tanque.siguiente.numero, 1);
 });
 
-test('se abre el turno y no se puede abrir dos veces', async () => {
-  const a = await llamar('/api/produccion/turno/abrir', { method: 'POST', cuerpo: { nombre: 'Noche' } });
-  assert.equal(a.estado, 201);
-  assert.equal(a.json.datos.turno.nombre, 'Noche');
-
-  const b = await llamar('/api/produccion/turno/abrir', { method: 'POST', cuerpo: {} });
-  assert.equal(b.estado, 409);
-});
-
-test('un tanque sin historial arranca con todas las canastas listas', async () => {
-  const { json } = await llamar('/api/produccion/estado');
-  const canastas = json.datos.tanque.panos.flatMap((p) => p.canastas);
-  assert.ok(canastas.every((c) => c.estado === 'lista' && c.sinRegistro));
-});
-
-test('al sacar una canasta queda FUERA: sacada pero sin rellenar', async () => {
-  const c = panos[0].canastas[0].id;
-  const r = await llamar('/api/produccion/sacar', { method: 'POST', cuerpo: { canastaId: c } });
+test('sacar un paño lo rellena en el mismo movimiento', async () => {
+  const r = await llamar(`/api/produccion/panos/${panos[0].id}/sacar`, {
+    method: 'POST', cuerpo: { tipoAgua: 'purificada', ejecutorId: operarioId }
+  });
   assert.equal(r.estado, 201);
-  assert.equal(r.json.datos.marquetas, 3);      // los 3 moldes salieron bien
+  assert.equal(r.json.datos.marquetas, 6);      // 2 canastas x 3 moldes
+  assert.equal(r.json.datos.terminado, true);
 
-  const { json } = await llamar('/api/produccion/estado');
-  const canasta = json.datos.tanque.panos[0].canastas[0];
-  assert.equal(canasta.estado, 'fuera');
-  assert.equal(json.datos.fuera, 1);
+  // El paño quedó congelando, no fuera: los moldes se volvieron a llenar.
+  const d = await estadoTanque();
+  assert.equal(d.tanque.panos[0].estado, 'congelando');
+  assert.equal(d.fuera, 0);
 });
 
-test('no se puede sacar dos veces una canasta que ya está fuera', async () => {
-  const c = panos[0].canastas[0].id;
-  const r = await llamar('/api/produccion/sacar', { method: 'POST', cuerpo: { canastaId: c } });
-  assert.equal(r.estado, 409);
-  assert.match(r.json.error, /rellenarla/);
+test('tras el paño 1 toca el 3, no el 2', async () => {
+  const d = await estadoTanque();
+  assert.equal(d.tanque.siguiente.numero, 3);
 });
 
-test('al rellenar arranca el reloj: la canasta pasa a CONGELANDO', async () => {
-  const c = panos[0].canastas[0].id;
-  const r = await llamar('/api/produccion/rellenar', {
-    method: 'POST', cuerpo: { canastaId: c, tipoAgua: 'purificada' }
+test('un operario NO puede saltarse la rotación', async () => {
+  const chema = (await llamar('/api/auth/usuarios-disponibles')).json.datos.usuarios
+    .find((u) => u.nombre === 'Don Chema');
+  await llamar('/api/auth/entrar-pin', { method: 'POST', cuerpo: { usuarioId: chema.id, pin: '2222' } });
+
+  const r = await llamar(`/api/produccion/panos/${panos[1].id}/sacar`, {
+    method: 'POST', cuerpo: { tipoAgua: 'purificada' }
+  });
+  assert.equal(r.estado, 403);
+  assert.match(r.json.error, /Toca el paño 3/);
+  assert.equal(r.json.tocaPano, 3);
+});
+
+test('el operario sí puede sacar el que le toca', async () => {
+  const r = await llamar(`/api/produccion/panos/${panos[2].id}/sacar`, {
+    method: 'POST', cuerpo: { tipoAgua: 'potable' }
   });
   assert.equal(r.estado, 201);
 
-  const { json } = await llamar('/api/produccion/estado');
-  const canasta = json.datos.tanque.panos[0].canastas[0];
-  assert.equal(canasta.estado, 'congelando');
-  assert.equal(canasta.tipoAgua, 'purificada');
-  assert.equal(json.datos.fuera, 0);
+  const d = await estadoTanque();
+  assert.equal(d.tanque.siguiente.numero, 5);
 });
 
-test('el rellenado exige decir con qué agua', async () => {
-  const c = panos[0].canastas[1].id;
-  const r = await llamar('/api/produccion/rellenar', { method: 'POST', cuerpo: { canastaId: c } });
-  assert.equal(r.estado, 400);
-  assert.match(r.json.error, /purificada o potable/);
+test('el admin se salta la rotación, pero tiene que escribir el motivo', async () => {
+  await llamar('/api/auth/entrar-contrasena', {
+    method: 'POST', cuerpo: { usuario: 'tony', contrasena: 'clavelarga1' }
+  });
+
+  const sinMotivo = await llamar(`/api/produccion/panos/${panos[1].id}/sacar`, {
+    method: 'POST', cuerpo: { tipoAgua: 'purificada' }
+  });
+  assert.equal(sinMotivo.estado, 400);
+  assert.equal(sinMotivo.json.requiereMotivo, true);
+
+  const conMotivo = await llamar(`/api/produccion/panos/${panos[1].id}/sacar`, {
+    method: 'POST', cuerpo: { tipoAgua: 'purificada', motivo: 'Se necesitaba hielo ya' }
+  });
+  assert.equal(conMotivo.estado, 201);
+
+  const sp = bd.prepare('SELECT * FROM sacadas_pano WHERE motivo_orden IS NOT NULL').get();
+  assert.ok(sp.autorizada_por);
+  assert.equal(sp.motivo_orden, 'Se necesitaba hielo ya');
 });
 
-test('cumplidas las horas, la canasta pasa sola a LISTA', async () => {
-  const c = panos[0].canastas[0].id;
-  envejecer(c, 25);                            // el tanque pide 24 h
+test('un paño a medias queda en proceso y es el siguiente que toca', async () => {
+  // Solo la primera canasta del paño 5: al obrero se le acabó el agua.
+  const d0 = await estadoTanque();
+  const pano5 = d0.tanque.panos.find((p) => p.numero === 5);
 
-  const { json } = await llamar('/api/produccion/estado');
-  const canasta = json.datos.tanque.panos[0].canastas[0];
-  assert.equal(canasta.estado, 'lista');
-  assert.ok(canasta.horas >= 25);
+  const r = await llamar(`/api/produccion/panos/${pano5.id}/sacar`, {
+    method: 'POST',
+    cuerpo: { tipoAgua: 'purificada', canastas: [pano5.canastas[0].id], ejecutorId: operarioId }
+  });
+  assert.equal(r.estado, 201);
+  assert.equal(r.json.datos.terminado, false);
+
+  const d = await estadoTanque();
+  const p5 = d.tanque.panos.find((p) => p.numero === 5);
+  assert.equal(p5.enProceso, true);
+  assert.equal(d.tanque.siguiente.numero, 5);            // primero se termina lo empezado
+  assert.match(d.tanque.siguiente.porque, /a medias/);
 });
 
-test('la sacada guarda las horas reales que estuvo congelando', async () => {
-  const c = panos[0].canastas[0].id;
-  const r = await llamar('/api/produccion/sacar', { method: 'POST', cuerpo: { canastaId: c } });
-  assert.ok(r.json.datos.sacada.horas >= 25);
+test('otro obrero termina el paño que quedó a medias', async () => {
+  const d0 = await estadoTanque();
+  const pano5 = d0.tanque.panos.find((p) => p.numero === 5);
+
+  const r = await llamar(`/api/produccion/panos/${pano5.id}/sacar`, {
+    method: 'POST', cuerpo: { tipoAgua: 'purificada' }
+  });
+  assert.equal(r.json.datos.terminado, true);
+
+  const d = await estadoTanque();
+  assert.equal(d.tanque.panos.find((p) => p.numero === 5).enProceso, false);
+
+  // Los dos obreros quedaron registrados en las canastas que hizo cada uno.
+  const quienes = bd.prepare(`
+    SELECT DISTINCT ejecutor_id FROM sacadas
+     WHERE sacada_pano_id = (SELECT id FROM sacadas_pano WHERE pano_id = ? ORDER BY iniciada_en DESC LIMIT 1)
+  `).all(pano5.id);
+  assert.equal(quienes.length, 2);
 });
 
-test('la merma se registra molde por molde y no cuenta como marqueta', async () => {
-  const canasta = panos[1].canastas[0];
-  const detalle = await llamar(`/api/tanques/${tanqueId}`);
-  const moldes = detalle.json.datos.tanque.panos[1].canastas[0].moldes;
+test('dejar un paño fuera NO lo rellena y sale en la alerta', async () => {
+  const d0 = await estadoTanque();
+  const siguiente = d0.tanque.panos.find((p) => p.numero === d0.tanque.siguiente.numero);
 
-  const r = await llamar('/api/produccion/sacar', {
+  await llamar(`/api/produccion/panos/${siguiente.id}/sacar`, {
+    method: 'POST', cuerpo: { rellenar: false, motivo: 'Limpieza del molde' }
+  });
+
+  const d = await estadoTanque();
+  assert.ok(d.fuera > 0);
+  assert.equal(d.tanque.panos.find((p) => p.id === siguiente.id).estado, 'fuera');
+});
+
+test('la merma se guarda y el molde recuerda que falló', async () => {
+  const d0 = await estadoTanque();
+  const pano = d0.tanque.panos.find((p) => p.estado === 'congelando');
+  const molde = pano.canastas[0].moldes[0];
+
+  await llamar(`/api/produccion/panos/${pano.id}/sacar`, {
     method: 'POST',
     cuerpo: {
-      canastaId: canasta.id,
-      resultados: [
-        { moldeId: moldes[0].id, resultado: 'merma' },
-        { moldeId: moldes[1].id, resultado: 'hueco' }
-      ]
+      tipoAgua: 'purificada', motivo: 'Prueba de merma',
+      resultados: [{ moldeId: molde.id, resultado: 'merma' }]
+    }
+  });
+
+  const d = await estadoTanque();
+  const mismo = d.tanque.panos.find((p) => p.id === pano.id)
+                  .canastas[0].moldes.find((m) => m.id === molde.id);
+  assert.equal(mismo.ultimoResultado, 'merma');
+});
+
+test('la captura en lote registra la jornada completa de un obrero', async () => {
+  const r2 = await llamar('/api/tanques', {
+    method: 'POST', cuerpo: { nombre: 'T', panos: 4, plantilla: [3], horasCongelacion: 24 }
+  });
+  const nuevos = r2.json.datos.tanque.panos;
+
+  const r = await llamar('/api/produccion/lote', {
+    method: 'POST',
+    cuerpo: {
+      ejecutorId: operarioId, tipoAgua: 'potable',
+      panos: [nuevos[0].id, nuevos[1].id, nuevos[2].id]
     }
   });
   assert.equal(r.estado, 201);
-  assert.equal(r.json.datos.marquetas, 1);            // solo 1 de 3 salió bien
-  assert.equal(r.json.datos.sacada.resumen.merma, 1);
-  assert.equal(r.json.datos.sacada.resumen.hueco, 1);
-});
+  assert.equal(r.json.datos.panos.length, 3);
+  assert.equal(r.json.datos.marquetas, 9);       // 3 paños x 3 moldes
 
-test('cada molde de la sacada quedó registrado con su posición', () => {
+  // Todo quedó a nombre del obrero, no de quien lo capturó.
   const filas = bd.prepare(`
-    SELECT m.numero, sm.resultado
-      FROM sacadas_moldes sm
-      JOIN moldes m ON m.id = sm.molde_id
-      JOIN sacadas s ON s.id = sm.sacada_id
-     ORDER BY s.fecha DESC, m.numero LIMIT 3
+    SELECT ejecutor_id, capturista_id FROM sacadas_pano
+     WHERE notas LIKE 'Capturado en lote%'
   `).all();
   assert.equal(filas.length, 3);
-  assert.deepEqual(filas.map((f) => f.numero), [1, 2, 3]);
+  assert.ok(filas.every((f) => f.ejecutor_id === operarioId));
+  assert.ok(filas.every((f) => f.capturista_id !== operarioId));
 });
 
-test('el resumen del turno cuenta marquetas y merma por separado', async () => {
-  const { json } = await llamar('/api/produccion/resumen-turno');
-  assert.equal(json.datos.marquetas, 7);   // 3 + 3 + 1
-  assert.equal(json.datos.merma, 2);
+test('el resumen del día reparte las marquetas por obrero', async () => {
+  const { json } = await llamar('/api/produccion/hoy');
+  const chema = json.datos.porObrero.find((o) => o.nombre === 'Don Chema');
+  assert.ok(chema);
+  assert.ok(chema.marquetas > 0);
+  assert.ok(json.datos.panos.length > 0);
 });
 
-test('el turno no se cierra si quedan canastas sin rellenar', async () => {
-  const r = await llamar('/api/produccion/turno/cerrar', { method: 'POST', cuerpo: {} });
-  assert.equal(r.estado, 409);
-  assert.ok(r.json.canastasFuera.length > 0);
+test('un gerente puede autorizar y corregir; un cajero no', async () => {
+  await llamar('/api/usuarios', {
+    method: 'POST', cuerpo: { nombre: 'Lupita', rol: 'gerente', pin: '3333' }
+  });
+  await llamar('/api/usuarios', {
+    method: 'POST', cuerpo: { nombre: 'Rosa', rol: 'cajero', pin: '4444' }
+  });
+
+  const lista = (await llamar('/api/auth/usuarios-disponibles')).json.datos.usuarios;
+  const lupita = lista.find((u) => u.nombre === 'Lupita');
+  const rosa = lista.find((u) => u.nombre === 'Rosa');
+
+  await llamar('/api/auth/entrar-pin', { method: 'POST', cuerpo: { usuarioId: rosa.id, pin: '4444' } });
+  const d = await estadoTanque();
+  assert.equal(d.puedeAutorizar, false);
+
+  await llamar('/api/auth/entrar-pin', { method: 'POST', cuerpo: { usuarioId: lupita.id, pin: '3333' } });
+  const d2 = await estadoTanque();
+  assert.equal(d2.puedeAutorizar, true);
 });
 
-test('el turno se puede cerrar a la fuerza y queda constancia', async () => {
-  const r = await llamar('/api/produccion/turno/cerrar', { method: 'POST', cuerpo: { forzar: true } });
-  assert.equal(r.estado, 200);
-  assert.ok(r.json.datos.canastasFuera > 0);
+test('anular un registro equivocado deja el paño como estaba', async () => {
+  await llamar('/api/auth/entrar-contrasena', {
+    method: 'POST', cuerpo: { usuario: 'tony', contrasena: 'clavelarga1' }
+  });
 
-  const t = await llamar('/api/produccion/turno');
-  assert.equal(t.json.datos.turno, null);
-});
-
-test('la bitácora guarda quién ejecutó y quién capturó cada movimiento', () => {
-  const evento = bd.prepare(
-    "SELECT * FROM bitacora WHERE accion = 'produccion.sacada' ORDER BY fecha DESC LIMIT 1"
+  const antes = bd.prepare('SELECT COUNT(*) n FROM sacadas').get().n;
+  const sp = bd.prepare(
+    'SELECT id FROM sacadas_pano WHERE notas LIKE \'Capturado en lote%\' LIMIT 1'
   ).get();
-  assert.ok(evento.ejecutor_id);
-  assert.ok(evento.capturista_id);
+
+  const r = await llamar(`/api/produccion/sacadas-pano/${sp.id}/anular`, {
+    method: 'POST', cuerpo: { motivo: 'Se equivocaron de paño' }
+  });
+  assert.equal(r.estado, 200);
+
+  const despues = bd.prepare('SELECT COUNT(*) n FROM sacadas').get().n;
+  assert.ok(despues < antes);
+
+  // La sacada del paño no se borra: queda marcada como anulada.
+  const marcada = bd.prepare('SELECT notas FROM sacadas_pano WHERE id = ?').get(sp.id);
+  assert.match(marcada.notas, /^ANULADA/);
+
+  // Y quedó anotado en la bitácora.
+  const evento = bd.prepare(
+    "SELECT * FROM bitacora WHERE accion = 'produccion.anulacion' ORDER BY fecha DESC LIMIT 1"
+  ).get();
+  assert.ok(evento);
 });
 
-test('el sistema sugiere el paño que lleva más tiempo congelando', async () => {
-  await llamar('/api/produccion/turno/abrir', { method: 'POST', cuerpo: { nombre: 'Día' } });
-
-  // Paño 3: rellenado hace mucho. Paño 1: rellenado hace poco.
-  for (const c of panos[2].canastas) {
-    await llamar('/api/produccion/rellenar', { method: 'POST', cuerpo: { canastaId: c.id, tipoAgua: 'potable' } });
-    envejecer(c.id, 40);
-  }
-  for (const c of panos[0].canastas) {
-    await llamar('/api/produccion/rellenar', { method: 'POST', cuerpo: { canastaId: c.id, tipoAgua: 'potable' } });
-    envejecer(c.id, 26);
-  }
-
-  const { json } = await llamar('/api/produccion/estado');
-  assert.equal(json.datos.sugerido.numero, 3);   // el más viejo, no el primero
-});
-
-test('un cajero puede ver producción pero no registrar', async () => {
-  await llamar('/api/usuarios', { method: 'POST', cuerpo: { nombre: 'Ana', rol: 'repartidor', pin: '7777' } });
-  const { json } = await llamar('/api/auth/usuarios-disponibles');
-  const ana = json.datos.usuarios.find((u) => u.nombre === 'Ana');
-  await llamar('/api/auth/entrar-pin', { method: 'POST', cuerpo: { usuarioId: ana.id, pin: '7777' } });
-
-  const ver = await llamar('/api/produccion/estado');
-  assert.equal(ver.estado, 403);   // el repartidor no tiene produccion.ver
+test('anular exige motivo', async () => {
+  const sp = bd.prepare(
+    'SELECT id FROM sacadas_pano WHERE notas NOT LIKE \'ANULADA%\' OR notas IS NULL LIMIT 1'
+  ).get();
+  const r = await llamar(`/api/produccion/sacadas-pano/${sp.id}/anular`, {
+    method: 'POST', cuerpo: {}
+  });
+  assert.equal(r.estado, 400);
 });

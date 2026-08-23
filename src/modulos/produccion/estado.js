@@ -13,6 +13,7 @@
  * se pueden reconstruir, porque los eventos nunca cambian.
  */
 const { bd } = require('../../db/conexion');
+const { siguientePano, explicar } = require('./rotacion');
 
 const ESTADOS = {
   CONGELANDO: 'congelando',
@@ -99,6 +100,39 @@ function estadoDeCanasta(ultimo, horasTanque) {
 }
 
 /**
+ * Último resultado conocido de cada molde de un tanque.
+ * Sirve para pintar en la pantalla el molde que falló la última vez: si uno
+ * aparece marcado siempre, hay un problema físico en ese molde concreto.
+ */
+function ultimoResultadoPorMolde(tanqueId) {
+  const filas = bd.prepare(`
+    SELECT sm.molde_id, sm.resultado
+      FROM sacadas_moldes sm
+      JOIN sacadas s   ON s.id = sm.sacada_id
+      JOIN canastas c  ON c.id = s.canasta_id
+      JOIN panos p     ON p.id = c.pano_id
+     WHERE p.tanque_id = ?
+       AND s.fecha = (SELECT MAX(s2.fecha) FROM sacadas s2
+                       JOIN sacadas_moldes sm2 ON sm2.sacada_id = s2.id
+                      WHERE sm2.molde_id = sm.molde_id)
+  `).all(tanqueId);
+
+  return new Map(filas.map((f) => [f.molde_id, f.resultado]));
+}
+
+/** Sacadas de paño empezadas y sin terminar en un tanque. */
+function panosEnProceso(tanqueId) {
+  return bd.prepare(`
+    SELECT sp.*, p.numero AS pano_numero, u.nombre AS ejecutor_nombre
+      FROM sacadas_pano sp
+      JOIN panos p ON p.id = sp.pano_id
+      LEFT JOIN usuarios u ON u.id = sp.ejecutor_id
+     WHERE p.tanque_id = ? AND sp.terminada_en IS NULL AND p.activo = 1
+     ORDER BY sp.iniciada_en
+  `).all(tanqueId);
+}
+
+/**
  * Estructura completa de un tanque con el estado de cada canasta.
  * Es lo que pinta la pantalla de producción.
  */
@@ -107,6 +141,9 @@ function tanqueConEstado(tanqueId) {
   if (!tanque) return null;
 
   const eventos = ultimosEventos(tanqueId);
+  const resultados = ultimoResultadoPorMolde(tanqueId);
+  const enProceso = panosEnProceso(tanqueId);
+  const panosEnProcesoIds = new Set(enProceso.map((x) => x.pano_id));
 
   const panos = bd.prepare(
     'SELECT * FROM panos WHERE tanque_id = ? AND activo = 1 ORDER BY numero'
@@ -122,7 +159,10 @@ function tanqueConEstado(tanqueId) {
   for (const pano of panos) {
     pano.canastas = canastasDe.all(pano.id).map((c) => {
       const info = estadoDeCanasta(eventos.get(c.id), tanque.horas_congelacion);
-      return { ...c, ...info, moldes: moldesDe.all(c.id) };
+      const moldes = moldesDe.all(c.id).map((m) => ({
+        ...m, ultimoResultado: resultados.get(m.id) || null
+      }));
+      return { ...c, ...info, moldes };
     });
 
     pano.total_moldes = pano.canastas.reduce((n, c) => n + c.moldes.length, 0);
@@ -139,9 +179,35 @@ function tanqueConEstado(tanqueId) {
     const congelando = pano.canastas.filter((c) => c.estado === ESTADOS.CONGELANDO);
     pano.horas = congelando.length ? Math.min(...congelando.map((c) => c.horas)) : null;
     pano.sinRegistro = pano.canastas.every((c) => c.sinRegistro);
+
+    // Un paño empezado y sin terminar: alguien tiene que ir a acabarlo.
+    pano.enProceso = panosEnProcesoIds.has(pano.id);
+    if (pano.enProceso) {
+      const abierta = enProceso.find((x) => x.pano_id === pano.id);
+      pano.sacadaPanoId = abierta.id;
+      pano.empezadoPor = abierta.ejecutor_nombre;
+      pano.empezadoEn = abierta.iniciada_en;
+      pano.estado = 'proceso';
+    }
+
+    // Moldes que fallaron la última vez que se sacó este paño.
+    pano.mermaUltima = pano.canastas.reduce(
+      (n, c) => n + c.moldes.filter((m) => m.ultimoResultado && m.ultimoResultado !== 'ok').length, 0);
   }
 
   tanque.panos = panos;
+
+  // Qué paño toca, según la rotación intercalada.
+  const numeros = panos.map((p) => p.numero);
+  const numerosEnProceso = panos.filter((p) => p.enProceso).map((p) => p.numero);
+  const toca = siguientePano(numeros, tanque.ultimo_pano_sacado, numerosEnProceso);
+
+  tanque.siguiente = toca == null ? null : {
+    numero: toca,
+    id: panos.find((p) => p.numero === toca)?.id || null,
+    porque: explicar(numeros, tanque.ultimo_pano_sacado, numerosEnProceso)
+  };
+
   return tanque;
 }
 
@@ -197,5 +263,6 @@ function canastasFuera() {
 
 module.exports = {
   ESTADOS, horasDesde, ultimosEventos, estadoDeCanasta,
-  tanqueConEstado, panoSugerido, canastasFuera
+  tanqueConEstado, panoSugerido, canastasFuera,
+  ultimoResultadoPorMolde, panosEnProceso
 };

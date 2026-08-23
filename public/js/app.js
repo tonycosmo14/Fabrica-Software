@@ -90,7 +90,10 @@ async function dibujar() {
  */
 function pintarBarra() {
   document.getElementById('barra-marca').innerHTML = marcaBarraHTML();
-  document.getElementById('barra-nombre').textContent = estado.usuario?.nombre || '';
+  // En el celular no cabe el nombre completo: se deja el de pila.
+  const nombre = estado.usuario?.nombre || '';
+  document.getElementById('barra-nombre').textContent =
+    window.innerWidth < 460 ? nombre.split(' ')[0] : nombre;
   document.getElementById('barra-rol').textContent = ETIQUETAS_ROL[estado.usuario?.rol] || '';
 }
 
@@ -99,15 +102,21 @@ function pintarBarra() {
  * un reloj a la vista y la hora importa (turnos, congelación, cortes).
  */
 function iniciarReloj() {
-  const caja = document.getElementById('reloj');
+  const cajaFecha = document.getElementById('reloj-fecha');
+  const cajaHora = document.getElementById('reloj-hora');
   let ultimo = '';
 
   const pintar = () => {
     const ahora = new Date();
-    const fecha = ahora.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' });
     const hora = ahora.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
-    const texto = `${fecha} · ${hora}`;
-    if (texto !== ultimo) { caja.textContent = texto; ultimo = texto; }
+    if (hora === ultimo) return;
+    ultimo = hora;
+
+    // La fecha se esconde sola en pantallas angostas (lo hace el CSS);
+    // aquí solo se escriben las dos partes.
+    cajaFecha.textContent = ahora.toLocaleDateString('es-MX',
+      { weekday: 'short', day: 'numeric', month: 'short' });
+    cajaHora.textContent = hora;
   };
 
   pintar();
@@ -115,8 +124,19 @@ function iniciarReloj() {
 }
 
 function abrirMenu(abierto) {
-  menu.hidden = !abierto;
-  if (!abierto) return;
+  const boton = document.getElementById('btn-menu');
+  boton.classList.toggle('abierto', abierto);
+
+  if (!abierto) {
+    // Se quita la clase primero para que la animación de salida se vea,
+    // y solo después se esconde de verdad.
+    menu.classList.remove('abierto');
+    setTimeout(() => { menu.hidden = true; }, 200);
+    return;
+  }
+
+  menu.hidden = false;
+  requestAnimationFrame(() => menu.classList.add('abierto'));
   document.getElementById('menu-nombre').textContent = estado.usuario?.nombre || '—';
   document.getElementById('menu-rol').textContent = ETIQUETAS_ROL[estado.usuario?.rol] || '';
   menu.querySelectorAll('[data-permiso]').forEach((a) => { a.hidden = !puede(a.dataset.permiso); });

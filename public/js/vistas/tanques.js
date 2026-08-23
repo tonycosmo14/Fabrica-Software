@@ -15,6 +15,71 @@ import { api } from '../api.js';
 import { esc, avisar } from '../util.js';
 import { confirmar, pedirNumero, menu } from '../dialogo.js';
 
+/**
+ * Explicación visual de la jerarquía. Va plegada para no robar espacio,
+ * pero está siempre a mano y sirve de base para el manual de ayuda.
+ */
+function bloqueQueEsQue() {
+  return `
+    <details class="ayuda-bloque">
+      <summary>¿Qué es un paño, una canasta y un molde?</summary>
+      <div class="ayuda-cuerpo">
+        <div class="esquema">
+          <div class="esquema-tanque">
+            <span class="esquema-etiqueta tanque">TANQUE</span>
+            ${[1, 2, 3].map((n) => `
+              <div class="esquema-pano">
+                <span class="esquema-num">${n}</span>
+                ${[3, 3, 3, 4].map((moldes, i) => `
+                  <span class="esquema-canasta ${n === 1 && i === 0 ? 'senalada' : ''}">
+                    ${Array.from({ length: moldes }, () => '<i></i>').join('')}
+                  </span>`).join('')}
+              </div>`).join('')}
+          </div>
+          <div class="esquema-notas">
+            <p><span class="esquema-punto tanque"></span>
+               <strong>Tanque</strong> — el depósito con salmuera. Tú tienes 2N, T y N.</p>
+            <p><span class="esquema-punto pano"></span>
+               <strong>Paño</strong> — cada fila del tanque. Es la unidad de trabajo:
+               se saca completo.</p>
+            <p><span class="esquema-punto canasta"></span>
+               <strong>Canasta</strong> — lo que la grúa levanta de un jalón.
+               Un paño lleva varias.</p>
+            <p><span class="esquema-punto molde"></span>
+               <strong>Molde</strong> — cada hueco de la canasta.
+               <strong>Un molde = una marqueta.</strong></p>
+          </div>
+        </div>
+      </div>
+    </details>`;
+}
+
+/** Instrucciones de uso del configurador. */
+function bloqueComoSeUsa() {
+  return `
+    <details class="ayuda-bloque">
+      <summary>Cómo agregar o quitar paños y canastas</summary>
+      <div class="ayuda-cuerpo">
+        <ul class="instrucciones">
+          <li><b>Agregar paños</b> — botón <em>＋ Agregar paños</em>. Te pregunta cuántos
+              y los crea copiados del último paño.</li>
+          <li><b>Quitar paños</b> — botón <em>− Quitar últimos</em> si te pasaste al crear
+              el tanque, o el botón <em>⋯</em> del paño para quitar uno concreto.</li>
+          <li><b>Agregar una canasta a un paño</b> — el botón <em>＋</em> al final de la
+              fila, o <em>⋯ → Agregar una canasta</em>.</li>
+          <li><b>Cambiar los moldes de una canasta</b> — toca la canasta y usa
+              los botones <em>−</em> y <em>＋</em>.</li>
+          <li><b>Recuperar algo quitado</b> — botón <em>Ver bajas</em>: lo quitado aparece
+              en gris y se puede volver a activar.</li>
+        </ul>
+        <p class="ayuda" style="margin:12px 0 0;font-size:14px">
+          Nada se borra nunca. Lo que quitas deja de contar, pero su historial
+          se conserva completo para los reportes.
+        </p>
+      </div>
+    </details>`;
+}
+
 export async function vistaTanques(pantalla, estado) {
   const puedeConfigurar = estado.permisos.includes('*') ||
                           estado.permisos.includes('tanques.configurar');
@@ -34,6 +99,8 @@ export async function vistaTanques(pantalla, estado) {
         el trabajo diario va en Producción.
       </p>
 
+      ${bloqueQueEsQue()}
+
       ${tanques.length ? `
         <div class="resumen-fabrica">
           <div><strong>${tanques.length}</strong><small>${tanques.length === 1 ? 'tanque' : 'tanques'}</small></div>
@@ -41,7 +108,7 @@ export async function vistaTanques(pantalla, estado) {
           <div><strong>${totalMoldes}</strong><small>moldes</small></div>
         </div>` : ''}
 
-      <div style="margin-top:14px">
+      <div class="lista-tanques" style="margin-top:14px">
         ${tanques.map((t) => `
           <div class="tanque-fila">
             <button class="tanque-tarjeta" data-id="${esc(t.id)}">
@@ -256,6 +323,8 @@ export async function vistaTanques(pantalla, estado) {
           </button>
         </div>` : ''}
 
+      ${bloqueComoSeUsa()}
+
       <div class="panos">
         ${tanque.panos.map((p) => filaPano(p)).join('') ||
           '<p class="vacio">Este tanque no tiene paños.</p>'}
@@ -287,6 +356,23 @@ export async function vistaTanques(pantalla, estado) {
       b.onclick = () => menuPano(tanque, b.dataset.pano, verBajas);
     });
 
+    // La fichita "＋" del final de cada fila: agrega una canasta sin menús.
+    pantalla.querySelectorAll('[data-nueva-canasta]').forEach((b) => {
+      b.onclick = async () => {
+        const moldes = await pedirNumero({
+          titulo: 'Canasta nueva',
+          texto: 'Se agrega al final del paño. ¿Cuántos moldes lleva?',
+          valor: 3, min: 1, max: 20, ok: 'Agregar'
+        });
+        if (moldes === null) return;
+        try {
+          await api.enviar(`/tanques/panos/${b.dataset.nuevaCanasta}/canastas`, { moldes });
+          avisar('Canasta agregada', 'bien');
+          detalle(id, { verBajas });
+        } catch (e) { avisar(e.message, 'error'); }
+      };
+    });
+
     function filaPano(p) {
       return `
         <div class="pano ${p.activo ? '' : 'de-baja'}">
@@ -298,6 +384,10 @@ export async function vistaTanques(pantalla, estado) {
                 <span class="canasta-num">C${c.numero}</span>
                 <span class="canasta-moldes">${c.total_moldes}</span>
               </button>`).join('')}
+            ${puedeConfigurar
+              ? `<button class="canasta agregar" data-nueva-canasta="${esc(p.id)}"
+                         title="Agregar una canasta a este paño">＋</button>`
+              : ''}
           </div>
           <div class="pano-total">${p.total_moldes}</div>
           ${puedeConfigurar

@@ -12,9 +12,38 @@
  * tipo: 'nuevo' | 'mejora' | 'arreglo' | 'importante'
  */
 
-const VERSION_ACTUAL = '0.3';
+const VERSION_ACTUAL = '0.4';
 
 const VERSIONES = [
+  {
+    numero: '0.4',
+    nombre: 'Producción como trabaja la fábrica',
+    fecha: '2026-08-23',
+    resumen:
+      'Producción se rehizo con el flujo real: el paño como unidad, la ' +
+      'rotación intercalada como regla, y la captura de la jornada completa ' +
+      'al final del día, que es como se hace hoy.',
+    cambios: [
+      { tipo: 'importante', texto: 'La rotación 1, 3, 5... y luego 2, 4, 6... ahora es regla: el sistema marca cuál toca y no deja sacar otro.' },
+      { tipo: 'importante', texto: 'Sacar un paño que no toca requiere autorización de gerente o administrador, con motivo, y queda registrado.' },
+      { tipo: 'importante', texto: 'Sacar y rellenar son un solo toque, porque los moldes siempre se vuelven a llenar. Dejar un paño fuera es la excepción y se marca aparte.' },
+      { tipo: 'nuevo', texto: 'Registrar lo que sacó un obrero: marcas los paños que te dice y se capturan todos de golpe, a su nombre.' },
+      { tipo: 'nuevo', texto: 'Un paño empezado y sin terminar queda "a medias" y es el siguiente que toca; otro obrero lo termina y quedan los dos registrados.' },
+      { tipo: 'nuevo', texto: 'El agua se cambia con un botón al lado, sin entrar a ningún menú.' },
+      { tipo: 'nuevo', texto: 'Rol Gerente de turno: autoriza saltarse la rotación y corrige errores. El cajero no puede.' },
+      { tipo: 'nuevo', texto: 'Anular un registro equivocado: no se borra nada, queda marcado como anulado con su motivo.' },
+      { tipo: 'nuevo', texto: 'Un molde que falló la última vez queda marcado en rojo. Si siempre aparece marcado, ese molde tiene un problema físico.' },
+      { tipo: 'nuevo', texto: 'Lo de hoy: marquetas y merma del día, repartidas por obrero.' },
+      { tipo: 'mejora', texto: 'Se quitaron los turnos de abrir y cerrar. Cada movimiento guarda su hora y quién lo hizo.' },
+      { tipo: 'mejora', texto: 'Encabezado en un solo renglón: reloj, logo y usuario a la misma altura. Se gana pantalla.' },
+      { tipo: 'mejora', texto: 'El menú entra deslizándose en vez de aparecer de golpe.' },
+      { tipo: 'nuevo', texto: 'En Configurar tanques: un esquema visual que explica qué es un paño, una canasta y un molde, y las instrucciones de uso.' },
+      { tipo: 'nuevo', texto: 'Volvió la fichita ＋ al final de cada paño para agregar una canasta de un toque.' },
+      { tipo: 'mejora', texto: 'En PC se aprovecha todo el ancho: los tanques se acomodan en varias columnas.' },
+      { tipo: 'mejora', texto: 'Los nombres de los tanques van centrados y se desplazan de lado si algún día no caben.' }
+    ],
+    siguiente: 'v0.5 — La Existencia: lo que se sacó, lo que se vendió y lo que sobra en el cuarto frío.'
+  },
   {
     numero: '0.3',
     nombre: 'Producción',
@@ -35,8 +64,7 @@ const VERSIONES = [
       { tipo: 'nuevo', texto: 'Resumen del turno: marquetas, merma y todos los movimientos con hora y responsable.' },
       { tipo: 'importante', texto: 'Sacar y rellenar son dos cosas distintas: puedes sacar y dejar la canasta para rellenarla al rato, y el sistema no la pierde de vista.' },
       { tipo: 'importante', texto: 'El estado no se guarda: se deduce de los movimientos. Así cualquier día del pasado se puede reconstruir tal como fue.' }
-    ],
-    siguiente: 'v0.3.1 — Traspaso a caja: el hielo pasa de producción a la custodia del cajero.'
+    ]
   },
   {
     numero: '0.2.2',

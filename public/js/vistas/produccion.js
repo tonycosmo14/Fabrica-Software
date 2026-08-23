@@ -1,53 +1,43 @@
 /**
- * PRODUCCIÓN  (v0.3)
+ * PRODUCCIÓN  (v0.4 — el flujo real de la fábrica)
  *
- * La pantalla del trabajo diario. Pestañas por tanque, un paño por renglón,
- * y cada canasta pintada del color de su estado.
+ * Dos formas de trabajar, las dos válidas y sobre los mismos datos:
  *
- * EL FLUJO NORMAL ES UN TAP (sección 6.6 y 12 del plan):
- *   canasta lista  -> tap = sacarla, todos los moldes bien
- *   canasta fuera  -> tap = rellenarla
- * Las excepciones (marcar merma molde por molde, cambiar el agua, sacar sin
- * rellenar) están en el menú ⋯ de la canasta.
+ *  1. EN VIVO — una pantalla táctil junto a los tanques. El obrero toca el
+ *     paño que le toca y queda registrado con su hora.
+ *
+ *  2. AL FINAL DE LA JORNADA — el obrero llega a caja y dice "saqué el 1, el
+ *     3 y el 5". El cajero marca esos paños y los captura de golpe.
+ *     Es como funciona hoy, y por eso es el botón grande de arriba.
+ *
+ * La rotación intercalada (1, 3, 5... luego 2, 4, 6...) es regla: el paño que
+ * toca aparece resaltado y sacar otro pide autorización de gerente o admin.
  */
 import { api } from '../api.js';
-import { esc, avisar, fecha as formatoFecha } from '../util.js';
-import { confirmar, menu } from '../dialogo.js';
-
-const COLOR_ESTADO = { congelando: 'congelando', lista: 'lista', fuera: 'fuera' };
+import { esc, avisar } from '../util.js';
+import { confirmar, menu, pedirNumero } from '../dialogo.js';
 
 export async function vistaProduccion(pantalla, estado) {
   const puedeRegistrar = estado.permisos.includes('*') ||
                          estado.permisos.includes('produccion.registrar');
 
-  // El agua elegida se recuerda durante la sesión: preguntarla en cada
-  // canasta rompería el flujo de un tap.
-  let aguaActual = localStorage.getItem('tipo_agua') || 'purificada';
+  let agua = localStorage.getItem('tipo_agua') || 'purificada';
   let tanqueActivo = localStorage.getItem('tanque_activo') || null;
+  let datos = null;
 
   await pintar();
 
   async function pintar() {
-    const datos = await api.obtener(
+    datos = await api.obtener(
       `/produccion/estado${tanqueActivo ? `?tanque=${encodeURIComponent(tanqueActivo)}` : ''}`);
 
-    if (!datos.tanques.length) {
-      pantalla.innerHTML = `
-        <h2>Producción</h2>
-        <div class="tarjeta plana" style="text-align:center;padding:34px 20px">
-          <div style="font-size:44px">🧊</div>
-          <p class="ayuda" style="margin:12px 0 0">
-            Todavía no hay tanques dados de alta.<br>
-            Primero configúralos en <strong>Configurar tanques</strong>.
-          </p>
-          <a class="boton" href="#/config-tanques" style="margin-top:16px">Ir a configurar</a>
-        </div>`;
-      return;
-    }
+    if (!datos.tanques.length) return sinTanques();
 
-    const { tanques, tanque, sugerido, turno, fuera } = datos;
+    const { tanques, tanque, fuera } = datos;
     tanqueActivo = tanque.id;
     localStorage.setItem('tanque_activo', tanqueActivo);
+
+    const toca = tanque.siguiente;
 
     pantalla.innerHTML = `
       <div class="pestanas">
@@ -56,220 +46,252 @@ export async function vistaProduccion(pantalla, estado) {
                   data-tanque="${esc(t.id)}">${esc(t.nombre)}</button>`).join('')}
       </div>
 
-      ${turno ? `
-        <div class="turno-barra">
-          <span class="turno-info">
-            🕐 ${esc(turno.nombre || 'Turno')} · ${esc(turno.abierto_por_nombre || '')}
-          </span>
-          ${sugerido ? `<span class="sugerencia">sigue paño ${sugerido.numero}</span>` : ''}
-        </div>` : `
-        <div class="turno-barra sin-turno">
-          <span class="turno-info">No hay turno abierto</span>
-          ${puedeRegistrar ? '<button class="chico" id="abrir-turno">Abrir turno</button>' : ''}
-        </div>`}
+      <div class="barra-produccion">
+        ${toca ? `
+          <div class="toca">
+            <span class="toca-etiqueta">toca</span>
+            <strong>paño ${toca.numero}</strong>
+            <small>${esc(toca.porque)}</small>
+          </div>` : '<div class="toca"><small>Este tanque no tiene paños.</small></div>'}
+
+        ${puedeRegistrar ? `
+          <button class="agua-boton ${agua}" id="agua" title="Cambiar el agua">
+            <span class="agua-icono">💧</span>
+            <span>${agua === 'purificada' ? 'Purificada' : 'Potable'}</span>
+          </button>` : ''}
+      </div>
 
       ${fuera ? `
         <div class="alerta-fuera">
-          ⚠️ ${fuera} ${fuera === 1 ? 'canasta sacada sin rellenar' : 'canastas sacadas sin rellenar'}
+          ⚠️ ${fuera} ${fuera === 1 ? 'canasta quedó fuera del tanque' : 'canastas quedaron fuera del tanque'}
         </div>` : ''}
 
+      ${puedeRegistrar ? `
+        <button id="lote" class="boton-lote">
+          📋 Registrar lo que sacó un obrero
+        </button>` : ''}
+
       <div class="panos-produccion">
-        ${tanque.panos.map((p) => filaPano(p, sugerido)).join('') ||
+        ${tanque.panos.map((p) => filaPano(p, toca)).join('') ||
           '<p class="vacio">Este tanque no tiene paños.</p>'}
       </div>
 
       <div class="leyenda">
         <span><i class="punto-estado congelando"></i> congelando</span>
         <span><i class="punto-estado lista"></i> lista</span>
-        <span><i class="punto-estado fuera"></i> sin rellenar</span>
+        <span><i class="punto-estado fuera"></i> fuera del tanque</span>
+        <span><i class="punto-estado proceso"></i> a medias</span>
+        <span><i class="punto-estado merma"></i> falló la última vez</span>
       </div>
 
-      ${turno && puedeRegistrar ? `
-        <div class="fila-botones" style="margin-top:18px">
-          <button class="secundario chico" id="ver-turno">Resumen del turno</button>
-          <button class="secundario chico" id="cerrar-turno">Cerrar turno</button>
-        </div>` : ''}`;
+      <div class="fila-botones" style="margin-top:16px">
+        <button class="secundario chico" id="ver-hoy">Lo de hoy</button>
+      </div>`;
 
-    // --- eventos ---
     pantalla.querySelectorAll('[data-tanque]').forEach((b) => {
       b.onclick = () => { tanqueActivo = b.dataset.tanque; pintar(); };
     });
+    pantalla.querySelector('#ver-hoy').onclick = verHoy;
 
-    const btnAbrir = pantalla.querySelector('#abrir-turno');
-    if (btnAbrir) btnAbrir.onclick = abrirTurno;
+    if (!puedeRegistrar) return;
 
-    const btnCerrar = pantalla.querySelector('#cerrar-turno');
-    if (btnCerrar) btnCerrar.onclick = cerrarTurno;
+    // Un solo toque para cambiar el agua: sin entrar a ningún menú.
+    pantalla.querySelector('#agua').onclick = () => {
+      agua = agua === 'purificada' ? 'potable' : 'purificada';
+      localStorage.setItem('tipo_agua', agua);
+      pintar();
+    };
 
-    const btnResumen = pantalla.querySelector('#ver-turno');
-    if (btnResumen) btnResumen.onclick = verResumen;
+    pantalla.querySelector('#lote').onclick = capturaEnLote;
 
-    if (puedeRegistrar && turno) {
-      pantalla.querySelectorAll('[data-canasta]').forEach((b) => {
-        b.onclick = () => unTap(b.dataset.canasta, tanque);
-      });
-      pantalla.querySelectorAll('[data-mas]').forEach((b) => {
-        b.onclick = (ev) => { ev.stopPropagation(); menuCanasta(b.dataset.mas, tanque); };
-      });
-    }
+    pantalla.querySelectorAll('[data-pano]').forEach((b) => {
+      b.onclick = () => sacarPano(b.dataset.pano);
+    });
+    pantalla.querySelectorAll('[data-mas]').forEach((b) => {
+      b.onclick = (ev) => { ev.stopPropagation(); masOpciones(b.dataset.mas); };
+    });
   }
 
-  /** Un paño: su número, sus canastas con los moldes, y las horas a la derecha. */
-  function filaPano(p, sugerido) {
-    const esSugerido = sugerido && sugerido.id === p.id;
-    const derecha = p.estado === 'fuera' ? 'fuera'
+  function sinTanques() {
+    pantalla.innerHTML = `
+      <h2>Producción</h2>
+      <div class="tarjeta plana" style="text-align:center;padding:34px 20px">
+        <div style="font-size:44px">🧊</div>
+        <p class="ayuda" style="margin:12px 0 0">
+          Todavía no hay tanques dados de alta.<br>
+          Primero configúralos en <strong>Configurar tanques</strong>.
+        </p>
+        <a class="boton" href="#/config-tanques" style="margin-top:16px">Ir a configurar</a>
+      </div>`;
+  }
+
+  /** Una fila = un paño. El botón grande saca el paño completo. */
+  function filaPano(p, toca) {
+    const esElQueToca = toca && toca.id === p.id;
+    const derecha = p.enProceso ? 'a medias'
+                  : p.estado === 'fuera' ? 'fuera'
                   : p.estado === 'lista' ? 'listo'
                   : `${Math.floor(p.horas)} h`;
 
     return `
-      <div class="pano-prod ${esSugerido ? 'sugerido' : ''}">
-        <div class="pano-prod-num">${p.numero}</div>
-        <div class="canastas-prod">
-          ${p.canastas.map((c) => `
-            <button class="canasta-prod ${COLOR_ESTADO[c.estado]} ${c.sinRegistro ? 'sin-registro' : ''}"
-                    data-canasta="${esc(c.id)}"
-                    title="Canasta ${c.numero} · ${c.estado}">
-              ${c.moldes.map(() => '<i class="molde"></i>').join('')}
-            </button>`).join('')}
-        </div>
-        <div class="pano-prod-horas ${p.estado}">${derecha}</div>
-        <button class="mas-canasta" data-mas="${esc(p.id)}" title="Opciones del paño">⋯</button>
+      <div class="pano-prod ${esElQueToca ? 'toca-este' : ''} ${p.enProceso ? 'en-proceso' : ''}">
+        <button class="pano-prod-cuerpo" data-pano="${esc(p.id)}"
+                ${puedeRegistrar ? '' : 'disabled'}>
+          <span class="pano-prod-num">${p.numero}</span>
+          <span class="canastas-prod">
+            ${p.canastas.map((c) => `
+              <span class="canasta-prod ${c.estado}">
+                ${c.moldes.map((m) => `
+                  <i class="molde ${m.ultimoResultado && m.ultimoResultado !== 'ok' ? 'fallo' : ''}"></i>
+                `).join('')}
+              </span>`).join('')}
+          </span>
+          <span class="pano-prod-horas ${p.enProceso ? 'proceso' : p.estado}">${derecha}</span>
+        </button>
+        <button class="mas-canasta" data-mas="${esc(p.id)}" title="Más opciones">⋯</button>
       </div>`;
   }
 
   // ==========================================================
-  // UN TAP
+  // SACAR UN PAÑO — un toque
   // ==========================================================
-  async function unTap(canastaId, tanque) {
-    const { pano, canasta } = ubicar(tanque, canastaId);
+  async function sacarPano(panoId, extra = {}) {
+    const pano = datos.tanque.panos.find((p) => p.id === panoId);
 
-    if (canasta.estado === 'fuera') {
-      return rellenar(canasta, pano);
-    }
-
-    if (canasta.estado === 'congelando') {
-      const sigue = await confirmar({
-        titulo: `Le faltan ${Math.ceil(canasta.listaEn)} h`,
-        texto: `La canasta ${canasta.numero} del paño ${pano.numero} lleva ` +
-               `${Math.floor(canasta.horas)} h congelando. ¿Sacarla de todos modos?`,
-        ok: 'Sacar igual'
-      });
-      if (!sigue) return;
-    }
-
-    await sacar(canasta, pano);
-  }
-
-  async function sacar(canasta, pano, resultados) {
     try {
-      const r = await api.enviar('/produccion/sacar', {
-        canastaId: canasta.id,
-        resultados: resultados || undefined
+      const r = await api.enviar(`/produccion/panos/${panoId}/sacar`, {
+        tipoAgua: agua, rellenar: true, ...extra
       });
-      const merma = (r.sacada.resumen.merma || 0) + (r.sacada.resumen.hueco || 0);
-      avisar(`Paño ${pano.numero} · ${r.marquetas} marquetas` +
-             (merma ? ` · ${merma} de merma` : ''), 'bien');
+      avisar(
+        `Paño ${pano.numero}: ${r.marquetas} marquetas` +
+        (r.merma ? ` · ${r.merma} de merma` : '') +
+        (r.terminado ? '' : ' · queda a medias'), 'bien');
       await pintar();
-    } catch (e) { avisar(e.message, 'error'); }
-  }
+    } catch (e) {
+      // Se salió de la rotación: o no puede, o hay que escribir el motivo.
+      if (e.codigo === 403) return avisar(e.message, 'error');
 
-  async function rellenar(canasta, pano) {
-    try {
-      await api.enviar('/produccion/rellenar', { canastaId: canasta.id, tipoAgua: aguaActual });
-      avisar(`Paño ${pano.numero} rellenado con agua ${aguaActual}`, 'bien');
-      await pintar();
-    } catch (e) { avisar(e.message, 'error'); }
+      if (e.codigo === 400 && /motivo/.test(e.message)) {
+        const motivo = await menu({
+          titulo: `No toca el paño ${pano.numero}`,
+          texto: e.message,
+          opciones: [
+            { valor: 'El agua de ese paño no estaba lista', texto: 'El agua no estaba lista' },
+            { valor: 'El paño que tocaba está en mantenimiento', texto: 'Ese paño está en mantenimiento' },
+            { valor: 'Demanda: se necesitaba hielo ya', texto: 'Se necesitaba hielo ya' },
+            { valor: 'Corrección de un error de captura', texto: 'Corrijo un error de captura' }
+          ]
+        });
+        if (!motivo) return;
+        return sacarPano(panoId, { motivo });
+      }
+      avisar(e.message, 'error');
+    }
   }
 
   // ==========================================================
-  // MENÚ DEL PAÑO — las excepciones
+  // MÁS OPCIONES DEL PAÑO
   // ==========================================================
-  async function menuCanasta(panoId, tanque) {
-    const pano = tanque.panos.find((p) => p.id === panoId);
+  async function masOpciones(panoId) {
+    const pano = datos.tanque.panos.find((p) => p.id === panoId);
+    const puedeCorregir = estado.permisos.includes('*') ||
+                          estado.permisos.includes('produccion.corregir');
+
+    const opciones = [
+      { valor: 'sacar', texto: 'Sacar y rellenar el paño', detalle: `Con agua ${agua}` },
+      { valor: 'merma', texto: 'Sacar marcando merma', detalle: 'Molde por molde' },
+      { valor: 'fuera', texto: 'Sacar y dejarlo fuera',
+        detalle: 'Limpieza, mantenimiento o se acabó el agua' }
+    ];
+    if (pano.enProceso && puedeCorregir) {
+      opciones.push({ valor: 'anular', texto: 'Anular este registro',
+                      detalle: 'Se equivocaron de paño', peligro: true });
+    }
 
     const opcion = await menu({
       titulo: `Paño ${pano.numero}`,
-      texto: `${pano.canastas.length} canastas · ${pano.total_moldes} marquetas`,
-      opciones: [
-        { valor: 'sacar-todo', texto: 'Sacar el paño completo', detalle: 'Todas sus canastas, todo bien' },
-        { valor: 'rellenar-todo', texto: 'Rellenar el paño completo', detalle: `Con agua ${aguaActual}` },
-        { valor: 'merma', texto: 'Sacar marcando merma', detalle: 'Molde por molde' },
-        { valor: 'agua', texto: `Cambiar el agua (ahora: ${aguaActual})`, detalle: 'Purificada o potable' }
-      ]
+      texto: pano.enProceso
+        ? `Empezado por ${esc(pano.empezadoPor || '—')} y sin terminar.`
+        : `${pano.canastas.length} canastas · ${pano.total_moldes} marquetas`,
+      opciones
     });
 
-    if (opcion === 'sacar-todo') {
-      for (const c of pano.canastas.filter((x) => x.estado !== 'fuera')) {
-        try { await api.enviar('/produccion/sacar', { canastaId: c.id }); } catch { /* sigue */ }
-      }
-      avisar(`Paño ${pano.numero} sacado`, 'bien');
-      return pintar();
-    }
-
-    if (opcion === 'rellenar-todo') {
-      for (const c of pano.canastas) {
-        try { await api.enviar('/produccion/rellenar', { canastaId: c.id, tipoAgua: aguaActual }); }
-        catch { /* sigue */ }
-      }
-      avisar(`Paño ${pano.numero} rellenado`, 'bien');
-      return pintar();
-    }
-
-    if (opcion === 'agua') {
-      const elegida = await menu({
-        titulo: 'Tipo de agua',
-        texto: 'Queda registrado en cada rellenado.',
-        opciones: [
-          { valor: 'purificada', texto: 'Purificada' },
-          { valor: 'potable', texto: 'Potable' }
-        ]
+    if (opcion === 'sacar') return sacarPano(panoId);
+    if (opcion === 'merma') return pantallaMerma(pano);
+    if (opcion === 'fuera') {
+      const sigue = await confirmar({
+        titulo: `¿Dejar el paño ${pano.numero} fuera?`,
+        texto: 'Se saca el hielo pero los moldes NO se rellenan. Quedará en la alerta ' +
+               'hasta que alguien los llene.',
+        ok: 'Dejarlo fuera'
       });
-      if (!elegida) return;
-      aguaActual = elegida;
-      localStorage.setItem('tipo_agua', elegida);
-      avisar(`Ahora se rellena con agua ${elegida}`, 'bien');
-      return pintar();
+      if (!sigue) return;
+      return sacarPano(panoId, { rellenar: false });
     }
-
-    if (opcion === 'merma') return pantallaMerma(pano, tanque);
+    if (opcion === 'anular') return anular(pano);
   }
 
-  /** Marcar el resultado molde por molde. Es la excepción, no el flujo normal. */
-  async function pantallaMerma(pano, tanque) {
-    const sacables = pano.canastas.filter((c) => c.estado !== 'fuera');
-    if (!sacables.length) return avisar('Ese paño ya está fuera del tanque.', 'error');
+  async function anular(pano) {
+    const motivo = await menu({
+      titulo: `Anular el paño ${pano.numero}`,
+      texto: 'El registro se anula y el paño vuelve como estaba. Queda constancia.',
+      opciones: [
+        { valor: 'Se equivocaron de paño', texto: 'Se equivocaron de paño' },
+        { valor: 'Error de captura', texto: 'Error de captura' },
+        { valor: 'Se registró dos veces', texto: 'Se registró dos veces' }
+      ]
+    });
+    if (!motivo) return;
 
-    const marcas = new Map();   // moldeId -> resultado
+    try {
+      await api.enviar(`/produccion/sacadas-pano/${pano.sacadaPanoId}/anular`, { motivo });
+      avisar('Registro anulado', 'bien');
+      pintar();
+    } catch (e) { avisar(e.message, 'error'); }
+  }
+
+  // ==========================================================
+  // MERMA MOLDE POR MOLDE
+  // ==========================================================
+  async function pantallaMerma(pano) {
+    const marcas = new Map();
+    const canastas = pano.canastas.filter((c) => c.estado !== 'fuera');
+    const total = canastas.reduce((n, c) => n + c.moldes.length, 0);
 
     const dibujar = () => {
       pantalla.innerHTML = `
         <button class="secundario chico" id="volver">‹ Producción</button>
-        <h2 style="margin-top:14px">Paño ${pano.numero} · merma</h2>
+        <h2 style="margin-top:14px">Paño ${pano.numero}</h2>
         <p class="ayuda">
-          Toca un molde para cambiar cómo salió. Los que no toques cuentan como buenos.
+          Toca un molde para marcar cómo salió. Los que no toques cuentan como
+          buenos. Al guardar, el paño se saca y se rellena con agua ${agua}.
         </p>
 
-        ${sacables.map((c) => `
-          <div class="tarjeta">
-            <strong style="display:block;margin-bottom:10px">Canasta ${c.numero}</strong>
-            <div class="moldes-detalle">
-              ${c.moldes.map((m) => {
-                const r = marcas.get(m.id) || 'ok';
-                return `<button class="molde-boton ${r}" data-molde="${esc(m.id)}">
-                          <span class="molde-num">${m.numero}</span>
-                          <span class="molde-estado">${etiquetaResultado(r)}</span>
-                        </button>`;
-              }).join('')}
-            </div>
-          </div>`).join('')}
+        <div class="canastas-merma">
+          ${canastas.map((c) => `
+            <div class="tarjeta">
+              <strong style="display:block;margin-bottom:10px">Canasta ${c.numero}</strong>
+              <div class="moldes-detalle">
+                ${c.moldes.map((m) => {
+                  const r = marcas.get(m.id) || 'ok';
+                  const aviso = m.ultimoResultado && m.ultimoResultado !== 'ok';
+                  return `<button class="molde-boton ${r}" data-molde="${esc(m.id)}">
+                            <span class="molde-num">${m.numero}</span>
+                            <span class="molde-estado">${etiqueta(r)}</span>
+                            ${aviso ? '<span class="molde-aviso" title="Falló la última vez">!</span>' : ''}
+                          </button>`;
+                }).join('')}
+              </div>
+            </div>`).join('')}
+        </div>
 
         <div class="total-vivo">
-          <span>de ${totalMoldes()} moldes</span>
-          <strong>${totalMoldes() - marcas.size}</strong>
+          <span>de ${total} moldes</span>
+          <strong>${total - marcas.size}</strong>
           <small>marquetas buenas</small>
         </div>
 
-        <button id="guardar" style="margin-top:14px">Registrar la sacada</button>`;
+        <button id="guardar" style="margin-top:14px">Sacar el paño</button>`;
 
       pantalla.querySelector('#volver').onclick = pintar;
 
@@ -284,106 +306,152 @@ export async function vistaProduccion(pantalla, estado) {
       });
 
       pantalla.querySelector('#guardar').onclick = async () => {
-        for (const c of sacables) {
-          const resultados = c.moldes
-            .filter((m) => marcas.has(m.id))
-            .map((m) => ({ moldeId: m.id, resultado: marcas.get(m.id) }));
-          try { await api.enviar('/produccion/sacar', { canastaId: c.id, resultados }); }
-          catch (e) { avisar(e.message, 'error'); return; }
-        }
-        avisar(`Paño ${pano.numero} registrado`, 'bien');
-        pintar();
+        const resultados = [...marcas.entries()].map(([moldeId, resultado]) => ({ moldeId, resultado }));
+        await sacarPano(pano.id, { resultados });
       };
     };
 
-    const totalMoldes = () => sacables.reduce((n, c) => n + c.moldes.length, 0);
     dibujar();
   }
 
-  function etiquetaResultado(r) {
-    return r === 'ok' ? 'bien' : r === 'merma' ? 'merma' : 'hueco';
-  }
-
-  function ubicar(tanque, canastaId) {
-    const pano = tanque.panos.find((p) => p.canastas.some((c) => c.id === canastaId));
-    return { pano, canasta: pano.canastas.find((c) => c.id === canastaId) };
-  }
+  const etiqueta = (r) => (r === 'ok' ? 'bien' : r === 'merma' ? 'merma' : 'hueco');
 
   // ==========================================================
-  // TURNO
+  // CAPTURA EN LOTE — el flujo de las 3 de la tarde
   // ==========================================================
-  async function abrirTurno() {
-    const nombre = await menu({
-      titulo: 'Abrir turno de producción',
-      texto: 'Todo lo que se saque y se rellene quedará dentro de este turno.',
-      opciones: [
-        { valor: 'Matutino', texto: 'Matutino' },
-        { valor: 'Vespertino', texto: 'Vespertino' },
-        { valor: 'Noche', texto: 'Noche' },
-        { valor: '', texto: 'Sin nombre', detalle: 'Solo la hora de apertura' }
-      ]
-    });
-    if (nombre === null) return;
+  async function capturaEnLote() {
+    const { obreros } = await api.obtener('/produccion/obreros');
+    const todos = await api.obtener('/produccion/estado');
+    let obreroId = obreros[0]?.id || null;
+    const elegidos = new Set();
 
-    try {
-      await api.enviar('/produccion/turno/abrir', { nombre });
-      avisar('Turno abierto', 'bien');
-      pintar();
-    } catch (e) { avisar(e.message, 'error'); }
-  }
-
-  async function cerrarTurno() {
-    try {
-      await api.enviar('/produccion/turno/cerrar', {});
-      avisar('Turno cerrado', 'bien');
-      return pintar();
-    } catch (e) {
-      // Quedaron canastas fuera del tanque: se avisa antes de cerrar (6.3).
-      if (e.codigo !== 409) return avisar(e.message, 'error');
-
-      const sigue = await confirmar({
-        titulo: 'Quedan canastas sin rellenar',
-        texto: `${e.message} Si cierras el turno así, queda constancia de cuántas quedaron.`,
-        ok: 'Cerrar de todos modos', peligro: true
-      });
-      if (!sigue) return;
-
-      try {
-        await api.enviar('/produccion/turno/cerrar', { forzar: true });
-        avisar('Turno cerrado', 'bien');
-        pintar();
-      } catch (e2) { avisar(e2.message, 'error'); }
+    // Se cargan los paños de todos los tanques, no solo el que está en pantalla.
+    const porTanque = [];
+    for (const t of todos.tanques) {
+      const d = await api.obtener(`/produccion/estado?tanque=${encodeURIComponent(t.id)}`);
+      porTanque.push(d.tanque);
     }
+
+    const dibujar = () => {
+      pantalla.innerHTML = `
+        <button class="secundario chico" id="volver">‹ Producción</button>
+        <h2 style="margin-top:14px">Registrar lo que se sacó</h2>
+        <p class="ayuda">
+          El obrero te dice los números de los paños que sacó durante su jornada.
+          Márcalos aquí y se registran todos de golpe, a su nombre.
+        </p>
+
+        <div class="tarjeta">
+          <label for="obrero">¿Quién los sacó?</label>
+          <select id="obrero">
+            ${obreros.map((o) => `
+              <option value="${esc(o.id)}" ${o.id === obreroId ? 'selected' : ''}>
+                ${esc(o.nombre)}
+              </option>`).join('')}
+          </select>
+
+          <label style="margin-top:16px">Agua con la que se rellenó</label>
+          <div class="fila-botones">
+            <button class="${agua === 'purificada' ? '' : 'secundario'}" data-agua="purificada">Purificada</button>
+            <button class="${agua === 'potable' ? '' : 'secundario'}" data-agua="potable">Potable</button>
+          </div>
+        </div>
+
+        ${porTanque.map((t) => `
+          <h3>${esc(t.nombre)}</h3>
+          <div class="rejilla-panos">
+            ${t.panos.map((p) => `
+              <button class="ficha-pano ${elegidos.has(p.id) ? 'elegido' : ''}"
+                      data-elegir="${esc(p.id)}">${p.numero}</button>`).join('')}
+          </div>`).join('')}
+
+        <div class="total-vivo" style="margin-top:18px">
+          <span>paños marcados</span>
+          <strong>${elegidos.size}</strong>
+          <small>${calcularMarquetas()} marquetas</small>
+        </div>
+
+        <button id="guardar" style="margin-top:14px" ${elegidos.size ? '' : 'disabled'}>
+          Registrar ${elegidos.size} ${elegidos.size === 1 ? 'paño' : 'paños'}
+        </button>`;
+
+      pantalla.querySelector('#volver').onclick = pintar;
+      pantalla.querySelector('#obrero').onchange = (e) => { obreroId = e.target.value; };
+
+      pantalla.querySelectorAll('[data-agua]').forEach((b) => {
+        b.onclick = () => { agua = b.dataset.agua; localStorage.setItem('tipo_agua', agua); dibujar(); };
+      });
+
+      pantalla.querySelectorAll('[data-elegir]').forEach((b) => {
+        b.onclick = () => {
+          const id = b.dataset.elegir;
+          if (elegidos.has(id)) elegidos.delete(id); else elegidos.add(id);
+          dibujar();
+        };
+      });
+
+      pantalla.querySelector('#guardar').onclick = async () => {
+        try {
+          const r = await api.enviar('/produccion/lote', {
+            ejecutorId: obreroId, panos: [...elegidos], tipoAgua: agua
+          });
+          avisar(`${r.panos.length} paños · ${r.marquetas} marquetas`, 'bien');
+          pintar();
+        } catch (e) { avisar(e.message, 'error'); }
+      };
+    };
+
+    function calcularMarquetas() {
+      let n = 0;
+      for (const t of porTanque) {
+        for (const p of t.panos) if (elegidos.has(p.id)) n += p.total_moldes;
+      }
+      return n;
+    }
+
+    dibujar();
   }
 
-  async function verResumen() {
-    const r = await api.obtener('/produccion/resumen-turno');
-    const { movimientos } = await api.obtener('/produccion/movimientos?limite=20');
+  // ==========================================================
+  // LO DE HOY
+  // ==========================================================
+  async function verHoy() {
+    const r = await api.obtener('/produccion/hoy');
 
     pantalla.innerHTML = `
       <button class="secundario chico" id="volver">‹ Producción</button>
-      <h2 style="margin-top:14px">Turno ${esc(r.turno?.nombre || '')}</h2>
-      <p class="ayuda">Abierto ${esc(formatoFecha(r.turno?.abierto_en))}</p>
+      <h2 style="margin-top:14px">Lo de hoy</h2>
 
       <div class="resumen-fabrica">
         <div><strong>${r.marquetas}</strong><small>marquetas</small></div>
         <div><strong>${r.merma}</strong><small>merma</small></div>
-        <div><strong>${r.fuera}</strong><small>sin rellenar</small></div>
+        <div><strong>${r.fuera}</strong><small>fuera</small></div>
       </div>
 
-      <h3>Movimientos</h3>
+      ${r.porObrero.length ? `
+        <h3>Por obrero</h3>
+        <div class="tarjeta plana">
+          <table class="tabla">
+            <tr><th>Quién</th><th>Paños</th><th>Marquetas</th></tr>
+            ${r.porObrero.map((o) => `
+              <tr><td>${esc(o.nombre)}</td><td>${o.panos}</td>
+                  <td><strong>${o.marquetas}</strong></td></tr>`).join('')}
+          </table>
+        </div>` : ''}
+
+      <h3>Paños sacados</h3>
       <div class="tarjeta plana">
         <table class="tabla">
-          <tr><th>Hora</th><th>Qué</th><th>Dónde</th><th>Quién</th></tr>
-          ${movimientos.map((m) => `
-            <tr>
-              <td>${esc(new Date(m.fecha).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }))}</td>
-              <td>${m.tipo === 'sacada'
-                    ? `sacó <strong>${m.marquetas}</strong>`
-                    : `rellenó <small>${esc(m.tipo_agua)}</small>`}</td>
-              <td>${esc(m.tanque)} · paño ${m.pano} · C${m.canasta}</td>
-              <td>${esc(m.quien || '—')}</td>
-            </tr>`).join('') || '<tr><td colspan="4">Todavía no hay movimientos.</td></tr>'}
+          <tr><th>Hora</th><th>Dónde</th><th>Quién</th><th>Marq.</th></tr>
+          ${r.panos.map((p) => `
+            <tr class="${p.notas && p.notas.startsWith('ANULADA') ? 'anulada' : ''}">
+              <td>${esc(new Date(p.iniciada_en).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }))}</td>
+              <td>${esc(p.tanque)} · paño ${p.pano}
+                  ${p.motivo_orden ? '<small class="marca-orden">fuera de orden</small>' : ''}
+                  ${!p.terminada_en ? '<small class="marca-orden">a medias</small>' : ''}</td>
+              <td>${esc(p.quien || '—')}</td>
+              <td><strong>${p.marquetas}</strong></td>
+            </tr>`).join('') || '<tr><td colspan="4">Todavía no hay nada registrado hoy.</td></tr>'}
         </table>
       </div>`;
 

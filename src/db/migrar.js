@@ -59,11 +59,19 @@ function migrar({ silencioso = false } = {}) {
   for (const archivo of pendientes) {
     const sql = fs.readFileSync(path.join(config.CARPETA_MIGRACIONES, archivo), 'utf8');
 
-    // Cada migracion es una transaccion: o se aplica completa, o no se aplica.
-    const aplicarUna = bd.transaction(() => {
-      bd.exec(sql);
-      registrar.run(archivo, new Date().toISOString());
-    });
+    // Casi todas las migraciones van dentro de una transaccion: o se aplican
+    // completas, o no se aplican. La excepcion son las que necesitan apagar
+    // las llaves foraneas para recrear una tabla, porque SQLite ignora ese
+    // ajuste dentro de una transaccion. Esas se marcan con "-- sin-transaccion"
+    // en la primera linea y manejan su propio BEGIN/COMMIT.
+    const sinTransaccion = sql.trimStart().startsWith('-- sin-transaccion');
+
+    const aplicarUna = sinTransaccion
+      ? () => { bd.exec(sql); registrar.run(archivo, new Date().toISOString()); }
+      : bd.transaction(() => {
+          bd.exec(sql);
+          registrar.run(archivo, new Date().toISOString());
+        });
 
     try {
       aplicarUna();

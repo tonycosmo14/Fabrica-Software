@@ -58,7 +58,9 @@ export function marcaBarraHTML() {
   const hayLogo = usarOscuro || m?.logoClaro;
 
   if (!hayLogo) {
-    return '<span class="barra-marca-texto">Hielo <b>LOLHA</b></span>';
+    // En pantalla angosta solo cabe "LOLHA"; la palabra "Hielo" se esconde
+    // con CSS para no encimarse con el reloj y el nombre.
+    return '<span class="barra-marca-texto"><span class="solo-ancho">Hielo </span><b>LOLHA</b></span>';
   }
   const url = `${usarOscuro ? '/marca/logo-oscuro' : '/marca/logo'}?v=${encodeURIComponent(m.version)}`;
   return `<img src="${url}" alt="${escapar(m.nombreNegocio)}">`;

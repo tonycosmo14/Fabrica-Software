@@ -7,6 +7,32 @@ Tipos: `nuevo` (funcionalidad nueva) · `mejora` · `arreglo` · `clave` (regla 
 
 ---
 
+## v0.4 — Producción como trabaja la fábrica · 23 de agosto de 2026
+
+Rehecho tras entender la operación real. Migración `005_produccion_real.sql`.
+
+**El modelo cambió, no solo la pantalla:**
+
+- **clave** — La unidad de trabajo es el **paño**, no la canasta. Nace `sacadas_pano`: un paño empezado y sin terminar queda **en proceso** y cualquiera lo continúa; los dos obreros quedan registrados en las canastas que hizo cada uno.
+- **clave** — **Sacar y rellenar son un solo movimiento** en la interfaz, porque los moldes siempre se vuelven a llenar. En la base siguen siendo dos eventos separados: el reloj de congelación depende de eso. Dejar un paño fuera (limpieza, se acabó el agua) es la excepción explícita.
+- **clave** — La **rotación intercalada** (1, 3, 5… luego 2, 4, 6…) pasa de sugerencia a regla, en `src/modulos/produccion/rotacion.js`. Sacar otro paño exige permiso `produccion.autorizar` y motivo; queda en `sacadas_pano.autorizada_por` y `motivo_orden`. Una sacada fuera de orden **no** mueve el puntero de la rotación.
+- **clave** — Se eliminan los turnos de abrir y cerrar: cada movimiento guarda hora y ejecutor. Los obreros no reportan uno por uno.
+- **nuevo** — `POST /produccion/lote`: el flujo real de las 3 de la tarde. El obrero dice los números, el cajero los marca y se registran todos a nombre del obrero, con el capturista aparte.
+- **nuevo** — Rol **gerente**, entre cajero y administrador: autoriza y corrige. Requirió recrear la tabla `usuarios` (el rol vive en un CHECK), y con ello una escotilla `-- sin-transaccion` en el runner de migraciones.
+- **nuevo** — `POST /produccion/sacadas-pano/:id/anular`: la sacada queda marcada como anulada con su motivo; no se borra el registro del paño.
+- **nuevo** — Memoria por molde: el último resultado de cada molde se pinta en la pantalla. Un molde marcado siempre es un problema físico.
+
+**Diseño:**
+
+- **mejora** — Encabezado en un solo renglón (reloj, logo centrado, usuario y menú), responsivo para que nada se encime en 390px.
+- **mejora** — El menú entra deslizándose, con los enlaces escalonados, y respeta `prefers-reduced-motion`.
+- **nuevo** — Esquema visual e instrucciones plegables en Configurar tanques, base del manual de ayuda.
+- **nuevo** — Vuelve la ficha ＋ al final de cada paño para agregar canasta de un toque.
+- **mejora** — En PC los tanques se acomodan en rejilla de 2 y 3 columnas; ancho útil de 1180px.
+- **mejora** — Pestañas de tanque centradas y con desplazamiento lateral.
+
+---
+
 ## v0.3 — Producción · 23 de agosto de 2026
 
 El trabajo diario en los tanques. Migración `004_produccion.sql`.
