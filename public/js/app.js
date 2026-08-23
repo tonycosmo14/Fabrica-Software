@@ -20,6 +20,7 @@ import { vistaUsuarios } from './vistas/usuarios.js';
 import { vistaNovedades, hayVersionNueva } from './vistas/novedades.js';
 import { vistaAyuda } from './vistas/ayuda.js';
 import { vistaPersonalizar } from './vistas/personalizar.js';
+import { vistaProductos } from './vistas/productos.js';
 import { vistaSistema } from './vistas/sistema.js';
 
 const pantalla = document.getElementById('pantalla');
@@ -31,11 +32,12 @@ const estado = { usuario: null, permisos: [], configurado: true };
 const RUTAS = {
   '#/inicio':    { titulo: 'Inicio',            vista: vistaInicio },
   '#/tanques':   { titulo: 'Producción',        vista: vistaProduccion, permiso: 'produccion.ver' },
-  '#/venta':     { titulo: 'Punto de venta',    vista: vistaVenta,     permiso: 'venta.registrar' },
+  '#/venta':     { titulo: 'Punto de venta',    vista: vistaVenta,     permiso: 'venta.registrar', fija: true },
   '#/caja':      { titulo: 'Caja',              vista: vistaCaja,      permiso: 'caja.ver' },
   '#/existencia': { titulo: 'Existencia',       vista: vistaExistencia, permiso: 'existencia.ver' },
   '#/config-tanques': { titulo: 'Configurar tanques', vista: vistaTanques, permiso: 'produccion.ver' },
   '#/usuarios':  { titulo: 'Usuarios',          vista: vistaUsuarios,  permiso: 'usuarios.administrar' },
+  '#/productos': { titulo: 'Productos y precios', vista: vistaProductos, permiso: 'sistema.configurar' },
   '#/personalizar': { titulo: 'Personalizar',   vista: vistaPersonalizar, permiso: 'sistema.configurar' },
   '#/sistema':   { titulo: 'Sistema',           vista: vistaSistema,   permiso: 'sistema.ver' },
   '#/ayuda':     { titulo: 'Ayuda',              vista: vistaAyuda },
@@ -46,10 +48,21 @@ function puede(permiso) {
   return !permiso || estado.permisos.includes('*') || estado.permisos.includes(permiso);
 }
 
+/**
+ * A dónde cae cada quien al entrar.
+ *
+ * El cajero pasa el 90% del día cobrando, así que su pantalla de inicio es
+ * la caja, no un menú de iconos. A quien no cobra se le abre el inicio de
+ * siempre.
+ */
+function pantallaDeArranque() {
+  return puede('venta.registrar') ? '#/venta' : '#/inicio';
+}
+
 function entrar(datos) {
   Object.assign(estado, datos);
   estado.configurado = true;
-  location.hash = '#/inicio';
+  location.hash = pantallaDeArranque();
   iniciar();
 }
 
@@ -78,7 +91,15 @@ async function dibujar() {
   // así que en la barra solo se usa para la pestaña del navegador.
   document.title = `${ruta.titulo} · Hielo LOLHA`;
   pintarBarra();
-  document.getElementById('btn-atras').hidden = location.hash === '#/inicio' || !location.hash;
+  document.getElementById('btn-atras').hidden =
+    location.hash === pantallaDeArranque() || location.hash === '#/inicio' || !location.hash;
+  // Avisar a la vista que se va, para que suelte lo que haya enganchado
+  // (el punto de venta escucha el teclado de toda la página).
+  pantalla.dispatchEvent(new CustomEvent('vista-desmontada'));
+
+  // Las pantallas "fijas" ocupan el alto exacto y no se desplazan.
+  document.body.classList.toggle('pantalla-fija', Boolean(ruta.fija));
+
   pantalla.innerHTML = '<div class="cargando">Cargando…</div>';
 
   try {

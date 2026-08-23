@@ -339,12 +339,51 @@ test('el historial de cortes los trae del más nuevo al más viejo', async () =>
 // QUIÉN PUEDE QUÉ
 // ============================================================
 
-test('el cajero abre, mueve dinero y cierra; pero no anula movimientos', async () => {
+/**
+ * v0.10: el turno lo abre el PIN. En la fábrica nadie va a una pantalla
+ * aparte a "abrir la caja": se llega, se pone el PIN y se cobra.
+ */
+test('entrar con el PIN abre el turno solo, en cero', async () => {
   await entrarAdmin();
   await cerrarSiHayAbierto();
-  await entrarPorNombre('Rosa', '4444');
+  assert.equal((await llamar('/api/caja')).json.datos.abierta, null);
 
-  assert.equal((await llamar('/api/caja/abrir', { method: 'POST', cuerpo: { fondo: 100 } })).estado, 201);
+  const u = await entrarPorNombre('Rosa', '4444');
+
+  const e = (await llamar('/api/caja')).json.datos.abierta;
+  assert.ok(e, 'entrar abrió el turno');
+  assert.equal(e.fondo, 0, 'arranca en cero: el fondo se agrega como movimiento');
+  assert.equal(e.caja.cajero_id, u.id, 'el turno es de quien puso su PIN');
+});
+
+test('si ya hay un turno abierto, entrar NO abre otro', async () => {
+  const antes = (await llamar('/api/caja')).json.datos.abierta.caja;
+
+  await entrarPorNombre('Mari', '7777');
+
+  const despues = (await llamar('/api/caja')).json.datos.abierta.caja;
+  assert.equal(despues.id, antes.id, 'Mari sigue en el turno que dejó abierto Rosa');
+
+  const abiertos = bd.prepare('SELECT COUNT(*) n FROM cajas WHERE cerrada_en IS NULL').get().n;
+  assert.equal(abiertos, 1);
+});
+
+test('un operario no abre ninguna caja al entrar', async () => {
+  await entrarAdmin();
+  await cerrarSiHayAbierto();
+
+  await entrarPorNombre('Chema', '5555');
+
+  // Se mira la base directamente: volver a entrar como administrador
+  // abriría un turno y taparía justo lo que se quiere comprobar.
+  const abiertos = bd.prepare('SELECT COUNT(*) n FROM cajas WHERE cerrada_en IS NULL').get().n;
+  assert.equal(abiertos, 0, 'el operario no maneja dinero: no abre caja');
+});
+
+test('el cajero mueve dinero y cierra; pero no anula movimientos', async () => {
+  await entrarAdmin();
+  await cerrarSiHayAbierto();
+  await entrarPorNombre('Rosa', '4444');   // esto ya le abre el turno
 
   const mov = await llamar('/api/caja/movimientos', {
     method: 'POST', cuerpo: { tipo: 'salida', concepto: 'Refrescos', monto: 60 }
@@ -357,13 +396,11 @@ test('el cajero abre, mueve dinero y cierra; pero no anula movimientos', async (
   });
   assert.equal(anula.estado, 403);
 
-  assert.equal((await llamar('/api/caja/cerrar', { method: 'POST', cuerpo: { contado: 40 } })).estado, 200);
+  assert.equal((await llamar('/api/caja/cerrar', { method: 'POST', cuerpo: { contado: 0 } })).estado, 200);
 });
 
 test('el gerente sí puede anular un movimiento', async () => {
-  await entrarAdmin();
-  await cerrarSiHayAbierto();
-  await llamar('/api/caja/abrir', { method: 'POST', cuerpo: { fondo: 0 } });
+  await entrarAdmin();          // entrar ya abre turno si no hay
   const mov = await llamar('/api/caja/movimientos', {
     method: 'POST', cuerpo: { tipo: 'salida', concepto: 'Prueba gerente', monto: 10 }
   });

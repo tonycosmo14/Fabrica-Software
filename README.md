@@ -3,7 +3,7 @@
 Sistema para la fábrica de hielo de Hunucmá, Yucatán.
 Se construye **por versiones**: cada versión es un pedazo terminado, probado y usable.
 
-**Versión actual: v0.9.1**
+**Versión actual: v0.10**
 
 ---
 
@@ -114,7 +114,7 @@ src/
     sesion.js          Quién está conectado y qué puede hacer
   modulos/             Un módulo por área. Agregar uno no toca los demás
     auth/  usuarios/  tanques/  produccion/  existencia/  ventas/  caja/
-    ayuda/  personalizacion/  versiones/  sistema/
+    catalogo/  ayuda/  personalizacion/  versiones/  sistema/
 
 public/                La interfaz (HTML, CSS y JavaScript sin librerías)
   index.html
@@ -140,7 +140,65 @@ datos/                 Base de datos y respaldos (no se sube a GitHub)
 
 ---
 
-## Cómo se cobra (v0.8)
+## Cómo se cobra en la caja (v0.10)
+
+La pantalla que se abre al entrar. Izquierda lo que lleva el cliente,
+derecha los botones, y **no se desplaza**: todo está siempre en el mismo
+sitio.
+
+### Sin soltar el teclado
+
+Cada producto tiene un **código**. Los del hielo vienen puestos:
+
+| Código | Es |
+|---|---|
+| `1` | una marqueta |
+| `12` | 1/2 |
+| `14` | 1/4 |
+| `18` | 1/8 |
+| `116` | 1/16 |
+
+```
+18  Enter     el octavo entra al ticket
+F10            pasa a cobrar, con el cursor puesto
+200 Enter      dice el cambio
+    Enter      cobra y registra
+    Enter      imprime (cada enter más, otra copia)
+Esc            listo para el siguiente cliente
+```
+
+Si pagan justo, basta **Enter** sin teclear nada. Al pie de la pantalla hay
+un renglón que dice qué hace enter en ese momento.
+
+### El hielo es una sola línea
+
+Los pedazos se **suman** en ella. Tocar 1/8 tres veces son **3/8 = $106**
+(1/4 + 1/8), no tres renglones de $36. Si fueran renglones sueltos el ticket
+diría "3/8" y cobraría $108, y el cliente que sepa sumar tendría razón al
+reclamar. Una sola línea es la única forma de que el papel y la lista de
+precios digan lo mismo.
+
+### La impresora
+
+`INICIAR.bat` abre el sistema con Chrome o Edge en modo aplicación (sin
+barra de direcciones) y con **impresión directa**: el ticket sale por la
+impresora predeterminada sin preguntar nada.
+
+Si se abre escribiendo la dirección en un navegador cualquiera, todo
+funciona igual pero volverá a aparecer el cuadro de "elegir impresora".
+
+### El catálogo
+
+Categorías y productos se dan de alta en **Productos y precios**, sin tocar
+el programa. Un producto es de **hielo** (entrega una fracción y toma su
+precio de la lista por fracción) o **normal** (un refresco, un garrafón: su
+propio precio, y no descuenta del cuarto frío).
+
+Nada se borra: se da de baja. Los tickets viejos nunca cambian.
+
+---
+
+## Cómo se forman los precios (v0.8)
 
 El hielo se vende en pedazos de marqueta, y **cada pedazo tiene su propio
 precio**. No se saca dividiendo: el 1/16 se cobra más caro de lo
@@ -292,8 +350,9 @@ versión nueva le aparece un punto rojo en el menú.
 | **v0.8** | Punto de venta, conteo con fracciones, vendido vs faltante | ✅ listo |
 | **v0.9** | La Caja: turnos, gastos, arqueo y corte imprimible | ✅ listo |
 | **v0.9.1** | Manual de ayuda dentro del sistema | ✅ listo |
-| v0.10 | Clientes, mayoreo, crédito y autorizaciones | siguiente |
-| v0.11 | Mantenimiento: equipos, tareas, insumos, checklists | |
-| v0.12 | Planta de agua y garrafones | |
-| v0.13 | Reparto, mapas y neveras en comodato | |
+| **v0.10** | Caja táctil: catálogo, teclado rápido, ticket corto, impresión directa | ✅ listo |
+| v0.11 | Clientes registrados y crédito | siguiente |
+| v0.12 | Reparto, pedidos y neveras en comodato | |
+| v0.13 | Planta de agua: garrafones, botellas y depósitos | |
+| v0.14 | Mantenimiento: compresores, ósmosis, membranas, horario punta | |
 | v1.0 | Sistema completo en producción | |

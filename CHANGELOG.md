@@ -7,6 +7,49 @@ Tipos: `nuevo` (funcionalidad nueva) · `mejora` · `arreglo` · `clave` (regla 
 
 ---
 
+## v0.10 — La caja de verdad · 23 de agosto de 2026
+
+Migración `010_productos.sql`. Rediseño del punto de venta a partir de cómo
+se trabaja de verdad con gente esperando, tomando como referencia el POS
+táctil que ya se usa en la fábrica.
+
+### El flujo
+
+- **clave** — La venta es la **pantalla de arranque** para quien cobra. Es la que se usa el 90% del día; un menú de iconos en medio es un toque de más, cientos de veces al día.
+- **clave** — El turno de caja lo **abre el PIN**. Nadie va a una pantalla aparte a "abrir la caja": se llega, se pone el PIN y se cobra. El turno arranca en cero y el fondo se agrega como el movimiento que es. Si ya hay uno abierto, se sigue en ese: dos turnos harían que ninguna venta supiera a cuál pertenece.
+- **clave** — **Nada se desplaza.** `body.pantalla-fija` fija el alto exacto; solo la rejilla de productos tiene scroll. Buscar un botón que se fue hacia abajo cuesta segundos que no hay.
+
+### El teclado
+
+- **clave** — Cada producto tiene **código**. Se teclea `18`, enter, y el octavo está en el ticket. Los del hielo vienen puestos: `1`, `12`, `14`, `18`, `116`.
+- **clave** — Cadena de enter: **F10** cobra → teclear el pago y **Enter** calcula el cambio → **Enter** cobra y registra → **Enter** imprime, y cada enter más imprime otra copia → **Esc** deja listo el siguiente ticket. Enter con el campo vacío = pagó justo, así se cobra con dos teclas.
+- **nuevo** — Un renglón al pie dice **qué hace enter en ese momento**. Es lo que hace que el teclado se aprenda sin manual.
+- **arreglo** — La fase `guardando` no estaba en la tabla de pistas y `pintarPista()` reventaba justo al registrar la venta, cortando la cadena de enter.
+
+### El catálogo
+
+- **clave** — Categorías y productos son **datos**, no código: se dan de alta en Productos y precios. Dos clases: `hielo` (entrega una fracción, y el precio sale de la lista por fracción) y `simple` (refresco, garrafón, botella: precio propio, no descuenta del cuarto frío).
+- **clave** — Un producto de hielo **no guarda precio**. Si lo guardara, un día el producto y la lista dirían cosas distintas y nadie sabría cuál manda. La base lo impide con un `CHECK`.
+- **clave** — **El hielo es una sola línea que se suma.** Tocar 1/8 tres veces son 3/8 = $106, no tres renglones de $36 = $108. Si fueran renglones sueltos, el ticket diría "3/8" y cobraría otra cosa, y el cliente que sepa sumar tendría razón. Hay prueba.
+- **nuevo** — Bajas, no borrados: un producto dado de baja desaparece de la caja pero los tickets viejos siguen diciendo lo mismo. Dar de baja una categoría se lleva sus productos, y avisa cuántos son.
+- **nuevo** — Códigos únicos entre productos activos; uno liberado por una baja se puede reutilizar.
+
+### El ticket y la impresora
+
+- **clave** — Ticket rehecho: número pequeño, fecha/hora/cajero en un renglón, **la cantidad en grande y centrada**, el desglose chico debajo solo si dice algo distinto, el total en grande. Fuera el "gracias por su compra". Con cientos de tickets al día, cada renglón de más son metros de papel al mes.
+- **clave** — Sale **solo el ticket**: vive en `#area-impresion`, fuera de la pantalla, y al imprimir se esconde todo lo demás. Antes salía la página entera.
+- **clave** — Sin el cuadro de "elegir impresora": en Windows, `INICIAR.bat` abre Chrome o Edge con `--app` y `--kiosk-printing`, en un perfil aparte. El perfil aparte no es capricho: con el perfil normal ya abierto, la ventana nueva se pega a esa copia y la impresión directa no se aplica.
+
+### Lo demás
+
+- **nuevo** — Meter dinero y anotar gastos desde la propia pantalla de venta. Verde entra, rojo sale.
+- **nuevo** — Los precios se editan en **Productos y precios**, junto al catálogo, y solo el administrador. Salieron del punto de venta.
+- **arreglo** — `ARCHIVO_BD` y la carpeta del navegador cuelgan de `CARPETA_DATOS`.
+- **arreglo** — La tachita se estiraba a óvalo dentro de un renglón: el `min-height` de 52 px de los botones (para poder tocarlos con el dedo) le ganaba a su `height`.
+- **nuevo** — `docs/REGLAS-DEL-NEGOCIO.md`: cómo trabaja de verdad la fábrica (crédito, reparto, neveras en comodato, garrafones, mantenimiento). Se escribe antes de programar, porque en la v0.3 se programó sobre suposiciones y hubo que tirar el módulo entero.
+
+---
+
 ## v0.9.1 — Manual de ayuda · 23 de agosto de 2026
 
 El manual vive **dentro** del sistema (`#/ayuda`), no en un PDF aparte que

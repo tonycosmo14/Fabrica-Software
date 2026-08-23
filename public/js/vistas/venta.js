@@ -1,481 +1,628 @@
 /**
- * PUNTO DE VENTA  (v0.8)
+ * PUNTO DE VENTA  (v0.10 — rediseño)
  *
- * La pantalla que más se usa en toda la fábrica. Todo el diseño está hecho
- * para una cosa: cobrar rápido, con las manos mojadas y sin equivocarse.
+ * La pantalla que más se usa en toda la fábrica, así que manda ella:
  *
- * Reglas del plan que se ven aquí:
+ *  · TODO CABE DE UNA VEZ. No se desplaza. Solo la rejilla de productos.
+ *  · IZQUIERDA lo que lleva el cliente, DERECHA los botones para agregarlo,
+ *    organizados en categorías como carpetas.
+ *  · SIN TOCAR EL RATÓN. El cajero con práctica teclea 18, da enter y el
+ *    octavo ya está en el ticket. F10 cobra. Enter avanza. Esc regresa.
  *
- *  3.1  Todo se teclea en fracciones de marqueta, nunca en decimales.
- *  3.5  El precio se COPIA dentro del ticket. Subir precios mañana no
- *       cambia los tickets de hoy.
- *  7.2  Cada fracción tiene su propio precio. Tocar seis veces 1/16 cuesta
- *       exactamente lo mismo que tocar 1/4 y 1/8, porque el sistema parte
- *       la cantidad siempre igual.
- *  7.3  Folio consecutivo. Nunca se reinicia.
- *  7.4  Una venta cobrada no se edita: se cancela, con motivo y responsable.
+ * EL HIELO ES UNA SOLA LÍNEA, y esto es importante: los pedazos se van
+ * SUMANDO en ella. Tocar 1/8 tres veces no son tres renglones de $36; son
+ * 3/8, que cuestan $106 (1/4 + 1/8). Si fueran tres renglones el ticket
+ * cobraría $108 y diría "3/8", y el cliente que sepa sumar tendría razón al
+ * reclamar. Una sola línea es la única forma de que el papel y la lista de
+ * precios digan lo mismo.
  *
- * El precio que se ve en pantalla lo calcula el navegador para que responda
- * al instante, pero EL QUE MANDA ES EL DEL SERVIDOR: al cobrar, el servidor
- * vuelve a calcularlo desde cero con sus propios precios. Si alguien tocara
- * el navegador para cambiar el total, no le serviría de nada.
+ * El precio que se ve lo calcula el navegador para que responda al instante,
+ * pero EL QUE MANDA ES EL DEL SERVIDOR: al cobrar vuelve a cotizar todo
+ * desde cero con sus propios precios.
  */
 import { api } from '../api.js';
-import { esc, avisar, fecha as formatoFecha } from '../util.js';
-import { pedirTexto, confirmar } from '../dialogo.js';
-import { crearTeclado, aTexto, descomponer, desglose, pesos, POR_MARQUETA } from '../fracciones.js';
+import { esc, avisar, soloHora } from '../util.js';
+import { pedirTexto, pedirCantidad, confirmar } from '../dialogo.js';
+import { aTexto, descomponer, desglose, pesos } from '../fracciones.js';
 import { cargarMarca } from '../marca.js';
+import { imprimirTicket, limpiarImpresion } from '../imprimir.js';
 
 /** Billetes con los que de verdad paga la gente. */
 const BILLETES = [50, 100, 200, 500, 1000];
 
+/**
+ * Las fases por las que pasa el teclado. En cada una, ENTER hace una sola
+ * cosa, y la pantalla dice cuál. Ese cartel es lo que hace que se pueda
+ * aprender sin manual.
+ */
+const FASES = {
+  venta:     { enter: 'agrega lo que tecleaste',  esc: 'borra' },
+  cobro:     { enter: 'calcula el cambio',        esc: 'volver al ticket' },
+  cambio:    { enter: 'cobra y registra',         esc: 'corregir el pago' },
+  // Mientras el servidor guarda, enter y esc no hacen nada: que dos toques
+  // seguidos no puedan cobrar dos veces.
+  guardando: { enter: 'guardando…',               esc: 'espera' },
+  cobrada:   { enter: 'imprime otro ticket',      esc: 'nueva venta' }
+};
+
 export async function vistaVenta(pantalla, estadoApp) {
-  const puedeCancelar = estadoApp.permisos.includes('*') ||
-                        estadoApp.permisos.includes('venta.cancelar');
-  const puedePrecios = estadoApp.permisos.includes('*');
+  const puedeOperarCaja = estadoApp.permisos.includes('*') ||
+                          estadoApp.permisos.includes('caja.operar');
 
-  const contexto = await api.obtener('/ventas/contexto');
   const marca = await cargarMarca();
+  let ctx = await api.obtener('/ventas/contexto');
 
-  // Mapa fracción -> centavos, para calcular el precio sin ir al servidor.
-  const tarifa = new Map(contexto.precios.map((p) => [p.dieciseisavos, p.centavos]));
+  // Precios del hielo por fracción, para cotizar sin ir al servidor.
+  let tarifa = new Map(ctx.precios.map((p) => [p.dieciseisavos, p.centavos]));
 
-  /** El mismo cálculo que hace el servidor: se parte y se suman los pedazos. */
-  function cotizar(dieciseisavos) {
+  // ---- Lo que lleva el cliente ----
+  let hielo = 0;                 // dieciseisavos, TODO en una sola línea
+  let articulos = [];            // { producto, cantidad }
+  let categoriaAbierta = null;   // null = se ven las categorías
+
+  // ---- La fase del teclado ----
+  let fase = 'venta';
+  let pago = 0;                  // centavos tecleados en el cobro
+  let ventaCobrada = null;
+
+  pantalla.innerHTML = armazon();
+  const refs = {
+    lineas:  pantalla.querySelector('#pos-lineas'),
+    total:   pantalla.querySelector('#pos-total'),
+    rejilla: pantalla.querySelector('#pos-rejilla'),
+    migas:   pantalla.querySelector('#pos-migas'),
+    codigo:  pantalla.querySelector('#pos-codigo'),
+    cobro:   pantalla.querySelector('#pos-cobro'),
+    pista:   pantalla.querySelector('#pos-pista')
+  };
+
+  document.addEventListener('keydown', alTeclado);
+  pantalla.addEventListener('vista-desmontada', () => {
+    document.removeEventListener('keydown', alTeclado);
+    limpiarImpresion();
+  }, { once: true });
+
+  pintarTodo();
+  enfocar();
+
+  // ==========================================================
+  // EL ARMAZÓN: izquierda el ticket, derecha los botones
+  // ==========================================================
+  function armazon() {
+    return `
+      <div class="pos">
+        <section class="pos-ticket">
+          <div class="pos-ticket-cabeza">
+            <span class="etiqueta-folio">ticket #${ctx.siguienteFolio}</span>
+            ${ctx.caja
+              ? `<span class="etiqueta-turno">turno #${ctx.caja.folio}</span>`
+              : '<span class="etiqueta-mal">sin turno</span>'}
+          </div>
+
+          <div class="pos-lineas" id="pos-lineas"></div>
+
+          <div id="pos-total"></div>
+
+          ${puedeOperarCaja ? `
+            <div class="pos-dinero">
+              <button class="pos-btn-entrada" id="meter">＋ Meter dinero</button>
+              <button class="pos-btn-salida" id="gasto">− Gasto</button>
+            </div>` : ''}
+
+          <button class="pos-cobrar" id="cobrar">
+            <span>Cobrar</span><small>F10</small>
+          </button>
+        </section>
+
+        <section class="pos-catalogo">
+          <div class="pos-barra">
+            <input id="pos-codigo" class="pos-codigo" autocomplete="off"
+                   inputmode="numeric" placeholder="Teclea el código y enter…">
+            <button class="pos-calc" id="calculadora" title="Otra cantidad de hielo">
+              🧮
+            </button>
+          </div>
+          <div class="pos-migas" id="pos-migas"></div>
+          <div class="pos-rejilla" id="pos-rejilla"></div>
+          <div class="pos-pista" id="pos-pista"></div>
+        </section>
+      </div>
+
+      <div class="pos-cobro" id="pos-cobro" hidden></div>`;
+  }
+
+  // ==========================================================
+  // COTIZAR (el mismo reparto que hace el servidor)
+  // ==========================================================
+  function precioHielo(dieciseisavos) {
     let centavos = 0;
     for (const parte of descomponer(dieciseisavos)) centavos += tarifa.get(parte) ?? 0;
     return centavos;
   }
 
-  let lineas = [];        // lo que lleva el ticket en curso
-  let teclado = null;
+  function total() {
+    return precioHielo(hielo) +
+      articulos.reduce((t, a) => t + a.producto.precio_centavos * a.cantidad, 0);
+  }
 
-  cobrar();
+  function hayAlgo() { return hielo > 0 || articulos.length > 0; }
 
   // ==========================================================
-  // LA PANTALLA DE COBRO
+  // AGREGAR Y QUITAR
   // ==========================================================
-  function cobrar() {
-    pantalla.innerHTML = `
-      <div class="venta-cabeza">
-        <h2>Punto de venta</h2>
-        <div class="venta-cabeza-datos">
-          <span class="etiqueta-folio">ticket #${contexto.siguienteFolio}</span>
-          ${contexto.caja ? `<span class="etiqueta-turno">turno #${contexto.caja.folio}</span>` : ''}
-          <button class="secundario chico" id="buscar">Buscar tickets</button>
-          ${puedePrecios ? '<button class="secundario chico" id="precios">Precios</button>' : ''}
-        </div>
-      </div>
+  function agregarProducto(p) {
+    if (fase !== 'venta') return;
 
-      ${contexto.caja
-        ? ''
-        : `<div class="aviso-sin-caja no-imprimir">
-             <strong>No hay turno de caja abierto.</strong>
-             Puedes cobrar igual, pero estas ventas no entrarán en ningún corte.
-             <a href="#/caja">Abrir la caja</a>
-           </div>`}
+    if (p.tipo === 'hielo') {
+      hielo += p.dieciseisavos;          // se SUMA, no se agrega otro renglón
+    } else {
+      const ya = articulos.find((a) => a.producto.id === p.id);
+      if (ya) ya.cantidad++;
+      else articulos.push({ producto: p, cantidad: 1 });
+    }
+    pintarTodo();
+  }
 
-      <div class="venta-tablero">
-        <section class="venta-teclado tarjeta">
-          <div id="teclado"></div>
-          <button id="agregar" class="grande" disabled>Agregar al ticket</button>
-          <p class="ayuda" style="margin:10px 0 0">
-            Los botones se van sumando: 1/2 y luego 1/8 son 5/8. Cuando los
-            pedazos completan una marqueta, sube solo.
-          </p>
-        </section>
+  function porCodigo(codigo) {
+    const limpio = String(codigo).trim().toUpperCase();
+    return ctx.productos.find((p) => (p.codigo || '').toUpperCase() === limpio) || null;
+  }
 
-        <section class="venta-ticket tarjeta">
-          <div id="lista"></div>
-          <div id="pago"></div>
-        </section>
+  // ==========================================================
+  // PINTAR
+  // ==========================================================
+  function pintarTodo() {
+    pintarLineas();
+    pintarRejilla();
+    pintarPista();
+  }
+
+  function pintarLineas() {
+    const filas = [];
+
+    if (hielo > 0) {
+      filas.push(`
+        <div class="pos-linea pos-linea-hielo">
+          <div class="pos-cant">${esc(aTexto(hielo))}</div>
+          <div class="pos-desc">
+            Hielo
+            ${desglose(hielo) !== aTexto(hielo)
+              ? `<small>${esc(desglose(hielo))}</small>` : ''}
+          </div>
+          <div class="pos-importe">${pesos(precioHielo(hielo))}</div>
+          <button class="tachita" data-quita-hielo aria-label="Quitar el hielo">×</button>
+        </div>`);
+    }
+
+    for (const [i, a] of articulos.entries()) {
+      filas.push(`
+        <div class="pos-linea">
+          <div class="pos-cant">${a.cantidad}</div>
+          <div class="pos-desc">${esc(a.producto.nombre)}</div>
+          <div class="pos-importe">${pesos(a.producto.precio_centavos * a.cantidad)}</div>
+          <button class="tachita" data-quita="${i}" aria-label="Quitar">×</button>
+        </div>`);
+    }
+
+    refs.lineas.innerHTML = filas.length
+      ? filas.join('')
+      : `<div class="pos-vacio">
+           <span>El ticket está vacío</span>
+           <small>Toca un producto o teclea su código</small>
+         </div>`;
+
+    const t = total();
+    refs.total.innerHTML = `
+      <div class="pos-total ${hayAlgo() ? '' : 'apagado'}">
+        <span>Total</span>
+        <strong>${pesos(t)}</strong>
       </div>`;
 
-    teclado = crearTeclado(pantalla.querySelector('#teclado'), {
-      valor: 0,
-      alCambiar: (n) => {
-        teclado.decir(n
-          ? `${esc(desglose(n))} = <strong>${pesos(cotizar(n))}</strong>`
-          : 'toca una fracción para empezar');
-        pantalla.querySelector('#agregar').disabled = n <= 0;
-      }
+    pantalla.querySelector('#cobrar').disabled = !hayAlgo();
+
+    const quitaHielo = refs.lineas.querySelector('[data-quita-hielo]');
+    if (quitaHielo) quitaHielo.onclick = () => { hielo = 0; pintarTodo(); enfocar(); };
+
+    refs.lineas.querySelectorAll('[data-quita]').forEach((b) => {
+      b.onclick = () => {
+        articulos.splice(Number(b.dataset.quita), 1);
+        pintarTodo(); enfocar();
+      };
     });
-    teclado.decir('toca una fracción para empezar');
-
-    pantalla.querySelector('#agregar').onclick = agregarLinea;
-    // Ojo: sin la flecha, el navegador le pasaría el evento del clic como
-    // texto de búsqueda y la lista saldría siempre vacía.
-    pantalla.querySelector('#buscar').onclick = () => buscarTickets();
-    if (puedePrecios) pantalla.querySelector('#precios').onclick = verPrecios;
-
-    pintarLista();
   }
 
-  function agregarLinea() {
-    const n = teclado.valor();
-    if (n <= 0) return;
-    lineas.push({ concepto: 'Hielo', dieciseisavos: n, centavos: cotizar(n) });
-    teclado.poner(0);
-    pintarLista();
+  function pintarRejilla() {
+    if (!categoriaAbierta) {
+      refs.migas.innerHTML = '<span class="miga-actual">Categorías</span>';
+      refs.rejilla.innerHTML = ctx.categorias.map((c) => `
+        <button class="pos-boton pos-categoria" data-categoria="${esc(c.id)}"
+                style="${c.color ? `--tono:${esc(c.color)}` : ''}">
+          <span class="pos-boton-nombre">${esc(c.nombre)}</span>
+        </button>`).join('')
+        || '<p class="vacio">No hay productos dados de alta todavía.</p>';
+    } else {
+      const cat = ctx.categorias.find((c) => c.id === categoriaAbierta);
+      const suyos = ctx.productos.filter((p) => p.categoria_id === categoriaAbierta);
+
+      refs.migas.innerHTML = `
+        <button class="miga" data-volver>‹ Categorías</button>
+        <span class="miga-actual">${esc(cat?.nombre || '')}</span>`;
+
+      refs.rejilla.innerHTML = suyos.map((p) => `
+        <button class="pos-boton" data-producto="${esc(p.id)}"
+                style="${p.color || p.categoria_color
+                  ? `--tono:${esc(p.color || p.categoria_color)}` : ''}">
+          ${p.codigo ? `<span class="pos-boton-codigo">${esc(p.codigo)}</span>` : ''}
+          <span class="pos-boton-nombre">${esc(p.nombre)}</span>
+          <span class="pos-boton-precio">${p.tipo === 'hielo'
+            ? pesos(precioHielo(p.dieciseisavos))
+            : pesos(p.precio_centavos)}</span>
+        </button>`).join('')
+        || '<p class="vacio">Esta categoría no tiene productos.</p>';
+    }
+
+    refs.rejilla.querySelectorAll('[data-categoria]').forEach((b) => {
+      b.onclick = () => { categoriaAbierta = b.dataset.categoria; pintarRejilla(); enfocar(); };
+    });
+    refs.rejilla.querySelectorAll('[data-producto]').forEach((b) => {
+      b.onclick = () => {
+        agregarProducto(ctx.productos.find((p) => p.id === b.dataset.producto));
+        enfocar();
+      };
+    });
+    const volver = refs.migas.querySelector('[data-volver]');
+    if (volver) volver.onclick = () => { categoriaAbierta = null; pintarRejilla(); enfocar(); };
   }
 
-  function total() {
-    return lineas.reduce((t, l) => t + l.centavos, 0);
+  /** El cartel que dice qué hace enter ahora mismo. */
+  function pintarPista() {
+    const f = FASES[fase];
+    refs.pista.innerHTML = `
+      <span><kbd>Enter</kbd> ${esc(f.enter)}</span>
+      <span><kbd>Esc</kbd> ${esc(f.esc)}</span>
+      ${fase === 'venta' ? '<span><kbd>F10</kbd> cobrar</span>' : ''}`;
   }
 
-  function totalHielo() {
-    return lineas.reduce((t, l) => t + l.dieciseisavos, 0);
+  function enfocar() {
+    if (fase === 'venta') setTimeout(() => refs.codigo.focus(), 0);
   }
 
   // ==========================================================
-  // EL TICKET EN CURSO
+  // EL TECLADO
   // ==========================================================
-  function pintarLista() {
-    const lista = pantalla.querySelector('#lista');
+  function alTeclado(ev) {
+    // Mientras haya un diálogo abierto, él manda.
+    if (document.querySelector('.dialogo')) return;
 
-    if (!lineas.length) {
-      lista.innerHTML = `
-        <p class="vacio" style="margin:0;padding:26px 0">
-          El ticket está vacío.<br>
-          <small>Marca la cantidad y toca «Agregar al ticket».</small>
-        </p>`;
-      pantalla.querySelector('#pago').innerHTML = '';
+    if (ev.key === 'F10') {
+      ev.preventDefault();
+      if (fase === 'venta') irACobro();
       return;
     }
 
-    lista.innerHTML = `
-      <table class="venta-lineas">
-        ${lineas.map((l, i) => `
-          <tr>
-            <td class="cantidad">${esc(aTexto(l.dieciseisavos))}</td>
-            <td class="detalle">
-              ${esc(l.concepto)}
-              <small>${esc(desglose(l.dieciseisavos))}</small>
-            </td>
-            <td class="importe">${pesos(l.centavos)}</td>
-            <td class="quitar">
-              <button class="tachita" data-quitar="${i}" aria-label="Quitar esta línea">×</button>
-            </td>
-          </tr>`).join('')}
-      </table>
+    if (ev.key === 'Escape') {
+      ev.preventDefault();
+      retroceder();
+      return;
+    }
 
-      <div class="venta-total">
-        <div>
-          <span>Total</span>
-          <small>${esc(aTexto(totalHielo()))} ${totalHielo() === POR_MARQUETA ? 'marqueta' : 'marquetas'}</small>
-        </div>
-        <strong>${pesos(total())}</strong>
-      </div>`;
+    if (ev.key === 'Enter') {
+      ev.preventDefault();
+      avanzar();
+      return;
+    }
 
-    lista.querySelectorAll('[data-quitar]').forEach((b) => {
-      b.onclick = () => { lineas.splice(Number(b.dataset.quitar), 1); pintarLista(); };
-    });
+    // Backspace con el campo ya vacío también regresa: es lo que hace la
+    // mano sola cuando se equivocó de pantalla.
+    if (ev.key === 'Backspace' && fase !== 'venta') {
+      const campo = refs.cobro.querySelector('#pos-pago');
+      if (campo && campo.value === '') { ev.preventDefault(); retroceder(); }
+      return;
+    }
 
-    pintarPago();
+    // Cualquier tecla suelta en la fase de venta va al campo del código.
+    if (fase === 'venta' && document.activeElement !== refs.codigo &&
+        ev.key.length === 1 && !ev.ctrlKey && !ev.altKey && !ev.metaKey) {
+      refs.codigo.focus();
+    }
+  }
+
+  function avanzar() {
+    if (fase === 'venta')   return agregarPorCodigo();
+    if (fase === 'cobro')   return calcularCambio();
+    if (fase === 'cambio')  return registrar();
+    if (fase === 'cobrada') return imprimir();
+  }
+
+  function retroceder() {
+    if (fase === 'venta') {
+      if (refs.codigo.value) { refs.codigo.value = ''; return; }
+      if (hayAlgo()) vaciar();
+      return;
+    }
+    if (fase === 'cobro')   { cerrarCobro(); return; }
+    if (fase === 'cambio')  { fase = 'cobro'; pintarCobro(); return; }
+    if (fase === 'cobrada') { nuevaVenta(); }
+  }
+
+  function agregarPorCodigo() {
+    const codigo = refs.codigo.value.trim();
+    if (!codigo) return;
+
+    const p = porCodigo(codigo);
+    if (!p) { avisar(`No hay ningún producto con el código ${codigo}`, 'error'); return; }
+
+    agregarProducto(p);
+    refs.codigo.value = '';
+  }
+
+  async function vaciar() {
+    if (!await confirmar({
+      titulo: '¿Vaciar el ticket?',
+      texto: 'Se quita todo lo capturado. No se registra nada.',
+      ok: 'Vaciar', peligro: true
+    })) { enfocar(); return; }
+    hielo = 0; articulos = [];
+    pintarTodo(); enfocar();
   }
 
   // ==========================================================
-  // EL PAGO Y EL CAMBIO
+  // COBRAR
   // ==========================================================
-  function pintarPago() {
-    const caja = pantalla.querySelector('#pago');
+  function irACobro() {
+    if (!hayAlgo()) return;
+    fase = 'cobro';
+    pago = 0;
+    pintarCobro();
+    pintarPista();
+  }
+
+  function cerrarCobro() {
+    fase = 'venta';
+    refs.cobro.hidden = true;
+    pintarPista();
+    enfocar();
+  }
+
+  function pintarCobro() {
     const aPagar = total();
+    const cambio = pago - aPagar;
 
-    caja.innerHTML = `
-      <label class="etiqueta-chica" for="pago-campo">¿Con cuánto paga?</label>
-      <div class="venta-billetes">
-        <button class="secundario chico" data-billete="exacto">Justo</button>
-        ${BILLETES.filter((b) => b * 100 >= aPagar)
-          .slice(0, 4)
-          .map((b) => `<button class="secundario chico" data-billete="${b}">$${b}</button>`).join('')}
-      </div>
-      <input id="pago-campo" class="venta-pago" inputmode="decimal"
-             placeholder="0.00" autocomplete="off">
+    refs.cobro.hidden = false;
+    refs.cobro.innerHTML = `
+      <div class="pos-cobro-caja">
+        <div class="pos-cobro-total">
+          <span>Total a cobrar</span>
+          <strong>${pesos(aPagar)}</strong>
+        </div>
 
-      <div class="venta-cambio" id="cambio" hidden>
-        <span>Cambio</span>
-        <strong id="cambio-monto">$0.00</strong>
-      </div>
+        <label class="etiqueta-chica" for="pos-pago">¿Con cuánto paga?</label>
+        <input id="pos-pago" class="pos-pago" inputmode="decimal" autocomplete="off"
+               placeholder="${(aPagar / 100).toFixed(2)}"
+               ${fase === 'cambio' ? 'disabled' : ''}
+               value="${pago ? (pago / 100).toFixed(2) : ''}">
 
-      <div class="fila-botones" style="margin-top:14px">
-        <button class="secundario" id="vaciar">Vaciar</button>
-        <button class="grande crece" id="cobrar">Cobrar ${pesos(aPagar)}</button>
+        <div class="pos-billetes">
+          ${BILLETES.filter((b) => b * 100 >= aPagar).slice(0, 4)
+            .map((b) => `<button class="secundario chico" data-billete="${b}">$${b}</button>`).join('')}
+          <button class="secundario chico" data-billete="justo">Justo</button>
+        </div>
+
+        ${fase === 'cambio' ? `
+          <div class="pos-cambio ${cambio === 0 ? 'sin-cambio' : ''}">
+            <span>${cambio === 0 ? 'Pagó justo' : 'Cambio'}</span>
+            <strong>${pesos(cambio)}</strong>
+          </div>
+          <button class="pos-confirmar" id="confirmar">
+            <span>Cobrar ${pesos(aPagar)}</span><small>Enter</small>
+          </button>` : `
+          <button class="pos-confirmar" id="calcular">
+            <span>Calcular el cambio</span><small>Enter</small>
+          </button>`}
+
+        <button class="secundario" id="salir-cobro" style="margin-top:10px;width:100%">
+          Esc · volver al ticket
+        </button>
       </div>`;
 
-    const campo = caja.querySelector('#pago-campo');
-    const cambio = caja.querySelector('#cambio');
-    const monto = caja.querySelector('#cambio-monto');
+    const campo = refs.cobro.querySelector('#pos-pago');
+    if (fase === 'cobro') setTimeout(() => campo.focus(), 0);
 
-    function recalcular() {
-      const centavos = Math.round((Number(campo.value.replace(/[^0-9.]/g, '')) || 0) * 100);
-      // El cambio solo se enseña cuando el pago alcanza: enseñar un número
-      // negativo en rojo no ayuda a nadie a las tres de la tarde.
-      if (centavos >= aPagar && campo.value.trim() !== '') {
-        monto.textContent = pesos(centavos - aPagar);
-        cambio.hidden = false;
-      } else {
-        cambio.hidden = true;
-      }
-    }
+    campo.oninput = () => {
+      pago = Math.round((Number(campo.value.replace(/[^0-9.]/g, '')) || 0) * 100);
+    };
 
-    campo.oninput = recalcular;
-    campo.onkeydown = (ev) => { if (ev.key === 'Enter') registrar(campo.value); };
-
-    caja.querySelectorAll('[data-billete]').forEach((b) => {
+    refs.cobro.querySelectorAll('[data-billete]').forEach((b) => {
       b.onclick = () => {
-        campo.value = b.dataset.billete === 'exacto'
-          ? (aPagar / 100).toFixed(2)
-          : b.dataset.billete;
-        recalcular();
+        pago = b.dataset.billete === 'justo' ? aPagar : Number(b.dataset.billete) * 100;
+        campo.value = (pago / 100).toFixed(2);
+        calcularCambio();
       };
     });
 
-    caja.querySelector('#vaciar').onclick = async () => {
-      if (!await confirmar({
-        titulo: '¿Vaciar el ticket?',
-        texto: 'Se quita todo lo que llevas capturado. No se registra nada.',
-        ok: 'Vaciar', peligro: true
-      })) return;
-      lineas = [];
-      pintarLista();
-    };
-
-    caja.querySelector('#cobrar').onclick = () => registrar(campo.value);
+    const calcular = refs.cobro.querySelector('#calcular');
+    if (calcular) calcular.onclick = calcularCambio;
+    const confirmar2 = refs.cobro.querySelector('#confirmar');
+    if (confirmar2) confirmar2.onclick = registrar;
+    refs.cobro.querySelector('#salir-cobro').onclick = cerrarCobro;
   }
 
-  async function registrar(pagoTexto) {
-    if (!lineas.length) return;
+  function calcularCambio() {
+    const aPagar = total();
+    // Enter con el campo vacío = pagó justo. Es el caso más común y así se
+    // cobra con dos teclas.
+    if (!pago) pago = aPagar;
+    if (pago < aPagar) {
+      avisar('El pago es menor que el total', 'error');
+      return;
+    }
+    fase = 'cambio';
+    pintarCobro();
+    pintarPista();
+  }
 
-    const boton = pantalla.querySelector('#cobrar');
-    if (boton) { boton.disabled = true; boton.textContent = 'Cobrando…'; }
+  async function registrar() {
+    if (fase !== 'cambio') return;
+    fase = 'guardando';
+    pintarPista();
+
+    const lineas = [];
+    if (hielo > 0) lineas.push({ dieciseisavos: hielo });
+    for (const a of articulos) lineas.push({ productoId: a.producto.id, cantidad: a.cantidad });
 
     try {
       const { venta } = await api.enviar('/ventas', {
-        almacenId: contexto.almacenes[0]?.id,
-        lineas: lineas.map((l) => ({ concepto: l.concepto, dieciseisavos: l.dieciseisavos })),
-        pago: pagoTexto?.trim() ? pagoTexto.replace(/[^0-9.]/g, '') : undefined
+        almacenId: ctx.almacenes[0]?.id,
+        lineas,
+        pago: (pago / 100).toFixed(2)
       });
-      lineas = [];
-      contexto.siguienteFolio = venta.folio + 1;
-      verTicket(venta, { reciencobrada: true });
+      ventaCobrada = venta;
+      ctx.siguienteFolio = venta.folio + 1;
+      fase = 'cobrada';
+      pintarCobrada();
+      pintarPista();
+      imprimir();                       // el primer ticket sale solo
     } catch (e) {
+      fase = 'cambio';
+      pintarCobro();
+      pintarPista();
       avisar(e.message, 'error');
-      if (boton) { boton.disabled = false; boton.textContent = `Cobrar ${pesos(total())}`; }
     }
   }
 
-  // ==========================================================
-  // EL TICKET IMPRESO
-  // ==========================================================
-  function verTicket(venta, { reciencobrada = false } = {}) {
-    pantalla.innerHTML = `
-      <button class="secundario chico no-imprimir" id="volver">‹ Punto de venta</button>
+  function pintarCobrada() {
+    const v = ventaCobrada;
+    refs.cobro.innerHTML = `
+      <div class="pos-cobro-caja pos-cobrada">
+        <div class="pos-cobrada-folio">Ticket #${v.folio}</div>
 
-      ${reciencobrada && venta.cambio_centavos !== null ? `
-        <div class="venta-cambio grande-cambio no-imprimir">
-          <span>Cambio</span>
-          <strong>${pesos(venta.cambio_centavos)}</strong>
-        </div>` : ''}
-
-      <div class="ticket ticket-venta" id="ticket">
-        <div class="ticket-cabeza">
-          <strong>${esc((marca.nombreNegocio || 'Hielo LOLHA').toUpperCase())}</strong>
-          <span>${esc(formatoFecha(venta.fecha))}</span>
+        <div class="pos-cambio grande ${v.cambio_centavos ? '' : 'sin-cambio'}">
+          <span>${v.cambio_centavos ? 'Cambio' : 'Pagó justo'}</span>
+          <strong>${pesos(v.cambio_centavos || 0)}</strong>
         </div>
 
-        <div class="ticket-folio">TICKET #${venta.folio}</div>
-        ${venta.cancelada_en ? '<div class="ticket-cancelado">CANCELADO</div>' : ''}
+        <button class="pos-confirmar" id="otro-ticket">
+          <span>🖨️ Imprimir otro</span><small>Enter</small>
+        </button>
+        <button class="secundario" id="siguiente" style="margin-top:10px;width:100%">
+          Esc · siguiente venta
+        </button>
+      </div>`;
 
-        <table class="ticket-tabla">
-          ${venta.lineas.map((l) => `
-            <tr>
-              <td>${esc(l.texto)} ${esc(l.concepto.toLowerCase())}
-                  <small>${esc(l.desglose || '')}</small></td>
-              <td>${pesos(l.precio_centavos)}</td>
-            </tr>`).join('')}
-          <tr class="fuerte"><td>TOTAL</td><td>${pesos(venta.total_centavos)}</td></tr>
-          ${venta.pago_centavos !== null ? `
-            <tr><td>Pagó</td><td>${pesos(venta.pago_centavos)}</td></tr>
-            <tr><td>Cambio</td><td>${pesos(venta.cambio_centavos)}</td></tr>` : ''}
-        </table>
+    refs.cobro.querySelector('#otro-ticket').onclick = imprimir;
+    refs.cobro.querySelector('#siguiente').onclick = nuevaVenta;
+  }
 
-        <div class="ticket-pie">
-          <div>Atendió: ${esc(venta.cajero_nombre || '—')}</div>
-          <div>Lista: ${esc(venta.lista_nombre || '—')}</div>
-          <div class="ticket-gracias">¡Gracias por su compra!</div>
-        </div>
-      </div>
+  function nuevaVenta() {
+    hielo = 0; articulos = []; pago = 0; ventaCobrada = null;
+    fase = 'venta';
+    refs.cobro.hidden = true;
+    limpiarImpresion();
+    pantalla.querySelector('.pos-ticket-cabeza .etiqueta-folio').textContent =
+      `ticket #${ctx.siguienteFolio}`;
+    pintarTodo();
+    enfocar();
+  }
 
-      <div class="fila-botones no-imprimir" style="margin-top:14px;flex-wrap:wrap">
-        <button id="imprimir">🖨️ Imprimir</button>
-        <button class="secundario" id="nueva">Nueva venta</button>
-        ${puedeCancelar && !venta.cancelada_en
-          ? '<button class="secundario peligro" id="cancelar">Cancelar esta venta</button>' : ''}
-      </div>
-
-      ${venta.cancelada_en ? `
-        <div class="tarjeta aviso-cancelada no-imprimir" style="margin-top:14px">
-          <strong>Venta cancelada</strong>
-          <p class="ayuda" style="margin:6px 0 0">
-            ${esc(formatoFecha(venta.cancelada_en))} ·
-            ${esc(venta.cancelada_por_nombre || '—')}<br>
-            Motivo: ${esc(venta.motivo_cancelacion || '—')}
-          </p>
-        </div>` : ''}`;
-
-    pantalla.querySelector('#volver').onclick = cobrar;
-    pantalla.querySelector('#nueva').onclick = cobrar;
-    pantalla.querySelector('#imprimir').onclick = () => window.print();
-
-    const btnCancelar = pantalla.querySelector('#cancelar');
-    if (btnCancelar) btnCancelar.onclick = () => cancelarVenta(venta);
+  // ==========================================================
+  // EL TICKET
+  // ==========================================================
+  function imprimir() {
+    if (!ventaCobrada) return;
+    imprimirTicket(ticketHTML(ventaCobrada));
   }
 
   /**
-   * Cancelar NO borra ni corrige el ticket (regla 7.4): lo marca, guarda
-   * quién lo canceló y por qué, y el original sigue ahí para siempre.
+   * El ticket de hielo se imprime a cientos al día: cada renglón de más son
+   * metros de papel al mes. Así que va lo mínimo, y lo que importa —cuánto
+   * hielo se llevó— en grande y centrado.
    */
-  async function cancelarVenta(venta) {
-    const motivo = await pedirTexto({
-      titulo: `Cancelar el ticket #${venta.folio}`,
-      texto: 'El ticket no se borra: queda marcado como cancelado, con tu nombre y el motivo. El hielo vuelve a contar como que no salió.',
-      marcador: 'Se cobró de más, el cliente devolvió el hielo...',
-      ok: 'Cancelar la venta'
+  function ticketHTML(v) {
+    const lineasHielo = v.lineas.filter((l) => l.dieciseisavos > 0);
+    const otras = v.lineas.filter((l) => l.dieciseisavos === 0);
+    const totalHielo = lineasHielo.reduce((t, l) => t + l.dieciseisavos, 0);
+    const f = new Date(v.fecha);
+
+    return `
+      <div class="tk">
+        <div class="tk-alto">
+          <span>#${v.folio}</span>
+          <span>${f.toLocaleDateString('es-MX')} ${esc(soloHora(v.fecha))}</span>
+          <span>${esc((v.cajero_nombre || '').split(' ')[0])}</span>
+        </div>
+
+        ${totalHielo ? `
+          <div class="tk-hielo">${esc(aTexto(totalHielo))}</div>
+          ${desglose(totalHielo) !== aTexto(totalHielo)
+            ? `<div class="tk-desglose">${esc(desglose(totalHielo))}</div>` : ''}` : ''}
+
+        ${otras.length ? `
+          <table class="tk-otras">
+            ${otras.map((l) => `
+              <tr><td>${esc(l.concepto)}</td><td>${pesos(l.precio_centavos)}</td></tr>`).join('')}
+          </table>` : ''}
+
+        <div class="tk-total">${pesos(v.total_centavos)}</div>
+
+        ${v.pago_centavos && v.cambio_centavos ? `
+          <div class="tk-pago">
+            Pagó ${pesos(v.pago_centavos)} · cambio ${pesos(v.cambio_centavos)}
+          </div>` : ''}
+
+        ${marca.nombreNegocio ? `<div class="tk-pie">${esc(marca.nombreNegocio)}</div>` : ''}
+      </div>`;
+  }
+
+  // ==========================================================
+  // LA CALCULADORA DE FRACCIONES
+  // ==========================================================
+  pantalla.querySelector('#calculadora').onclick = async () => {
+    const n = await pedirCantidad({
+      titulo: 'Otra cantidad de hielo',
+      texto: 'Para las cantidades que no tienen botón. Se suma a lo que ya lleva el ticket.',
+      valor: 0, ok: 'Agregar al ticket'
     });
-    if (!motivo) return;
+    if (n) { hielo += n; pintarTodo(); }
+    enfocar();
+  };
+
+  pantalla.querySelector('#cobrar').onclick = irACobro;
+  refs.codigo.onkeydown = (ev) => { if (ev.key === 'Enter') ev.stopPropagation(); };
+  refs.codigo.addEventListener('keyup', (ev) => {
+    if (ev.key === 'Enter') agregarPorCodigo();
+  });
+
+  // ==========================================================
+  // DINERO QUE ENTRA O SALE DEL CAJÓN
+  // ==========================================================
+  if (puedeOperarCaja) {
+    pantalla.querySelector('#meter').onclick = () => movimiento('entrada');
+    pantalla.querySelector('#gasto').onclick = () => movimiento('salida');
+  }
+
+  async function movimiento(tipo) {
+    const esSalida = tipo === 'salida';
+
+    const concepto = await pedirTexto({
+      titulo: esSalida ? 'Gasto o retiro' : 'Meter dinero al cajón',
+      texto: esSalida
+        ? '¿En qué se usó? La gasolina, un refresco, el retiro a la caja fuerte…'
+        : '¿De dónde viene? El fondo con el que arranca el cajón, cambio del banco…',
+      marcador: esSalida ? 'Gasolina' : 'Fondo para cambio',
+      ok: 'Siguiente'
+    });
+    if (!concepto) { enfocar(); return; }
+
+    const monto = await pedirTexto({
+      titulo: concepto, texto: '¿De cuánto es?',
+      marcador: '200', ok: esSalida ? 'Anotar la salida' : 'Anotar la entrada', largo: 12
+    });
+    if (!monto) { enfocar(); return; }
 
     try {
-      await api.enviar(`/ventas/${venta.id}/cancelar`, { motivo });
-      avisar('Venta cancelada', 'bien');
-      const r = await api.obtener(`/ventas/${venta.id}`);
-      verTicket(r.venta);
+      await api.enviar('/caja/movimientos', { tipo, concepto, monto });
+      avisar(esSalida ? 'Salida anotada' : 'Dinero anotado', 'bien');
     } catch (e) { avisar(e.message, 'error'); }
-  }
-
-  // ==========================================================
-  // BUSCAR TICKETS
-  // ==========================================================
-  async function buscarTickets(busca = '') {
-    const { ventas } = await api.obtener(`/ventas?limite=30&busca=${encodeURIComponent(busca)}`);
-
-    pantalla.innerHTML = `
-      <button class="secundario chico" id="volver">‹ Punto de venta</button>
-      <h2 style="margin-top:14px">Tickets</h2>
-      <p class="ayuda">
-        Se busca por número de ticket, por el importe o por la hora.
-        Los últimos 30 salen solos.
-      </p>
-
-      <input id="busca" class="buscador" placeholder="Número, monto u hora"
-             value="${esc(busca)}" autocomplete="off">
-
-      <div class="tarjeta plana" style="margin-top:14px">
-        <table class="tabla">
-          <tr><th>#</th><th>Cuándo</th><th>Total</th><th>Cajero</th></tr>
-          ${ventas.map((v) => `
-            <tr data-abrir="${esc(v.id)}" style="cursor:pointer"
-                class="${v.cancelada_en ? 'anulada' : ''}">
-              <td><strong>${v.folio}</strong></td>
-              <td>${esc(formatoFecha(v.fecha))}</td>
-              <td>${pesos(v.total_centavos)}</td>
-              <td>${esc(v.cajero_nombre || '—')}</td>
-            </tr>`).join('') || '<tr><td colspan="4">No hay tickets que coincidan.</td></tr>'}
-        </table>
-      </div>`;
-
-    pantalla.querySelector('#volver').onclick = cobrar;
-
-    const campo = pantalla.querySelector('#busca');
-    let espera;
-    campo.oninput = () => {
-      clearTimeout(espera);
-      espera = setTimeout(() => buscarTickets(campo.value.trim()), 350);
-    };
-
-    pantalla.querySelectorAll('[data-abrir]').forEach((fila) => {
-      fila.onclick = async () => {
-        const r = await api.obtener(`/ventas/${fila.dataset.abrir}`);
-        verTicket(r.venta);
-      };
-    });
-  }
-
-  // ==========================================================
-  // PRECIOS — solo el administrador
-  // ==========================================================
-  async function verPrecios() {
-    const { listas } = await api.obtener('/ventas/precios/listas');
-
-    pantalla.innerHTML = `
-      <button class="secundario chico" id="volver">‹ Punto de venta</button>
-      <h2 style="margin-top:14px">Precios</h2>
-      <p class="ayuda">
-        Cada fracción tiene su propio precio; no se saca dividiendo el de la
-        marqueta. El 1/16 se cobra más caro de lo proporcional porque da más
-        trabajo cortarlo. Los tickets ya cobrados <strong>no cambian</strong>
-        cuando cambias un precio aquí.
-      </p>
-
-      ${listas.map((l) => `
-        <div class="tarjeta" data-lista="${esc(l.id)}">
-          <div class="existencia-cabeza">
-            <div>
-              <strong>${esc(l.nombre)}</strong>
-              <small>${l.activa ? 'Es la que se está cobrando' : 'Guardada, sin usar'}</small>
-            </div>
-          </div>
-
-          <div class="precios-rejilla">
-            ${l.precios.map((p) => `
-              <label class="precio-celda">
-                <span>${esc(p.etiqueta)}</span>
-                <input inputmode="decimal" data-precio="${p.dieciseisavos}"
-                       value="${(p.centavos / 100).toFixed(2)}">
-              </label>`).join('')}
-          </div>
-
-          <div class="fila-botones" style="margin-top:14px">
-            <button class="secundario" data-sugerir="${esc(l.id)}">Sugerir proporcional</button>
-            <button data-guardar="${esc(l.id)}">Guardar precios</button>
-          </div>
-        </div>`).join('')}`;
-
-    pantalla.querySelector('#volver').onclick = cobrar;
-
-    pantalla.querySelectorAll('[data-guardar]').forEach((b) => {
-      b.onclick = async () => {
-        const tarjeta = b.closest('[data-lista]');
-        const precios = [...tarjeta.querySelectorAll('[data-precio]')].map((c) => ({
-          dieciseisavos: Number(c.dataset.precio),
-          pesos: Number(c.value.replace(/[^0-9.]/g, '')) || 0
-        }));
-        try {
-          await api.actualizar(`/ventas/precios/${b.dataset.guardar}`, { precios });
-          avisar('Precios guardados', 'bien');
-          // La pantalla de cobro trae los precios en memoria: hay que releerlos.
-          const nuevo = await api.obtener('/ventas/contexto');
-          contexto.precios = nuevo.precios;
-          tarifa.clear();
-          for (const p of nuevo.precios) tarifa.set(p.dieciseisavos, p.centavos);
-        } catch (e) { avisar(e.message, 'error'); }
-      };
-    });
-
-    pantalla.querySelectorAll('[data-sugerir]').forEach((b) => {
-      b.onclick = async () => {
-        const tarjeta = b.closest('[data-lista]');
-        const marqueta = Number(
-          tarjeta.querySelector('[data-precio="16"]').value.replace(/[^0-9.]/g, '')
-        );
-        if (!marqueta) { avisar('Pon primero el precio de la marqueta', 'error'); return; }
-
-        const { sugerencias } = await api.obtener(`/ventas/precios/sugerencia?marqueta=${marqueta}`);
-        for (const s of sugerencias) {
-          const campo = tarjeta.querySelector(`[data-precio="${s.dieciseisavos}"]`);
-          if (campo) campo.value = (s.centavos / 100).toFixed(2);
-        }
-        avisar('Es solo la parte proporcional. Súbelos si el corte da trabajo.', '');
-      };
-    });
+    enfocar();
   }
 }

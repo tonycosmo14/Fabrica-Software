@@ -12,9 +12,33 @@
  * tipo: 'nuevo' | 'mejora' | 'arreglo' | 'importante'
  */
 
-const VERSION_ACTUAL = '0.9.1';
+const VERSION_ACTUAL = '0.10';
 
 const VERSIONES = [
+  {
+    numero: '0.10',
+    nombre: 'La caja de verdad',
+    fecha: '2026-08-23',
+    resumen:
+      'El punto de venta rehecho para trabajar con gente esperando: todo en ' +
+      'una pantalla, sin desplazar, y sin soltar el teclado.',
+    cambios: [
+      { tipo: 'importante', texto: 'La venta es ahora la pantalla que se abre al entrar. Es la que se usa el 90% del día.' },
+      { tipo: 'importante', texto: 'El turno de caja lo abre tu PIN. Ya no hay que ir a ninguna pantalla a abrirlo: quien entra es el responsable del dinero.' },
+      { tipo: 'importante', texto: 'TODO CABE DE UNA VEZ: izquierda lo que lleva el cliente, derecha los botones. Solo se desplaza la rejilla de productos.' },
+      { tipo: 'importante', texto: 'Sin tocar el ratón: tecleas 18 y enter y el octavo entra al ticket. F10 cobra. Enter calcula el cambio, otro enter cobra, otro imprime. Esc regresa. Abajo dice siempre qué hace enter.' },
+      { tipo: 'nuevo', texto: 'Categorías y productos como carpetas: Hielo, Refrescos, Agua… Se dan de alta en Productos y precios, con su color y su código.' },
+      { tipo: 'nuevo', texto: 'Ya se pueden vender cosas que no son hielo: refrescos, garrafones, botellas. Con su propio precio, y sin descontar del cuarto frío.' },
+      { tipo: 'importante', texto: 'El hielo es UNA SOLA LÍNEA que se va sumando. Tocar 1/8 tres veces son 3/8 y cuestan $106, no tres renglones de $36. Así el ticket y la lista de precios dicen siempre lo mismo.' },
+      { tipo: 'importante', texto: 'Ticket mucho más corto: la cantidad en grande y centrada, el número chiquito, sin "gracias por su compra". Con cientos al día, eso son metros de papel al mes.' },
+      { tipo: 'importante', texto: 'El ticket sale directo por la impresora, sin el cuadro de "elegir impresora". INICIAR.bat abre el sistema como programa, sin barra de direcciones.' },
+      { tipo: 'nuevo', texto: 'Meter dinero y anotar gastos desde la misma pantalla de venta. Verde entra, rojo sale.' },
+      { tipo: 'nuevo', texto: 'Los precios se cambian en Productos y precios, junto al catálogo. Solo el administrador.' },
+      { tipo: 'nuevo', texto: 'La calculadora de fracciones sigue ahí, en el botón 🧮, para las cantidades que no tienen botón.' },
+      { tipo: 'nuevo', texto: 'El manual explica el teclado paso por paso.' }
+    ],
+    siguiente: 'v0.11 — Clientes registrados y crédito.'
+  },
   {
     numero: '0.9.1',
     nombre: 'Manual de ayuda',
@@ -28,7 +52,6 @@ const VERSIONES = [
       { tipo: 'importante', texto: 'La tabla de quién puede hacer qué NO está escrita a mano: la arma el sistema con los permisos de verdad. El día que cambien, el manual se corrige solo. Hay una prueba que lo comprueba rol por rol.' },
       { tipo: 'nuevo', texto: 'Está en el menú y en el inicio, y la ve cualquiera: no hace falta ser administrador para leer cómo se usa el sistema.' }
     ],
-    siguiente: 'v0.10 — Clientes, mayoreo y crédito.'
   },
   {
     numero: '0.9',

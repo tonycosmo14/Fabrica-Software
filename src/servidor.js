@@ -9,6 +9,8 @@
  */
 const os = require('node:os');
 const net = require('node:net');
+const fs = require('node:fs');
+const path = require('node:path');
 const { spawn } = require('node:child_process');
 const express = require('express');
 const config = require('./config');
@@ -41,6 +43,7 @@ function crearApp() {
   app.use('/api/tanques', require('./modulos/tanques/rutas'));
   app.use('/api/produccion', require('./modulos/produccion/rutas'));
   app.use('/api/existencia', require('./modulos/existencia/rutas'));
+  app.use('/api/catalogo', require('./modulos/catalogo/rutas'));
   app.use('/api/caja', require('./modulos/caja/rutas'));
   app.use('/api/ventas', require('./modulos/ventas/rutas'));
   app.use('/api/ayuda', require('./modulos/ayuda/rutas'));
@@ -62,18 +65,71 @@ function crearApp() {
   return app;
 }
 
+/** Dónde suele estar Chrome o Edge en una PC con Windows. */
+function navegadorDeWindows() {
+  const carpetas = [
+    process.env['PROGRAMFILES'],
+    process.env['PROGRAMFILES(X86)'],
+    process.env['LOCALAPPDATA']
+  ].filter(Boolean);
+
+  const candidatos = [
+    ['Google', 'Chrome', 'Application', 'chrome.exe'],
+    ['Microsoft', 'Edge', 'Application', 'msedge.exe']
+  ];
+
+  for (const carpeta of carpetas) {
+    for (const partes of candidatos) {
+      const ruta = path.join(carpeta, ...partes);
+      if (fs.existsSync(ruta)) return ruta;
+    }
+  }
+  return null;
+}
+
 /**
- * Abre el navegador en la direccion del sistema.
- * Se usa cuando se arranca con doble clic (bandera --abrir).
+ * Abre el sistema.
+ *
+ * En Windows, si hay Chrome o Edge, se abre EN MODO APLICACIÓN: sin barra de
+ * direcciones ni pestañas, como un programa de escritorio. Y con impresión
+ * directa, que es lo que de verdad importa en la caja: al imprimir un ticket
+ * sale por la impresora predeterminada sin preguntar nada. Con cientos de
+ * tickets al día, ese cuadro de diálogo son horas al mes.
+ *
+ * El perfil aparte (--user-data-dir) no es un capricho: si Chrome ya está
+ * abierto con el perfil de siempre, la ventana nueva se pega a esa copia y
+ * la impresión directa NO se aplica. Con su propio perfil siempre arranca
+ * una copia con la opción puesta.
+ *
+ * Si no hay ninguno de los dos, se abre el navegador que haya. Todo funciona
+ * igual; solo volverá a aparecer el cuadro de imprimir.
  */
 function abrirNavegador(url) {
-  const comandos = {
-    win32:  ['cmd', ['/c', 'start', '""', url]],
-    darwin: ['open', [url]],
-    linux:  ['xdg-open', [url]]
-  };
-  const elegido = comandos[process.platform] || comandos.linux;
   try {
+    if (process.platform === 'win32') {
+      const navegador = navegadorDeWindows();
+      if (navegador) {
+        const perfil = path.join(config.CARPETA_DATOS, 'navegador');
+        fs.mkdirSync(perfil, { recursive: true });
+        const p = spawn(navegador, [
+          `--app=${url}`,
+          '--kiosk-printing',
+          `--user-data-dir=${perfil}`,
+          '--no-first-run',
+          '--no-default-browser-check'
+        ], { detached: true, stdio: 'ignore' });
+        p.on('error', () => {});
+        p.unref();
+        return;
+      }
+    }
+
+    const comandos = {
+      win32:  ['cmd', ['/c', 'start', '""', url]],
+      darwin: ['open', [url]],
+      linux:  ['xdg-open', [url]]
+    };
+    const elegido = comandos[process.platform] || comandos.linux;
     const p = spawn(elegido[0], elegido[1], { detached: true, stdio: 'ignore' });
     p.on('error', () => {});   // si no hay navegador, no pasa nada
     p.unref();

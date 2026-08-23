@@ -123,15 +123,39 @@ debería quedar − contado = FALTA</pre>
   {
     id: 'venta',
     titulo: 'Punto de venta: cobrar',
-    busca: 'venta cobrar ticket precio fracción cambio billete folio cancelar imprimir',
+    busca: 'venta cobrar ticket precio fracción cambio billete folio cancelar imprimir teclado enter f10 código rápido categorías',
     cuerpo: `
-      <h4>Cobrar</h4>
+      <p>Es la pantalla que se abre al entrar, porque es la que se usa casi
+      todo el día. A la izquierda lo que lleva el cliente, a la derecha los
+      botones. <b>No se desplaza:</b> todo está siempre en el mismo sitio.</p>
+
+      <h4>Con el ratón</h4>
       <ol class="instrucciones">
-        <li>Marcas la cantidad con los botones. Se van sumando.</li>
-        <li>Tocas <b>Agregar al ticket</b>. Puedes agregar varias líneas.</li>
-        <li>Tocas el billete con el que te pagan (o escribes el monto).</li>
-        <li><b>Cobrar</b>. Sale el cambio en grande y el ticket para imprimir.</li>
+        <li>Tocas la categoría (Hielo, Refrescos…) y luego el producto.</li>
+        <li>El hielo <b>se va sumando</b>: tocas 1/2 y luego 1/8 y quedan 5/8.</li>
+        <li><b>Cobrar</b>, tocas el billete con el que pagan y listo.</li>
       </ol>
+
+      <h4>Sin soltar el teclado (así es más rápido)</h4>
+      <p>Cada producto tiene un <b>código</b>. El del octavo es <b>18</b>. No
+      hay que buscar el botón: se teclea y se da enter.</p>
+      <ol class="instrucciones">
+        <li>Tecleas <b>18</b> y <em>Enter</em> → el octavo entra al ticket.</li>
+        <li><em>F10</em> → pasa a cobrar, con el cursor ya puesto.</li>
+        <li>Tecleas lo que te dan y <em>Enter</em> → te dice el cambio.</li>
+        <li><em>Enter</em> otra vez → se cobra y sale el ticket.</li>
+        <li>Cada <em>Enter</em> más imprime otra copia.</li>
+        <li><em>Esc</em> → listo para el siguiente cliente.</li>
+      </ol>
+      <p>Si pagan justo, en el paso 3 basta dar <em>Enter</em> sin teclear
+      nada. Y <em>Esc</em> siempre regresa un paso.</p>
+      <p class="ayuda-tip">Abajo a la derecha hay un renglón que dice
+      <b>qué hace Enter en ese momento</b>. Mirándolo dos o tres veces ya no
+      hace falta acordarse.</p>
+
+      <h4>Cantidades que no tienen botón</h4>
+      <p>El botón de la calculadora 🧮, arriba a la derecha, abre el teclado
+      de fracciones para cualquier cantidad. Se suma a lo que ya lleva.</p>
 
       <h4>Los precios</h4>
       <p>Cada pedazo tiene <b>su propio precio</b>; no se saca dividiendo el de
@@ -144,7 +168,7 @@ debería quedar − contado = FALTA</pre>
       que tocar 1/4 y 1/8. Da igual quién atienda y cómo teclee: el precio es
       el mismo.</p>
 
-      <p>Los precios se cambian en <b>Punto de venta → Precios</b>, y solo el
+      <p>Los precios se cambian en <b>Productos y precios</b>, y solo el
       administrador. <b>Los tickets ya cobrados no cambian</b> cuando subes un
       precio.</p>
 
@@ -166,17 +190,23 @@ debería quedar − contado = FALTA</pre>
     titulo: 'Caja: el turno y el corte',
     busca: 'caja turno fondo corte arqueo gasto retiro efectivo cerrar cuadrar sobra falta',
     cuerpo: `
-      <h4>Abrir el turno</h4>
-      <p>Al empezar, <b>Abrir turno de caja</b> y escribes con cuánto dinero
-      arranca el cajón (el fondo para dar cambio). Si arranca vacío, 0.</p>
+      <h4>El turno se abre solo</h4>
+      <p>No hay que ir a ninguna pantalla a abrir la caja: <b>lo hace tu
+      PIN</b>. Quien entra es quien se hace responsable del dinero de ese
+      turno, y las ventas se le pegan solas.</p>
 
-      <p>A partir de ahí <b>las ventas se pegan solas</b>. No hay que capturar
-      nada dos veces.</p>
+      <p>El turno arranca en <b>cero</b>. Si el cajón trae fondo para dar
+      cambio, se agrega con el botón verde <b>＋ Meter dinero</b> de la
+      pantalla de venta, y queda anotado de dónde salió.</p>
+
+      <p>Si alguien dejó el turno abierto y entras tú, <b>sigues en ese
+      turno</b>. Nunca hay dos abiertos a la vez: si los hubiera, ninguna
+      venta sabría a cuál pertenece.</p>
 
       <h4>Gastos y retiros</h4>
-      <p>Todo el dinero que sale del cajón sin ser cambio se anota:
-      la gasolina, los refrescos, el retiro a la caja fuerte. Y si traes cambio
-      del banco, se anota como entrada.</p>
+      <p>Con el botón rojo <b>− Gasto</b> de la pantalla de venta. Todo el
+      dinero que sale del cajón sin ser cambio: la gasolina, los refrescos, el
+      retiro a la caja fuerte. Verde entra, rojo sale.</p>
 
       <h4>Cerrar y contar</h4>
       <p>Cuentas <b>todo</b> el dinero del cajón, incluido el fondo, y lo
@@ -194,12 +224,48 @@ debería haber − contado = DIFERENCIA</pre>
       <h4>Cosas que conviene saber</h4>
       <ul class="instrucciones">
         <li>Solo puede haber <b>un turno abierto</b> a la vez.</li>
-        <li>Si nadie abrió la caja, <b>se cobra igual</b> — la fábrica no se
-        para por eso. Pero la pantalla de venta lo avisa en amarillo, porque
-        ese dinero no va a salir en ningún corte.</li>
         <li>Un corte cerrado <b>ya no cambia</b>. Si mañana cancelas una venta
         de hoy, el corte firmado se queda como está.</li>
+        <li>Al cerrar el turno, el siguiente se abre solo cuando alguien
+        vuelva a entrar con su PIN.</li>
       </ul>`
+  },
+
+  // ==========================================================
+  {
+    id: 'productos',
+    titulo: 'Productos y precios: qué aparece en la caja',
+    busca: 'productos categorías catálogo precios códigos alta baja refrescos garrafones botones color',
+    cuerpo: `
+      <p>Los botones de la caja se dan de alta en <b>Productos y precios</b>,
+      sin tocar el programa. Solo el administrador.</p>
+
+      <h4>Categorías</h4>
+      <p>Son carpetas: Hielo, Refrescos, Agua… El cajero toca la categoría y
+      ve lo que hay dentro. Cada una puede tener su color, y ese color es el
+      del botón: con práctica la mano va sola sin leer.</p>
+
+      <h4>Dos clases de producto</h4>
+      <ul class="instrucciones">
+        <li><b>Hielo</b> — el botón entrega una fracción de marqueta. No tiene
+        precio propio: lo toma de la lista de precios. Así nunca hay dos
+        precios distintos para lo mismo.</li>
+        <li><b>Normal</b> — un refresco, un garrafón, una bolsa. Tiene su
+        precio y no descuenta hielo del cuarto frío.</li>
+      </ul>
+
+      <h4>El código</h4>
+      <p>Es lo que el cajero teclea para agregarlo sin buscar el botón. Los
+      del hielo vienen puestos: <b>1</b> la marqueta, <b>12</b> la mitad,
+      <b>14</b>, <b>18</b> y <b>116</b>. A un refresco le puedes poner
+      <b>COCA</b>. Puede quedar vacío si no lo necesitas.</p>
+
+      <h4>Quitar un producto</h4>
+      <p>Se da de <b>baja</b>: deja de aparecer en la caja, pero
+      <b>los tickets viejos no cambian</b>. Nada se borra nunca.</p>
+
+      <p class="ayuda-tip">Dar de baja una categoría se lleva sus productos.
+      El sistema te dice cuántos son antes de hacerlo.</p>`
   },
 
   // ==========================================================
@@ -271,9 +337,13 @@ debería haber − contado = DIFERENCIA</pre>
       tiene que estar encendida con el sistema abierto. La dirección para el
       celular sale en la ventana negra al arrancar.</p>
 
-      <h4>No imprime el ticket</h4>
-      <p>El botón de imprimir usa la impresora normal de Windows. Revisa que la
-      térmica esté puesta como predeterminada y encendida.</p>
+      <h4>No imprime el ticket, o pregunta qué impresora</h4>
+      <p>El ticket sale por la <b>impresora predeterminada</b> de Windows:
+      revisa que la térmica esté puesta como predeterminada y encendida.</p>
+      <p>Si cada vez aparece el cuadro de "elegir impresora", es que el
+      sistema no se abrió con <b>INICIAR.bat</b>. Ese archivo abre el programa
+      en modo impresión directa; si entras escribiendo la dirección en un
+      navegador cualquiera, el cuadro va a salir siempre.</p>
 
       <h4>Alguien capturó algo mal</h4>
       <p>Nada se borra en este sistema, así que <b>nada se pierde por

@@ -21,6 +21,8 @@ const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
 const { listaActiva, preciosDe, precioDe, sugerencia } = require('./precios');
 const { sesionAbierta } = require('../caja/calculo');
+const { productoPorId, productoPorCodigo, cotizar,
+        categoriasActivas, productosActivos } = require('../catalogo/catalogo');
 
 const router = express.Router();
 
@@ -56,7 +58,9 @@ router.get('/contexto', vender, (req, res) => {
   return ok(res, {
     lista, precios, almacenes,
     siguienteFolio: ultimoFolio + 1,
-    caja: caja ? { folio: caja.folio, cajero: caja.cajero_nombre } : null
+    caja: caja ? { folio: caja.folio, cajero: caja.cajero_nombre } : null,
+    categorias: categoriasActivas(),
+    productos: productosActivos()
   });
 });
 
@@ -96,23 +100,44 @@ router.post('/', vender, (req, res) => {
   let total = 0;
 
   for (const l of lineas) {
-    const cantidad = Number(l.dieciseisavos);
-    try { validar(cantidad); } catch { return error(res, 'Cantidad inválida en una línea.'); }
-    if (cantidad <= 0 || cantidad > MAX_DIECISEISAVOS) return error(res, 'Cantidad fuera de rango.');
+    // Una línea puede venir de un botón del catálogo (productoId o código)
+    // o de la calculadora de fracciones (solo dieciseisavos).
+    const producto = l.productoId ? productoPorId(l.productoId)
+                   : l.codigo     ? productoPorCodigo(l.codigo)
+                   : null;
 
-    const p = precioDe(cantidad, lista.id);
-    if (p.faltan.length) {
+    if ((l.productoId || l.codigo) && !producto) {
+      return error(res, 'Ese producto ya no existe o se dio de baja.', 409);
+    }
+
+    const cantidad = Number(l.cantidad ?? 1);
+    if (!Number.isInteger(cantidad) || cantidad < 1 || cantidad > 500) {
+      return error(res, 'La cantidad de una línea no es válida.');
+    }
+
+    let sueltos = 0;
+    if (!producto) {
+      sueltos = Number(l.dieciseisavos);
+      try { validar(sueltos); } catch { return error(res, 'Cantidad inválida en una línea.'); }
+      if (sueltos <= 0) return error(res, 'Cantidad fuera de rango.');
+    }
+
+    const c = cotizar({ producto, dieciseisavos: sueltos, listaId: lista.id, cantidad });
+
+    if (c.dieciseisavos > MAX_DIECISEISAVOS) return error(res, 'Cantidad fuera de rango.');
+    if (c.faltan.length) {
       return error(res,
-        `Falta poner precio a ${p.faltan.map(aTexto).join(', ')} en la lista ${lista.nombre}.`, 409);
+        `Falta poner precio a ${c.faltan.map(aTexto).join(', ')} en la lista ${lista.nombre}.`, 409);
     }
 
     preparadas.push({
-      concepto: String(l.concepto || 'Hielo').slice(0, 40),
-      dieciseisavos: cantidad,
-      centavos: p.centavos,
-      desglose: p.desglose
+      productoId: producto?.id || null,
+      concepto: String(c.concepto).slice(0, 40),
+      dieciseisavos: c.dieciseisavos,
+      centavos: c.centavos,
+      desglose: c.desglose
     });
-    total += p.centavos;
+    total += c.centavos;
   }
 
   // --- Pago ---
@@ -147,11 +172,13 @@ router.post('/', vender, (req, res) => {
            turno?.id || null);
 
     const insertar = bd.prepare(`
-      INSERT INTO venta_lineas (id, venta_id, concepto, dieciseisavos, precio_centavos, desglose)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO venta_lineas
+        (id, venta_id, concepto, dieciseisavos, precio_centavos, desglose, producto_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
     for (const l of preparadas) {
-      insertar.run(nuevoId(), id, l.concepto, l.dieciseisavos, l.centavos, l.desglose);
+      insertar.run(nuevoId(), id, l.concepto, l.dieciseisavos, l.centavos,
+                   l.desglose, l.productoId);
     }
     return folio;
   });

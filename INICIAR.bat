@@ -46,7 +46,10 @@ if not exist "node_modules\express\package.json" (
   cls
 )
 
-REM --- 3. Arrancar. El navegador se abre solo cuando este listo ---
+REM --- 3. Arrancar.
+REM El sistema abre solo la ventana. Si hay Chrome o Edge se abre como
+REM programa (sin barra de direcciones) y con impresion directa: los
+REM tickets salen sin preguntar que impresora usar.
 node src\servidor.js --abrir
 
 REM --- 4. Si llega aqui es que el servidor se detuvo ---

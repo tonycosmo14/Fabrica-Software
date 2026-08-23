@@ -10,6 +10,7 @@ const { hashear, verificar, nuevoToken, hashToken, esPinValido } = require('../.
 const { permisosDe } = require('../../lib/roles');
 const { ok, error } = require('../../lib/respuestas');
 const bitacora = require('../../lib/bitacora');
+const { abrirTurnoSiHaceFalta } = require('../caja/turno');
 const { exigirSesion, ponerCookie, borrarCookie, NOMBRE_COOKIE } = require('../../middleware/sesion');
 const config = require('../../config');
 
@@ -95,10 +96,12 @@ function crearSesion(res, usuario, dispositivo) {
   ponerCookie(res, token, config.DIAS_SESION);
 }
 
-function datosSesion(usuario) {
+function datosSesion(usuario, turno) {
   return {
     usuario: { id: usuario.id, nombre: usuario.nombre, rol: usuario.rol },
-    permisos: permisosDe(usuario.rol)
+    permisos: permisosDe(usuario.rol),
+    // Quien entra y maneja dinero abre turno de caja con el mismo PIN.
+    caja: turno ? { folio: turno.folio, cajero: turno.cajero_nombre } : null
   };
 }
 
@@ -114,7 +117,7 @@ router.post('/entrar-pin', (req, res) => {
 
   crearSesion(res, u, req.headers['user-agent']);
   bitacora.registrar({ accion: 'sesion.inicio', entidad: 'usuario', entidadId: u.id, ejecutorId: u.id, detalle: { via: 'pin' } });
-  return ok(res, datosSesion(u));
+  return ok(res, datosSesion(u, abrirTurnoSiHaceFalta(u)));
 });
 
 /** Entrar con usuario y contraseña (admin). */
@@ -129,13 +132,19 @@ router.post('/entrar-contrasena', (req, res) => {
 
   crearSesion(res, u, req.headers['user-agent']);
   bitacora.registrar({ accion: 'sesion.inicio', entidad: 'usuario', entidadId: u.id, ejecutorId: u.id, detalle: { via: 'contrasena' } });
-  return ok(res, datosSesion(u));
+  return ok(res, datosSesion(u, abrirTurnoSiHaceFalta(u)));
 });
 
-/** Quien soy. El frontend lo llama al abrir para saber si ya hay sesion. */
+/**
+ * Quién soy. El frontend lo llama al abrir para saber si ya hay sesión.
+ *
+ * Aquí también se abre el turno: la sesión dura 30 días, así que la mayoría
+ * de las mañanas nadie vuelve a teclear el PIN. Si el turno solo se abriera
+ * al teclearlo, el primer día se abriría y los siguientes no.
+ */
 router.get('/yo', (req, res) => {
   if (!req.usuario) return ok(res, { usuario: null, permisos: [] });
-  return ok(res, datosSesion(req.usuario));
+  return ok(res, datosSesion(req.usuario, abrirTurnoSiHaceFalta(req.usuario)));
 });
 
 /** Salir. Cierra la sesion de ESTE dispositivo, no las demas. */
