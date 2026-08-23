@@ -26,6 +26,7 @@ const { bd } = require('../../db/conexion');
 const { nuevoId, ahora } = require('../../lib/ids');
 const { ok, error } = require('../../lib/respuestas');
 const { puede, ETIQUETAS_ROL } = require('../../lib/roles');
+const autorizar = require('../../lib/autorizacion');
 const { verificar } = require('../../lib/seguridad');
 const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
@@ -48,35 +49,12 @@ function resolverEjecutor(req) {
   return existe ? pedido : req.usuario.id;
 }
 
-/**
- * Comprueba la autorización de un responsable.
- * El PIN se verifica AQUÍ, en el servidor: la pantalla nunca sabe si un PIN
- * es correcto, solo manda lo que tecleó la persona.
- */
+/** Comprobar el PIN de quien autoriza. El ayudante vive en lib. */
 function comprobarAutorizacion(autorizacion) {
-  if (!autorizacion?.usuarioId || !autorizacion?.pin) {
-    return { error: 'Falta la autorización de un responsable.' };
-  }
-
-  const u = bd.prepare('SELECT * FROM usuarios WHERE id = ? AND activo = 1').get(autorizacion.usuarioId);
-  if (!u) return { error: 'Ese responsable no existe.' };
-  if (!puede(u.rol, 'produccion.autorizar')) {
-    return { error: `${u.nombre} no puede autorizar esto. Solo un gerente o el administrador.` };
-  }
-  if (!verificar(autorizacion.pin, u.pin_hash, u.pin_sal)) {
-    return { error: 'PIN incorrecto.' };
-  }
-  return { usuario: u };
+  return autorizar.comprobar(autorizacion, 'produccion.autorizar');
 }
 
-/** Quiénes pueden autorizar. La pantalla los ofrece en una lista. */
-function responsables() {
-  return bd.prepare(`
-    SELECT id, nombre, rol FROM usuarios
-     WHERE activo = 1 AND rol IN ('gerente','admin') AND pin_hash IS NOT NULL
-     ORDER BY CASE rol WHEN 'gerente' THEN 0 ELSE 1 END, nombre
-  `).all().map((u) => ({ ...u, rolEtiqueta: ETIQUETAS_ROL[u.rol] }));
-}
+const responsables = autorizar.responsables;
 
 function datosPano(panoId) {
   return bd.prepare(`

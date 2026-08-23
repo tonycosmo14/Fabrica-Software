@@ -5,9 +5,60 @@ dentro del sistema en la pantalla **Qué hay de nuevo**.
 
 Tipos: `nuevo` (funcionalidad nueva) · `mejora` · `arreglo` · `clave` (regla de negocio importante)
 
+**Cómo se numeran:** después de la v0.9 viene la **v1.0**, no la v0.10. El
+segundo número va de 0 a 9 y luego sube el primero. El tercero (v1.4.1) es
+solo para arreglos de algo que ya estaba, o para cambios de puro aspecto.
+
 ---
 
-## v0.13 — Productos con foto, costo e inventario · 23 de agosto de 2026
+## v1.4 — Editar sin formularios · 23 de agosto de 2026
+
+Migración `013_categoria_foto.sql`.
+
+### El bug: lo dado de baja no se podía recuperar
+
+Tony dio de baja unos pedazos de hielo y se quedó sin ellos. La regla del
+sistema es que **nada se borra**, pero eso no sirve de nada si el usuario no
+puede traerlo de vuelta: para él, estaba borrado.
+
+- **arreglo** — `POST /catalogo/productos/:id/alta` y su equivalente para categorías. En la pantalla, un botón **Ver dados de baja** los muestra en gris y desde ahí se recuperan.
+- **clave** — Recuperar un producto **revive su categoría** si se fue con él: si no, volvería a una carpeta que ya no existe.
+- **clave** — Si su código lo tomó otro mientras estaba de baja, **vuelve sin código** en vez de fallar. Recuperar el producto importa más que conservarle el código, y el código se vuelve a poner en dos segundos.
+
+### Editar en el sitio
+
+- **clave** — Se toca el nombre, el precio o el costo y se escribe encima; al salir del campo queda guardado. Un formulario por pasos está bien para dar de alta algo nuevo; para corregir un precio es un estorbo, y corregir precios es lo que se hace todos los días.
+- **nuevo** — El campo parpadea en verde al guardar: sin eso, editar en el sitio se siente como que no pasó nada.
+- **nuevo** — El valor vuelve **normalizado**: quien escribe `30` ve `30.00`, que es lo que de verdad quedó.
+- **nuevo** — Al crear un producto **ya no se pregunta si es hielo**: lo dice la categoría en la que estás. Preguntarlo era pedirle al usuario que repitiera algo que el sistema ya sabía.
+
+### Cuánto le ganas
+
+- **nuevo** — Porcentaje sobre el costo, pesos por pieza, y porcentaje sobre lo que cobras, con una lectura corta: *"Buen margen. De estos conviene vender más."* Un producto barato con buen margen es el que conviene empujar, y eso no se ve mirando solo la diferencia en pesos.
+
+### El hielo, como los demás
+
+- **nuevo** — Sus pedazos aparecen como productos, con foto y código, y se editan igual. Su "inventario" es la **Existencia del cuarto frío**, que se muestra ahí mismo con un enlace a la pantalla completa.
+
+### Categorías
+
+- **nuevo** — Menú de **tres puntos** en la propia lista, en vez de tener que abrir la categoría para ver sus opciones.
+- **nuevo** — Imagen propia y **selector de color de verdad** (`input type=color`), no un campo donde escribir `#29abe2`.
+
+### Permisos
+
+- **clave** — Dar de baja algo **con mercancía** avisa cuántas piezas quedan y pide el PIN de un responsable. Son piezas físicas que nadie va a volver a contar: eso es dinero que se pierde de vista.
+- **clave** — El **cajero** entra al inventario con vista limitada: ve cuántas hay e imprime la hoja para contar. Los costos **no salen del servidor**, no solo se esconden en la pantalla: esconderlos en el navegador no sirve de nada, los datos igual viajan.
+- **nuevo** — Permisos nuevos: `inventario.ver` (cajero), `inventario.mover`, `costos.ver` y `productos.administrar` (gerente y admin).
+- **mejora** — `src/lib/autorizacion.js`: el comprobador de PIN salió de producción a una librería, para que el catálogo pudiera usarlo sin duplicarlo.
+
+### Numeración
+
+- **clave** — Después de la v0.9 viene la **v1.0**, no la v0.10. Se renumeran las cuatro versiones anteriores (v0.10→v1.0, v0.11→v1.1, v0.12→v1.2, v0.13→v1.3): una lista que fuera 0.9 → 0.10 → 1.4 sería confusa para siempre.
+
+---
+
+## v1.3 — Productos con foto, costo e inventario · 23 de agosto de 2026
 
 Migración `012_inventario.sql`.
 
@@ -43,7 +94,7 @@ Migración `012_inventario.sql`.
 
 ---
 
-## v0.12 — Dos clientes a la vez y cambios de ticket · 23 de agosto de 2026
+## v1.2 — Dos clientes a la vez y cambios de ticket · 23 de agosto de 2026
 
 Migración `011_cambios.sql`.
 
@@ -73,7 +124,7 @@ que ya sabe lo que quiere.
 
 ---
 
-## v0.11 — Impresión de verdad y relevo de turno · 23 de agosto de 2026
+## v1.1 — Impresión de verdad y relevo de turno · 23 de agosto de 2026
 
 ### La impresora
 
@@ -117,7 +168,7 @@ iba, y las ventas de la noche salían a nombre equivocado.
 
 ---
 
-## v0.10 — La caja de verdad · 23 de agosto de 2026
+## v1.0 — La caja de verdad · 23 de agosto de 2026
 
 Migración `010_productos.sql`. Rediseño del punto de venta a partir de cómo
 se trabaja de verdad con gente esperando, tomando como referencia el POS

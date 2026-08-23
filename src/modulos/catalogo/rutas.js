@@ -13,25 +13,51 @@ const { aCentavos } = require('../../lib/dinero');
 const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
 const { categoriasActivas, productosActivos } = require('./catalogo');
+const { estadoProducto } = require('./inventario');
+const { comprobar: comprobarAutorizacion, responsables } = require('../../lib/autorizacion');
 const fotos = require('./fotos');
 
 const router = express.Router();
 
 const verCatalogo = exigirPermiso('venta.registrar');
-const configurar = exigirPermiso('sistema.configurar');
+// Dar de alta y de baja productos y categorías: gerente y administrador.
+// Los precios del hielo siguen siendo solo del administrador.
+const administrar = exigirPermiso('productos.administrar');
 
 const FRACCIONES_VALIDAS = [16, 8, 4, 2, 1];
 
-/** El catálogo entero, listo para pintar los botones. */
+/**
+ * El catálogo entero, listo para pintar los botones.
+ *
+ * Con ?incluirBajas=1 vienen también los dados de baja. Sirve para poder
+ * recuperarlos: nada se borra, pero si no hay forma de verlos, para el
+ * usuario es como si se hubieran borrado.
+ */
 router.get('/', verCatalogo, (req, res) => {
-  return ok(res, { categorias: categoriasActivas(), productos: productosActivos() });
+  const conBajas = req.query.incluirBajas === '1';
+
+  if (!conBajas) {
+    return ok(res, { categorias: categoriasActivas(), productos: productosActivos() });
+  }
+
+  const categorias = bd.prepare(
+    'SELECT * FROM categorias ORDER BY activo DESC, orden, nombre'
+  ).all();
+  const productos = bd.prepare(`
+    SELECT p.*, c.nombre AS categoria_nombre, c.color AS categoria_color
+      FROM productos p
+      LEFT JOIN categorias c ON c.id = p.categoria_id
+     ORDER BY p.activo DESC, p.orden, p.nombre
+  `).all();
+
+  return ok(res, { categorias, productos });
 });
 
 // ============================================================
 // CATEGORÍAS
 // ============================================================
 
-router.post('/categorias', configurar, (req, res) => {
+router.post('/categorias', administrar, (req, res) => {
   const nombre = String(req.body?.nombre || '').trim();
   if (!nombre) return error(res, 'La categoría necesita un nombre.');
 
@@ -56,7 +82,7 @@ router.post('/categorias', configurar, (req, res) => {
   return ok(res, { categoria: bd.prepare('SELECT * FROM categorias WHERE id = ?').get(id) }, 201);
 });
 
-router.put('/categorias/:id', configurar, (req, res) => {
+router.put('/categorias/:id', administrar, (req, res) => {
   const c = bd.prepare('SELECT * FROM categorias WHERE id = ?').get(req.params.id);
   if (!c) return error(res, 'Esa categoría no existe.', 404);
 
@@ -83,7 +109,7 @@ router.put('/categorias/:id', configurar, (req, res) => {
 });
 
 /** Dar de baja una categoría se lleva sus productos: si no, quedan huérfanos. */
-router.post('/categorias/:id/baja', configurar, (req, res) => {
+router.post('/categorias/:id/baja', administrar, (req, res) => {
   const c = bd.prepare('SELECT * FROM categorias WHERE id = ?').get(req.params.id);
   if (!c) return error(res, 'Esa categoría no existe.', 404);
 
@@ -183,7 +209,7 @@ function leerProducto(cuerpo, anterior = null) {
   return { nombre, tipo, dieciseisavos, centavos, codigo, costo, minimo, llevaInventario };
 }
 
-router.post('/productos', configurar, (req, res) => {
+router.post('/productos', administrar, (req, res) => {
   const datos = leerProducto(req.body);
   if (datos.error) return error(res, datos.error);
 
@@ -222,7 +248,7 @@ router.post('/productos', configurar, (req, res) => {
   return ok(res, { producto: bd.prepare('SELECT * FROM productos WHERE id = ?').get(id) }, 201);
 });
 
-router.put('/productos/:id', configurar, (req, res) => {
+router.put('/productos/:id', administrar, (req, res) => {
   const p = bd.prepare('SELECT * FROM productos WHERE id = ?').get(req.params.id);
   if (!p) return error(res, 'Ese producto no existe.', 404);
 
@@ -266,7 +292,31 @@ router.put('/productos/:id', configurar, (req, res) => {
  * La foto del producto. Llega como texto "data:image/png;base64,..." desde
  * el navegador, igual que el logo.
  */
-router.post('/productos/:id/foto', configurar, (req, res) => {
+router.post('/categorias/:id/foto', administrar, (req, res) => {
+  const c = bd.prepare('SELECT * FROM categorias WHERE id = ?').get(req.params.id);
+  if (!c) return error(res, 'Esa categoría no existe.', 404);
+
+  const r = fotos.guardar(c.id, req.body?.archivo);
+  if (r.error) return error(res, r.error);
+
+  bd.prepare('UPDATE categorias SET foto = ? WHERE id = ?').run(r.archivo, c.id);
+  bitacora.registrar({
+    accion: 'categoria.foto', entidad: 'categoria', entidadId: c.id,
+    ejecutorId: req.usuario.id, detalle: { nombre: c.nombre }
+  });
+  return ok(res, { categoria: bd.prepare('SELECT * FROM categorias WHERE id = ?').get(c.id) });
+});
+
+router.post('/categorias/:id/foto/quitar', administrar, (req, res) => {
+  const c = bd.prepare('SELECT * FROM categorias WHERE id = ?').get(req.params.id);
+  if (!c) return error(res, 'Esa categoría no existe.', 404);
+
+  fotos.quitar(c.id);
+  bd.prepare('UPDATE categorias SET foto = NULL WHERE id = ?').run(c.id);
+  return ok(res, { quitada: true });
+});
+
+router.post('/productos/:id/foto', administrar, (req, res) => {
   const p = bd.prepare('SELECT * FROM productos WHERE id = ?').get(req.params.id);
   if (!p) return error(res, 'Ese producto no existe.', 404);
 
@@ -282,7 +332,7 @@ router.post('/productos/:id/foto', configurar, (req, res) => {
   return ok(res, { producto: bd.prepare('SELECT * FROM productos WHERE id = ?').get(p.id) });
 });
 
-router.post('/productos/:id/foto/quitar', configurar, (req, res) => {
+router.post('/productos/:id/foto/quitar', administrar, (req, res) => {
   const p = bd.prepare('SELECT * FROM productos WHERE id = ?').get(req.params.id);
   if (!p) return error(res, 'Ese producto no existe.', 404);
 
@@ -296,16 +346,106 @@ router.post('/productos/:id/foto/quitar', configurar, (req, res) => {
   return ok(res, { quitada: true });
 });
 
-router.post('/productos/:id/baja', configurar, (req, res) => {
+/**
+ * VOLVER A DAR DE ALTA.
+ *
+ * Sin esto, dar de baja era una puerta de un solo sentido: el producto
+ * seguía en la base pero nadie podía traerlo de vuelta, así que para el
+ * usuario estaba borrado. Eso contradice la regla de que nada se borra.
+ */
+router.post('/productos/:id/alta', administrar, (req, res) => {
   const p = bd.prepare('SELECT * FROM productos WHERE id = ?').get(req.params.id);
   if (!p) return error(res, 'Ese producto no existe.', 404);
+  if (p.activo) return error(res, 'Ese producto ya está activo.');
+
+  // Su categoría pudo haberse dado de baja con él: se revive también, o el
+  // producto volvería a una carpeta que no existe.
+  const cat = bd.prepare('SELECT * FROM categorias WHERE id = ?').get(p.categoria_id);
+  if (!cat) return error(res, 'Su categoría ya no existe. Elige otra al editarlo.', 409);
+
+  // Si el código lo tomó otro mientras estaba de baja, se devuelve sin
+  // código en vez de fallar: recuperar el producto importa más.
+  let codigo = p.codigo;
+  if (codigo) {
+    const ocupado = bd.prepare(
+      'SELECT nombre FROM productos WHERE codigo = ? AND activo = 1 AND id <> ?'
+    ).get(codigo, p.id);
+    if (ocupado) codigo = null;
+  }
+
+  const revivir = bd.transaction(() => {
+    if (!cat.activo) {
+      bd.prepare('UPDATE categorias SET activo = 1, fecha_baja = NULL WHERE id = ?').run(cat.id);
+    }
+    bd.prepare('UPDATE productos SET activo = 1, fecha_baja = NULL, codigo = ? WHERE id = ?')
+      .run(codigo, p.id);
+  });
+  revivir();
+
+  bitacora.registrar({
+    accion: 'producto.alta', entidad: 'producto', entidadId: p.id,
+    ejecutorId: req.usuario.id,
+    detalle: { nombre: p.nombre, codigoLiberado: codigo === null && p.codigo ? p.codigo : null }
+  });
+
+  return ok(res, {
+    producto: bd.prepare('SELECT * FROM productos WHERE id = ?').get(p.id),
+    codigoPerdido: codigo === null && p.codigo ? p.codigo : null
+  });
+});
+
+router.post('/categorias/:id/alta', administrar, (req, res) => {
+  const c = bd.prepare('SELECT * FROM categorias WHERE id = ?').get(req.params.id);
+  if (!c) return error(res, 'Esa categoría no existe.', 404);
+  if (c.activo) return error(res, 'Esa categoría ya está activa.');
+
+  const repetida = bd.prepare(
+    'SELECT id FROM categorias WHERE nombre = ? AND activo = 1'
+  ).get(c.nombre);
+  if (repetida) {
+    return error(res, `Ya hay otra categoría llamada "${c.nombre}". Renómbrala primero.`, 409);
+  }
+
+  bd.prepare('UPDATE categorias SET activo = 1, fecha_baja = NULL WHERE id = ?').run(c.id);
+  bitacora.registrar({
+    accion: 'categoria.alta', entidad: 'categoria', entidadId: c.id,
+    ejecutorId: req.usuario.id, detalle: { nombre: c.nombre, recuperada: true }
+  });
+
+  return ok(res, { categoria: bd.prepare('SELECT * FROM categorias WHERE id = ?').get(c.id) });
+});
+
+/**
+ * Dar de baja un producto.
+ *
+ * Si todavía tiene mercancía, no se hace a la primera: quedan piezas
+ * físicas que nadie va a volver a contar, y eso es dinero que se pierde de
+ * vista. Se avisa cuántas hay y se pide el PIN de un responsable.
+ */
+router.post('/productos/:id/baja', administrar, (req, res) => {
+  const p = bd.prepare('SELECT * FROM productos WHERE id = ?').get(req.params.id);
+  if (!p) return error(res, 'Ese producto no existe.', 404);
+
+  const inv = p.lleva_inventario ? estadoProducto(p) : null;
+  const quedan = inv?.esperado || 0;
+
+  if (quedan > 0) {
+    const auth = comprobarAutorizacion(req.body?.autorizacion, 'productos.administrar');
+    if (auth.error) {
+      return error(res, auth.error, 403, {
+        requiereAutorizacion: true,
+        quedan,
+        responsables: responsables()
+      });
+    }
+  }
 
   bd.prepare('UPDATE productos SET activo = 0, fecha_baja = ? WHERE id = ?').run(ahora(), p.id);
   bitacora.registrar({
     accion: 'producto.baja', entidad: 'producto', entidadId: p.id,
-    ejecutorId: req.usuario.id, detalle: { nombre: p.nombre }
+    ejecutorId: req.usuario.id, detalle: { nombre: p.nombre, quedaban: quedan }
   });
-  return ok(res, { dadoDeBaja: true });
+  return ok(res, { dadoDeBaja: true, quedaban: quedan });
 });
 
 module.exports = router;

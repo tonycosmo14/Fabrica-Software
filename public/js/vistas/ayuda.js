@@ -343,9 +343,29 @@ debería haber − contado = FALTA</pre>
       por pieza. El costo de cada compra se guarda con esa compra; el del
       producto es el de la última.</p>
 
-      <h4>Quitar un producto</h4>
+      <h4>Editar: se toca y se escribe</h4>
+      <p>No hay botón de guardar. Tocas el nombre, el precio o el costo,
+      escribes encima y sales del campo: ya quedó. El campo parpadea en
+      verde cuando se guardó.</p>
+
+      <h4>Quitar un producto, y recuperarlo</h4>
       <p>Se da de <b>baja</b>: deja de aparecer en la caja, pero
       <b>los tickets viejos no cambian</b>. Nada se borra nunca.</p>
+      <p>Y se puede traer de vuelta: el botón <b>Ver dados de baja</b>, arriba,
+      los muestra en gris, y desde el producto se vuelve a dar de alta.</p>
+      <p class="ayuda-tip">Si el producto todavía tiene mercancía, el sistema
+      avisa cuántas piezas quedan y pide el PIN de un gerente o del
+      administrador: son piezas de verdad que nadie va a volver a contar.</p>
+
+      <h4>Lo que ve cada quien</h4>
+      <ul class="instrucciones">
+        <li><b>Cajero</b> — entra a ver cuántas hay e imprimir la hoja para
+        contar. No ve los costos ni puede cambiar nada.</li>
+        <li><b>Gerente</b> — todo lo anterior, más los costos, los
+        movimientos de inventario y dar de alta o de baja productos.</li>
+        <li><b>Administrador</b> — además, los precios del hielo y la
+        impresora.</li>
+      </ul>
 
       <p class="ayuda-tip">Dar de baja una categoría se lleva sus productos.
       El sistema te dice cuántos son antes de hacerlo.</p>

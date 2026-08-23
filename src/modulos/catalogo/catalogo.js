@@ -21,7 +21,8 @@ function categoriasActivas() {
 
 function productosActivos() {
   return bd.prepare(`
-    SELECT p.*, c.nombre AS categoria_nombre, c.color AS categoria_color
+    SELECT p.*, c.nombre AS categoria_nombre, c.color AS categoria_color,
+           c.foto AS categoria_foto
       FROM productos p
       LEFT JOIN categorias c ON c.id = p.categoria_id
      WHERE p.activo = 1

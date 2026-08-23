@@ -16,7 +16,10 @@ const PERMISOS_POR_ROL = {
     'venta.registrar',
     'venta.ver',
     'existencia.ver',
-    'existencia.contar'
+    'existencia.contar',
+    // Del inventario solo ve cuántas hay, para poder ir a contar con la
+    // hoja impresa. Ni los costos ni los movimientos son cosa suya.
+    'inventario.ver'
   ],
   repartidor: ['reparto.ver', 'reparto.operar'],
 
@@ -35,6 +38,12 @@ const PERMISOS_POR_ROL = {
     'existencia.ver',
     'existencia.contar',
     'existencia.corregir',
+    'inventario.ver',
+    'inventario.mover',
+    // Ver a cómo se compra cada cosa y cuánto se le gana.
+    'costos.ver',
+    // Dar de alta y de baja productos y categorías.
+    'productos.administrar',
     'reparto.ver'
   ],
   admin: ['*'] // el comodin abre todo

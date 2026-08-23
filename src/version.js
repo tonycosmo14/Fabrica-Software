@@ -10,13 +10,38 @@
  *   3. Se actualiza "version" en package.json
  *
  * tipo: 'nuevo' | 'mejora' | 'arreglo' | 'importante'
+ *
+ * CÓMO SE NUMERAN
+ * Después de la v0.9 viene la v1.0, no la v0.10. El segundo número va de 0
+ * a 9 y luego sube el primero. El tercero (v1.4.1) es solo para arreglos de
+ * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '0.13';
+const VERSION_ACTUAL = '1.4';
 
 const VERSIONES = [
   {
-    numero: '0.13',
+    numero: '1.4',
+    nombre: 'Editar sin formularios',
+    fecha: '2026-08-23',
+    resumen:
+      'Los productos se editan tocándolos: el nombre, el precio, el costo. ' +
+      'Y lo dado de baja por fin se puede recuperar.',
+    cambios: [
+      { tipo: 'arreglo', texto: 'ARREGLADO: lo que se daba de baja no se podía recuperar. Ahora hay un botón "Ver dados de baja" y desde ahí se vuelven a dar de alta. Si su código lo tomó otro mientras tanto, vuelve sin código en vez de fallar.' },
+      { tipo: 'importante', texto: 'Se edita en el sitio: tocas el nombre, el precio o el costo y escribes encima. Sales del campo y ya quedó guardado. Se acabaron los formularios de cinco pasos para corregir un precio.' },
+      { tipo: 'importante', texto: 'Cuánto le ganas a cada producto, en porcentaje y en pesos, con una lectura de si el margen está bueno o apretado. Un producto barato con buen margen es el que conviene empujar, y eso no se ve mirando solo la diferencia.' },
+      { tipo: 'nuevo', texto: 'El hielo se ve como los demás: sus pedazos son productos, con su foto y su código. Y ahí mismo se ve la existencia del cuarto frío.' },
+      { tipo: 'nuevo', texto: 'Las categorías llevan su menú de tres puntos, imagen propia y selector de color de verdad (nada de escribir códigos raros).' },
+      { tipo: 'nuevo', texto: 'Al crear un producto ya no se pregunta si es hielo: lo dice la categoría en la que estás.' },
+      { tipo: 'importante', texto: 'Dar de baja algo que todavía tiene mercancía avisa cuántas piezas quedan y pide el PIN de un gerente o del administrador.' },
+      { tipo: 'importante', texto: 'El cajero entra al inventario con VISTA LIMITADA: ve cuántas hay e imprime la hoja para contar, pero no ve los costos ni puede modificar nada. Y el costo ni siquiera sale del servidor.' },
+      { tipo: 'nuevo', texto: 'El gerente ya administra productos y mueve inventario, no solo el administrador.' }
+    ],
+    siguiente: 'v1.5 — Vender con más pantalla, historiales y accesos rápidos.'
+  },
+  {
+    numero: '1.3',
     nombre: 'Productos con foto, costo e inventario',
     fecha: '2026-08-23',
     resumen:
@@ -34,10 +59,9 @@ const VERSIONES = [
       { tipo: 'importante', texto: 'La línea de venta ahora guarda CUÁNTAS PIEZAS. Sin eso, "2 × Coca" habría descontado un solo refresco del inventario.' },
       { tipo: 'arreglo', texto: 'Escribir −5 piezas se convertía en 5 al limpiar el texto. Ahora se rechaza: borrarle el signo habría metido una entrada que nadie pidió.' }
     ],
-    siguiente: 'v0.14 — Clientes registrados y crédito.'
   },
   {
-    numero: '0.12',
+    numero: '1.2',
     nombre: 'Dos clientes a la vez y cambios de ticket',
     fecha: '2026-08-23',
     resumen:
@@ -54,7 +78,7 @@ const VERSIONES = [
     ],
   },
   {
-    numero: '0.11',
+    numero: '1.1',
     nombre: 'Impresión de verdad y relevo de turno',
     fecha: '2026-08-23',
     resumen:
@@ -74,7 +98,7 @@ const VERSIONES = [
     ],
   },
   {
-    numero: '0.10',
+    numero: '1.0',
     nombre: 'La caja de verdad',
     fecha: '2026-08-23',
     resumen:

@@ -15,13 +15,16 @@ const { ok, error } = require('../../lib/respuestas');
 const { aCentavos } = require('../../lib/dinero');
 const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
+const { puede } = require('../../lib/roles');
 const { estadoProducto, movimientos, inventarioCompleto } = require('./inventario');
 
 const router = express.Router();
 
-const verInventario = exigirPermiso('existencia.ver');
-const moverInventario = exigirPermiso('existencia.contar');
-const configurar = exigirPermiso('sistema.configurar');
+// El cajero entra a ver cuántas hay y a imprimir la hoja para contar.
+const verInventario = exigirPermiso('inventario.ver');
+// Registrar entradas, salidas y conteos es del gerente y del administrador.
+const moverInventario = exigirPermiso('inventario.mover');
+const verCostos = exigirPermiso('costos.ver');
 
 const MAX_PIEZAS = 1000000;
 
@@ -43,11 +46,31 @@ function leerPiezas(valor, { permitirCero = true } = {}) {
   return n;
 }
 
+/**
+ * A cómo se compra cada cosa es información del negocio, no del mostrador.
+ * A quien no tiene permiso se le quita antes de mandarla: esconderla solo
+ * en la pantalla no serviría de nada, los datos igual viajan.
+ */
+function sinCostos(producto) {
+  const { costo_centavos, ...resto } = producto;
+  return resto;
+}
+
+function puedeVerCostos(req) {
+  return Boolean(req.usuario) && puede(req.usuario.rol, 'costos.ver');
+}
+
 /** Todo lo que lleva inventario, con lo que debería haber de cada cosa. */
 router.get('/', verInventario, (req, res) => {
-  const inventario = inventarioCompleto();
+  const conCostos = puedeVerCostos(req);
+  const inventario = inventarioCompleto().map((i) => ({
+    ...i,
+    producto: conCostos ? i.producto : sinCostos(i.producto)
+  }));
+
   return ok(res, {
     inventario,
+    conCostos,
     // Lo que ya toca pedir: es la razón de ser de esta pantalla.
     bajos: inventario.filter((i) => i.bajo).length
   });
@@ -56,10 +79,15 @@ router.get('/', verInventario, (req, res) => {
 router.get('/:productoId', verInventario, (req, res) => {
   const p = bd.prepare('SELECT * FROM productos WHERE id = ?').get(req.params.productoId);
   if (!p) return error(res, 'Ese producto no existe.', 404);
+
+  const conCostos = puedeVerCostos(req);
   return ok(res, {
-    producto: p,
+    producto: conCostos ? p : sinCostos(p),
     estado: estadoProducto(p),
-    movimientos: movimientos(p.id)
+    conCostos,
+    // Los movimientos traen el costo de cada compra: mismo criterio.
+    movimientos: movimientos(p.id).map((m) =>
+      conCostos ? m : { ...m, costo_centavos: undefined })
   });
 });
 
@@ -169,7 +197,7 @@ router.post('/:productoId/conteo', moverInventario, (req, res) => {
 });
 
 /** Anular un movimiento mal capturado. No se borra: se marca. */
-router.post('/movimientos/:id/anular', configurar, (req, res) => {
+router.post('/movimientos/:id/anular', verCostos, (req, res) => {
   const m = bd.prepare('SELECT * FROM movimientos_inventario WHERE id = ?')
     .get(req.params.id);
   if (!m) return error(res, 'Ese movimiento no existe.', 404);

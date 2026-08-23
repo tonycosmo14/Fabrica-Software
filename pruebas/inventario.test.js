@@ -243,7 +243,12 @@ test('anular exige motivo', async () => {
 // QUIÉN PUEDE QUÉ
 // ============================================================
 
-test('el cajero cuenta y registra, pero no anula', async () => {
+/**
+ * El cajero entra al inventario solo para saber cuántas hay e imprimir la
+ * hoja con la que va a contar. Lo que cuestan las cosas es información del
+ * negocio, no del mostrador.
+ */
+test('el cajero ve cuántas hay, pero NO lo que cuestan', async () => {
   await entrarAdmin();
   await llamar('/api/usuarios', {
     method: 'POST', cuerpo: { nombre: 'Rosa', rol: 'cajero', pin: '4444' }
@@ -252,14 +257,51 @@ test('el cajero cuenta y registra, pero no anula', async () => {
   const rosa = lista.find((u) => u.nombre === 'Rosa');
   await llamar('/api/auth/entrar-pin', { method: 'POST', cuerpo: { usuarioId: rosa.id, pin: '4444' } });
 
-  assert.equal((await llamar('/api/inventario')).estado, 200);
+  const r = await llamar('/api/inventario');
+  assert.equal(r.estado, 200);
+  assert.equal(r.json.datos.conCostos, false);
+
+  const suyo = r.json.datos.inventario.find((i) => i.producto.id === coca.id);
+  assert.ok(suyo, 'sí ve el producto');
+  assert.equal(typeof suyo.esperado, 'number', 'y cuántas hay');
+  assert.equal(suyo.producto.costo_centavos, undefined, 'pero no lo que costó');
+
+  // Ni siquiera pidiéndolo de frente: el dato no sale del servidor.
+  const uno = await llamar(`/api/inventario/${coca.id}`);
+  assert.equal(uno.json.datos.producto.costo_centavos, undefined);
+  for (const m of uno.json.datos.movimientos) {
+    assert.equal(m.costo_centavos, undefined);
+  }
+});
+
+test('el cajero no mueve ni cuenta el inventario de productos', async () => {
+  assert.equal((await llamar(`/api/inventario/${coca.id}/conteo`, {
+    method: 'POST', cuerpo: { contado: 4 } })).estado, 403);
+
+  assert.equal((await llamar(`/api/inventario/${coca.id}/movimientos`, {
+    method: 'POST', cuerpo: { tipo: 'entrada', cantidad: 5 } })).estado, 403);
+
+  assert.equal((await llamar('/api/catalogo/productos', {
+    method: 'POST',
+    cuerpo: { nombre: 'No', categoriaId: catId, tipo: 'simple', precio: 1 } })).estado, 403);
+});
+
+test('el gerente sí ve los costos y sí mueve el inventario', async () => {
+  await entrarAdmin();
+  await llamar('/api/usuarios', {
+    method: 'POST', cuerpo: { nombre: 'Mari', rol: 'gerente', pin: '7777' }
+  });
+  const lista = (await llamar('/api/auth/usuarios-disponibles')).json.datos.usuarios;
+  const mari = lista.find((u) => u.nombre === 'Mari');
+  await llamar('/api/auth/entrar-pin', { method: 'POST', cuerpo: { usuarioId: mari.id, pin: '7777' } });
+
+  const r = await llamar('/api/inventario');
+  assert.equal(r.json.datos.conCostos, true);
+  const suyo = r.json.datos.inventario.find((i) => i.producto.id === coca.id);
+  assert.equal(suyo.producto.costo_centavos, 1800);
+
   assert.equal((await llamar(`/api/inventario/${coca.id}/conteo`, {
     method: 'POST', cuerpo: { contado: 4 } })).estado, 201);
-
-  const movs = (await llamar(`/api/inventario/${coca.id}`)).json.datos.movimientos;
-  const r = await llamar(`/api/inventario/movimientos/${movs[0].id}/anular`, {
-    method: 'POST', cuerpo: { motivo: 'No debería poder' } });
-  assert.equal(r.estado, 403);
 });
 
 test('un operario no ve el inventario', async () => {

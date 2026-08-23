@@ -3,7 +3,7 @@
 Sistema para la fábrica de hielo de Hunucmá, Yucatán.
 Se construye **por versiones**: cada versión es un pedazo terminado, probado y usable.
 
-**Versión actual: v0.13**
+**Versión actual: v1.4**
 
 ---
 
@@ -376,7 +376,9 @@ Están escritas en el código, no solo en el documento:
 
 ## Cómo se agrega una versión nueva
 
-1. Se programa el pedazo (con su migración `00X_...sql` si toca la base).
+0. La numeración: después de la v0.9 viene la **v1.0**, no la v0.10. El
+   tercer número (v1.4.1) es solo para arreglos o cambios de aspecto.
+1. Se programa el pedazo (con su migración `0XX_...sql` si toca la base).
 2. Se agrega la entrada nueva **hasta arriba** del arreglo en `src/version.js`.
 3. Se actualiza `VERSION_ACTUAL` ahí mismo y `version` en `package.json`.
 4. Se corre `npm run prueba`.
@@ -407,13 +409,14 @@ versión nueva le aparece un punto rojo en el menú.
 | **v0.8** | Punto de venta, conteo con fracciones, vendido vs faltante | ✅ listo |
 | **v0.9** | La Caja: turnos, gastos, arqueo y corte imprimible | ✅ listo |
 | **v0.9.1** | Manual de ayuda dentro del sistema | ✅ listo |
-| **v0.10** | Caja táctil: catálogo, teclado rápido, ticket corto | ✅ listo |
-| **v0.11** | Impresión ESC/POS desde el servidor, relevo de turno, reimpresión | ✅ listo |
-| **v0.12** | Ventas en espera y cambios de ticket | ✅ listo |
-| **v0.13** | Productos con foto, costo e inventario | ✅ listo |
-| v0.14 | Clientes registrados y crédito | siguiente |
-| v0.15 | Reparto, pedidos y neveras en comodato | |
-| v0.16 | Planta de agua: garrafones, botellas y depósitos | |
-| v0.17 | Mantenimiento: compresores, ósmosis, membranas, horario punta | |
-| v0.18 | Estadísticas | |
-| v1.0 | Sistema completo en producción | |
+| **v1.0** | Caja táctil: catálogo, teclado rápido, ticket corto | ✅ listo |
+| **v1.1** | Impresión ESC/POS desde el servidor, relevo de turno, reimpresión | ✅ listo |
+| **v1.2** | Ventas en espera y cambios de ticket | ✅ listo |
+| **v1.3** | Productos con foto, costo e inventario | ✅ listo |
+| **v1.4** | Editar sin formularios, recuperar bajas, márgenes | ✅ listo |
+| v1.5 | Vender con más pantalla, historiales y accesos rápidos | siguiente |
+| v1.6 | Clientes registrados y crédito | |
+| v1.7 | Reparto, pedidos y neveras en comodato | |
+| v1.8 | Planta de agua: garrafones, botellas y depósitos | |
+| v1.9 | Mantenimiento: compresores, ósmosis, membranas, horario punta | |
+| v2.0 | Estadísticas y sistema completo en producción | |

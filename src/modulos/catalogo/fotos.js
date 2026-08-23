@@ -75,11 +75,13 @@ function quitar(productoId) {
   }
 }
 
-/** Sirve la foto de un producto. */
+/** Sirve la foto de un producto o de una categoría. */
 function servir(req, res) {
   const nombre = String(req.params.archivo || '');
   // Solo nombres que este módulo pudo haber creado: nada de subir carpetas.
-  if (!/^[0-9a-f-]{36}-\d+\.(png|jpg|webp)$/i.test(nombre)) {
+  // Los ids de siembra son cortos (cat-hielo), así que se admite cualquier
+  // id razonable, pero sin barras ni puntos que permitan salir de aquí.
+  if (!/^[0-9a-zA-Z-]{1,40}-\d+\.(png|jpg|webp)$/.test(nombre)) {
     return res.status(404).end();
   }
 
