@@ -136,19 +136,28 @@ body {
    con la sombra cian desplazada, igual que la marca impresa.
    ============================================================ */
 .marca { text-align: center; line-height: 1; }
+
+/* Con un logo subido desde Personalizar, las letras de respaldo no salen. */
+.marca-logo {
+  max-width: 250px; max-height: 130px; width: auto; height: auto;
+  object-fit: contain; display: block; margin: 0 auto;
+}
+
+/* Un logo de letras negras desaparecería en modo oscuro, así que va sobre
+   una placa blanca. Se evita subiendo también un logo para modo oscuro. */
+.marca-logo.con-placa { background: #fff; border-radius: 14px; padding: 12px 16px; }
+
+/* Respaldo en letras, imitando el logo impreso. */
 .marca-hielo {
-  display: block;
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 26px; letter-spacing: .5px; color: var(--texto);
+  font-size: 27px; letter-spacing: .5px; color: var(--texto);
 }
 .marca-lolha {
-  display: block;
-  font-size: 40px; font-weight: 900; letter-spacing: 2px;
+  font-size: 44px; font-weight: 900; letter-spacing: 2px;
   color: var(--texto);
   text-shadow: 3px 3px 0 var(--marca-cian);
-  margin-top: 2px;
+  margin-top: 4px;
 }
-.marca-cubo { font-size: 30px; }
 
 /* ---------- Barra superior ---------- */
 header {
@@ -381,6 +390,88 @@ select { color-scheme: light dark; }
 .vacio { text-align: center; color: var(--suave); padding: 40px 16px; }
 
 
+
+/* ---------- Personalizar ---------- */
+.logo-previa {
+  display: grid; place-items: center; min-height: 120px; padding: 16px;
+  background: #fff; border: 1px solid var(--borde); border-radius: 12px; margin-bottom: 14px;
+}
+.logo-previa.oscura { background: #0b131b; border-color: #26384a; }
+.logo-previa img { max-width: 100%; max-height: 120px; }
+.logo-vacio { color: #7b8b96; font-size: 14px; text-align: center; }
+.logo-previa.oscura .logo-vacio { color: #8ea6b8; }
+
+.subir {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 52px; padding: 15px 18px; border-radius: 12px;
+  background: var(--primario); color: var(--primario-texto);
+  font-weight: 600; cursor: pointer; margin: 0;
+}
+.subir:active { filter: brightness(.92); }
+
+/* ============================================================
+   DIÁLOGOS
+   En celular suben desde abajo, en PC salen centrados.
+   Sustituyen a los prompt() y confirm() del navegador.
+   ============================================================ */
+
+.dialogo { position: fixed; inset: 0; z-index: 100; display: flex; align-items: flex-end; }
+.dialogo-fondo {
+  position: absolute; inset: 0; background: rgba(0, 0, 0, .55);
+  opacity: 0; transition: opacity .16s ease;
+}
+.dialogo.abierto .dialogo-fondo { opacity: 1; }
+
+.dialogo-hoja {
+  position: relative; width: 100%;
+  background: var(--superficie); color: var(--texto);
+  border-radius: 20px 20px 0 0;
+  padding: 22px 18px calc(22px + env(safe-area-inset-bottom));
+  box-shadow: 0 -8px 34px rgba(0, 0, 0, .35);
+  transform: translateY(100%); transition: transform .18s ease;
+  max-height: 88vh; overflow-y: auto;
+}
+.dialogo.abierto .dialogo-hoja { transform: translateY(0); }
+
+.dialogo-titulo { margin: 0 0 6px; font-size: 19px; color: var(--texto); }
+.dialogo-texto { margin: 0 0 16px; color: var(--suave); font-size: 15px; line-height: 1.45; }
+
+.dialogo-botones { display: flex; gap: 10px; margin-top: 18px; }
+.dialogo-botones button { flex: 1; min-width: 0; }
+
+.dialogo-opciones { display: grid; gap: 8px; }
+.dialogo-opcion {
+  width: 100%; min-width: 0; text-align: left; justify-content: flex-start;
+  flex-direction: column; align-items: flex-start; gap: 2px;
+  background: var(--superficie-alt); color: var(--texto);
+  border: 2px solid var(--borde); padding: 14px 16px;
+}
+.dialogo-opcion strong { font-size: 16px; }
+.dialogo-opcion small { color: var(--suave); font-weight: 400; }
+.dialogo-opcion.peligrosa { border-color: var(--peligro-f); }
+.dialogo-opcion.peligrosa strong { color: var(--rojo); }
+
+/* Contador − 3 + : con manos mojadas es más fácil tocar que escribir */
+.contador { display: flex; align-items: center; gap: 12px; justify-content: center; margin: 6px 0 4px; }
+.contador-boton {
+  width: 62px; min-width: 62px; height: 62px; border-radius: 16px; font-size: 28px;
+  background: var(--superficie-alt); color: var(--texto); border: 2px solid var(--borde);
+}
+.contador-valor {
+  width: 96px; text-align: center; font-size: 30px; font-weight: 800;
+  padding: 10px 6px; color: var(--acento);
+}
+
+@media (min-width: 620px) {
+  .dialogo { align-items: center; justify-content: center; padding: 20px; }
+  .dialogo-hoja {
+    max-width: 420px; border-radius: 20px; padding: 26px 24px;
+    transform: translateY(14px) scale(.98); opacity: 0;
+    transition: transform .16s ease, opacity .16s ease;
+  }
+  .dialogo.abierto .dialogo-hoja { transform: translateY(0) scale(1); opacity: 1; }
+}
+
 /* ============================================================
    TANQUES (v0.2)
    La canasta es el bloque tactil, no el molde: asi los 18 paños
@@ -399,33 +490,49 @@ select { color-scheme: light dark; }
 
 .tanque-tarjeta {
   display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px;
-  width: 100%; min-height: 84px; text-align: left; margin-bottom: 10px;
+  width: 100%; min-height: 82px; text-align: left; margin-bottom: 10px;
   background: var(--superficie); color: var(--texto);
   border: 1px solid var(--borde); border-radius: var(--radio);
-  padding: 14px 16px; box-shadow: var(--sombra); font-weight: 400;
+  padding: 12px 14px; box-shadow: var(--sombra); font-weight: 400;
 }
 .tanque-nombre {
-  font-size: 24px; font-weight: 800; color: var(--primario-texto);
-  background: var(--marca-azul); border-radius: 12px;
-  min-width: 62px; padding: 10px 12px; text-align: center;
+  font-size: 22px; font-weight: 800; color: #fff;
+  background: linear-gradient(140deg, var(--marca-cian), var(--marca-azul));
+  border-radius: 12px; min-width: 58px; padding: 12px 10px; text-align: center;
+  letter-spacing: .5px;
 }
-:root[data-tema="oscuro"] .tanque-nombre,
-.tanque-nombre { color: #fff; }
-.tanque-datos { display: flex; flex-direction: column; gap: 2px; font-size: 14px; color: var(--suave); }
-.tanque-datos strong { color: var(--texto); font-size: 15px; }
+.tanque-nombre.grande { font-size: 28px; min-width: 74px; padding: 16px 12px; }
+.tanque-datos { display: flex; flex-direction: column; gap: 3px; font-size: 14px; color: var(--suave); }
+.tanque-datos strong { color: var(--texto); }
+.tanque-moldes strong { color: var(--acento); font-size: 17px; }
+.tanque-flecha { color: var(--suave); font-size: 24px; line-height: 1; }
 .tanque-horas { color: var(--suave); font-size: 14px; white-space: nowrap; }
 
-.cabeza-tanque { margin-bottom: 4px; }
+/* Cabecera del detalle */
+.tanque-cabeza {
+  display: flex; align-items: center; gap: 16px; margin: 16px 0 0;
+  background: var(--superficie); border: 1px solid var(--borde);
+  border-radius: var(--radio); padding: 14px; box-shadow: var(--sombra);
+}
+.tanque-cifras { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 14px; color: var(--suave); }
+.tanque-cifras strong { color: var(--texto); font-size: 16px; }
 
 .panos { display: flex; flex-direction: column; gap: 8px; }
 /* Compacto a proposito: los 18 paños de un tanque tienen que caber en la
    pantalla de un celular sin scroll interminable (seccion 12 del plan).
    Por eso un paño es una sola fila de bloques, nunca dos. */
 .pano {
-  display: grid; grid-template-columns: 26px 1fr 30px; align-items: center; gap: 8px;
+  display: grid; grid-template-columns: 26px 1fr 28px auto; align-items: center; gap: 8px;
   background: var(--superficie); border: 1px solid var(--borde);
   border-radius: 12px; padding: 6px 8px;
 }
+.pano.de-baja { opacity: .5; border-style: dashed; }
+.pano-menu {
+  width: 30px; min-width: 30px; height: 34px; padding: 0;
+  background: transparent; color: var(--suave); border: 0;
+  font-size: 20px; line-height: 1; border-radius: 8px;
+}
+.canasta.de-baja { opacity: .45; border-style: dashed; }
 .pano-num {
   width: 26px; height: 26px; border-radius: 7px;
   background: var(--superficie-alt); color: var(--suave);
@@ -456,15 +563,21 @@ select { color-scheme: light dark; }
 #plantilla .canasta-moldes { font-size: 22px; }
 
 .total-vivo {
-  margin: 16px 0 0; padding: 12px; border-radius: 10px;
-  background: var(--superficie-alt); color: var(--suave); font-size: 15px; text-align: center;
+  margin: 4px 0 0; padding: 18px 14px; border-radius: var(--radio); text-align: center;
+  background: linear-gradient(140deg, var(--superficie-alt), var(--superficie));
+  border: 2px solid var(--borde-fuerte);
 }
-.total-vivo strong { color: var(--texto); }
-.total-vivo .grande { font-size: 22px; color: var(--acento); }
+.total-vivo span { display: block; color: var(--suave); font-size: 14px; }
+.total-vivo strong {
+  display: block; font-size: 44px; font-weight: 800; line-height: 1.1;
+  color: var(--acento); font-variant-numeric: tabular-nums; margin: 4px 0 0;
+}
+.total-vivo small { display: block; color: var(--suave); font-size: 13px;
+  text-transform: uppercase; letter-spacing: .6px; }
 
 /* En pantalla grande hay sitio de sobra: los bloques crecen. */
 @media (min-width: 620px) {
-  .pano { grid-template-columns: 34px 1fr 40px; gap: 10px; padding: 8px 10px; }
+  .pano { grid-template-columns: 34px 1fr 40px auto; gap: 10px; padding: 8px 10px; }
   .pano-num { width: 30px; height: 30px; font-size: 14px; }
   .canasta { min-width: 56px; min-height: 56px; }
   .canasta-num { font-size: 10px; }
@@ -504,9 +617,10 @@ select { color-scheme: light dark; }
   button, .boton { width: auto; min-width: 200px; }
   /* ...menos estos, que viven dentro de una rejilla y deben respetarla. */
   button.chico, .icono, .teclado button, .tema-opciones button, .item button,
-  .canasta {
+  .canasta, .pano-menu, .contador-boton, .dialogo-botones button, .dialogo-opcion {
     min-width: 0;
   }
+  .contador-boton { min-width: 62px; }
   .canasta { min-width: 44px; }
   .canasta.agregar { min-width: 30px; }
   form button { min-width: 220px; }

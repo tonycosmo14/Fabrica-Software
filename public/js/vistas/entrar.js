@@ -5,6 +5,7 @@
  */
 import { api } from '../api.js';
 import { esc, avisar, ETIQUETAS_ROL } from '../util.js';
+import { marcaHTML } from '../marca.js';
 
 export async function vistaEntrar(pantalla, { alEntrar }) {
   const { usuarios } = await api.obtener('/auth/usuarios-disponibles');
@@ -23,10 +24,7 @@ export async function vistaEntrar(pantalla, { alEntrar }) {
     pantalla.innerHTML = `
       <div class="entrada">
         <div class="logo">
-          <div class="marca">
-            <span class="marca-hielo">Hielo</span>
-            <span class="marca-lolha">LOLHA</span>
-          </div>
+        ${marcaHTML()}
           <small style="display:block;margin-top:16px">Toca tu nombre para entrar</small>
         </div>
         <div class="lista-usuarios">

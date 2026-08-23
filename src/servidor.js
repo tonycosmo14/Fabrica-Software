@@ -22,8 +22,17 @@ function crearApp() {
   const app = express();
 
   app.disable('x-powered-by');
-  app.use(express.json({ limit: '1mb' }));
   app.use(cargarUsuario);
+
+  // El logo puede pesar más que el resto de peticiones, así que este módulo
+  // lleva su propio lector de datos, con un límite mayor, y va antes que el
+  // general para que sea el suyo el que aplique.
+  const personalizacion = require('./modulos/personalizacion/rutas');
+  app.use('/api/personalizacion', express.json({ limit: '5mb' }), personalizacion.router);
+  app.get('/marca/logo', personalizacion.servirLogo('logo_claro'));
+  app.get('/marca/logo-oscuro', personalizacion.servirLogo('logo_oscuro'));
+
+  app.use(express.json({ limit: '1mb' }));
 
   // API
   app.use('/api/auth', require('./modulos/auth/rutas'));

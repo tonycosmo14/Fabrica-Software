@@ -7,12 +7,14 @@
 import { api } from './api.js';
 import { avisar, esc, ETIQUETAS_ROL } from './util.js';
 import { iniciarTema } from './tema.js';
+import { cargarMarca } from './marca.js';
 import { vistaBienvenida } from './vistas/bienvenida.js';
 import { vistaEntrar } from './vistas/entrar.js';
 import { vistaInicio } from './vistas/inicio.js';
 import { vistaTanques } from './vistas/tanques.js';
 import { vistaUsuarios } from './vistas/usuarios.js';
 import { vistaNovedades, hayVersionNueva } from './vistas/novedades.js';
+import { vistaPersonalizar } from './vistas/personalizar.js';
 import { vistaSistema } from './vistas/sistema.js';
 
 const pantalla = document.getElementById('pantalla');
@@ -23,8 +25,9 @@ const estado = { usuario: null, permisos: [], configurado: true };
 
 const RUTAS = {
   '#/inicio':    { titulo: 'Inicio',            vista: vistaInicio },
-  '#/tanques':   { titulo: 'Tanques',           vista: vistaTanques,   permiso: 'produccion.ver' },
+  '#/config-tanques': { titulo: 'Configurar tanques', vista: vistaTanques, permiso: 'produccion.ver' },
   '#/usuarios':  { titulo: 'Usuarios',          vista: vistaUsuarios,  permiso: 'usuarios.administrar' },
+  '#/personalizar': { titulo: 'Personalizar',   vista: vistaPersonalizar, permiso: 'sistema.configurar' },
   '#/sistema':   { titulo: 'Sistema',           vista: vistaSistema,   permiso: 'sistema.ver' },
   '#/novedades': { titulo: 'Qué hay de nuevo',  vista: vistaNovedades }
 };
@@ -89,6 +92,8 @@ async function actualizarPuntoNovedades() {
 }
 
 async function iniciar() {
+  await cargarMarca();
+
   try {
     const inicial = await api.obtener('/auth/estado-inicial');
     estado.configurado = inicial.configurado;

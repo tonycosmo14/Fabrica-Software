@@ -12,9 +12,27 @@
  * tipo: 'nuevo' | 'mejora' | 'arreglo' | 'importante'
  */
 
-const VERSION_ACTUAL = '0.2';
+const VERSION_ACTUAL = '0.2.1';
 
 const VERSIONES = [
+  {
+    numero: '0.2.1',
+    nombre: 'Personalizar y mejor acabado',
+    fecha: '2026-08-23',
+    resumen:
+      'Ya puedes subir tu logo desde el sistema, se puede quitar un paño que ' +
+      'sobra, y las ventanas del sistema dejaron de ser las feas del navegador.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'Pantalla Personalizar: sube tu logo en PNG o SVG, con versión aparte para modo oscuro, y cambia el nombre del negocio.' },
+      { tipo: 'importante', texto: 'El logo se guarda junto a tus datos, no dentro del programa: no se pierde al actualizar.' },
+      { tipo: 'arreglo', texto: 'Ya se puede quitar un paño que metiste de más, sin borrar el tanque completo. Y recuperarlo desde "Ver bajas".' },
+      { tipo: 'nuevo', texto: 'Ventanas propias del sistema en vez de las del navegador, con botones − y ＋ para los moldes.' },
+      { tipo: 'mejora', texto: 'La pantalla ahora se llama Configurar tanques. Producción será la del trabajo diario.' },
+      { tipo: 'mejora', texto: 'Mejor acabado del configurador: tarjetas de tanque, cabecera y el total en grande.' },
+      { tipo: 'arreglo', texto: 'En la PC el botón de opciones del paño se caía a otro renglón.' }
+    ],
+    siguiente: 'v0.3 — Producción: sacar y rellenar canastas, con el reloj de congelación.'
+  },
   {
     numero: '0.2',
     nombre: 'Tanques',
@@ -32,8 +50,7 @@ const VERSIONES = [
       { tipo: 'importante', texto: 'Nada está escrito en el código: si mañana crece la fábrica, los tanques nuevos los das de alta tú.' },
       { tipo: 'arreglo', texto: 'Tocar en el menú la pantalla en la que ya estabas no hacía nada.' },
       { tipo: 'arreglo', texto: 'El campo de usuario del asistente de bienvenida daba un error en los navegadores nuevos.' }
-    ],
-    siguiente: 'v0.3 — Producción: sacar y rellenar canastas, con el reloj de congelación.'
+    ]
   },
   {
     numero: '0.1.4',

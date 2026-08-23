@@ -6,15 +6,13 @@
  */
 import { api } from '../api.js';
 import { esc, avisar } from '../util.js';
+import { marcaHTML } from '../marca.js';
 
 export function vistaBienvenida(pantalla, { alEntrar }) {
   pantalla.innerHTML = `
     <div class="entrada">
       <div class="logo">
-        <div class="marca">
-          <span class="marca-hielo">Hielo</span>
-          <span class="marca-lolha">LOLHA</span>
-        </div>
+        ${marcaHTML()}
       </div>
 
       <h2 style="text-align:center;margin-bottom:6px">Bienvenido</h2>
