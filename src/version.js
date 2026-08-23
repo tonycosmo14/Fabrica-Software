@@ -12,9 +12,27 @@
  * tipo: 'nuevo' | 'mejora' | 'arreglo' | 'importante'
  */
 
-const VERSION_ACTUAL = '0.11';
+const VERSION_ACTUAL = '0.12';
 
 const VERSIONES = [
+  {
+    numero: '0.12',
+    nombre: 'Dos clientes a la vez y cambios de ticket',
+    fecha: '2026-08-23',
+    resumen:
+      'Ya se puede dejar una venta a medias para atender al de atrás, y ' +
+      'hacer el cambio clásico de "pedí de más" sin sacar la cuenta a mano.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'NUEVA VENTA (F2): el ticket a medias se guarda, atiendes al que ya sabe lo que quiere, y al terminar el pendiente vuelve solo.' },
+      { tipo: 'nuevo', texto: 'Arriba se ve cuántas ventas quedaron esperando. Puedes tener varias y elegir cuál seguir.' },
+      { tipo: 'importante', texto: 'CAMBIO DE TICKET (F4): tecleas el número del ticket que trae el cliente, el sistema lo abona a favor, marcas lo que se lleva ahora y te dice si hay que cobrar la diferencia o devolverla.' },
+      { tipo: 'importante', texto: 'En el cambio, el ticket viejo se cancela y queda amarrado al nuevo. El hielo vuelve solo al cuarto frío y la caja cuadra sola: no hay ninguna cuenta especial que se pueda desincronizar.' },
+      { tipo: 'nuevo', texto: 'Si el ticket es de un turno ya cerrado, el sistema anota el movimiento para que el arqueo de hoy no salga corto.' },
+      { tipo: 'arreglo', texto: 'El campo del código se quedaba con el enter durante el cobro, así que el enter que confirma no llegaba. Pasaba solo cuando no había que cobrar nada.' },
+      { tipo: 'arreglo', texto: 'La fila de botones de arriba se metía como columna y descuadraba la pantalla.' }
+    ],
+    siguiente: 'v0.13 — Productos con foto, inventario y costos.'
+  },
   {
     numero: '0.11',
     nombre: 'Impresión de verdad y relevo de turno',
@@ -34,7 +52,6 @@ const VERSIONES = [
       { tipo: 'arreglo', texto: 'Los campos de dinero ya no dejan escribir letras, y enter acepta en vez de hacer un salto de línea.' },
       { tipo: 'arreglo', texto: 'Los cajeros ya no ven la configuración de tanques. Sí siguen poniendo la producción y la existencia, y queda anotado quién con su PIN.' }
     ],
-    siguiente: 'v0.12 — Clientes, ventas en espera y cambios de ticket.'
   },
   {
     numero: '0.10',

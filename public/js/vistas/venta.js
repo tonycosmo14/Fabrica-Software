@@ -43,6 +43,7 @@ const FASES = {
   // seguidos no puedan cobrar dos veces.
   guardando: { enter: 'guardando…',               esc: 'espera' },
   historial: { enter: 'busca',                    esc: 'volver a vender' },
+  espera:    { enter: 'nada',                     esc: 'volver a vender' },
   cobrada:   { enter: 'imprime el ticket',        esc: 'siguiente venta' }
 };
 
@@ -61,10 +62,28 @@ export async function vistaVenta(pantalla, estadoApp) {
   let articulos = [];            // { producto, cantidad }
   let categoriaAbierta = null;   // null = se ven las categorías
 
+  /**
+   * VENTAS EN ESPERA.
+   *
+   * Llega un cliente, pide 1/8 y se queda pensando. Detrás llega uno de
+   * siempre que ya sabe lo que quiere. Con «Nueva venta» el ticket a medias
+   * se guarda, se atiende al de atrás, y al terminar el que quedó pendiente
+   * vuelve solo.
+   *
+   * Viven en el navegador nada más: son minutos, no días. Pero se guardan
+   * también en el aparato, para que un refresco de la pantalla no borre lo
+   * que un cliente ya había pedido.
+   */
+  let enEspera = leerEnEspera();
+
+  // ---- Cambio de ticket: lo que el cliente trae a favor ----
+  let cambiando = null;          // { venta, aFavor }
+
   // ---- La fase del teclado ----
   let fase = 'venta';
   let pago = 0;                  // centavos tecleados en el cobro
   let ventaCobrada = null;
+  let ultimoCambio = null;       // el resultado del último cambio de ticket
 
   pantalla.innerHTML = armazon();
   const refs = {
@@ -92,12 +111,25 @@ export async function vistaVenta(pantalla, estadoApp) {
   function armazon() {
     return `
       <div class="pos">
+        <div class="pos-acciones-arriba">
+          <button class="pos-accion" id="nueva-venta">
+            <span>＋ Nueva venta</span><small>F2</small>
+          </button>
+          <button class="pos-accion pos-accion-cambio" id="cambio">
+            <span>⇄ Cambio</span><small>F4</small>
+          </button>
+          <button class="pos-accion" id="historial">
+            <span>🧾 Tickets</span><small>F3</small>
+          </button>
+        </div>
+
         <section class="pos-ticket">
           <div class="pos-ticket-cabeza">
-            <span class="etiqueta-folio">ticket #${ctx.siguienteFolio}</span>
+            <span class="etiqueta-folio" id="etiqueta-folio">ticket #${ctx.siguienteFolio}</span>
             ${ctx.caja
               ? `<span class="etiqueta-turno">turno #${ctx.caja.folio}</span>`
               : '<span class="etiqueta-mal">sin turno</span>'}
+            <span class="etiqueta-espera" id="etiqueta-espera" hidden></span>
           </div>
 
           <div class="pos-lineas" id="pos-lineas"></div>
@@ -122,9 +154,6 @@ export async function vistaVenta(pantalla, estadoApp) {
             <button class="pos-calc" id="calculadora" title="Otra cantidad de hielo">
               🧮
             </button>
-            <button class="pos-calc" id="historial" title="Tickets de hoy (F3)">
-              🧾
-            </button>
           </div>
           <div class="pos-migas" id="pos-migas"></div>
           <div class="pos-rejilla" id="pos-rejilla"></div>
@@ -133,6 +162,145 @@ export async function vistaVenta(pantalla, estadoApp) {
       </div>
 
       <div class="pos-cobro" id="pos-cobro" hidden></div>`;
+  }
+
+  // ==========================================================
+  // VENTAS EN ESPERA
+  // ==========================================================
+  const LLAVE_ESPERA = 'lolha.ventas-en-espera';
+
+  function leerEnEspera() {
+    try { return JSON.parse(localStorage.getItem(LLAVE_ESPERA)) || []; }
+    catch { return []; }
+  }
+
+  function guardarEnEspera() {
+    try { localStorage.setItem(LLAVE_ESPERA, JSON.stringify(enEspera)); }
+    catch { /* sin espacio o en privado: no es grave, son minutos */ }
+  }
+
+  /** Guarda el ticket de ahora y deja la pantalla lista para otro cliente. */
+  function apartarVenta() {
+    if (!hayAlgo()) {
+      avisar('El ticket ya está vacío', '');
+      enfocar();
+      return;
+    }
+    if (cambiando) {
+      avisar('Termina el cambio antes de empezar otra venta', 'error');
+      enfocar();
+      return;
+    }
+
+    enEspera.push({
+      hielo,
+      articulos: articulos.map((a) => ({ productoId: a.producto.id, cantidad: a.cantidad })),
+      hora: new Date().toISOString()
+    });
+    guardarEnEspera();
+
+    hielo = 0;
+    articulos = [];
+    pintarTodo();
+    avisar('Venta apartada. Sigue el siguiente cliente.', 'bien');
+    enfocar();
+  }
+
+  /** Devuelve a la pantalla una venta apartada. */
+  function retomarVenta(indice) {
+    const v = enEspera[indice];
+    if (!v) return;
+
+    // Si lo que hay en pantalla es algo, se aparta antes de traer la otra:
+    // nunca se pierde un ticket por retomar otro.
+    if (hayAlgo()) apartarVenta();
+
+    enEspera.splice(indice, 1);
+    guardarEnEspera();
+
+    hielo = v.hielo || 0;
+    articulos = (v.articulos || [])
+      .map((a) => ({
+        producto: ctx.productos.find((p) => p.id === a.productoId),
+        cantidad: a.cantidad
+      }))
+      // Un producto dado de baja mientras esperaba ya no se puede cobrar.
+      .filter((a) => a.producto);
+
+    fase = 'venta';
+    refs.cobro.hidden = true;
+    pintarTodo();
+    pintarPista();
+    enfocar();
+  }
+
+  /** Al terminar una venta, si quedó alguien esperando, vuelve solo. */
+  function retomarSiHay() {
+    if (!enEspera.length) return false;
+    retomarVenta(enEspera.length - 1);
+    avisar('Vuelves a la venta que quedó pendiente', '');
+    return true;
+  }
+
+  function verEnEspera() {
+    if (!enEspera.length) { apartarVenta(); return; }
+
+    fase = 'espera';
+    refs.cobro.hidden = false;
+    refs.cobro.innerHTML = `
+      <div class="pos-cobro-caja">
+        <h3 style="margin:0 0 4px">Ventas en espera</h3>
+        <p class="ayuda" style="margin:0 0 12px">
+          Tickets que quedaron a medias. Toca uno para seguir con él.
+        </p>
+        <div class="lista-tickets">
+          ${enEspera.map((v, i) => {
+            const arts = (v.articulos || []).reduce((n, a) => n + a.cantidad, 0);
+            return `
+              <div class="ticket-fila">
+                <div class="crece">
+                  <strong>${v.hielo ? esc(aTexto(v.hielo)) + ' de hielo' : ''}${
+                    v.hielo && arts ? ' · ' : ''}${arts ? arts + ' artículo' + (arts === 1 ? '' : 's') : ''}</strong>
+                  <small>apartada a las ${esc(soloHora(v.hora))}</small>
+                </div>
+                <button class="secundario chico" data-retomar="${i}">Seguir</button>
+                <button class="tachita" data-tirar="${i}" aria-label="Tirar">×</button>
+              </div>`;
+          }).join('')}
+        </div>
+        <div class="fila-botones" style="margin-top:12px">
+          <button class="secundario crece" id="apartar-esta">Apartar la de ahora</button>
+          <button class="secundario crece" id="cerrar-espera">Esc · volver</button>
+        </div>
+      </div>`;
+
+    refs.cobro.querySelectorAll('[data-retomar]').forEach((b) => {
+      b.onclick = () => { refs.cobro.hidden = true; retomarVenta(Number(b.dataset.retomar)); };
+    });
+    refs.cobro.querySelectorAll('[data-tirar]').forEach((b) => {
+      b.onclick = async () => {
+        if (!await confirmar({
+          titulo: '¿Tirar esta venta apartada?',
+          texto: 'No se registra nada. Solo se borra lo que se había capturado.',
+          ok: 'Tirar', peligro: true
+        })) return;
+        enEspera.splice(Number(b.dataset.tirar), 1);
+        guardarEnEspera();
+        verEnEspera();
+      };
+    });
+    refs.cobro.querySelector('#apartar-esta').onclick = () => {
+      refs.cobro.hidden = true; fase = 'venta'; apartarVenta(); pintarPista();
+    };
+    refs.cobro.querySelector('#cerrar-espera').onclick = cerrarEspera;
+    pintarPista();
+  }
+
+  function cerrarEspera() {
+    fase = 'venta';
+    refs.cobro.hidden = true;
+    pintarPista();
+    enfocar();
   }
 
   // ==========================================================
@@ -184,6 +352,19 @@ export async function vistaVenta(pantalla, estadoApp) {
   function pintarLineas() {
     const filas = [];
 
+    if (cambiando) {
+      filas.push(`
+        <div class="pos-linea pos-linea-credito">
+          <div class="pos-cant">⇄</div>
+          <div class="pos-desc">
+            Devuelve el ticket #${cambiando.venta.folio}
+            <small>a favor del cliente</small>
+          </div>
+          <div class="pos-importe">−${pesos(cambiando.aFavor)}</div>
+          <button class="tachita" data-cancelar-cambio aria-label="Cancelar el cambio">×</button>
+        </div>`);
+    }
+
     if (hielo > 0) {
       filas.push(`
         <div class="pos-linea pos-linea-hielo">
@@ -216,13 +397,29 @@ export async function vistaVenta(pantalla, estadoApp) {
          </div>`;
 
     const t = total();
-    refs.total.innerHTML = `
-      <div class="pos-total ${hayAlgo() ? '' : 'apagado'}">
-        <span>Total</span>
-        <strong>${pesos(t)}</strong>
-      </div>`;
+    // En un cambio, lo que importa es la diferencia: lo que se cobra o lo
+    // que se devuelve. El total del ticket ya lo pagó antes.
+    const dif = cambiando ? t - cambiando.aFavor : t;
+    refs.total.innerHTML = cambiando
+      ? `<div class="pos-total ${dif < 0 ? 'devolver' : ''}">
+           <span>${dif < 0 ? 'A devolver' : dif > 0 ? 'A cobrar' : 'Queda a mano'}</span>
+           <strong>${pesos(Math.abs(dif))}</strong>
+         </div>`
+      : `<div class="pos-total ${hayAlgo() ? '' : 'apagado'}">
+           <span>Total</span>
+           <strong>${pesos(t)}</strong>
+         </div>`;
 
     pantalla.querySelector('#cobrar').disabled = !hayAlgo();
+    pantalla.querySelector('#cobrar').querySelector('span').textContent =
+      cambiando ? 'Hacer el cambio' : 'Cobrar';
+
+    const etiqueta = pantalla.querySelector('#etiqueta-espera');
+    etiqueta.hidden = enEspera.length === 0;
+    etiqueta.textContent = `${enEspera.length} en espera`;
+
+    const quitarCambio = refs.lineas.querySelector('[data-cancelar-cambio]');
+    if (quitarCambio) quitarCambio.onclick = () => { cambiando = null; pintarTodo(); enfocar(); };
 
     const quitaHielo = refs.lineas.querySelector('[data-quita-hielo]');
     if (quitaHielo) quitaHielo.onclick = () => { hielo = 0; pintarTodo(); enfocar(); };
@@ -284,8 +481,11 @@ export async function vistaVenta(pantalla, estadoApp) {
     refs.pista.innerHTML = `
       <span><kbd>Enter</kbd> ${esc(f.enter)}</span>
       <span><kbd>Esc</kbd> ${esc(f.esc)}</span>
-      ${fase === 'venta'
-        ? '<span><kbd>F10</kbd> cobrar</span><span><kbd>F3</kbd> tickets</span>' : ''}`;
+      ${fase === 'venta' ? `
+        <span><kbd>F10</kbd> cobrar</span>
+        <span><kbd>F2</kbd> nueva venta</span>
+        <span><kbd>F3</kbd> tickets</span>
+        <span><kbd>F4</kbd> cambio</span>` : ''}`;
   }
 
   function enfocar() {
@@ -305,12 +505,28 @@ export async function vistaVenta(pantalla, estadoApp) {
       return;
     }
 
+    // F2 aparta el ticket de ahora y deja la pantalla lista para otro
+    // cliente. Con una venta ya apartada, muestra la lista.
+    if (ev.key === 'F2') {
+      ev.preventDefault();
+      if (fase === 'venta') verEnEspera();
+      else if (fase === 'espera') cerrarEspera();
+      return;
+    }
+
     // F3 abre los tickets de hoy. Se usa cuando el cliente vuelve por una
     // copia, o cuando alguien se salió de la pantalla sin querer.
     if (ev.key === 'F3') {
       ev.preventDefault();
       if (fase === 'venta') verHistorial();
       else if (fase === 'historial') cerrarHistorial();
+      return;
+    }
+
+    // F4 es el cambio de ticket.
+    if (ev.key === 'F4') {
+      ev.preventDefault();
+      if (fase === 'venta') iniciarCambio();
       return;
     }
 
@@ -343,6 +559,7 @@ export async function vistaVenta(pantalla, estadoApp) {
 
   function avanzar() {
     if (fase === 'historial') return;      // el buscador se encarga solo
+    if (fase === 'espera') return;
     if (fase === 'venta')   return agregarPorCodigo();
     if (fase === 'cobro')   return calcularCambio();
     if (fase === 'cambio')  return registrar();
@@ -351,8 +568,10 @@ export async function vistaVenta(pantalla, estadoApp) {
 
   function retroceder() {
     if (fase === 'historial') { cerrarHistorial(); return; }
+    if (fase === 'espera') { cerrarEspera(); return; }
     if (fase === 'venta') {
       if (refs.codigo.value) { refs.codigo.value = ''; return; }
+      if (cambiando) { cambiando = null; pintarTodo(); return; }
       if (hayAlgo()) vaciar();
       return;
     }
@@ -401,40 +620,61 @@ export async function vistaVenta(pantalla, estadoApp) {
   }
 
   function pintarCobro() {
-    const aPagar = total();
-    const cambio = pago - aPagar;
+    // En un cambio, el cliente ya pagó el ticket que trae: lo único que
+    // se mueve es la diferencia. Puede ser a cobrar o a devolver.
+    const aPagar = cambiando ? Math.max(total() - cambiando.aFavor, 0) : total();
+    const aDevolver = cambiando ? Math.max(cambiando.aFavor - total(), 0) : 0;
+    const vuelto = pago - aPagar;
+
+    // Si no hay nada que cobrar (se lleva menos, o queda a mano) no se pide
+    // pago: sería preguntarle con cuánto paga cuando no paga nada.
+    const soloDevolver = aPagar === 0;
+    const enConfirmacion = fase === 'cambio';
 
     refs.cobro.hidden = false;
     refs.cobro.innerHTML = `
       <div class="pos-cobro-caja">
-        <div class="pos-cobro-total">
-          <span>Total a cobrar</span>
-          <strong>${pesos(aPagar)}</strong>
+        ${cambiando ? `
+          <div class="pos-cobro-cambio-aviso">
+            Cambio del ticket #${cambiando.venta.folio} ·
+            a favor ${pesos(cambiando.aFavor)}
+          </div>` : ''}
+
+        <div class="pos-cobro-total ${aDevolver ? 'devolver' : ''}">
+          <span>${aDevolver ? 'A devolver al cliente'
+                 : aPagar === 0 ? 'Queda a mano' : 'Total a cobrar'}</span>
+          <strong>${pesos(aDevolver || aPagar)}</strong>
         </div>
 
-        <label class="etiqueta-chica" for="pos-pago">¿Con cuánto paga?</label>
-        <input id="pos-pago" class="pos-pago" inputmode="decimal" autocomplete="off"
-               placeholder="${(aPagar / 100).toFixed(2)}"
-               ${fase === 'cambio' ? 'disabled' : ''}
-               value="${pago ? (pago / 100).toFixed(2) : ''}">
-
-        <div class="pos-billetes">
-          ${BILLETES.filter((b) => b * 100 >= aPagar).slice(0, 4)
-            .map((b) => `<button class="secundario chico" data-billete="${b}">$${b}</button>`).join('')}
-          <button class="secundario chico" data-billete="justo">Justo</button>
-        </div>
-
-        ${fase === 'cambio' ? `
-          <div class="pos-cambio ${cambio === 0 ? 'sin-cambio' : ''}">
-            <span>${cambio === 0 ? 'Pagó justo' : 'Cambio'}</span>
-            <strong>${pesos(cambio)}</strong>
-          </div>
+        ${soloDevolver ? `
           <button class="pos-confirmar" id="confirmar">
-            <span>Cobrar ${pesos(aPagar)}</span><small>Enter</small>
+            <span>${aDevolver ? `Devolver ${pesos(aDevolver)}` : 'Hacer el cambio'}</span>
+            <small>Enter</small>
           </button>` : `
-          <button class="pos-confirmar" id="calcular">
-            <span>Calcular el cambio</span><small>Enter</small>
-          </button>`}
+          <label class="etiqueta-chica" for="pos-pago">¿Con cuánto paga?</label>
+          <input id="pos-pago" class="pos-pago" inputmode="decimal" autocomplete="off"
+                 placeholder="${(aPagar / 100).toFixed(2)}"
+                 ${enConfirmacion ? 'disabled' : ''}
+                 value="${pago ? (pago / 100).toFixed(2) : ''}">
+
+          <div class="pos-billetes">
+            ${BILLETES.filter((b) => b * 100 >= aPagar).slice(0, 4)
+              .map((b) => `<button class="secundario chico" data-billete="${b}">$${b}</button>`).join('')}
+            <button class="secundario chico" data-billete="justo">Justo</button>
+          </div>
+
+          ${enConfirmacion ? `
+            <div class="pos-cambio ${vuelto === 0 ? 'sin-cambio' : ''}">
+              <span>${vuelto === 0 ? 'Pagó justo' : 'Cambio'}</span>
+              <strong>${pesos(vuelto)}</strong>
+            </div>
+            <button class="pos-confirmar" id="confirmar">
+              <span>${cambiando ? 'Hacer el cambio' : `Cobrar ${pesos(aPagar)}`}</span>
+              <small>Enter</small>
+            </button>` : `
+            <button class="pos-confirmar" id="calcular">
+              <span>Calcular el cambio</span><small>Enter</small>
+            </button>`}`}
 
         <button class="secundario" id="salir-cobro" style="margin-top:10px;width:100%">
           Esc · volver al ticket
@@ -442,29 +682,40 @@ export async function vistaVenta(pantalla, estadoApp) {
       </div>`;
 
     const campo = refs.cobro.querySelector('#pos-pago');
-    if (fase === 'cobro') setTimeout(() => campo.focus(), 0);
-
-    campo.oninput = () => {
-      pago = Math.round((Number(campo.value.replace(/[^0-9.]/g, '')) || 0) * 100);
-    };
+    if (campo) {
+      if (fase === 'cobro') setTimeout(() => campo.focus(), 0);
+      campo.oninput = () => {
+        pago = Math.round((Number(campo.value.replace(/[^0-9.]/g, '')) || 0) * 100);
+      };
+    } else {
+      // Sin campo de pago, el foco tiene que salir de la caja de códigos:
+      // si se queda ahí, lo que se teclee se iría al ticket de atrás.
+      setTimeout(() => refs.cobro.querySelector('#confirmar')?.focus(), 0);
+    }
 
     refs.cobro.querySelectorAll('[data-billete]').forEach((b) => {
       b.onclick = () => {
         pago = b.dataset.billete === 'justo' ? aPagar : Number(b.dataset.billete) * 100;
-        campo.value = (pago / 100).toFixed(2);
+        if (campo) campo.value = (pago / 100).toFixed(2);
         calcularCambio();
       };
     });
 
     const calcular = refs.cobro.querySelector('#calcular');
     if (calcular) calcular.onclick = calcularCambio;
-    const confirmar2 = refs.cobro.querySelector('#confirmar');
-    if (confirmar2) confirmar2.onclick = registrar;
+    const btnConfirmar = refs.cobro.querySelector('#confirmar');
+    if (btnConfirmar) btnConfirmar.onclick = registrar;
     refs.cobro.querySelector('#salir-cobro').onclick = cerrarCobro;
   }
 
   function calcularCambio() {
-    const aPagar = total();
+    const aPagar = cambiando ? Math.max(total() - cambiando.aFavor, 0) : total();
+
+    // Si no hay nada que cobrar —se lleva menos, o queda a mano— no hay
+    // cambio que calcular. El botón dice "Devolver $99", así que enter tiene
+    // que hacer eso y no dejar la misma pantalla pidiendo otro enter.
+    if (aPagar === 0) { pago = 0; fase = 'cambio'; registrar(); return; }
+
     // Enter con el campo vacío = pagó justo. Es el caso más común y así se
     // cobra con dos teclas.
     if (!pago) pago = aPagar;
@@ -487,11 +738,23 @@ export async function vistaVenta(pantalla, estadoApp) {
     for (const a of articulos) lineas.push({ productoId: a.producto.id, cantidad: a.cantidad });
 
     try {
-      const { venta } = await api.enviar('/ventas', {
-        almacenId: ctx.almacenes[0]?.id,
-        lineas,
-        pago: (pago / 100).toFixed(2)
-      });
+      const respuesta = cambiando
+        ? await api.enviar(`/ventas/${cambiando.venta.id}/cambiar`, {
+            almacenId: ctx.almacenes[0]?.id,
+            lineas,
+            // En un cambio el cliente solo entrega la diferencia.
+            pago: pago ? (pago / 100).toFixed(2) : undefined,
+            motivo: 'Cambio del ticket que trajo el cliente'
+          })
+        : await api.enviar('/ventas', {
+            almacenId: ctx.almacenes[0]?.id,
+            lineas,
+            pago: (pago / 100).toFixed(2)
+          });
+
+      const venta = respuesta.venta;
+      ultimoCambio = cambiando ? respuesta : null;
+      cambiando = null;
       ventaCobrada = venta;
       ctx.siguienteFolio = venta.folio + 1;
       fase = 'cobrada';
@@ -509,20 +772,29 @@ export async function vistaVenta(pantalla, estadoApp) {
 
   function pintarCobrada() {
     const v = ventaCobrada;
+    const c = ultimoCambio;
+
+    // En un cambio, lo que el cajero necesita ver es lo que entrega o
+    // recibe de más, no el "cambio" de un billete.
+    const aDevolver = c ? c.porDevolver : 0;
+    const vuelto = c ? 0 : (v.cambio_centavos || 0);
+
     refs.cobro.innerHTML = `
       <div class="pos-cobro-caja pos-cobrada">
-        <div class="pos-cobrada-folio">Ticket #${v.folio}</div>
+        <div class="pos-cobrada-folio">
+          Ticket #${v.folio}${c ? ` · cambio del #${c.anterior.folio}` : ''}
+        </div>
 
-        <div class="pos-cambio grande ${v.cambio_centavos ? '' : 'sin-cambio'}">
-          <span>${v.cambio_centavos ? 'Cambio' : 'Pagó justo'}</span>
-          <strong>${pesos(v.cambio_centavos || 0)}</strong>
+        <div class="pos-cambio grande ${(aDevolver || vuelto) ? '' : 'sin-cambio'}">
+          <span>${aDevolver ? 'Devuélvele' : vuelto ? 'Cambio' : 'Pagó justo'}</span>
+          <strong>${pesos(aDevolver || vuelto)}</strong>
         </div>
 
         <button class="pos-confirmar" id="otro-ticket">
           <span>🖨️ Imprimir ticket</span><small>Enter</small>
         </button>
         <button class="secundario" id="siguiente" style="margin-top:10px;width:100%">
-          Esc · siguiente venta
+          Esc · ${enEspera.length ? 'volver a la venta pendiente' : 'siguiente venta'}
         </button>
       </div>`;
 
@@ -532,11 +804,16 @@ export async function vistaVenta(pantalla, estadoApp) {
 
   function nuevaVenta() {
     hielo = 0; articulos = []; pago = 0; ventaCobrada = null;
+    ultimoCambio = null; cambiando = null;
     fase = 'venta';
     refs.cobro.hidden = true;
     limpiarImpresion();
-    pantalla.querySelector('.pos-ticket-cabeza .etiqueta-folio').textContent =
-      `ticket #${ctx.siguienteFolio}`;
+    pantalla.querySelector('#etiqueta-folio').textContent = `ticket #${ctx.siguienteFolio}`;
+
+    // Si quedó alguien esperando, su ticket vuelve solo: es a lo que se
+    // regresa después de atender al que se coló.
+    if (retomarSiHay()) return;
+
     pintarTodo();
     enfocar();
   }
@@ -610,6 +887,58 @@ export async function vistaVenta(pantalla, estadoApp) {
 
         ${marca.nombreNegocio ? `<div class="tk-pie">${esc(marca.nombreNegocio)}</div>` : ''}
       </div>`;
+  }
+
+  // ==========================================================
+  // CAMBIO DE TICKET
+  //
+  // "Pedí 1/2 pero no sabía que era tanto, quería 1/8." Pasa seguido.
+  // Se pide el número del ticket, se ve qué traía, y a partir de ahí se
+  // arma el ticket nuevo normal: lo que traía queda como saldo a favor y
+  // abajo se ve si hay que cobrar la diferencia o devolverla.
+  // ==========================================================
+  async function iniciarCambio() {
+    if (cambiando) { avisar('Ya estás haciendo un cambio', ''); enfocar(); return; }
+    if (hayAlgo()) {
+      avisar('Termina o aparta el ticket de ahora antes de hacer un cambio', 'error');
+      enfocar();
+      return;
+    }
+
+    const folio = await pedirTexto({
+      titulo: 'Cambio de ticket',
+      texto: 'Número del ticket que trae el cliente. Viene impreso arriba.',
+      marcador: '124', ok: 'Buscar', largo: 12, unaLinea: true
+    });
+    if (!folio) { enfocar(); return; }
+
+    try {
+      const { ventas } = await api.obtener(
+        `/ventas?limite=5&busca=${encodeURIComponent(folio.trim())}`);
+      const v = ventas.find((x) => String(x.folio) === folio.trim());
+
+      if (!v) { avisar(`No hay ningún ticket #${folio.trim()}`, 'error'); enfocar(); return; }
+      if (v.cancelada_en) {
+        avisar(`El ticket #${v.folio} está cancelado y no se puede cambiar`, 'error');
+        enfocar();
+        return;
+      }
+
+      const { venta } = await api.obtener(`/ventas/${v.id}`);
+      const detalle = venta.lineas
+        .map((l) => `${l.dieciseisavos ? l.texto + ' de ' : ''}${l.concepto.toLowerCase()}`)
+        .join(', ');
+
+      if (!await confirmar({
+        titulo: `Ticket #${venta.folio} · ${pesos(venta.total_centavos)}`,
+        texto: `Traía: ${detalle}. Se le abona a favor y eliges por qué lo cambia.`,
+        ok: 'Hacer el cambio'
+      })) { enfocar(); return; }
+
+      cambiando = { venta, aFavor: venta.total_centavos };
+      pintarTodo();
+      enfocar();
+    } catch (e) { avisar(e.message, 'error'); enfocar(); }
   }
 
   // ==========================================================
@@ -705,7 +1034,14 @@ export async function vistaVenta(pantalla, estadoApp) {
 
   pantalla.querySelector('#cobrar').onclick = irACobro;
   pantalla.querySelector('#historial').onclick = () => verHistorial();
-  refs.codigo.onkeydown = (ev) => { if (ev.key === 'Enter') ev.stopPropagation(); };
+  pantalla.querySelector('#nueva-venta').onclick = () => verEnEspera();
+  pantalla.querySelector('#cambio').onclick = () => iniciarCambio();
+  // El campo del código se queda con el enter SOLO mientras se está
+  // capturando. En el cobro no hay nada que agregar, y si se lo tragara,
+  // el enter que confirma no llegaría a ningún lado.
+  refs.codigo.onkeydown = (ev) => {
+    if (ev.key === 'Enter' && fase === 'venta') ev.stopPropagation();
+  };
   refs.codigo.addEventListener('keyup', (ev) => {
     if (ev.key === 'Enter') agregarPorCodigo();
   });

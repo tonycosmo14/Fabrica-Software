@@ -29,10 +29,29 @@ let bd = null;
  * Agrega a la base el ayudante de transacciones.
  * Uso:  const guardar = bd.transaction(() => { ...varios INSERT... });  guardar();
  * O todo se aplica, o no se aplica nada.
+ *
+ * SE PUEDEN ANIDAR. Una operación compuesta —un cambio de ticket, por
+ * ejemplo— usa por dentro otras que ya venían con su propia transacción.
+ * SQLite no admite un BEGIN dentro de otro, así que aquí se lleva la cuenta
+ * de a qué profundidad vamos: solo la de más afuera abre y cierra de
+ * verdad, y las de adentro se dejan llevar por ella.
+ *
+ * Eso es justo lo que se quiere: si algo revienta en el paso 3, se deshace
+ * también el paso 1. Media operación guardada sería peor que ninguna.
  */
 function conTransacciones(base) {
+  let profundidad = 0;
+
   base.transaction = (fn) => (...args) => {
+    // Ya estamos dentro de una: la de afuera manda.
+    if (profundidad > 0) {
+      profundidad++;
+      try { return fn(...args); }
+      finally { profundidad--; }
+    }
+
     base.exec('BEGIN');
+    profundidad = 1;
     try {
       const resultado = fn(...args);
       base.exec('COMMIT');
@@ -40,6 +59,8 @@ function conTransacciones(base) {
     } catch (e) {
       try { base.exec('ROLLBACK'); } catch { /* la transaccion ya murio */ }
       throw e;
+    } finally {
+      profundidad = 0;
     }
   };
   return base;

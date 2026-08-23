@@ -123,7 +123,7 @@ debería quedar − contado = FALTA</pre>
   {
     id: 'venta',
     titulo: 'Punto de venta: cobrar',
-    busca: 'venta cobrar ticket precio fracción cambio billete folio cancelar imprimir teclado enter f10 código rápido categorías',
+    busca: 'venta cobrar ticket precio fracción cambio devolución billete folio cancelar imprimir teclado enter f10 f2 f3 f4 código rápido categorías nueva venta espera pendiente',
     cuerpo: `
       <p>Es la pantalla que se abre al entrar, porque es la que se usa casi
       todo el día. A la izquierda lo que lleva el cliente, a la derecha los
@@ -153,6 +153,27 @@ debería quedar − contado = FALTA</pre>
       <p class="ayuda-tip">Abajo a la derecha hay un renglón que dice
       <b>qué hace Enter en ese momento</b>. Mirándolo dos o tres veces ya no
       hace falta acordarse.</p>
+
+      <h4>Dos clientes a la vez</h4>
+      <p>Llega uno, pide 1/8 y se queda pensando. Detrás llega otro que ya
+      sabe lo que quiere. Con <b>Nueva venta</b> (<em>F2</em>) el ticket a
+      medias se guarda, atiendes al de atrás, y <b>al terminar el pendiente
+      vuelve solo</b>.</p>
+      <p>Arriba se ve cuántas hay esperando. Puedes tener varias y elegir
+      cuál seguir.</p>
+
+      <h4>Cambios y devoluciones</h4>
+      <p><b>Cambio</b> (<em>F4</em>) para el clásico: <em>"pedí 1/2 pero no
+      sabía que era tanto, quería 1/8"</em>.</p>
+      <ol class="instrucciones">
+        <li>Tecleas el número del ticket que trae el cliente.</li>
+        <li>El sistema te enseña qué traía y lo abona <b>a favor</b>.</li>
+        <li>Marcas lo que se lleva ahora, como en cualquier venta.</li>
+        <li>Abajo dice si hay que <b>cobrar</b> la diferencia o
+        <b>devolverla</b>.</li>
+      </ol>
+      <p>El ticket viejo queda cancelado y amarrado al nuevo, el hielo
+      vuelve al cuarto frío solo y la caja cuadra sola. Todo queda anotado.</p>
 
       <h4>Buscar un ticket viejo o sacar una copia</h4>
       <p><em>F3</em>, o el botón 🧾. Se busca por número, por el importe o por

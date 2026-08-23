@@ -7,6 +7,36 @@ Tipos: `nuevo` (funcionalidad nueva) · `mejora` · `arreglo` · `clave` (regla 
 
 ---
 
+## v0.12 — Dos clientes a la vez y cambios de ticket · 23 de agosto de 2026
+
+Migración `011_cambios.sql`.
+
+### Ventas en espera
+
+Llega un cliente, pide 1/8 y se queda pensando. Detrás llega uno de siempre
+que ya sabe lo que quiere.
+
+- **nuevo** — **F2** aparta el ticket a medias y deja la pantalla lista. Al terminar la venta siguiente, **el pendiente vuelve solo**: eso es lo que pidió Tony, no una lista que haya que ir a buscar.
+- **nuevo** — Se pueden tener varias. La etiqueta de arriba dice cuántas, y F2 con alguna apartada abre la lista para elegir.
+- **nuevo** — Viven en el navegador (`localStorage`): son minutos, no días, pero un refresco de pantalla no debe borrar lo que un cliente ya pidió.
+- **clave** — Retomar una venta con otra en pantalla **aparta la de ahora primero**: no hay forma de perder un ticket por retomar otro.
+
+### Cambios de ticket
+
+- **clave** — Un cambio se registra como **cancelar el viejo + hacer uno nuevo**, amarrados en las dos direcciones. No es pereza: son dos hechos que el sistema ya sabía registrar, y al hacerlo así el hielo vuelve solo al cuarto frío (`vendidoDesde` ignora las canceladas) y la caja cuadra sola. Un tipo de venta aparte habría necesitado su propia aritmética en tres módulos, y esa aritmética se desincroniza.
+- **clave** — **La caja del mismo turno cuadra sin hacer nada:** cancelar el viejo le quita su importe a lo cobrado y el nuevo suma el suyo, así que lo esperado se mueve exactamente en la diferencia. Hay prueba.
+- **clave** — Si el ticket es de un **turno cerrado**, ese dinero entró otro día. Se anota una salida por el importe del ticket viejo: es lo que el cliente pagó con papel en vez de con billetes. Sin eso, el arqueo de hoy saldría corto por el importe del ticket. Hay prueba.
+- **nuevo** — En pantalla, el ticket devuelto aparece como una línea de saldo a favor y abajo dice **A cobrar** o **A devolver**.
+- **nuevo** — Guardas: no se cambia dos veces, no se cambia uno cancelado, y si el pago no alcanza la diferencia no se cancela nada a medias.
+
+### Arreglos
+
+- **clave** — `bd.transaction` ahora **se puede anidar**. Un cambio de ticket usa por dentro la creación de venta, que ya traía su propia transacción, y SQLite no admite un `BEGIN` dentro de otro. Se lleva la cuenta de la profundidad: solo la de más afuera abre y cierra. Si algo revienta en el paso 3 se deshace también el paso 1, que es justo lo que se quiere.
+- **arreglo** — El campo del código hacía `stopPropagation` del enter siempre, así que durante el cobro el enter que confirma nunca llegaba al manejador. Solo se notaba cuando no había que cobrar nada (un cambio con devolución), porque en los demás casos el foco estaba en el campo del pago.
+- **arreglo** — La fila de botones nueva entró como columna de la rejilla y partió la pantalla en dos.
+
+---
+
 ## v0.11 — Impresión de verdad y relevo de turno · 23 de agosto de 2026
 
 ### La impresora
