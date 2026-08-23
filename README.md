@@ -3,7 +3,7 @@
 Sistema para la fábrica de hielo de Hunucmá, Yucatán.
 Se construye **por versiones**: cada versión es un pedazo terminado, probado y usable.
 
-**Versión actual: v0.4**
+**Versión actual: v0.5**
 
 ---
 
@@ -177,7 +177,8 @@ versión nueva le aparece un punto rojo en el menú.
 | **v0.2.2** | Encabezado con logo y reloj, atajos, recuperación de acceso | ✅ listo |
 | **v0.3** | Producción: sacar, rellenar, estados, reloj de congelación | ✅ listo |
 | **v0.4** | Producción con el flujo real: rotación, paño como unidad, captura en lote | ✅ listo |
-| v0.5 | La Existencia: sacado, vendido y lo que sobra en el cuarto frío | siguiente |
+| **v0.5** | Números a sacar imprimibles, autorización con PIN, arreglos | ✅ listo |
+| v0.6 | La Existencia: conteo del cuarto frío y cuadre del día | siguiente |
 | v0.4 | Punto de venta: fracciones, precios por fracción, tickets | |
 | v0.5 | Caja: sesiones, vales, arqueos y cortes | |
 | v0.6 | Clientes, mayoreo, crédito y autorizaciones | |

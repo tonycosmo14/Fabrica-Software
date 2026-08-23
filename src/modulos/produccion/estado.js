@@ -105,19 +105,38 @@ function estadoDeCanasta(ultimo, horasTanque) {
  * aparece marcado siempre, hay un problema físico en ese molde concreto.
  */
 function ultimoResultadoPorMolde(tanqueId) {
+  // Historial completo de cada molde, del más reciente al más antiguo.
   const filas = bd.prepare(`
-    SELECT sm.molde_id, sm.resultado
+    SELECT sm.molde_id, sm.resultado, s.fecha
       FROM sacadas_moldes sm
       JOIN sacadas s   ON s.id = sm.sacada_id
       JOIN canastas c  ON c.id = s.canasta_id
       JOIN panos p     ON p.id = c.pano_id
      WHERE p.tanque_id = ?
-       AND s.fecha = (SELECT MAX(s2.fecha) FROM sacadas s2
-                       JOIN sacadas_moldes sm2 ON sm2.sacada_id = s2.id
-                      WHERE sm2.molde_id = sm.molde_id)
+     ORDER BY sm.molde_id, s.fecha DESC
   `).all(tanqueId);
 
-  return new Map(filas.map((f) => [f.molde_id, f.resultado]));
+  const mapa = new Map();
+  for (const f of filas) {
+    const previo = mapa.get(f.molde_id);
+
+    if (!previo) {
+      // La primera fila de cada molde es su última salida.
+      mapa.set(f.molde_id, {
+        resultado: f.resultado,
+        racha: f.resultado === 'ok' ? 0 : 1,
+        contando: f.resultado !== 'ok'
+      });
+      continue;
+    }
+
+    // Cuántas veces SEGUIDAS ha fallado: en cuanto sale bien una vez, se
+    // corta la cuenta. Un molde con racha alta tiene un problema físico;
+    // uno con racha de 1 fue mala suerte de ese día.
+    if (previo.contando && f.resultado !== 'ok') previo.racha++;
+    else previo.contando = false;
+  }
+  return mapa;
 }
 
 /** Sacadas de paño empezadas y sin terminar en un tanque. */
@@ -159,9 +178,14 @@ function tanqueConEstado(tanqueId) {
   for (const pano of panos) {
     pano.canastas = canastasDe.all(pano.id).map((c) => {
       const info = estadoDeCanasta(eventos.get(c.id), tanque.horas_congelacion);
-      const moldes = moldesDe.all(c.id).map((m) => ({
-        ...m, ultimoResultado: resultados.get(m.id) || null
-      }));
+      const moldes = moldesDe.all(c.id).map((m) => {
+        const h = resultados.get(m.id);
+        return {
+          ...m,
+          ultimoResultado: h?.resultado || null,
+          rachaFallos: h?.racha || 0
+        };
+      });
       return { ...c, ...info, moldes };
     });
 

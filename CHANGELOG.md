@@ -7,6 +7,32 @@ Tipos: `nuevo` (funcionalidad nueva) · `mejora` · `arreglo` · `clave` (regla 
 
 ---
 
+## v0.5 — Los números a sacar · 23 de agosto de 2026
+
+**Bugs corregidos:**
+
+- **arreglo** — Un paño con todas sus canastas fuera del tanque no respondía al tocarlo: la única acción era sacar, y ya no había nada que sacar. Nuevo `POST /produccion/panos/:id/rellenar`.
+- **arreglo** — Anular solo funcionaba sobre una sacada en proceso. Nuevo `POST /produccion/panos/:id/anular-ultima`, que anula la última sacada del paño esté terminada o no.
+- **arreglo** — El cliente descartaba los campos extra que acompañan a un error del servidor (`requiereAutorizacion`, `tocaPano`), así que la pantalla no sabía qué preguntar.
+
+**Autorización real:**
+
+- **clave** — Saltarse la rotación ya no depende de quién tiene la sesión abierta: exige motivo escrito y el **PIN de un gerente o del administrador**, verificado en el servidor. Queda firmado en `autorizada_por`.
+
+**Reordenado según el uso real:**
+
+- **nuevo** — `GET /produccion/siguientes` y la vista imprimible: el papel con los paños que siguen en cada tanque, fecha, hora, quién entregó y espacio para lo que sacó de verdad. Solo `produccion.autorizar`.
+- **nuevo** — "Registrar lo que se sacó" pasa a ser la primera acción de la pantalla.
+- **nuevo** — El detalle del paño concentra sacar, rellenar, marcar merma molde por molde y corregir.
+
+**Otros:**
+
+- **nuevo** — Racha de fallos consecutivos por molde: se corta en cuanto sale bien una vez, y así se distingue el molde defectuoso del mal día.
+- **nuevo** — El agua potable tiene color propio (morado) frente al azul de la purificada.
+- **nuevo** — Diálogos de texto libre y de autorización con PIN.
+
+---
+
 ## v0.4 — Producción como trabaja la fábrica · 23 de agosto de 2026
 
 Rehecho tras entender la operación real. Migración `005_produccion_real.sql`.

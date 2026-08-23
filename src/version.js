@@ -12,9 +12,30 @@
  * tipo: 'nuevo' | 'mejora' | 'arreglo' | 'importante'
  */
 
-const VERSION_ACTUAL = '0.4';
+const VERSION_ACTUAL = '0.5';
 
 const VERSIONES = [
+  {
+    numero: '0.5',
+    nombre: 'Los números a sacar',
+    fecha: '2026-08-23',
+    resumen:
+      'Producción se reordenó: primero registrar lo que se sacó, luego el ' +
+      'papel con los números que siguen. Y se arreglaron los paños que se ' +
+      'quedaban trabados.',
+    cambios: [
+      { tipo: 'arreglo', texto: 'Un paño que quedaba fuera del tanque ya no se traba: ahora se puede rellenar.' },
+      { tipo: 'arreglo', texto: 'Anular un registro ya funciona, aunque el paño esté terminado.' },
+      { tipo: 'nuevo', texto: 'Números a sacar: un papel con los paños que siguen en cada tanque, con fecha y hora, para imprimirlo y dárselo al obrero.' },
+      { tipo: 'nuevo', texto: 'Registrar lo que se sacó es ahora lo primero que se ve al entrar.' },
+      { tipo: 'nuevo', texto: 'Al entrar a un paño se marca molde por molde qué pasó, y ahí mismo se saca, se rellena o se corrige.' },
+      { tipo: 'importante', texto: 'Saltarse la rotación pide motivo escrito y el PIN de un gerente o del administrador. Ya no basta con estar dentro del sistema.' },
+      { tipo: 'nuevo', texto: 'Cada molde cuenta las veces SEGUIDAS que ha fallado. Si sale bien una vez, la cuenta se borra: así se distingue el molde malo del mal día.' },
+      { tipo: 'nuevo', texto: 'El agua potable se ve en morado y la purificada en azul, en las canastas y en el botón.' },
+      { tipo: 'nuevo', texto: 'Los números a sacar solo los ven el gerente y el administrador.' }
+    ],
+    siguiente: 'v0.6 — La Existencia: el conteo del cuarto frío a las 3 y a las 8, y el cuadre del día.'
+  },
   {
     numero: '0.4',
     nombre: 'Producción como trabaja la fábrica',
@@ -41,8 +62,7 @@ const VERSIONES = [
       { tipo: 'nuevo', texto: 'Volvió la fichita ＋ al final de cada paño para agregar una canasta de un toque.' },
       { tipo: 'mejora', texto: 'En PC se aprovecha todo el ancho: los tanques se acomodan en varias columnas.' },
       { tipo: 'mejora', texto: 'Los nombres de los tanques van centrados y se desplazan de lado si algún día no caben.' }
-    ],
-    siguiente: 'v0.5 — La Existencia: lo que se sacó, lo que se vendió y lo que sobra en el cuarto frío.'
+    ]
   },
   {
     numero: '0.3',

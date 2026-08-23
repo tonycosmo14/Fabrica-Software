@@ -25,7 +25,8 @@ const express = require('express');
 const { bd } = require('../../db/conexion');
 const { nuevoId, ahora } = require('../../lib/ids');
 const { ok, error } = require('../../lib/respuestas');
-const { puede } = require('../../lib/roles');
+const { puede, ETIQUETAS_ROL } = require('../../lib/roles');
+const { verificar } = require('../../lib/seguridad');
 const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
 const { tanqueConEstado, canastasFuera, horasDesde } = require('./estado');
@@ -44,6 +45,36 @@ function resolverEjecutor(req) {
   if (!pedido || pedido === req.usuario.id) return req.usuario.id;
   const existe = bd.prepare('SELECT 1 FROM usuarios WHERE id = ? AND activo = 1').get(pedido);
   return existe ? pedido : req.usuario.id;
+}
+
+/**
+ * Comprueba la autorización de un responsable.
+ * El PIN se verifica AQUÍ, en el servidor: la pantalla nunca sabe si un PIN
+ * es correcto, solo manda lo que tecleó la persona.
+ */
+function comprobarAutorizacion(autorizacion) {
+  if (!autorizacion?.usuarioId || !autorizacion?.pin) {
+    return { error: 'Falta la autorización de un responsable.' };
+  }
+
+  const u = bd.prepare('SELECT * FROM usuarios WHERE id = ? AND activo = 1').get(autorizacion.usuarioId);
+  if (!u) return { error: 'Ese responsable no existe.' };
+  if (!puede(u.rol, 'produccion.autorizar')) {
+    return { error: `${u.nombre} no puede autorizar esto. Solo un gerente o el administrador.` };
+  }
+  if (!verificar(autorizacion.pin, u.pin_hash, u.pin_sal)) {
+    return { error: 'PIN incorrecto.' };
+  }
+  return { usuario: u };
+}
+
+/** Quiénes pueden autorizar. La pantalla los ofrece en una lista. */
+function responsables() {
+  return bd.prepare(`
+    SELECT id, nombre, rol FROM usuarios
+     WHERE activo = 1 AND rol IN ('gerente','admin') AND pin_hash IS NOT NULL
+     ORDER BY CASE rol WHEN 'gerente' THEN 0 ELSE 1 END, nombre
+  `).all().map((u) => ({ ...u, rolEtiqueta: ETIQUETAS_ROL[u.rol] }));
 }
 
 function datosPano(panoId) {
@@ -74,8 +105,49 @@ router.get('/estado', verProduccion, (req, res) => {
     tanques,
     tanque,
     fuera: canastasFuera().length,
-    puedeAutorizar: puede(req.usuario.rol, 'produccion.autorizar')
+    puedeAutorizar: puede(req.usuario.rol, 'produccion.autorizar'),
+    responsables: responsables()
   });
+});
+
+/**
+ * LOS NÚMEROS QUE SIGUEN, para imprimirlos y dárselos a los obreros.
+ * Solo gerente o administrador: son ellos quienes reparten el trabajo.
+ */
+router.get('/siguientes', exigirPermiso('produccion.autorizar'), (req, res) => {
+  const tanques = bd.prepare(
+    'SELECT id, nombre FROM tanques WHERE activo = 1 ORDER BY orden, nombre'
+  ).all();
+
+  const lista = tanques.map((t) => {
+    const estado = tanqueConEstado(t.id);
+    const orden = [];
+    let ultimo = estado.ultimo_pano_sacado;
+
+    // Los siguientes de la rotación, no solo el primero: el obrero se lleva
+    // una lista para toda su jornada.
+    const numeros = estado.panos.map((p) => p.numero);
+    const enProceso = estado.panos.filter((p) => p.enProceso).map((p) => p.numero);
+    const { siguientePano } = require('./rotacion');
+
+    for (let i = 0; i < Math.min(6, numeros.length); i++) {
+      const n = siguientePano(numeros, ultimo, i === 0 ? enProceso : []);
+      if (n == null || orden.includes(n)) break;
+      const pano = estado.panos.find((p) => p.numero === n);
+      orden.push(n);
+      if (!(i === 0 && enProceso.length)) ultimo = n;
+      if (!pano) break;
+    }
+
+    return {
+      tanque: t.nombre,
+      siguientes: orden,
+      enProceso,
+      horasConfiguradas: estado.horas_congelacion
+    };
+  });
+
+  return ok(res, { fecha: ahora(), lista, entregadoPor: req.usuario.nombre });
 });
 
 /** Obreros a los que se les puede atribuir el trabajo. */
@@ -120,21 +192,26 @@ router.post('/panos/:id/sacar', registrar, (req, res) => {
   const esElQueToca = !toca || toca.id === pano.id;
 
   let autorizadaPor = null;
-  const motivo = String(req.body?.motivo || '').trim();
+  let motivo = String(req.body?.motivo || '').trim();
 
+  // Salirse de la rotación siempre exige la firma de un responsable: motivo
+  // escrito y el PIN de un gerente o del administrador. Da igual quién esté
+  // usando la pantalla; lo que vale es quién autorizó.
   if (!esElQueToca) {
-    if (!puede(req.usuario.rol, 'produccion.autorizar')) {
+    const auth = req.body?.autorizacion;
+    if (!auth) {
       return error(res,
-        `Toca el paño ${toca.numero}, no el ${pano.numero}. ` +
-        'Solo un gerente o el administrador puede saltarse la rotación.', 403,
-        { tocaPano: toca.numero, porque: toca.porque });
+        `Toca el paño ${toca.numero}, no el ${pano.numero}.`, 409,
+        { requiereAutorizacion: true, tocaPano: toca.numero, porque: toca.porque });
     }
-    if (!motivo) {
-      return error(res,
-        `Toca el paño ${toca.numero}. Para sacar el ${pano.numero} escribe el motivo.`, 400,
-        { requiereMotivo: true, tocaPano: toca.numero });
-    }
-    autorizadaPor = req.usuario.id;
+
+    const comprobado = comprobarAutorizacion(auth);
+    if (comprobado.error) return error(res, comprobado.error, 403, { requiereAutorizacion: true });
+
+    motivo = String(auth.motivo || motivo).trim();
+    if (!motivo) return error(res, 'Escribe por qué se saca este paño.', 400, { requiereAutorizacion: true });
+
+    autorizadaPor = comprobado.usuario.id;
   }
 
   // --- Qué canastas faltan por sacar en este paño ---
@@ -261,6 +338,48 @@ router.post('/panos/:id/sacar', registrar, (req, res) => {
   }, 201);
 });
 
+/**
+ * RELLENAR un paño que se quedó fuera del tanque.
+ *
+ * Antes esto no existía y era un callejón sin salida: un paño marcado como
+ * "fuera" no respondía al tocarlo, porque ya no había nada que sacar.
+ */
+router.post('/panos/:id/rellenar', registrar, (req, res) => {
+  const pano = datosPano(req.params.id);
+  if (!pano) return error(res, 'Ese paño no existe o está dado de baja.', 404);
+
+  const tipoAgua = String(req.body?.tipoAgua || 'purificada');
+  if (!TIPOS_AGUA.includes(tipoAgua)) {
+    return error(res, 'Indica si se rellena con agua purificada o potable.');
+  }
+
+  const estadoTanque = tanqueConEstado(pano.tanque_id);
+  const panoActual = estadoTanque.panos.find((p) => p.id === pano.id);
+  const fuera = panoActual.canastas.filter((c) => c.estado === 'fuera');
+
+  if (!fuera.length) return error(res, 'Ese paño no tiene canastas fuera del tanque.', 409);
+
+  const fecha = ahora();
+  const ejecutorId = resolverEjecutor(req);
+
+  const guardar = bd.transaction(() => {
+    const insertar = bd.prepare(`
+      INSERT INTO rellenados (id, canasta_id, fecha, ejecutor_id, capturista_id, tipo_agua)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    for (const c of fuera) insertar.run(nuevoId(), c.id, fecha, ejecutorId, req.usuario.id, tipoAgua);
+  });
+  guardar();
+
+  bitacora.registrar({
+    accion: 'produccion.rellenado', entidad: 'pano', entidadId: pano.id,
+    ejecutorId, capturistaId: req.usuario.id,
+    detalle: { tanque: pano.tanque_nombre, pano: pano.numero, canastas: fuera.length, tipoAgua }
+  });
+
+  return ok(res, { rellenadas: fuera.length, tipoAgua }, 201);
+});
+
 // ============================================================
 // CAPTURA EN LOTE — el flujo real de las 3 de la tarde
 // ============================================================
@@ -358,7 +477,24 @@ router.post('/lote', registrar, (req, res) => {
  * Se equivocaron de paño. No se borra nada: se anula la sacada con un
  * movimiento nuevo que la compensa (regla de oro 3.2).
  */
-router.post('/sacadas-pano/:id/anular', exigirPermiso('produccion.corregir'), (req, res) => {
+/** Anula la ÚLTIMA sacada de un paño, esté terminada o a medias. */
+router.post('/panos/:id/anular-ultima', exigirPermiso('produccion.corregir'), (req, res) => {
+  const ultima = bd.prepare(`
+    SELECT id FROM sacadas_pano
+     WHERE pano_id = ? AND (notas IS NULL OR notas NOT LIKE 'ANULADA%')
+     ORDER BY iniciada_en DESC LIMIT 1
+  `).get(req.params.id);
+
+  if (!ultima) return error(res, 'Ese paño no tiene ninguna sacada que anular.', 404);
+
+  req.params.id = ultima.id;
+  return anularSacadaPano(req, res);
+});
+
+router.post('/sacadas-pano/:id/anular', exigirPermiso('produccion.corregir'), (req, res) =>
+  anularSacadaPano(req, res));
+
+function anularSacadaPano(req, res) {
   const sp = bd.prepare(`
     SELECT sp.*, p.numero AS pano_numero, p.tanque_id, t.nombre AS tanque_nombre
       FROM sacadas_pano sp
@@ -394,7 +530,7 @@ router.post('/sacadas-pano/:id/anular', exigirPermiso('produccion.corregir'), (r
   });
 
   return ok(res, { anulado: true });
-});
+}
 
 // ============================================================
 // LO DE HOY

@@ -100,6 +100,83 @@ export function pedirNumero({ titulo, texto = '', valor = 1, min = 1, max = 99, 
 }
 
 /**
+ * Pide un texto libre. Para motivos, notas y todo lo que no cabe en una
+ * lista de opciones cerrada.
+ */
+export function pedirTexto({ titulo, texto = '', valor = '', marcador = '', ok = 'Guardar', largo = 200 }) {
+  return new Promise((resolver) => {
+    const { caja, salir } = montar(`
+      <h3 class="dialogo-titulo">${titulo}</h3>
+      ${texto ? `<p class="dialogo-texto">${texto}</p>` : ''}
+      <textarea id="texto" class="dialogo-texto-campo" rows="3"
+                maxlength="${largo}" placeholder="${marcador}">${valor}</textarea>
+      <div class="dialogo-botones">
+        <button class="secundario" data-no>Cancelar</button>
+        <button data-si>${ok}</button>
+      </div>`, resolver);
+
+    const campo = caja.querySelector('#texto');
+    setTimeout(() => campo.focus(), 220);
+
+    caja.querySelector('[data-no]').onclick = () => salir(null);
+    caja.querySelector('[data-si]').onclick = () => {
+      const v = campo.value.trim();
+      if (!v) { campo.focus(); return; }
+      salir(v);
+    };
+  });
+}
+
+/**
+ * AUTORIZACIÓN DE UN RESPONSABLE.
+ *
+ * Se usa cuando alguien quiere hacer algo que se sale de la regla: escribe
+ * el motivo, elige quién autoriza y ese responsable teclea SU PIN.
+ * El PIN se comprueba en el servidor, nunca aquí.
+ */
+export function pedirAutorizacion({ titulo, texto = '', responsables, motivoSugerido = '' }) {
+  return new Promise((resolver) => {
+    const { caja, salir } = montar(`
+      <h3 class="dialogo-titulo">${titulo}</h3>
+      ${texto ? `<p class="dialogo-texto">${texto}</p>` : ''}
+
+      <label for="motivo">¿Por qué?</label>
+      <textarea id="motivo" class="dialogo-texto-campo" rows="2" maxlength="200"
+                placeholder="Escribe qué pasó">${motivoSugerido}</textarea>
+
+      <label for="quien">¿Quién autoriza?</label>
+      <select id="quien">
+        ${responsables.map((r) => `
+          <option value="${r.id}">${r.nombre} · ${r.rolEtiqueta}</option>`).join('')}
+      </select>
+
+      <label for="pin">Su PIN</label>
+      <input id="pin" type="password" inputmode="numeric" maxlength="6"
+             autocomplete="off" placeholder="••••">
+
+      <div class="dialogo-botones">
+        <button class="secundario" data-no>Cancelar</button>
+        <button data-si>Autorizar</button>
+      </div>`, resolver);
+
+    const motivo = caja.querySelector('#motivo');
+    const pin = caja.querySelector('#pin');
+    setTimeout(() => motivo.focus(), 220);
+
+    const enviar = () => {
+      const m = motivo.value.trim();
+      if (!m) { motivo.focus(); return; }
+      if (!/^[0-9]{4,6}$/.test(pin.value)) { pin.focus(); return; }
+      salir({ motivo: m, usuarioId: caja.querySelector('#quien').value, pin: pin.value });
+    };
+
+    pin.onkeydown = (ev) => { if (ev.key === 'Enter') enviar(); };
+    caja.querySelector('[data-no]').onclick = () => salir(null);
+    caja.querySelector('[data-si]').onclick = enviar;
+  });
+}
+
+/**
  * Menú de opciones. Cada opción es { valor, texto, detalle, peligro }.
  * Devuelve el valor elegido, o null si se cerró.
  */

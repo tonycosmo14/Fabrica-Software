@@ -16,6 +16,13 @@ async function pedir(ruta, opciones = {}) {
   if (!r.ok || json.ok === false) {
     const e = new Error(json.error || `Error ${r.status}`);
     e.codigo = r.status;
+
+    // El servidor manda datos extra junto al error (por ejemplo
+    // "requiereAutorizacion" o "tocaPano"). Se conservan: la pantalla los
+    // necesita para saber qué preguntar.
+    for (const [clave, valor] of Object.entries(json)) {
+      if (clave !== 'ok' && clave !== 'error') e[clave] = valor;
+    }
     throw e;
   }
   return json.datos;
