@@ -3,7 +3,7 @@
 Sistema para la fábrica de hielo de Hunucmá, Yucatán.
 Se construye **por versiones**: cada versión es un pedazo terminado, probado y usable.
 
-**Versión actual: v0.2.1**
+**Versión actual: v0.2.2**
 
 ---
 
@@ -17,6 +17,7 @@ Se construye **por versiones**: cada versión es un pedazo terminado, probado y 
 | **CREAR-ACCESO-DIRECTO.bat** | Pone el icono en el escritorio (se hace una vez) |
 | **DETENER.bat** | Apaga el sistema |
 | **ACTUALIZAR.bat** | Baja la versión nueva sin perder los datos |
+| **RECUPERAR-ACCESO.bat** | Si el administrador olvidó su PIN y su contraseña |
 
 La primera vez, `INICIAR` instala solo lo que necesita (tarda 1 o 2 minutos).
 Si falta Node.js, te abre la página de descarga.
@@ -65,6 +66,7 @@ Para detener el sistema: `Ctrl + C` en la terminal.
 | `npm run dev` | Igual, pero se reinicia solo cuando cambias un archivo |
 | `npm run prueba` | Corre las pruebas automáticas |
 | `npm run respaldo` | Hace una copia de la base de datos a mano |
+| `npm run recuperar` | Restablece el PIN y la contraseña de un administrador |
 
 ---
 
@@ -172,6 +174,7 @@ versión nueva le aparece un punto rojo en el menú.
 | **v0.1.4** | Marca Hielo LOLHA, modo oscuro, asistente de primer arranque | ✅ listo |
 | **v0.2** | Configurador de tanques, paños, canastas y moldes | ✅ listo |
 | **v0.2.1** | Personalizar (logo propio), diálogos del sistema, quitar paños | ✅ listo |
+| **v0.2.2** | Encabezado con logo y reloj, atajos, recuperación de acceso | ✅ listo |
 | v0.3 | Producción: sacada, rellenado, estados de canasta, traspaso a caja | siguiente |
 | v0.4 | Punto de venta: fracciones, precios por fracción, tickets | |
 | v0.5 | Caja: sesiones, vales, arqueos y cortes | |

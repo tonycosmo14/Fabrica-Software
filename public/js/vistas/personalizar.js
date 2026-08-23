@@ -30,14 +30,15 @@ export async function vistaPersonalizar(pantalla) {
       <div class="tarjeta">
         <div class="logo-previa">
           ${m.logoClaro
-            ? `<img src="/marca/logo?v=${v}" alt="Logo actual">`
+            ? `<img src="/marca/logo?v=${v}" alt="Logo actual">
+               <button class="tachita" id="quitar-claro" title="Quitar el logo"
+                       aria-label="Quitar el logo">✕</button>`
             : '<span class="logo-vacio">Sin logo — se muestra el nombre en letras</span>'}
         </div>
         <label class="subir" for="archivo-claro">
           ${m.logoClaro ? 'Cambiar el logo' : 'Subir logo'}
           <input type="file" id="archivo-claro" accept="image/png,image/svg+xml,image/jpeg,image/webp" hidden>
         </label>
-        ${m.logoClaro ? '<button class="secundario" id="quitar-claro" style="margin-top:10px">Quitar el logo</button>' : ''}
         <p class="ayuda" style="margin:14px 0 0;font-size:14px">
           PNG, SVG, JPG o WEBP, hasta ${MAX_MB} MB. Lo mejor es un PNG con fondo
           transparente, ancho y no muy alto.
@@ -48,14 +49,15 @@ export async function vistaPersonalizar(pantalla) {
       <div class="tarjeta">
         <div class="logo-previa oscura">
           ${m.logoOscuro
-            ? `<img src="/marca/logo-oscuro?v=${v}" alt="Logo para modo oscuro">`
+            ? `<img src="/marca/logo-oscuro?v=${v}" alt="Logo para modo oscuro">
+               <button class="tachita" id="quitar-oscuro" title="Quitar el logo oscuro"
+                       aria-label="Quitar el logo oscuro">✕</button>`
             : '<span class="logo-vacio">Sin logo oscuro — se usa el normal sobre una placa blanca</span>'}
         </div>
         <label class="subir" for="archivo-oscuro">
           ${m.logoOscuro ? 'Cambiar el logo oscuro' : 'Subir logo para modo oscuro'}
           <input type="file" id="archivo-oscuro" accept="image/png,image/svg+xml,image/jpeg,image/webp" hidden>
         </label>
-        ${m.logoOscuro ? '<button class="secundario" id="quitar-oscuro" style="margin-top:10px">Quitar</button>' : ''}
         <p class="ayuda" style="margin:14px 0 0;font-size:14px">
           Si tu logo es de letras negras, aquí puedes subir la versión en blanco
           para que se vea bien en modo oscuro.
@@ -125,14 +127,14 @@ export async function vistaPersonalizar(pantalla) {
 
     boton.onclick = async () => {
       const sigue = await confirmar({
-        titulo: '¿Quitar el logo?',
-        texto: 'Se volverá a mostrar el nombre en letras. Puedes subirlo otra vez cuando quieras.',
-        ok: 'Quitar', peligro: true
+        titulo: '¿Eliminar la imagen?',
+        texto: 'Se volverá a mostrar el nombre en letras. Puedes subirla otra vez cuando quieras.',
+        ok: 'Eliminar', peligro: true
       });
       if (!sigue) return;
       try {
         await api.enviar('/personalizacion/logo/quitar', { variante });
-        avisar('Logo quitado', 'bien');
+        avisar('Imagen eliminada', 'bien');
         await pintar();
       } catch (e) { avisar(e.message, 'error'); }
     };

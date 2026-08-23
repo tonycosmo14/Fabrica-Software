@@ -7,7 +7,7 @@
 import { api } from './api.js';
 import { avisar, esc, ETIQUETAS_ROL } from './util.js';
 import { iniciarTema } from './tema.js';
-import { cargarMarca } from './marca.js';
+import { cargarMarca, marcaBarraHTML } from './marca.js';
 import { vistaBienvenida } from './vistas/bienvenida.js';
 import { vistaEntrar } from './vistas/entrar.js';
 import { vistaInicio } from './vistas/inicio.js';
@@ -64,7 +64,10 @@ async function dibujar() {
     return;
   }
 
-  document.getElementById('titulo').textContent = ruta.titulo;
+  // El nombre de la pantalla ya sale como título dentro de cada vista,
+  // así que en la barra solo se usa para la pestaña del navegador.
+  document.title = `${ruta.titulo} · Hielo LOLHA`;
+  pintarBarra();
   document.getElementById('btn-atras').hidden = location.hash === '#/inicio' || !location.hash;
   pantalla.innerHTML = '<div class="cargando">Cargando…</div>';
 
@@ -76,6 +79,37 @@ async function dibujar() {
   }
 
   actualizarPuntoNovedades();
+}
+
+/**
+ * Pinta el encabezado: logo en medio y quién está dentro a la derecha.
+ * El logo puede cambiar (Personalizar) y el tema también, así que se
+ * vuelve a pintar en cada pantalla.
+ */
+function pintarBarra() {
+  document.getElementById('barra-marca').innerHTML = marcaBarraHTML();
+  document.getElementById('barra-nombre').textContent = estado.usuario?.nombre || '';
+  document.getElementById('barra-rol').textContent = ETIQUETAS_ROL[estado.usuario?.rol] || '';
+}
+
+/**
+ * Reloj del encabezado. Solo para verlo: en la fábrica no siempre hay
+ * un reloj a la vista y la hora importa (turnos, congelación, cortes).
+ */
+function iniciarReloj() {
+  const caja = document.getElementById('reloj');
+  let ultimo = '';
+
+  const pintar = () => {
+    const ahora = new Date();
+    const fecha = ahora.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' });
+    const hora = ahora.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+    const texto = `${fecha} · ${hora}`;
+    if (texto !== ultimo) { caja.textContent = texto; ultimo = texto; }
+  };
+
+  pintar();
+  setInterval(pintar, 10000);
 }
 
 function abrirMenu(abierto) {
@@ -113,6 +147,7 @@ async function iniciar() {
 }
 
 iniciarTema();
+iniciarReloj();
 
 // --- Eventos de la barra y el menu ---
 document.getElementById('btn-menu').onclick = () => abrirMenu(true);

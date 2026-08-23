@@ -40,6 +40,7 @@ export async function vistaEntrar(pantalla, { alEntrar }) {
         <button class="secundario" id="btn-contrasena" style="margin-top:18px">
           Entrar con usuario y contraseña
         </button>
+        <p class="firma">Desarrollado por CasTec</p>
       </div>`;
 
     pantalla.querySelectorAll('.usuario-boton').forEach((b) => {

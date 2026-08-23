@@ -23,6 +23,32 @@ export async function vistaSistema(pantalla) {
       </table>
     </div>
 
+    <h3>Dónde viven los datos</h3>
+    <div class="tarjeta plana">
+      <table class="tabla">
+        <tr><th>Base de datos</th><td class="ruta">${esc(estado.baseDeDatos.archivo)}</td></tr>
+      </table>
+      <p class="ayuda" style="margin:12px 0 0;font-size:14px">
+        Ese archivo <strong>es el negocio</strong>: usuarios, tanques y, más
+        adelante, ventas y cortes. Cópialo de vez en cuando a una USB.
+        El sistema hace un respaldo solo antes de cada actualización.
+      </p>
+    </div>
+
+    <h3>Si se olvida la contraseña</h3>
+    <div class="tarjeta plana">
+      <p class="ayuda" style="margin:0">
+        Si el administrador olvida su PIN <em>y</em> su contraseña, se arregla
+        desde esta misma PC: doble clic en <strong>RECUPERAR-ACCESO</strong>,
+        en la carpeta del sistema. Pide qué cuenta arreglar y le pone claves
+        nuevas. Queda anotado en la bitácora.
+      </p>
+      <p class="ayuda" style="margin:12px 0 0">
+        Lo más sano es tener <strong>dos administradores</strong>: uno le
+        cambia el PIN al otro desde Usuarios y no hace falta nada más.
+      </p>
+    </div>
+
     <h3>Migraciones aplicadas</h3>
     <div class="tarjeta plana">
       <table class="tabla">

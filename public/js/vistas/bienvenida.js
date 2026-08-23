@@ -44,9 +44,10 @@ export function vistaBienvenida(pantalla, { alEntrar }) {
       </form>
 
       <p class="ayuda" style="margin-top:20px;font-size:14px">
-        Apúntalos donde no se pierdan. No hay forma de recuperarlos desde afuera:
-        ni el PIN ni la contraseña se guardan tal cual, solo su huella cifrada.
+        Apúntalos donde no se pierdan. Si algún día los olvidas, se recuperan
+        desde la PC donde vive el sistema, con <strong>RECUPERAR-ACCESO</strong>.
       </p>
+      <p class="firma">Desarrollado por CasTec</p>
     </div>`;
 
   pantalla.querySelector('#f').onsubmit = async (ev) => {

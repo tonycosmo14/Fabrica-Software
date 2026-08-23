@@ -12,9 +12,28 @@
  * tipo: 'nuevo' | 'mejora' | 'arreglo' | 'importante'
  */
 
-const VERSION_ACTUAL = '0.2.1';
+const VERSION_ACTUAL = '0.2.2';
 
 const VERSIONES = [
+  {
+    numero: '0.2.2',
+    nombre: 'Encabezado, reloj y atajos',
+    fecha: '2026-08-23',
+    resumen:
+      'El logo pasa al encabezado, se agregan reloj y usuario activo, ' +
+      'atajos para no entrar hasta la configuración, y qué hacer si se ' +
+      'olvida la contraseña del administrador.',
+    cambios: [
+      { tipo: 'importante', texto: 'RECUPERAR-ACCESO: si el administrador olvida su PIN y su contraseña, se le ponen claves nuevas desde la PC de la fábrica.' },
+      { tipo: 'nuevo', texto: 'El logo aparece en medio del encabezado, con la hora y la fecha a la izquierda y quién está dentro a la derecha.' },
+      { tipo: 'nuevo', texto: 'Las imágenes se eliminan con una tachita encima, y el sistema avisa "Imagen eliminada".' },
+      { tipo: 'nuevo', texto: 'Acciones rápidas en cada tanque de la lista, sin tener que entrar.' },
+      { tipo: 'nuevo', texto: 'Agregar y quitar varios paños de un golpe, en vez de uno por uno.' },
+      { tipo: 'nuevo', texto: 'La pantalla Sistema dice dónde vive la base de datos y cómo recuperar el acceso.' },
+      { tipo: 'arreglo', texto: 'El logo del encabezado no quedaba centrado cuando no había botón de atrás.' }
+    ],
+    siguiente: 'v0.3 — Producción: sacar y rellenar canastas, con el reloj de congelación.'
+  },
   {
     numero: '0.2.1',
     nombre: 'Personalizar y mejor acabado',
@@ -30,8 +49,7 @@ const VERSIONES = [
       { tipo: 'mejora', texto: 'La pantalla ahora se llama Configurar tanques. Producción será la del trabajo diario.' },
       { tipo: 'mejora', texto: 'Mejor acabado del configurador: tarjetas de tanque, cabecera y el total en grande.' },
       { tipo: 'arreglo', texto: 'En la PC el botón de opciones del paño se caía a otro renglón.' }
-    ],
-    siguiente: 'v0.3 — Producción: sacar y rellenar canastas, con el reloj de congelación.'
+    ]
   },
   {
     numero: '0.2',

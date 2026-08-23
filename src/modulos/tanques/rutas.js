@@ -197,6 +197,10 @@ router.post('/:id/alta', configurar, (req, res) => {
 // PAÑOS
 // ============================================================
 
+/**
+ * Agregar paños. Acepta "cantidad" para meter varios de un golpe: borrarlos
+ * y volverlos a poner uno por uno era una tortura.
+ */
 router.post('/:id/panos', configurar, (req, res) => {
   const t = bd.prepare('SELECT * FROM tanques WHERE id = ?').get(req.params.id);
   if (!t) return error(res, 'Ese tanque no existe.', 404);
@@ -205,19 +209,64 @@ router.post('/:id/panos', configurar, (req, res) => {
   const problema = validarPlantilla(plantilla);
   if (problema) return error(res, problema);
 
-  const activos = bd.prepare('SELECT COUNT(*) n FROM panos WHERE tanque_id = ? AND activo = 1').get(t.id).n;
-  if (activos >= MAX_PANOS) return error(res, `Ese tanque ya tiene ${MAX_PANOS} paños.`);
+  const cantidad = req.body?.cantidad === undefined ? 1 : Number(req.body.cantidad);
+  if (!Number.isInteger(cantidad) || cantidad < 1 || cantidad > MAX_PANOS) {
+    return error(res, `Se pueden agregar entre 1 y ${MAX_PANOS} paños a la vez.`);
+  }
 
-  const numero = siguienteNumero('panos', 'tanque_id', t.id);
-  const crear = bd.transaction(() => crearPano(t.id, numero, plantilla));
-  const panoId = crear();
+  const activos = bd.prepare('SELECT COUNT(*) n FROM panos WHERE tanque_id = ? AND activo = 1').get(t.id).n;
+  if (activos + cantidad > MAX_PANOS) {
+    return error(res, `El tanque tiene ${activos} paños y el máximo son ${MAX_PANOS}.`);
+  }
+
+  // Todo o nada: si falla a la mitad, no quedan paños sueltos.
+  const crear = bd.transaction(() => {
+    let numero = siguienteNumero('panos', 'tanque_id', t.id);
+    for (let i = 0; i < cantidad; i++) crearPano(t.id, numero++, plantilla);
+  });
+  crear();
 
   bitacora.registrar({
-    accion: 'pano.alta', entidad: 'pano', entidadId: panoId, ejecutorId: req.usuario.id,
-    detalle: { tanque: t.nombre, numero, plantilla }
+    accion: 'pano.alta', entidad: 'tanque', entidadId: t.id, ejecutorId: req.usuario.id,
+    detalle: { tanque: t.nombre, cantidad, plantilla }
   });
 
-  return ok(res, { tanque: detalleTanque(t.id) }, 201);
+  return ok(res, { tanque: detalleTanque(t.id), agregados: cantidad }, 201);
+});
+
+/**
+ * Quitar de golpe los últimos N paños. Es el arreglo natural de
+ * "me pasé de paños al crear el tanque".
+ */
+router.post('/:id/panos/quitar-ultimos', configurar, (req, res) => {
+  const t = bd.prepare('SELECT * FROM tanques WHERE id = ?').get(req.params.id);
+  if (!t) return error(res, 'Ese tanque no existe.', 404);
+
+  const cantidad = Number(req.body?.cantidad);
+  if (!Number.isInteger(cantidad) || cantidad < 1) {
+    return error(res, 'Indica cuántos paños quitar.');
+  }
+
+  const activos = bd.prepare(
+    'SELECT id, numero FROM panos WHERE tanque_id = ? AND activo = 1 ORDER BY numero DESC'
+  ).all(t.id);
+
+  if (cantidad >= activos.length) {
+    return error(res, 'El tanque se quedaría sin paños. Si ya no sirve, dalo de baja completo.');
+  }
+
+  const quitar = bd.transaction(() => {
+    const baja = bd.prepare('UPDATE panos SET activo = 0, fecha_baja = ? WHERE id = ?');
+    for (const p of activos.slice(0, cantidad)) baja.run(ahora(), p.id);
+  });
+  quitar();
+
+  bitacora.registrar({
+    accion: 'pano.baja_multiple', entidad: 'tanque', entidadId: t.id,
+    ejecutorId: req.usuario.id, detalle: { cantidad, desde: activos[0].numero }
+  });
+
+  return ok(res, { tanque: detalleTanque(t.id), quitados: cantidad });
 });
 
 router.post('/panos/:id/baja', configurar, (req, res) => {

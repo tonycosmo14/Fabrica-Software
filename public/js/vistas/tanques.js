@@ -43,14 +43,20 @@ export async function vistaTanques(pantalla, estado) {
 
       <div style="margin-top:14px">
         ${tanques.map((t) => `
-          <button class="tanque-tarjeta" data-id="${esc(t.id)}">
-            <span class="tanque-nombre">${esc(t.nombre)}</span>
-            <span class="tanque-datos">
-              <span><strong>${t.total_panos}</strong> paños · <strong>${t.total_canastas}</strong> canastas</span>
-              <span class="tanque-moldes"><strong>${t.total_moldes}</strong> moldes</span>
-            </span>
-            <span class="tanque-flecha">›</span>
-          </button>`).join('') || `
+          <div class="tanque-fila">
+            <button class="tanque-tarjeta" data-id="${esc(t.id)}">
+              <span class="tanque-nombre">${esc(t.nombre)}</span>
+              <span class="tanque-datos">
+                <span><strong>${t.total_panos}</strong> paños · <strong>${t.total_canastas}</strong> canastas</span>
+                <span class="tanque-moldes"><strong>${t.total_moldes}</strong> moldes</span>
+              </span>
+              <span class="tanque-flecha">›</span>
+            </button>
+            ${puedeConfigurar
+              ? `<button class="tanque-acciones" data-acciones="${esc(t.id)}"
+                         title="Acciones rápidas" aria-label="Acciones de ${esc(t.nombre)}">⋯</button>`
+              : ''}
+          </div>`).join('') || `
           <div class="tarjeta plana" style="text-align:center;padding:34px 20px">
             <div style="font-size:44px">🧊</div>
             <p class="ayuda" style="margin:10px 0 0">
@@ -65,6 +71,49 @@ export async function vistaTanques(pantalla, estado) {
     pantalla.querySelectorAll('.tanque-tarjeta').forEach((b) => {
       b.onclick = () => detalle(b.dataset.id);
     });
+    pantalla.querySelectorAll('[data-acciones]').forEach((b) => {
+      b.onclick = () => accionesRapidas(tanques.find((t) => t.id === b.dataset.acciones));
+    });
+  }
+
+  /**
+   * Acciones rápidas desde la lista, sin tener que entrar al tanque.
+   * Lo más común es agregar paños, y para eso no hace falta abrir nada.
+   */
+  async function accionesRapidas(t) {
+    const opcion = await menu({
+      titulo: `Tanque ${t.nombre}`,
+      texto: `${t.total_panos} paños · ${t.total_moldes} moldes`,
+      opciones: [
+        { valor: 'abrir', texto: 'Ver y configurar', detalle: 'Paños, canastas y moldes' },
+        { valor: 'agregar', texto: 'Agregar paños', detalle: 'Uno o varios de golpe' },
+        { valor: 'quitar', texto: 'Quitar los últimos paños', detalle: 'Si te pasaste al crearlo' },
+        { valor: 'baja', texto: 'Dar de baja el tanque', detalle: 'Sale de producción', peligro: true }
+      ]
+    });
+
+    if (opcion === 'abrir') return detalle(t.id);
+    if (opcion === 'agregar') {
+      const { tanque } = await api.obtener(`/tanques/${t.id}`);
+      return agregarPanos(tanque, lista);
+    }
+    if (opcion === 'quitar') {
+      const { tanque } = await api.obtener(`/tanques/${t.id}`);
+      return quitarUltimosPanos(tanque, lista);
+    }
+    if (opcion === 'baja') {
+      const sigue = await confirmar({
+        titulo: `¿Dar de baja el tanque ${t.nombre}?`,
+        texto: 'Sale de las pantallas de producción. Su historial se conserva completo.',
+        ok: 'Dar de baja', peligro: true
+      });
+      if (!sigue) return;
+      try {
+        await api.enviar(`/tanques/${t.id}/baja`, {});
+        avisar('Tanque fuera de servicio', 'bien');
+        lista();
+      } catch (e) { avisar(e.message, 'error'); }
+    }
   }
 
   // ==========================================================
@@ -212,7 +261,11 @@ export async function vistaTanques(pantalla, estado) {
           '<p class="vacio">Este tanque no tiene paños.</p>'}
       </div>
 
-      ${puedeConfigurar ? '<button id="agregar-pano" style="margin-top:14px">＋ Agregar paño</button>' : ''}
+      ${puedeConfigurar ? `
+        <div class="fila-botones" style="margin-top:14px">
+          <button id="agregar-pano">＋ Agregar paños</button>
+          <button class="secundario" id="quitar-panos">− Quitar últimos</button>
+        </div>` : ''}
 
       <p class="ayuda" style="margin-top:18px;font-size:14px">
         El número de la derecha es cuántas marquetas da ese paño.
@@ -224,7 +277,8 @@ export async function vistaTanques(pantalla, estado) {
 
     pantalla.querySelector('#editar').onclick = () => editarTanque(tanque);
     pantalla.querySelector('#ver-bajas').onclick = () => detalle(id, { verBajas: !verBajas });
-    pantalla.querySelector('#agregar-pano').onclick = () => agregarPano(tanque);
+    pantalla.querySelector('#agregar-pano').onclick = () => agregarPanos(tanque);
+    pantalla.querySelector('#quitar-panos').onclick = () => quitarUltimosPanos(tanque);
 
     pantalla.querySelectorAll('[data-canasta]').forEach((b) => {
       b.onclick = () => menuCanasta(tanque, b.dataset.canasta, verBajas);
@@ -257,24 +311,51 @@ export async function vistaTanques(pantalla, estado) {
   // 4. ACCIONES
   // ==========================================================
 
-  /** Agregar paño: por omisión copia el último, que es lo normal al expandir. */
-  async function agregarPano(tanque) {
+  /**
+   * Agregar paños. Se pueden pedir varios de un golpe: si borraste cinco por
+   * error, volver a ponerlos uno por uno es una tortura.
+   * Los nuevos se copian del último paño, que es lo normal al expandir.
+   */
+  async function agregarPanos(tanque, alTerminar) {
     const ultimo = tanque.panos.filter((p) => p.activo).at(-1);
     const plantilla = ultimo ? ultimo.canastas.filter((c) => c.activo).map((c) => c.total_moldes)
                              : [3, 3, 3, 4];
+    const porPano = plantilla.reduce((a, b) => a + b, 0);
 
-    const sigue = await confirmar({
-      titulo: `Agregar el paño ${tanque.total_panos + 1}`,
-      texto: `Se creará igual que el último: ${plantilla.length} canastas ` +
-             `(${plantilla.join(' + ')} moldes) = ${plantilla.reduce((a, b) => a + b, 0)} marquetas.`,
-      ok: 'Agregar'
+    const cantidad = await pedirNumero({
+      titulo: 'Agregar paños',
+      texto: `Cada uno se creará igual que el último: ${plantilla.length} canastas ` +
+             `(${plantilla.join(' + ')}) = ${porPano} marquetas.`,
+      valor: 1, min: 1, max: 100, ok: 'Agregar'
     });
-    if (!sigue) return;
+    if (cantidad === null) return;
 
     try {
-      await api.enviar(`/tanques/${tanque.id}/panos`, { plantilla });
-      avisar('Paño agregado', 'bien');
-      detalle(tanque.id);
+      const r = await api.enviar(`/tanques/${tanque.id}/panos`, { plantilla, cantidad });
+      avisar(`${cantidad} ${cantidad === 1 ? 'paño agregado' : 'paños agregados'} · ` +
+             `${r.tanque.total_moldes} moldes`, 'bien');
+      (alTerminar || (() => detalle(tanque.id)))();
+    } catch (e) { avisar(e.message, 'error'); }
+  }
+
+  /** Quitar de golpe los últimos paños: el arreglo de "me pasé al crear el tanque". */
+  async function quitarUltimosPanos(tanque, alTerminar) {
+    const activos = tanque.panos.filter((p) => p.activo).length;
+    if (activos <= 1) return avisar('El tanque solo tiene un paño.', 'error');
+
+    const cantidad = await pedirNumero({
+      titulo: 'Quitar los últimos paños',
+      texto: `El tanque tiene ${activos} paños. Se quitarán empezando por el último. ` +
+             'No se borran: puedes recuperarlos desde "Ver bajas".',
+      valor: 1, min: 1, max: activos - 1, ok: 'Quitar'
+    });
+    if (cantidad === null) return;
+
+    try {
+      const r = await api.enviar(`/tanques/${tanque.id}/panos/quitar-ultimos`, { cantidad });
+      avisar(`${cantidad} ${cantidad === 1 ? 'paño quitado' : 'paños quitados'} · ` +
+             `quedan ${r.tanque.total_panos}`, 'bien');
+      (alTerminar || (() => detalle(tanque.id)))();
     } catch (e) { avisar(e.message, 'error'); }
   }
 

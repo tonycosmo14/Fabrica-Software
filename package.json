@@ -1,6 +1,6 @@
 {
   "name": "fabrica-hielo",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Sistema de gestion para fabrica de hielo y planta de agua",
   "private": true,
   "type": "commonjs",
@@ -10,7 +10,8 @@
     "iniciar": "node src/servidor.js --abrir",
     "dev": "node --watch src/servidor.js",
     "prueba": "node --test pruebas/*.test.js",
-    "respaldo": "node src/db/respaldar.js"
+    "respaldo": "node src/db/respaldar.js",
+    "recuperar": "node src/recuperar.js"
   },
   "engines": {
     "node": ">=22.5"

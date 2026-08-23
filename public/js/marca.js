@@ -50,6 +50,20 @@ export function marcaHTML() {
     </div>`;
 }
 
+/** Versión pequeña para el encabezado: el logo, o el nombre en letras. */
+export function marcaBarraHTML() {
+  const m = cache;
+  const oscuro = enOscuro();
+  const usarOscuro = oscuro && m?.logoOscuro;
+  const hayLogo = usarOscuro || m?.logoClaro;
+
+  if (!hayLogo) {
+    return '<span class="barra-marca-texto">Hielo <b>LOLHA</b></span>';
+  }
+  const url = `${usarOscuro ? '/marca/logo-oscuro' : '/marca/logo'}?v=${encodeURIComponent(m.version)}`;
+  return `<img src="${url}" alt="${escapar(m.nombreNegocio)}">`;
+}
+
 function respaldo() {
   return `<div class="marca sin-logo">
       <span class="marca-hielo">Hielo</span>

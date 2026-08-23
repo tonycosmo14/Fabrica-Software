@@ -18,9 +18,15 @@
   <header id="barra" hidden>
     <div class="barra-interior">
       <button id="btn-atras" class="icono" title="Atrás" hidden>‹</button>
-      <h1 id="titulo">Hielo LOLHA</h1>
-      <span class="version-barra"><span class="version">—</span></span>
+      <div id="barra-marca" class="barra-marca"></div>
       <button id="btn-menu" class="icono" title="Menú">☰</button>
+    </div>
+    <div class="barra-inferior">
+      <span id="reloj" class="reloj">—</span>
+      <span class="barra-usuario">
+        <strong id="barra-nombre">—</strong>
+        <small id="barra-rol">—</small>
+      </span>
     </div>
   </header>
 
@@ -47,7 +53,10 @@
       </div>
 
       <button id="btn-salir" class="peligro" style="margin-top:14px">Cerrar sesión</button>
-      <small class="version-menu">Hielo LOLHA · <span class="version">—</span></small>
+      <small class="version-menu">
+        Hielo LOLHA · <span class="version">—</span><br>
+        <span class="creditos">Desarrollado por CasTec</span>
+      </small>
     </div>
   </nav>
 

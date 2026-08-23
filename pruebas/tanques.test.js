@@ -167,6 +167,42 @@ test('se rechaza un tanque sin nombre o con paños absurdos', async () => {
   assert.equal(c.estado, 400);
 });
 
+test('se agregan varios paños de un golpe', async () => {
+  const r0 = await llamar('/api/tanques', {
+    method: 'POST',
+    cuerpo: { nombre: 'Nuevo', panos: 2, plantilla: [3, 3], horasCongelacion: 24 }
+  });
+  const id = r0.json.datos.tanque.id;
+
+  const r = await llamar(`/api/tanques/${id}/panos`, {
+    method: 'POST', cuerpo: { plantilla: [3, 3], cantidad: 5 }
+  });
+  assert.equal(r.estado, 201);
+  assert.equal(r.json.datos.tanque.total_panos, 7);
+  assert.equal(r.json.datos.tanque.total_moldes, 42);
+
+  // Y se quitan varios de golpe, empezando por el último.
+  const q = await llamar(`/api/tanques/${id}/panos/quitar-ultimos`, {
+    method: 'POST', cuerpo: { cantidad: 4 }
+  });
+  assert.equal(q.json.datos.tanque.total_panos, 3);
+  assert.equal(q.json.datos.tanque.total_moldes, 18);
+
+  // Los paños que quedan son los primeros, no unos cualesquiera.
+  const { json } = await llamar(`/api/tanques/${id}`);
+  assert.deepEqual(json.datos.tanque.panos.map((p) => p.numero), [1, 2, 3]);
+});
+
+test('no se puede dejar un tanque sin ningún paño', async () => {
+  const { json } = await llamar('/api/tanques');
+  const t = json.datos.tanques.find((x) => x.nombre === 'Nuevo');
+  const r = await llamar(`/api/tanques/${t.id}/panos/quitar-ultimos`, {
+    method: 'POST', cuerpo: { cantidad: 3 }
+  });
+  assert.equal(r.estado, 400);
+  assert.match(r.json.error, /sin paños/);
+});
+
 test('un operario ve los tanques pero no puede modificarlos', async () => {
   await llamar('/api/usuarios', {
     method: 'POST', cuerpo: { nombre: 'Juan', rol: 'operario', pin: '4321' }
