@@ -478,6 +478,17 @@ select { color-scheme: light dark; }
 
 
 
+/* ---------- Respaldos ---------- */
+.respaldo-estado { border-left: 5px solid var(--verde); }
+.respaldo-estado.alerta { border-left-color: var(--est-fuera); }
+.respaldo-cabeza { display: flex; align-items: center; gap: 14px; }
+.respaldo-icono { font-size: 30px; }
+.respaldo-cabeza strong { display: block; font-size: 17px; }
+.respaldo-cabeza small { color: var(--suave); }
+.ruta { font-family: ui-monospace, monospace; font-size: 12.5px; word-break: break-all; }
+.bien { color: var(--verde); font-weight: 600; }
+.mal { color: var(--est-fuera); font-weight: 600; }
+
 /* ---------- Personalizar ---------- */
 .logo-previa {
   position: relative;

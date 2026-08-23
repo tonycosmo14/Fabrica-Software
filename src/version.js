@@ -12,9 +12,28 @@
  * tipo: 'nuevo' | 'mejora' | 'arreglo' | 'importante'
  */
 
-const VERSION_ACTUAL = '0.5.1';
+const VERSION_ACTUAL = '0.6';
 
 const VERSIONES = [
+  {
+    numero: '0.6',
+    nombre: 'Respaldos automáticos',
+    fecha: '2026-08-23',
+    resumen:
+      'Los datos de la fábrica se copian solos cada pocas horas, y también ' +
+      'fuera de la PC. Si el disco muere, no se pierde el negocio.',
+    cambios: [
+      { tipo: 'importante', texto: 'El sistema se respalda solo cada 4 horas, y también al encenderse. No hay que acordarse de nada.' },
+      { tipo: 'importante', texto: 'Segunda copia fuera de la PC: en una USB pegada atrás o en una carpeta de Drive u OneDrive. Esa es la que salva si el disco muere.' },
+      { tipo: 'nuevo', texto: 'En Sistema se ve de un vistazo si los respaldos están sanos, cuándo fue el último y cuántas copias hay.' },
+      { tipo: 'nuevo', texto: 'Botón para respaldar ahora mismo, y para cambiar cada cuánto se hace.' },
+      { tipo: 'nuevo', texto: 'La carpeta de fuera se prueba antes de aceptarla: si no se puede escribir, te lo dice en ese momento.' },
+      { tipo: 'nuevo', texto: 'Si la USB se desconecta, la copia local sigue haciéndose y la pantalla avisa que la de fuera está fallando.' },
+      { tipo: 'nuevo', texto: 'Se conservan las últimas 30 copias y las viejas se borran solas.' },
+      { tipo: 'mejora', texto: 'Las instrucciones para restaurar están en la propia pantalla de Sistema.' }
+    ],
+    siguiente: 'v0.7 — La Existencia: el conteo del cuarto frío a las 3 y a las 8, y el cuadre del día.'
+  },
   {
     numero: '0.5.1',
     nombre: 'Autoriza primero, decide después',
@@ -28,8 +47,7 @@ const VERSIONES = [
       { tipo: 'nuevo', texto: 'En el detalle del paño ahora se indica quién lo sacó y se cambia el agua ahí mismo.' },
       { tipo: 'arreglo', texto: 'Al dar de alta un operario ya no se pide contraseña: solo los administradores y gerentes entran desde la PC.' },
       { tipo: 'mejora', texto: 'Botones de acción centrados en el detalle del paño.' }
-    ],
-    siguiente: 'v0.6 — Respaldos automáticos: que nunca se pierdan los datos de la fábrica.'
+    ]
   },
   {
     numero: '0.5',

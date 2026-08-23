@@ -15,6 +15,7 @@ const config = require('./config');
 const { VERSION_ACTUAL } = require('./version');
 const { migrar } = require('./db/migrar');
 const { bd } = require('./db/conexion');
+const respaldos = require('./db/respaldos');
 const { cargarUsuario } = require('./middleware/sesion');
 const { error } = require('./lib/respuestas');
 
@@ -146,6 +147,19 @@ async function arrancar() {
   // pero hasta que el servidor esta realmente listo.
   const abrir = abrirAlIniciar;
   const direccion = url;
+
+  // Un respaldo al encender y el reloj de los automáticos en marcha.
+  try {
+    const r = respaldos.respaldar('arranque');
+    if (r.hecho) {
+      console.log(`  Respaldo al arrancar: ${r.principal}`);
+      if (r.errorExtra) console.log(`  ⚠ La copia de seguridad extra falló: ${r.errorExtra}`);
+      else if (r.extra) console.log(`  Copia extra: ${r.extra}`);
+    }
+  } catch (e) {
+    console.log(`  ⚠ No se pudo respaldar al arrancar: ${e.message}`);
+  }
+  respaldos.arrancarAutomaticos();
 
   const app = crearApp();
   const servidor = app.listen(config.PUERTO, config.HOST, () => {

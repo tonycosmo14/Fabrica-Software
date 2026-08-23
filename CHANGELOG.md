@@ -7,6 +7,26 @@ Tipos: `nuevo` (funcionalidad nueva) · `mejora` · `arreglo` · `clave` (regla 
 
 ---
 
+## v0.6 — Respaldos automáticos · 23 de agosto de 2026
+
+El usuario planteó su miedo real: perder los datos si muere la PC. La
+respuesta no es mover todo a un hosting (sin internet la fábrica se para y
+la impresora térmica es local), sino copiar fuera de la máquina.
+
+- **clave** — `src/db/respaldos.js`: copia automática cada N horas (4 por omisión) y una al arrancar. El reloj revisa cada 10 minutos si toca, así un apagón nocturno no se salta el respaldo: al encender lo hace.
+- **clave** — Segunda copia en una carpeta fuera de la PC (USB, Drive, OneDrive). Es la única que sobrevive a un disco muerto.
+- **clave** — Antes de copiar se fuerza `PRAGMA wal_checkpoint(TRUNCATE)`. Sin eso el respaldo podría no traer los últimos movimientos, porque SQLite en modo WAL los guarda en un archivo aparte. Hay una prueba que lo verifica escribiendo un dato y buscándolo dentro de la copia.
+- **nuevo** — Pantalla de estado en Sistema: si está sano, cuándo fue el último, cuántas copias, y si la copia de fuera está fallando.
+- **nuevo** — La carpeta externa se prueba escribiendo un archivo antes de aceptarla.
+- **nuevo** — Si la carpeta externa falla, la copia local se hace igual y el error queda anotado y visible. Un fallo de la USB no puede tumbar el respaldo.
+- **nuevo** — Poda automática: se conservan las últimas 30 copias.
+- **nuevo** — Instrucciones de restauración en la propia pantalla.
+
+Pruebas: 75. Incluyen abrir un respaldo como base de datos y comprobar que
+tiene los datos, y simular una USB desconectada.
+
+---
+
 ## v0.5.1 — Autoriza primero, decide después · 23 de agosto de 2026
 
 - **clave** — La puerta de autorización se mueve al primer toque. Nuevo `POST /produccion/autorizar` + `src/modulos/produccion/vales.js`: el responsable teclea su PIN una vez y el servidor devuelve un **vale** de un solo uso, atado a ese paño y con caducidad de 15 minutos. Así la pantalla puede enseñar las opciones sin guardar el PIN de nadie en memoria.
