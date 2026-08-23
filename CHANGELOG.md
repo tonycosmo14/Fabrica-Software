@@ -7,6 +7,19 @@ Tipos: `nuevo` (funcionalidad nueva) · `mejora` · `arreglo` · `clave` (regla 
 
 ---
 
+## v0.9.1 — Manual de ayuda · 23 de agosto de 2026
+
+El manual vive **dentro** del sistema (`#/ayuda`), no en un PDF aparte que
+nadie abre. Escrito para el cajero y el gerente, no para un programador.
+
+- **nuevo** — Nueve temas plegados: entrar, producción, existencia, punto de venta, caja, quién puede qué, respaldos, actualizar y qué hacer si algo no funciona.
+- **nuevo** — Buscador que filtra sin volver a dibujar la pantalla (un tema abierto se queda abierto) y abre solos los temas que coinciden.
+- **clave** — La tabla de permisos **no está escrita a mano**: `GET /api/ayuda/permisos` la arma leyendo `src/lib/roles.js`. El día que se agregue un rol o se mueva un permiso, el manual se corrige solo. Hay una prueba que compara la tabla contra `puede(rol, permiso)` para cada rol y cada acción: un manual que miente es peor que no tener manual.
+- **nuevo** — La prueba también falla si una acción descrita no la puede hacer nadie: o sobra en el manual, o falta el permiso.
+- **nuevo** — Visible para todos los roles. No hace falta ser administrador para leer cómo se usa el sistema.
+
+---
+
 ## v0.9 — La Caja · 23 de agosto de 2026
 
 Migración `009_caja.sql`.

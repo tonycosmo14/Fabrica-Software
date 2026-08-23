@@ -14,6 +14,7 @@ const ACCESOS = [
   { emoji: '👥', titulo: 'Usuarios',     ruta: '#/usuarios',  permiso: 'usuarios.administrar', desde: null   },
   { emoji: '🎨', titulo: 'Personalizar', ruta: '#/personalizar', permiso: 'sistema.configurar', desde: null },
   { emoji: '⚙️', titulo: 'Sistema',      ruta: '#/sistema',   permiso: 'sistema.ver',          desde: null   },
+  { emoji: '❓', titulo: 'Ayuda',        ruta: '#/ayuda',     permiso: null,                   desde: null   },
   { emoji: '✨', titulo: 'Qué hay de nuevo', ruta: '#/novedades', permiso: null,               desde: null   }
 ];
 

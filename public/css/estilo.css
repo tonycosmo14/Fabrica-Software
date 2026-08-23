@@ -1467,3 +1467,52 @@ tr.anulada { opacity: .45; text-decoration: line-through; }
   display: inline-flex; align-items: center; justify-content: center;
   width: 34px; min-width: 34px; max-width: 34px; height: 34px; flex: none;
 }
+
+
+/* ============================================================
+   MANUAL DE AYUDA (v0.9.1)
+   Texto para leer, no para adornar: renglones cómodos y ancho
+   limitado, que una línea de 1400 píxeles no se puede seguir.
+   ============================================================ */
+
+.ayuda-cuerpo p { margin: 0 0 12px; line-height: 1.65; font-size: 15.5px; }
+.ayuda-cuerpo p:last-child { margin-bottom: 0; }
+.ayuda-cuerpo h4 {
+  margin: 20px 0 8px; font-size: 15px; color: var(--primario);
+}
+.ayuda-cuerpo h4:first-child { margin-top: 0; }
+.ayuda-cuerpo ol.instrucciones { padding-left: 22px; }
+.ayuda-cuerpo code {
+  background: var(--superficie-alt); border: 1px solid var(--borde);
+  padding: 1px 6px; border-radius: 5px; font-size: 13.5px;
+}
+
+/* Las fórmulas del cuadre: se leen como la cuenta de una libreta */
+.ayuda-formula {
+  background: var(--superficie-alt); border-left: 4px solid var(--acento);
+  border-radius: 8px; padding: 12px 14px; margin: 0 0 12px;
+  font-size: 13.5px; line-height: 1.7; white-space: pre-wrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow-x: auto;
+}
+
+/* El apunte al margen: lo que de verdad hay que recordar */
+.ayuda-tip {
+  background: var(--et-operario-f); border-radius: 8px;
+  padding: 11px 14px; margin: 14px 0 0 !important;
+  font-size: 14.5px; color: var(--et-operario-t);
+}
+
+.tabla-ancha { overflow-x: auto; margin: 14px 0; }
+.tabla-permisos { min-width: 520px; }
+.tabla-permisos td.marca { text-align: center; font-weight: 700; }
+.tabla-permisos tr.grupo td {
+  background: var(--superficie-alt); font-weight: 700;
+  font-size: 13px; text-transform: uppercase; letter-spacing: .6px;
+  color: var(--suave);
+}
+
+@media (min-width: 900px) {
+  /* Un renglón de texto muy largo se pierde al saltar de línea */
+  .ayuda-cuerpo { max-width: 720px; }
+}

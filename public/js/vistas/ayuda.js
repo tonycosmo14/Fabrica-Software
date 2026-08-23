@@ -1,0 +1,379 @@
+/**
+ * MANUAL DE AYUDA  (v0.9.1)
+ *
+ * El manual vive dentro del sistema, no en un PDF que nadie abre. Está
+ * escrito para quien va a usarlo de verdad: el cajero, el gerente y quien
+ * cuenta el cuarto frío. Nada de palabras de programador.
+ *
+ * Cada tema va plegado para que la lista completa se vea de un vistazo, y
+ * hay un buscador arriba: se escribe "fracción" o "corte" y quedan solo los
+ * temas que hablan de eso.
+ *
+ * La tabla de quién puede qué NO está escrita aquí: se la pide al servidor,
+ * que la arma de los permisos de verdad. Así no puede quedar mintiendo.
+ */
+import { api } from '../api.js';
+import { esc } from '../util.js';
+
+const TEMAS = [
+  // ==========================================================
+  {
+    id: 'entrar',
+    titulo: 'Entrar al sistema',
+    busca: 'entrar pin contraseña acceso olvidé administrador sesión salir',
+    cuerpo: `
+      <p>Al abrir el sistema aparecen los nombres de todos. <b>Tocas tu nombre
+      y escribes tu PIN</b> de 4 a 6 números. Nada más.</p>
+
+      <p>El administrador también puede entrar con usuario y contraseña, con
+      el botón de abajo. Se usa cuando hay que hacer algo delicado.</p>
+
+      <p>La sesión se queda guardada en ese aparato, así que no te va a pedir
+      el PIN cada rato. Para salir, el menú de arriba a la derecha.</p>
+
+      <h4>Si olvidaste el PIN y la contraseña</h4>
+      <p>En la PC de la fábrica hay un archivo <b>RECUPERAR-ACCESO.bat</b>.
+      Le das doble clic y te deja poner un PIN nuevo al administrador. Solo
+      funciona sentado en esa computadora: quien no puede entrar a la fábrica,
+      no puede recuperar nada.</p>
+
+      <p class="ayuda-tip">Ten <b>dos administradores</b>. Si solo hay uno y
+      se va, el que quede se queda mirando la pantalla.</p>`
+  },
+
+  // ==========================================================
+  {
+    id: 'produccion',
+    titulo: 'Producción: sacar el hielo de los tanques',
+    busca: 'producción tanque paño canasta molde sacar rellenar rotación intercalado merma agua purificada potable congelación',
+    cuerpo: `
+      <h4>Cómo está armado un tanque</h4>
+      <p>Un <b>tanque</b> tiene varios <b>paños</b>. Cada paño tiene
+      <b>canastas</b>, y cada canasta tiene <b>moldes</b>. Cada molde que sale
+      bien es <b>una marqueta</b>.</p>
+
+      <h4>La regla de la rotación</h4>
+      <p>Los paños <b>siempre se sacan intercalados</b>: si se sacó el 1,
+      sigue el 3, luego el 5… y cuando se acaban los nones empiezan los pares.
+      Así el hielo alcanza a congelarse.</p>
+
+      <p>El sistema te marca <b>cuál toca</b>. Si tocas otro paño, te avisa
+      que ese no sigue y no te deja seguir hasta que un <b>gerente o el
+      administrador</b> escriba el motivo y meta su PIN. Queda anotado quién
+      lo autorizó y por qué.</p>
+
+      <h4>Sacar es una sola cosa</h4>
+      <p>Cuando se saca un paño, <b>se saca completo</b> y se vuelve a llenar
+      en el mismo momento. Por eso el sistema lo pide junto: marcas qué moldes
+      salieron bien y cuáles fueron merma, dices con qué agua se rellenó, y
+      listo. Un solo registro.</p>
+
+      <p>Los moldes que fallan quedan <b>marcados en rojo</b> hasta que ese
+      paño dé la vuelta otra vez. Si un molde falla varias veces seguidas, el
+      sistema lo señala: probablemente está roto.</p>
+
+      <h4>Los números que siguen</h4>
+      <p>El gerente y el administrador pueden imprimir <b>la lista de los
+      números que tocan</b>, con tanque, fecha y hora. Se les entrega a los
+      muchachos en la mañana y a las 3 te dicen qué sacaron.</p>
+
+      <p class="ayuda-tip">Los obreros no capturan nada. Ellos sacan hielo y
+      reportan; quien captura es quien recibe la existencia.</p>`
+  },
+
+  // ==========================================================
+  {
+    id: 'existencia',
+    titulo: 'Existencia: contar el cuarto frío',
+    busca: 'existencia conteo cuarto frío contar marquetas fracción 5/8 cuadre faltante vendido salidas almacén horarios',
+    cuerpo: `
+      <h4>Cuándo se cuenta</h4>
+      <p>A las horas que estén configuradas (de fábrica, <b>3 de la tarde y 8
+      de la noche</b>). Cuando pasa la hora y nadie ha contado, la pantalla lo
+      marca en naranja.</p>
+
+      <h4>Cómo se captura</h4>
+      <p>Tal como te lo dictan. Si te dicen <b>"quedan 14 marquetas y 5/8"</b>,
+      lo escribes así mismo en el cuadrito, o lo tocas con los botones
+      <b>1 · 1/2 · 1/4 · 1/8 · 1/16</b>, que se van sumando.</p>
+
+      <p>Los botones suman: tocas 1/2, luego 1/8, y queda 5/8. Cuando los
+      pedazos completan una marqueta, sube sola al contador de arriba.</p>
+
+      <h4>Qué te dice el cuadre</h4>
+      <pre class="ayuda-formula">había + se produjo − se vendió con ticket = debería quedar
+debería quedar − contado = FALTA</pre>
+
+      <p><b>Falta</b> es lo que salió del cuarto frío <b>sin ticket</b>: lo que
+      se derritió, lo que se cayó y lo que se fue sin pagar. Ese es el número a
+      vigilar. Si sale en verde, todo lo que salió tiene su ticket.</p>
+
+      <p>Si <b>sobra</b>, revisa: puede faltar capturar producción, o el conteo
+      anterior se quedó corto.</p>
+
+      <h4>Si te equivocaste al capturar</h4>
+      <p>El conteo <b>no se borra</b>: se anula, con motivo. Al anularlo vuelve
+      a valer el conteo anterior. Eso lo hace el gerente o el administrador.</p>
+
+      <p class="ayuda-tip">Cada conteo guarda sus números <b>congelados</b>. Si
+      mañana corriges una sacada vieja, el corte que ya hiciste no se mueve.</p>`
+  },
+
+  // ==========================================================
+  {
+    id: 'venta',
+    titulo: 'Punto de venta: cobrar',
+    busca: 'venta cobrar ticket precio fracción cambio billete folio cancelar imprimir',
+    cuerpo: `
+      <h4>Cobrar</h4>
+      <ol class="instrucciones">
+        <li>Marcas la cantidad con los botones. Se van sumando.</li>
+        <li>Tocas <b>Agregar al ticket</b>. Puedes agregar varias líneas.</li>
+        <li>Tocas el billete con el que te pagan (o escribes el monto).</li>
+        <li><b>Cobrar</b>. Sale el cambio en grande y el ticket para imprimir.</li>
+      </ol>
+
+      <h4>Los precios</h4>
+      <p>Cada pedazo tiene <b>su propio precio</b>; no se saca dividiendo el de
+      la marqueta, porque cortar da trabajo. Para cobrar una cantidad, el
+      sistema la parte en los pedazos más grandes y suma:</p>
+
+      <pre class="ayuda-formula">3/8  →  1/4 + 1/8  →  $70 + $36  =  $106.00</pre>
+
+      <p>Como siempre parte igual, <b>tocar seis veces 1/16 cuesta lo mismo</b>
+      que tocar 1/4 y 1/8. Da igual quién atienda y cómo teclee: el precio es
+      el mismo.</p>
+
+      <p>Los precios se cambian en <b>Punto de venta → Precios</b>, y solo el
+      administrador. <b>Los tickets ya cobrados no cambian</b> cuando subes un
+      precio.</p>
+
+      <h4>Si un ticket salió mal</h4>
+      <p>Un ticket cobrado <b>no se corrige</b>: se <b>cancela</b>. Queda
+      marcado como cancelado, con tu nombre y el motivo, y el original sigue
+      existiendo para siempre. El hielo vuelve a contar como que no salió.</p>
+
+      <p>Cancelar lo hace el gerente o el administrador, no el cajero.</p>
+
+      <h4>Buscar un ticket viejo</h4>
+      <p>Con el botón <b>Buscar tickets</b>: por número, por el importe o por
+      la hora. Los últimos 30 salen solos.</p>`
+  },
+
+  // ==========================================================
+  {
+    id: 'caja',
+    titulo: 'Caja: el turno y el corte',
+    busca: 'caja turno fondo corte arqueo gasto retiro efectivo cerrar cuadrar sobra falta',
+    cuerpo: `
+      <h4>Abrir el turno</h4>
+      <p>Al empezar, <b>Abrir turno de caja</b> y escribes con cuánto dinero
+      arranca el cajón (el fondo para dar cambio). Si arranca vacío, 0.</p>
+
+      <p>A partir de ahí <b>las ventas se pegan solas</b>. No hay que capturar
+      nada dos veces.</p>
+
+      <h4>Gastos y retiros</h4>
+      <p>Todo el dinero que sale del cajón sin ser cambio se anota:
+      la gasolina, los refrescos, el retiro a la caja fuerte. Y si traes cambio
+      del banco, se anota como entrada.</p>
+
+      <h4>Cerrar y contar</h4>
+      <p>Cuentas <b>todo</b> el dinero del cajón, incluido el fondo, y lo
+      escribes. El sistema hace la cuenta:</p>
+
+      <pre class="ayuda-formula">fondo + cobrado + entradas − gastos = debería haber
+debería haber − contado = DIFERENCIA</pre>
+
+      <p>Si <b>falta</b>: casi siempre es un cambio dado de más o un gasto que
+      no se anotó. Si <b>sobra</b>: un cambio que no se dio, o una venta
+      cobrada sin registrar.</p>
+
+      <p>El corte se imprime con espacio para la firma.</p>
+
+      <h4>Cosas que conviene saber</h4>
+      <ul class="instrucciones">
+        <li>Solo puede haber <b>un turno abierto</b> a la vez.</li>
+        <li>Si nadie abrió la caja, <b>se cobra igual</b> — la fábrica no se
+        para por eso. Pero la pantalla de venta lo avisa en amarillo, porque
+        ese dinero no va a salir en ningún corte.</li>
+        <li>Un corte cerrado <b>ya no cambia</b>. Si mañana cancelas una venta
+        de hoy, el corte firmado se queda como está.</li>
+      </ul>`
+  },
+
+  // ==========================================================
+  {
+    id: 'permisos',
+    titulo: 'Quién puede hacer qué',
+    busca: 'permisos roles cajero gerente operario repartidor administrador quién puede',
+    cuerpo: '<div id="tabla-permisos" class="cargando">Cargando…</div>'
+  },
+
+  // ==========================================================
+  {
+    id: 'respaldos',
+    titulo: 'Respaldos: no perder los datos',
+    busca: 'respaldo copia seguridad usb drive restaurar disco perder datos',
+    cuerpo: `
+      <p>El sistema se respalda <b>solo</b>: cada 4 horas y cada vez que se
+      enciende. No hay que acordarse de nada.</p>
+
+      <h4>Lo único importante que sí tienes que hacer</h4>
+      <p>Configurar una <b>carpeta fuera de la PC</b>: una USB pegada atrás de
+      la computadora, o una carpeta de Drive o de OneDrive. Se pone en
+      <b>Sistema → Respaldos</b>.</p>
+
+      <p class="ayuda-tip">Esa copia de fuera es <b>la única que te salva si el
+      disco de la PC muere</b>. La copia local se muere con él.</p>
+
+      <p>Si la USB se desconecta, la copia local se sigue haciendo igual y la
+      pantalla de Sistema te avisa que la de fuera está fallando.</p>
+
+      <h4>Si hay que restaurar</h4>
+      <p>Las instrucciones están en la propia pantalla de Sistema, paso por
+      paso. En resumen: se apaga el sistema, se copia el respaldo encima del
+      archivo de datos y se vuelve a encender.</p>`
+  },
+
+  // ==========================================================
+  {
+    id: 'actualizar',
+    titulo: 'Actualizar el sistema',
+    busca: 'actualizar versión nueva instalar archivos novedades',
+    cuerpo: `
+      <p>Doble clic en <b>ACTUALIZAR.bat</b>. Baja la versión nueva y
+      reemplaza los archivos del programa.</p>
+
+      <p><b>Tus datos no se tocan.</b> Viven en la carpeta <code>datos</code>,
+      que la actualización nunca toca. Y antes de cambiar nada en la base, el
+      sistema hace un respaldo.</p>
+
+      <p>Después de actualizar, en el menú aparece un <b>punto rojo</b> en
+      «Qué hay de nuevo»: ahí se ve todo lo que cambió.</p>`
+  },
+
+  // ==========================================================
+  {
+    id: 'problemas',
+    titulo: 'Si algo no funciona',
+    busca: 'problema error no abre no imprime lento se cerró ayuda soporte',
+    cuerpo: `
+      <h4>No abre el sistema</h4>
+      <ul class="instrucciones">
+        <li>Revisa que no esté ya abierto en otra ventana.</li>
+        <li>Doble clic en <b>DETENER.bat</b> y luego en <b>INICIAR.bat</b>.</li>
+        <li>Si sigue sin abrir, reinicia la computadora y vuelve a intentar.</li>
+      </ul>
+
+      <h4>Desde el celular no entra</h4>
+      <p>El celular tiene que estar en el <b>mismo WiFi</b> que la PC, y la PC
+      tiene que estar encendida con el sistema abierto. La dirección para el
+      celular sale en la ventana negra al arrancar.</p>
+
+      <h4>No imprime el ticket</h4>
+      <p>El botón de imprimir usa la impresora normal de Windows. Revisa que la
+      térmica esté puesta como predeterminada y encendida.</p>
+
+      <h4>Alguien capturó algo mal</h4>
+      <p>Nada se borra en este sistema, así que <b>nada se pierde por
+      equivocarse</b>. Todo se anula con motivo: conteos, ventas, movimientos
+      de caja y registros de producción. Lo hace el gerente o el
+      administrador, y queda anotado quién y por qué.</p>
+
+      <p class="ayuda-tip">En <b>Sistema → Bitácora</b> se ve todo lo que ha
+      pasado, con quién lo hizo y a qué hora.</p>`
+  }
+];
+
+export async function vistaAyuda(pantalla) {
+  pantalla.innerHTML = `
+    <h2>Ayuda</h2>
+    <p class="ayuda">
+      Cómo se usa cada parte del sistema. Toca un tema para abrirlo, o busca
+      lo que necesites.
+    </p>
+
+    <input id="busca-ayuda" class="buscador" autocomplete="off"
+           placeholder="Buscar: fracción, corte, respaldo…">
+
+    <div id="temas" style="margin-top:14px">
+      ${TEMAS.map((t) => `
+        <details class="ayuda-bloque" data-tema="${esc(t.id)}"
+                 data-busca="${esc((t.titulo + ' ' + t.busca).toLowerCase())}">
+          <summary>${esc(t.titulo)}</summary>
+          <div class="ayuda-cuerpo">${t.cuerpo}</div>
+        </details>`).join('')}
+    </div>
+
+    <p class="vacio" id="sin-resultados" hidden>
+      Nada coincide con eso. Prueba con otra palabra.
+    </p>`;
+
+  // El buscador solo esconde y muestra: no vuelve a dibujar nada, así un
+  // tema abierto se queda abierto mientras se escribe.
+  const campo = pantalla.querySelector('#busca-ayuda');
+  const bloques = [...pantalla.querySelectorAll('[data-busca]')];
+  const vacio = pantalla.querySelector('#sin-resultados');
+
+  campo.oninput = () => {
+    const q = campo.value.trim().toLowerCase();
+    let visibles = 0;
+
+    for (const b of bloques) {
+      const coincide = !q || b.dataset.busca.includes(q);
+      b.hidden = !coincide;
+      if (coincide) visibles++;
+      // Buscando, los temas que quedan se abren solos: para eso se busca.
+      if (q && coincide) b.open = true;
+    }
+    vacio.hidden = visibles > 0;
+  };
+
+  await pintarPermisos(pantalla);
+}
+
+/**
+ * La tabla de quién puede qué se pide al servidor, que la arma de los
+ * permisos reales. Si mañana cambian los permisos, esta tabla cambia sola.
+ */
+async function pintarPermisos(pantalla) {
+  const caja = pantalla.querySelector('#tabla-permisos');
+  if (!caja) return;
+
+  try {
+    const { roles, acciones } = await api.obtener('/ayuda/permisos');
+    const grupos = [...new Set(acciones.map((a) => a.grupo))];
+
+    caja.classList.remove('cargando');
+    caja.innerHTML = `
+      <p>Cada quien ve y hace solo lo suyo. Esta tabla no está escrita a mano:
+      la arma el sistema con los permisos de verdad, así que siempre dice la
+      verdad.</p>
+
+      <div class="tabla-ancha">
+        <table class="tabla tabla-permisos">
+          <tr>
+            <th>Puede…</th>
+            ${roles.map((r) => `<th>${esc(r.etiqueta)}</th>`).join('')}
+          </tr>
+          ${grupos.map((g) => `
+            <tr class="grupo"><td colspan="${roles.length + 1}">${esc(g)}</td></tr>
+            ${acciones.filter((a) => a.grupo === g).map((a) => `
+              <tr>
+                <td>${esc(a.texto)}</td>
+                ${roles.map((r) => `
+                  <td class="marca">${a.quienes.includes(r.rol) ? '✓' : '·'}</td>`).join('')}
+              </tr>`).join('')}
+          `).join('')}
+        </table>
+      </div>
+
+      <p class="ayuda-tip">El <b>administrador</b> puede todo, siempre. Por eso
+      conviene que haya dos, y que el resto tenga su propio usuario: así la
+      bitácora dice de verdad quién hizo cada cosa.</p>`;
+  } catch {
+    caja.classList.remove('cargando');
+    caja.innerHTML = '<p class="vacio">No se pudo cargar la tabla de permisos.</p>';
+  }
+}

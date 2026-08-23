@@ -12,9 +12,24 @@
  * tipo: 'nuevo' | 'mejora' | 'arreglo' | 'importante'
  */
 
-const VERSION_ACTUAL = '0.9';
+const VERSION_ACTUAL = '0.9.1';
 
 const VERSIONES = [
+  {
+    numero: '0.9.1',
+    nombre: 'Manual de ayuda',
+    fecha: '2026-08-23',
+    resumen:
+      'El manual vive dentro del sistema, no en un PDF que nadie abre. ' +
+      'Cómo se usa cada parte, escrito para quien lo va a usar.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'Pantalla de Ayuda con un tema por área: entrar, producción, existencia, venta, caja, respaldos, actualizar y qué hacer si algo no funciona.' },
+      { tipo: 'nuevo', texto: 'Buscador: escribes "fracción" o "corte" y quedan solo los temas que hablan de eso, ya abiertos.' },
+      { tipo: 'importante', texto: 'La tabla de quién puede hacer qué NO está escrita a mano: la arma el sistema con los permisos de verdad. El día que cambien, el manual se corrige solo. Hay una prueba que lo comprueba rol por rol.' },
+      { tipo: 'nuevo', texto: 'Está en el menú y en el inicio, y la ve cualquiera: no hace falta ser administrador para leer cómo se usa el sistema.' }
+    ],
+    siguiente: 'v0.10 — Clientes, mayoreo y crédito.'
+  },
   {
     numero: '0.9',
     nombre: 'La Caja',
@@ -37,7 +52,6 @@ const VERSIONES = [
       { tipo: 'nuevo', texto: 'Solo el efectivo entra al arqueo. Lo cobrado por otros medios se informa aparte: ese dinero nunca pasó por el cajón.' },
       { tipo: 'nuevo', texto: 'El cajero abre, mueve dinero y cierra. Anular un movimiento es del gerente y del administrador.' }
     ],
-    siguiente: 'v0.10 — Clientes, mayoreo y crédito.'
   },
   {
     numero: '0.8',

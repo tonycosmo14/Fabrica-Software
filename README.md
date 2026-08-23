@@ -3,7 +3,7 @@
 Sistema para la fábrica de hielo de Hunucmá, Yucatán.
 Se construye **por versiones**: cada versión es un pedazo terminado, probado y usable.
 
-**Versión actual: v0.9**
+**Versión actual: v0.9.1**
 
 ---
 
@@ -114,7 +114,7 @@ src/
     sesion.js          Quién está conectado y qué puede hacer
   modulos/             Un módulo por área. Agregar uno no toca los demás
     auth/  usuarios/  tanques/  produccion/  existencia/  ventas/  caja/
-    personalizacion/  versiones/  sistema/
+    ayuda/  personalizacion/  versiones/  sistema/
 
 public/                La interfaz (HTML, CSS y JavaScript sin librerías)
   index.html
@@ -226,6 +226,24 @@ informa aparte: ese dinero nunca pasó por el cajón.
 
 ---
 
+## El manual de ayuda
+
+Está **dentro del sistema**, en el menú → **Ayuda** (o `#/ayuda`). Lo ve
+cualquiera: no hace falta ser administrador para leer cómo se usa.
+
+Nueve temas plegados, con buscador. Y una cosa que vale la pena señalar: la
+tabla de **quién puede hacer qué** no está escrita a mano. El servidor la
+arma leyendo los permisos de verdad (`src/lib/roles.js`), así que el día que
+se agregue un rol o se mueva un permiso, el manual se corrige solo. Hay una
+prueba que compara la tabla contra los permisos reales, rol por rol: un
+manual que miente es peor que no tener manual.
+
+Para agregar o corregir un tema se edita `TEMAS` en
+`public/js/vistas/ayuda.js`. El campo `busca` son las palabras con las que
+ese tema tiene que aparecer en el buscador.
+
+---
+
 ## Las reglas de oro (del plan)
 
 Están escritas en el código, no solo en el documento:
@@ -273,8 +291,9 @@ versión nueva le aparece un punto rojo en el menú.
 | **v0.7** | La Existencia: conteo del cuarto frío y cuadre del día | ✅ listo |
 | **v0.8** | Punto de venta, conteo con fracciones, vendido vs faltante | ✅ listo |
 | **v0.9** | La Caja: turnos, gastos, arqueo y corte imprimible | ✅ listo |
+| **v0.9.1** | Manual de ayuda dentro del sistema | ✅ listo |
 | v0.10 | Clientes, mayoreo, crédito y autorizaciones | siguiente |
 | v0.11 | Mantenimiento: equipos, tareas, insumos, checklists | |
 | v0.12 | Planta de agua y garrafones | |
 | v0.13 | Reparto, mapas y neveras en comodato | |
-| v1.0 | Sistema completo en producción, con manual de ayuda | |
+| v1.0 | Sistema completo en producción | |

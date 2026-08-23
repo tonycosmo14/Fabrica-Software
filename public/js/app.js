@@ -18,6 +18,7 @@ import { vistaProduccion } from './vistas/produccion.js';
 import { vistaTanques } from './vistas/tanques.js';
 import { vistaUsuarios } from './vistas/usuarios.js';
 import { vistaNovedades, hayVersionNueva } from './vistas/novedades.js';
+import { vistaAyuda } from './vistas/ayuda.js';
 import { vistaPersonalizar } from './vistas/personalizar.js';
 import { vistaSistema } from './vistas/sistema.js';
 
@@ -37,6 +38,7 @@ const RUTAS = {
   '#/usuarios':  { titulo: 'Usuarios',          vista: vistaUsuarios,  permiso: 'usuarios.administrar' },
   '#/personalizar': { titulo: 'Personalizar',   vista: vistaPersonalizar, permiso: 'sistema.configurar' },
   '#/sistema':   { titulo: 'Sistema',           vista: vistaSistema,   permiso: 'sistema.ver' },
+  '#/ayuda':     { titulo: 'Ayuda',              vista: vistaAyuda },
   '#/novedades': { titulo: 'Qué hay de nuevo',  vista: vistaNovedades }
 };
 
