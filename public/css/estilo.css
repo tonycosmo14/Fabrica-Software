@@ -595,6 +595,78 @@ select { color-scheme: light dark; }
   .ticket { border: 0; max-width: none; margin: 0; }
 }
 
+
+/* ============================================================
+   EXISTENCIA (v0.7)
+   El cuadre tiene que leerse como una cuenta de papel: cada
+   renglón suma o resta, y abajo el resultado en grande.
+   ============================================================ */
+
+.existencia-tarjeta { border-left: 5px solid var(--borde-fuerte); }
+.existencia-tarjeta.toca-contar { border-left-color: var(--est-fuera); }
+.existencia-cabeza {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 10px; margin-bottom: 14px;
+}
+.existencia-cabeza strong { display: block; font-size: 17px; }
+.existencia-cabeza small { color: var(--suave); font-size: 13px; }
+.aviso-contar {
+  background: var(--est-fuera-f); color: var(--est-fuera);
+  padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  white-space: nowrap;
+}
+
+.cuadre { border-top: 1px solid var(--borde); }
+.cuadre-linea {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  padding: 9px 0; border-bottom: 1px solid var(--borde);
+  color: var(--suave); font-size: 14.5px;
+}
+.cuadre-linea strong {
+  color: var(--texto); font-size: 17px; font-variant-numeric: tabular-nums;
+}
+.cuadre-linea.suma strong { color: var(--acento); }
+.cuadre-linea.total { border-bottom: 2px solid var(--borde-fuerte); }
+.cuadre-linea.total span, .cuadre-linea.total strong { font-weight: 700; color: var(--texto); }
+.cuadre-linea.contado strong { color: var(--verde); }
+
+.salidas {
+  margin-top: 16px; padding: 18px 14px; border-radius: var(--radio); text-align: center;
+  background: var(--est-fuera-f); border: 2px solid var(--est-fuera);
+}
+.salidas span { display: block; color: var(--suave); font-size: 14px; }
+.salidas strong {
+  display: block; font-size: 44px; font-weight: 800; line-height: 1.1;
+  color: var(--est-fuera); font-variant-numeric: tabular-nums; margin: 4px 0 0;
+}
+.salidas small {
+  display: block; color: var(--suave); font-size: 13px;
+  text-transform: uppercase; letter-spacing: .6px;
+}
+.salidas.exacto { background: var(--et-cajero-f); border-color: var(--verde); }
+.salidas.exacto strong { color: var(--verde); }
+.salidas.sobra { background: var(--et-operario-f); border-color: var(--acento); }
+.salidas.sobra strong { color: var(--acento); }
+
+.cuadre-exacto { border-left: 5px solid var(--verde); }
+.cuadre-diferencia { border-left: 5px solid var(--est-fuera); }
+
+.horarios { display: flex; gap: 8px; flex-wrap: wrap; }
+.horario {
+  background: var(--superficie-alt); border: 2px solid var(--borde);
+  padding: 8px 16px; border-radius: 10px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.ticket-tabla { width: 100%; font-size: 12px; }
+.ticket-tabla td { padding: 3px 0; }
+.ticket-tabla td:last-child { text-align: right; font-weight: 700; }
+.ticket-tabla tr.fuerte td { border-top: 1px solid #000; padding-top: 6px; font-size: 14px; }
+
+@media (min-width: 900px) {
+  .existencia-tarjeta { max-width: 560px; }
+}
+
 /* ============================================================
    BLOQUES DE AYUDA
    Van plegados para no robar espacio, pero siempre a mano.

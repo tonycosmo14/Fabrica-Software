@@ -13,7 +13,9 @@ const PERMISOS_POR_ROL = {
     'produccion.registrar',
     'caja.ver',
     'caja.operar',
-    'venta.registrar'
+    'venta.registrar',
+    'existencia.ver',
+    'existencia.contar'
   ],
   repartidor: ['reparto.ver', 'reparto.operar'],
 
@@ -27,6 +29,9 @@ const PERMISOS_POR_ROL = {
     'caja.ver',
     'caja.operar',
     'venta.registrar',
+    'existencia.ver',
+    'existencia.contar',
+    'existencia.corregir',
     'reparto.ver'
   ],
   admin: ['*'] // el comodin abre todo

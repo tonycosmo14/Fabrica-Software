@@ -8,8 +8,9 @@ import { esc } from '../util.js';
 const ACCESOS = [
   { emoji: '🏭', titulo: 'Producción',   ruta: '#/tanques',   permiso: 'produccion.ver',       desde: null   },
   { emoji: '🧊', titulo: 'Configurar tanques', ruta: '#/config-tanques', permiso: 'produccion.ver', desde: null },
-  { emoji: '🛒', titulo: 'Vender',       ruta: '#/venta',     permiso: 'venta.registrar',      desde: 'v0.4' },
-  { emoji: '💵', titulo: 'Caja',         ruta: '#/caja',      permiso: 'caja.ver',             desde: 'v0.5' },
+  { emoji: '📦', titulo: 'Existencia',   ruta: '#/existencia', permiso: 'existencia.ver',      desde: null   },
+  { emoji: '🛒', titulo: 'Vender',       ruta: '#/venta',     permiso: 'venta.registrar',      desde: 'v0.8' },
+  { emoji: '💵', titulo: 'Caja',         ruta: '#/caja',      permiso: 'caja.ver',             desde: 'v0.9' },
   { emoji: '👥', titulo: 'Usuarios',     ruta: '#/usuarios',  permiso: 'usuarios.administrar', desde: null   },
   { emoji: '🎨', titulo: 'Personalizar', ruta: '#/personalizar', permiso: 'sistema.configurar', desde: null },
   { emoji: '⚙️', titulo: 'Sistema',      ruta: '#/sistema',   permiso: 'sistema.ver',          desde: null   },

@@ -3,7 +3,7 @@
 Sistema para la fábrica de hielo de Hunucmá, Yucatán.
 Se construye **por versiones**: cada versión es un pedazo terminado, probado y usable.
 
-**Versión actual: v0.6**
+**Versión actual: v0.7**
 
 ---
 
@@ -112,7 +112,8 @@ src/
   middleware/
     sesion.js          Quién está conectado y qué puede hacer
   modulos/             Un módulo por área. Agregar uno no toca los demás
-    auth/  usuarios/  tanques/  produccion/  personalizacion/  versiones/  sistema/
+    auth/  usuarios/  tanques/  produccion/  existencia/
+    personalizacion/  versiones/  sistema/
 
 public/                La interfaz (HTML, CSS y JavaScript sin librerías)
   index.html
@@ -181,7 +182,8 @@ versión nueva le aparece un punto rojo en el menú.
 | **v0.5** | Números a sacar imprimibles, autorización con PIN, arreglos | ✅ listo |
 | **v0.5.1** | Autorización al primer toque con vales, ajustes de formulario | ✅ listo |
 | **v0.6** | Respaldos automáticos dentro y fuera de la PC | ✅ listo |
-| v0.7 | La Existencia: conteo del cuarto frío y cuadre del día | siguiente |
+| **v0.7** | La Existencia: conteo del cuarto frío y cuadre del día | ✅ listo |
+| v0.8 | Punto de venta: fracciones, precios y tickets | siguiente |
 | v0.4 | Punto de venta: fracciones, precios por fracción, tickets | |
 | v0.5 | Caja: sesiones, vales, arqueos y cortes | |
 | v0.6 | Clientes, mayoreo, crédito y autorizaciones | |

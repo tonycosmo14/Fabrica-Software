@@ -7,6 +7,23 @@ Tipos: `nuevo` (funcionalidad nueva) · `mejora` · `arreglo` · `clave` (regla 
 
 ---
 
+## v0.7 — La Existencia · 23 de agosto de 2026
+
+El control que hoy se lleva en libreta. Migración `006_existencia.sql`.
+
+    existencia anterior + producido − contado = SALIDAS
+
+- **clave** — Tablas `almacenes` y `conteos`. El conteo guarda **congelados** `existencia_anterior`, `producido` y `salidas` (regla 3.2): corregir o anular una sacada vieja no cambia un corte que ya se hizo. Hay una prueba que anula producción anterior y verifica que el conteo no se mueve.
+- **clave** — Las cantidades se guardan en **dieciseisavos** aunque se cuenten en marquetas (regla 3.1), así el día que haya media marqueta el modelo ya la admite.
+- **nuevo** — Pantalla de Existencia con el cuadre línea por línea y las salidas en grande. Verde si cuadra exacto, ámbar si hay diferencia, azul si sobran.
+- **nuevo** — Ticket imprimible de cada conteo, con espacio para la firma.
+- **nuevo** — Horarios de conteo configurables (15:00 y 20:00 por omisión) y aviso de "toca contar" cuando pasó la hora y no se ha hecho.
+- **nuevo** — Cuartos fríos configurables, con la marca de cuál recibe la producción de los tanques. No se puede dejar la fábrica sin ninguno que la reciba.
+- **nuevo** — Historial de conteos y anulación con motivo; al anular, vuelve a valer el conteo anterior.
+- **nuevo** — Permisos `existencia.ver`, `existencia.contar` y `existencia.corregir`. El cajero cuenta; anular y configurar son del gerente y del administrador.
+
+---
+
 ## v0.6 — Respaldos automáticos · 23 de agosto de 2026
 
 El usuario planteó su miedo real: perder los datos si muere la PC. La

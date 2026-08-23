@@ -12,9 +12,28 @@
  * tipo: 'nuevo' | 'mejora' | 'arreglo' | 'importante'
  */
 
-const VERSION_ACTUAL = '0.6';
+const VERSION_ACTUAL = '0.7';
 
 const VERSIONES = [
+  {
+    numero: '0.7',
+    nombre: 'La Existencia',
+    fecha: '2026-08-23',
+    resumen:
+      'El control que hoy llevas en la libreta, hecho sistema: cuentas las ' +
+      'marquetas del cuarto frío y el sistema te dice cuánto salió.',
+    cambios: [
+      { tipo: 'importante', texto: 'Pantalla de Existencia con el cuadre: lo que había, más lo que se produjo, menos lo que contaste, igual a lo que salió.' },
+      { tipo: 'nuevo', texto: 'El conteo se hace con los botones − y ＋, partiendo del número que debería haber.' },
+      { tipo: 'nuevo', texto: 'Ticket imprimible de cada conteo, con firma. Tu respaldo en papel.' },
+      { tipo: 'nuevo', texto: 'Horarios de conteo configurables: a las 3 y a las 8 el sistema avisa que toca contar.' },
+      { tipo: 'nuevo', texto: 'Cuartos fríos configurables. Hoy hay uno; si mañana hay más, cada uno se cuenta por separado.' },
+      { tipo: 'nuevo', texto: 'Historial de conteos, y anular uno mal capturado sin borrar nada.' },
+      { tipo: 'importante', texto: 'Cada conteo guarda congelados sus números: corregir una sacada vieja no cambia un corte que ya se hizo.' },
+      { tipo: 'nuevo', texto: 'El cajero puede contar; anular y configurar es del gerente y del administrador.' }
+    ],
+    siguiente: 'v0.8 — Punto de venta: fracciones, precios por fracción y tickets.'
+  },
   {
     numero: '0.6',
     nombre: 'Respaldos automáticos',
@@ -31,8 +50,7 @@ const VERSIONES = [
       { tipo: 'nuevo', texto: 'Si la USB se desconecta, la copia local sigue haciéndose y la pantalla avisa que la de fuera está fallando.' },
       { tipo: 'nuevo', texto: 'Se conservan las últimas 30 copias y las viejas se borran solas.' },
       { tipo: 'mejora', texto: 'Las instrucciones para restaurar están en la propia pantalla de Sistema.' }
-    ],
-    siguiente: 'v0.7 — La Existencia: el conteo del cuarto frío a las 3 y a las 8, y el cuadre del día.'
+    ]
   },
   {
     numero: '0.5.1',

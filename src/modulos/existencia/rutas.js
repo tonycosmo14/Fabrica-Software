@@ -1,0 +1,297 @@
+/**
+ * LA EXISTENCIA  (v0.7)
+ *
+ * A las 3 y a las 8 alguien cuenta las marquetas que quedan en el cuarto
+ * frío. El sistema compara ese número con lo que debería haber:
+ *
+ *     existencia anterior + producido − contado = SALIDAS
+ *
+ * Hoy las salidas son "lo que se vendió y lo que se perdió", todo junto.
+ * Cuando exista el punto de venta, lo vendido saldrá de los tickets y la
+ * diferencia que quede es la que hay que explicar.
+ */
+const express = require('express');
+const { bd } = require('../../db/conexion');
+const { nuevoId, ahora } = require('../../lib/ids');
+const { ok, error } = require('../../lib/respuestas');
+const bitacora = require('../../lib/bitacora');
+const { exigirPermiso } = require('../../middleware/sesion');
+const { estadoAlmacen, ultimoConteo, deMarquetas, aMarquetas } = require('./calculo');
+
+const router = express.Router();
+
+const verExistencia = exigirPermiso('existencia.ver');
+const contar = exigirPermiso('existencia.contar');
+const configurar = exigirPermiso('sistema.configurar');
+
+const MAX_MARQUETAS = 100000;
+
+function almacenesActivos() {
+  return bd.prepare('SELECT * FROM almacenes WHERE activo = 1 ORDER BY orden, nombre').all();
+}
+
+/** Las horas del día en las que toca contar, tal como están configuradas. */
+function horariosConteo() {
+  const valor = bd.prepare("SELECT valor FROM configuracion WHERE clave = 'conteo_horarios'")
+    .get()?.valor || '';
+  return valor.split(',').map((h) => h.trim()).filter(Boolean);
+}
+
+/**
+ * ¿Toca contar? Se compara la hora de ahora con los horarios configurados
+ * y con la hora del último conteo del día.
+ */
+function pendienteDeConteo(almacen) {
+  const horarios = horariosConteo();
+  if (!horarios.length) return null;
+
+  const ahoraFecha = new Date();
+  const hoy = ahoraFecha.toISOString().slice(0, 10);
+  const minutosAhora = ahoraFecha.getHours() * 60 + ahoraFecha.getMinutes();
+
+  const ultimo = ultimoConteo(almacen.id);
+  const minutosUltimo = ultimo && ultimo.fecha.slice(0, 10) === hoy
+    ? (() => { const d = new Date(ultimo.fecha); return d.getHours() * 60 + d.getMinutes(); })()
+    : -1;
+
+  // El horario más reciente que ya pasó y que todavía no se ha cubierto.
+  let pendiente = null;
+  for (const h of horarios) {
+    const [hh, mm] = h.split(':').map(Number);
+    const minutos = hh * 60 + (mm || 0);
+    if (minutos <= minutosAhora && minutos > minutosUltimo) pendiente = h;
+  }
+  return pendiente;
+}
+
+// ============================================================
+// ESTADO
+// ============================================================
+
+router.get('/', verExistencia, (req, res) => {
+  const almacenes = almacenesActivos().map((a) => {
+    const estado = estadoAlmacen(a);
+    return {
+      ...estado,
+      pendiente: pendienteDeConteo(a),
+      // En marquetas, que es como lo piensa la gente
+      enMarquetas: {
+        anterior: aMarquetas(estado.existenciaAnterior),
+        producido: aMarquetas(estado.producido),
+        teorico: aMarquetas(estado.teorico)
+      }
+    };
+  });
+
+  return ok(res, { almacenes, horarios: horariosConteo() });
+});
+
+/** Historial de conteos de un almacén. */
+router.get('/conteos', verExistencia, (req, res) => {
+  const limite = Math.min(Number(req.query.limite) || 30, 200);
+  const almacenId = req.query.almacen;
+
+  const filas = bd.prepare(`
+    SELECT c.*, a.nombre AS almacen, u.nombre AS ejecutor_nombre,
+           v.nombre AS anulado_por_nombre
+      FROM conteos c
+      JOIN almacenes a ON a.id = c.almacen_id
+      LEFT JOIN usuarios u ON u.id = c.ejecutor_id
+      LEFT JOIN usuarios v ON v.id = c.anulado_por
+     ${almacenId ? 'WHERE c.almacen_id = ?' : ''}
+     ORDER BY c.fecha DESC LIMIT ?
+  `).all(...(almacenId ? [almacenId, limite] : [limite]));
+
+  return ok(res, { conteos: filas });
+});
+
+// ============================================================
+// HACER EL CONTEO
+// ============================================================
+
+router.post('/conteos', contar, (req, res) => {
+  const almacen = bd.prepare('SELECT * FROM almacenes WHERE id = ? AND activo = 1')
+    .get(req.body?.almacenId);
+  if (!almacen) return error(res, 'Ese cuarto frío no existe.', 404);
+
+  const marquetas = Number(req.body?.marquetas);
+  if (!Number.isFinite(marquetas) || marquetas < 0 || marquetas > MAX_MARQUETAS) {
+    return error(res, 'Escribe cuántas marquetas contaste.');
+  }
+
+  // La foto de cómo estaba justo antes de contar: se guarda congelada, para
+  // que corregir una sacada vieja no cambie un corte que ya se hizo.
+  const estado = estadoAlmacen(almacen);
+  const contado = deMarquetas(marquetas);
+  const salidas = estado.teorico - contado;
+
+  const ejecutorId = req.body?.ejecutorId || req.usuario.id;
+  const id = nuevoId();
+  const fecha = ahora();
+
+  bd.prepare(`
+    INSERT INTO conteos (id, almacen_id, fecha, ejecutor_id, capturista_id, contado,
+                         existencia_anterior, producido, salidas, desde, notas)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, almacen.id, fecha, ejecutorId, req.usuario.id, contado,
+         estado.existenciaAnterior, estado.producido, salidas,
+         estado.desde, req.body?.notas || null);
+
+  bitacora.registrar({
+    accion: 'existencia.conteo', entidad: 'almacen', entidadId: almacen.id,
+    ejecutorId, capturistaId: req.usuario.id,
+    detalle: {
+      almacen: almacen.nombre,
+      contado: aMarquetas(contado),
+      anterior: aMarquetas(estado.existenciaAnterior),
+      producido: aMarquetas(estado.producido),
+      salidas: aMarquetas(salidas)
+    }
+  });
+
+  return ok(res, {
+    conteo: bd.prepare('SELECT * FROM conteos WHERE id = ?').get(id),
+    resumen: {
+      anterior: aMarquetas(estado.existenciaAnterior),
+      producido: aMarquetas(estado.producido),
+      teorico: aMarquetas(estado.teorico),
+      contado: aMarquetas(contado),
+      salidas: aMarquetas(salidas),
+      primerConteo: !estado.ultimoConteo
+    }
+  }, 201);
+});
+
+/**
+ * Anular un conteo mal capturado. No se borra: se marca.
+ * Al anularlo, el conteo anterior vuelve a ser el bueno.
+ */
+router.post('/conteos/:id/anular', exigirPermiso('existencia.corregir'), (req, res) => {
+  const c = bd.prepare('SELECT * FROM conteos WHERE id = ?').get(req.params.id);
+  if (!c) return error(res, 'Ese conteo no existe.', 404);
+  if (c.anulado_en) return error(res, 'Ese conteo ya está anulado.');
+
+  const motivo = String(req.body?.motivo || '').trim();
+  if (!motivo) return error(res, 'Escribe por qué se anula.');
+
+  bd.prepare('UPDATE conteos SET anulado_en = ?, anulado_por = ?, motivo_anulacion = ? WHERE id = ?')
+    .run(ahora(), req.usuario.id, motivo, c.id);
+
+  bitacora.registrar({
+    accion: 'existencia.anulacion', entidad: 'conteo', entidadId: c.id,
+    ejecutorId: req.usuario.id, detalle: { motivo, contado: aMarquetas(c.contado) }
+  });
+
+  return ok(res, { anulado: true });
+});
+
+// ============================================================
+// CUARTOS FRÍOS — solo el administrador
+// ============================================================
+
+router.get('/almacenes', verExistencia, (req, res) => {
+  const incluirInactivos = req.query.incluirInactivos === '1';
+  const filas = bd.prepare(`
+    SELECT * FROM almacenes ${incluirInactivos ? '' : 'WHERE activo = 1'}
+     ORDER BY activo DESC, orden, nombre
+  `).all();
+  return ok(res, { almacenes: filas, horarios: horariosConteo() });
+});
+
+router.post('/almacenes', configurar, (req, res) => {
+  const nombre = String(req.body?.nombre || '').trim();
+  if (!nombre) return error(res, 'El cuarto frío necesita un nombre.');
+
+  const id = nuevoId();
+  const orden = bd.prepare('SELECT COALESCE(MAX(orden), 0) n FROM almacenes').get().n + 1;
+
+  bd.prepare(`
+    INSERT INTO almacenes (id, nombre, orden, recibe_produccion, notas, activo, fecha_alta, creado_por)
+    VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+  `).run(id, nombre, orden, req.body?.recibeProduccion ? 1 : 0,
+         req.body?.notas || null, ahora(), req.usuario.id);
+
+  bitacora.registrar({
+    accion: 'almacen.alta', entidad: 'almacen', entidadId: id,
+    ejecutorId: req.usuario.id, detalle: { nombre }
+  });
+
+  return ok(res, { almacen: bd.prepare('SELECT * FROM almacenes WHERE id = ?').get(id) }, 201);
+});
+
+router.put('/almacenes/:id', configurar, (req, res) => {
+  const a = bd.prepare('SELECT * FROM almacenes WHERE id = ?').get(req.params.id);
+  if (!a) return error(res, 'Ese cuarto frío no existe.', 404);
+
+  const nombre = req.body?.nombre !== undefined
+    ? String(req.body.nombre).trim() : a.nombre;
+  if (!nombre) return error(res, 'El nombre no puede quedar vacío.');
+
+  const recibe = req.body?.recibeProduccion !== undefined
+    ? (req.body.recibeProduccion ? 1 : 0) : a.recibe_produccion;
+
+  // Alguien tiene que recibir el hielo de los tanques.
+  if (!recibe && a.recibe_produccion) {
+    const otros = bd.prepare(
+      'SELECT COUNT(*) n FROM almacenes WHERE activo = 1 AND recibe_produccion = 1 AND id <> ?'
+    ).get(a.id).n;
+    if (otros === 0) {
+      return error(res, 'Algún cuarto frío tiene que recibir la producción de los tanques.');
+    }
+  }
+
+  bd.prepare('UPDATE almacenes SET nombre = ?, recibe_produccion = ?, notas = ? WHERE id = ?')
+    .run(nombre, recibe, req.body?.notas !== undefined ? req.body.notas : a.notas, a.id);
+
+  bitacora.registrar({
+    accion: 'almacen.edicion', entidad: 'almacen', entidadId: a.id,
+    ejecutorId: req.usuario.id, detalle: { nombre, recibeProduccion: Boolean(recibe) }
+  });
+
+  return ok(res, { almacen: bd.prepare('SELECT * FROM almacenes WHERE id = ?').get(a.id) });
+});
+
+router.post('/almacenes/:id/baja', configurar, (req, res) => {
+  const a = bd.prepare('SELECT * FROM almacenes WHERE id = ?').get(req.params.id);
+  if (!a) return error(res, 'Ese cuarto frío no existe.', 404);
+
+  const activos = bd.prepare('SELECT COUNT(*) n FROM almacenes WHERE activo = 1').get().n;
+  if (activos <= 1) return error(res, 'Es el único cuarto frío. No se puede dar de baja.');
+
+  bd.prepare('UPDATE almacenes SET activo = 0, fecha_baja = ? WHERE id = ?').run(ahora(), a.id);
+  bitacora.registrar({
+    accion: 'almacen.baja', entidad: 'almacen', entidadId: a.id, ejecutorId: req.usuario.id
+  });
+  return ok(res, { dadoDeBaja: true });
+});
+
+/** Horarios en los que toca contar. */
+router.put('/horarios', configurar, (req, res) => {
+  const lista = Array.isArray(req.body?.horarios) ? req.body.horarios : [];
+  const limpios = [];
+
+  for (const h of lista) {
+    const texto = String(h).trim();
+    if (!/^([01]?\d|2[0-3]):[0-5]\d$/.test(texto)) {
+      return error(res, `"${texto}" no es una hora válida. Se escriben así: 15:00`);
+    }
+    limpios.push(texto.padStart(5, '0'));
+  }
+  if (!limpios.length) return error(res, 'Pon al menos una hora de conteo.');
+
+  bd.prepare(`
+    INSERT INTO configuracion (clave, valor, actualizado_en, actualizado_por)
+    VALUES ('conteo_horarios', ?, ?, ?)
+    ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor,
+      actualizado_en = excluded.actualizado_en, actualizado_por = excluded.actualizado_por
+  `).run(limpios.sort().join(','), ahora(), req.usuario.id);
+
+  bitacora.registrar({
+    accion: 'existencia.horarios', entidad: 'configuracion',
+    ejecutorId: req.usuario.id, detalle: { horarios: limpios }
+  });
+
+  return ok(res, { horarios: limpios });
+});
+
+module.exports = router;

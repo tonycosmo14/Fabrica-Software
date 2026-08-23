@@ -11,6 +11,7 @@ import { cargarMarca, marcaBarraHTML } from './marca.js';
 import { vistaBienvenida } from './vistas/bienvenida.js';
 import { vistaEntrar } from './vistas/entrar.js';
 import { vistaInicio } from './vistas/inicio.js';
+import { vistaExistencia } from './vistas/existencia.js';
 import { vistaProduccion } from './vistas/produccion.js';
 import { vistaTanques } from './vistas/tanques.js';
 import { vistaUsuarios } from './vistas/usuarios.js';
@@ -27,6 +28,7 @@ const estado = { usuario: null, permisos: [], configurado: true };
 const RUTAS = {
   '#/inicio':    { titulo: 'Inicio',            vista: vistaInicio },
   '#/tanques':   { titulo: 'Producción',        vista: vistaProduccion, permiso: 'produccion.ver' },
+  '#/existencia': { titulo: 'Existencia',       vista: vistaExistencia, permiso: 'existencia.ver' },
   '#/config-tanques': { titulo: 'Configurar tanques', vista: vistaTanques, permiso: 'produccion.ver' },
   '#/usuarios':  { titulo: 'Usuarios',          vista: vistaUsuarios,  permiso: 'usuarios.administrar' },
   '#/personalizar': { titulo: 'Personalizar',   vista: vistaPersonalizar, permiso: 'sistema.configurar' },
