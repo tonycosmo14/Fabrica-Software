@@ -1841,3 +1841,33 @@ body.pantalla-fija main {
   text-align: center; font-size: 8pt; margin-top: 2mm;
   border-top: 1px dashed #000; padding-top: 1.5mm;
 }
+
+/* Campos de un solo renglón dentro de un diálogo: aquí enter acepta */
+.dialogo-campo-linea { margin: 0; font-size: 17px; }
+.campo-importe {
+  margin: 0; text-align: center; font-size: 30px; font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.rejilla-config { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+.rejilla-config label { display: block; }
+.rejilla-config select, .rejilla-config input { margin: 0; }
+
+/* El historial de tickets dentro del punto de venta */
+.pos-historial { width: min(560px, 100%); }
+.lista-tickets { max-height: 46vh; overflow-y: auto; margin-top: 12px; }
+.ticket-fila {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 2px; border-bottom: 1px solid var(--borde);
+}
+.ticket-fila strong { display: block; font-size: 16px; }
+.ticket-fila small { display: block; color: var(--suave); font-size: 12.5px; }
+.ticket-fila-total {
+  font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.ticket-fila.anulada { opacity: .55; text-decoration: line-through; }
+
+.tk-copia {
+  text-align: center; font-size: 11pt; font-weight: 700;
+  letter-spacing: 2px; margin: 1mm 0;
+}

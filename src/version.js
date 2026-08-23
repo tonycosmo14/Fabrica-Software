@@ -12,9 +12,30 @@
  * tipo: 'nuevo' | 'mejora' | 'arreglo' | 'importante'
  */
 
-const VERSION_ACTUAL = '0.10';
+const VERSION_ACTUAL = '0.11';
 
 const VERSIONES = [
+  {
+    numero: '0.11',
+    nombre: 'Impresión de verdad y relevo de turno',
+    fecha: '2026-08-23',
+    resumen:
+      'El ticket ya no lo imprime el navegador: lo manda el sistema directo ' +
+      'a la impresora. Y el cambio de cajero de las 3 por fin se puede ' +
+      'registrar como pasa en la fábrica.',
+    cambios: [
+      { tipo: 'importante', texto: 'El ticket sale al instante, sin que se asome la ventana de impresión. El sistema le manda los bytes directo a la impresora térmica, como los programas de caja de verdad.' },
+      { tipo: 'nuevo', texto: 'Configuración de la impresora en Productos y precios: nombre, ancho del papel, copias, renglón al pie, y un botón para imprimir una prueba.' },
+      { tipo: 'importante', texto: 'YA NO SE IMPRIME SOLO al cobrar. Se cobra con enter, y otro enter imprime si hace falta. No todos los tickets se entregan.' },
+      { tipo: 'nuevo', texto: 'F3 abre los tickets del día: se busca por número, importe u hora, y se puede sacar una COPIA. Para cuando el cliente vuelve o te saliste de la pantalla sin querer.' },
+      { tipo: 'importante', texto: 'RELEVO DE TURNO. Al terminar, el sistema pregunta si ya llegó quien sigue. Si ya llegó, se hace el corte y se cierra la sesión: el que entra pone su PIN y el turno queda a su nombre.' },
+      { tipo: 'importante', texto: 'Y si NO ha llegado (el relevo de las 2:30), se cuenta el dinero del que se va y la venta sigue: queda un turno esperando dueño, y lo que entre se aparta para el que llegue. Antes se seguía cobrando con el usuario equivocado y las ventas de la noche salían a nombre de quien no era.' },
+      { tipo: 'nuevo', texto: 'Un gasto imprime su comprobante con espacio para la firma. Meter dinero no: nadie firma por dejar dinero.' },
+      { tipo: 'arreglo', texto: 'Los campos de dinero ya no dejan escribir letras, y enter acepta en vez de hacer un salto de línea.' },
+      { tipo: 'arreglo', texto: 'Los cajeros ya no ven la configuración de tanques. Sí siguen poniendo la producción y la existencia, y queda anotado quién con su PIN.' }
+    ],
+    siguiente: 'v0.12 — Clientes, ventas en espera y cambios de ticket.'
+  },
   {
     numero: '0.10',
     nombre: 'La caja de verdad',
@@ -37,7 +58,6 @@ const VERSIONES = [
       { tipo: 'nuevo', texto: 'La calculadora de fracciones sigue ahí, en el botón 🧮, para las cantidades que no tienen botón.' },
       { tipo: 'nuevo', texto: 'El manual explica el teclado paso por paso.' }
     ],
-    siguiente: 'v0.11 — Clientes registrados y crédito.'
   },
   {
     numero: '0.9.1',

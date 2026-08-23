@@ -62,7 +62,8 @@ router.get('/', verCaja, (req, res) => {
 
   return ok(res, {
     abierta: estadoCaja(caja),
-    movimientos: movimientos(caja.id)
+    movimientos: movimientos(caja.id),
+    sinDueno: !caja.cajero_id
   });
 });
 
@@ -132,6 +133,63 @@ router.post('/cerrar', operarCaja, (req, res) => {
   return ok(res, { corte: detalleCorte(caja.id) });
 });
 
+/**
+ * ENTREGAR EL TURNO sin que haya llegado el que sigue.
+ *
+ * Es el caso de las 2:30 de la tarde: se entrega la existencia y se cuenta
+ * el dinero del cajero que se va, pero el que entra todavía no llega y la
+ * venta no se puede parar.
+ *
+ * Se cierra el turno del que se va y se abre uno NUEVO SIN DUEÑO. Las
+ * ventas siguen entrando ahí, y quedan apartadas para quien llegue: en
+ * cuanto ponga su PIN, el turno se le asigna. Cada venta guarda además
+ * quién la tecleó, así que el histórico no miente.
+ */
+router.post('/entregar', operarCaja, (req, res) => {
+  const caja = sesionAbierta();
+  if (!caja) return error(res, 'No hay ningún turno de caja abierto.', 409);
+  if (!caja.cajero_id) {
+    return error(res, 'Ese turno todavía está esperando dueño. No se puede entregar dos veces.', 409);
+  }
+
+  const contado = leerImporte(req.body?.contado);
+  if (contado === null) return error(res, 'Escribe cuánto dinero contaste.');
+
+  const estado = estadoCaja(caja);
+  const diferencia = contado - estado.esperado;
+  const fecha = ahora();
+  const nuevoId2 = nuevoId();
+
+  const entregar = bd.transaction(() => {
+    bd.prepare(`
+      UPDATE cajas SET
+        cerrada_en = ?, cerrada_por = ?, contado_centavos = ?, esperado_centavos = ?,
+        diferencia_centavos = ?, vendido_centavos = ?, entradas_centavos = ?,
+        salidas_centavos = ?, notas_cierre = ?
+      WHERE id = ?
+    `).run(fecha, req.usuario.id, contado, estado.esperado, diferencia,
+           estado.vendido, estado.entradas, estado.salidas,
+           req.body?.notas || 'Entrega de turno', caja.id);
+
+    const folio = bd.prepare('SELECT COALESCE(MAX(folio), 0) n FROM cajas').get().n + 1;
+    // cajero_id va en NULL a propósito: ese es el turno que espera dueño.
+    bd.prepare(`
+      INSERT INTO cajas (id, folio, cajero_id, abierta_por, abierta_en, fondo_centavos, notas_apertura)
+      VALUES (?, ?, NULL, ?, ?, 0, ?)
+    `).run(nuevoId2, folio, req.usuario.id, fecha, 'Esperando al cajero que entra');
+    return folio;
+  });
+  const folioNuevo = entregar();
+
+  bitacora.registrar({
+    accion: 'caja.entregada', entidad: 'caja', entidadId: caja.id,
+    ejecutorId: caja.cajero_id, capturistaId: req.usuario.id,
+    detalle: { folio: caja.folio, esperado: estado.esperado, contado, diferencia, folioNuevo }
+  });
+
+  return ok(res, { corte: detalleCorte(caja.id), turnoNuevo: folioNuevo });
+});
+
 // ============================================================
 // GASTOS Y RETIROS
 // ============================================================
@@ -175,6 +233,7 @@ router.post('/movimientos', operarCaja, (req, res) => {
   });
 
   return ok(res, {
+    movimientoId: id,
     abierta: estadoCaja(sesionAbierta()),
     movimientos: movimientos(caja.id)
   }, 201);

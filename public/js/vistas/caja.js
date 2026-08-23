@@ -12,11 +12,14 @@
  */
 import { api } from '../api.js';
 import { esc, avisar, fecha as formatoFecha, soloHora, rango } from '../util.js';
-import { pedirTexto, confirmar } from '../dialogo.js';
+import { pedirTexto, pedirImporte, confirmar, menu } from '../dialogo.js';
 import { pesos } from '../fracciones.js';
 import { cargarMarca } from '../marca.js';
 
-export async function vistaCaja(pantalla, estadoApp) {
+export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
+  // Al cerrar el turno se sale del sistema: así el siguiente cajero tiene
+  // que poner su PIN, y el turno queda a nombre de quien de verdad está.
+  const alTerminar = opciones.alSalir;
   const puedeOperar = estadoApp.permisos.includes('*') ||
                       estadoApp.permisos.includes('caja.operar');
   const puedeCorregir = estadoApp.permisos.includes('*') ||
@@ -29,7 +32,7 @@ export async function vistaCaja(pantalla, estadoApp) {
   async function pintar() {
     const datos = await api.obtener('/caja');
     if (!datos.abierta) return sinTurno(datos.ultimoCorte);
-    turnoAbierto(datos.abierta, datos.movimientos);
+    turnoAbierto(datos.abierta, datos.movimientos, datos.sinDueno);
   }
 
   // ==========================================================
@@ -100,7 +103,7 @@ export async function vistaCaja(pantalla, estadoApp) {
   // ==========================================================
   // TURNO ABIERTO
   // ==========================================================
-  function turnoAbierto(e, movs) {
+  function turnoAbierto(e, movs, sinDueno) {
     const c = e.caja;
 
     pantalla.innerHTML = `
@@ -114,8 +117,17 @@ export async function vistaCaja(pantalla, estadoApp) {
 
       <p class="ayuda">
         Abierto desde las ${esc(soloHora(c.abierta_en))}
-        · ${esc(c.cajero_nombre || '—')}
+        · ${sinDueno
+          ? '<strong>esperando al cajero que entra</strong>'
+          : esc(c.cajero_nombre || '—')}
       </p>
+
+      ${sinDueno ? `
+        <div class="aviso-sin-caja" style="margin-top:0;margin-bottom:14px">
+          <strong>Este turno todavía no tiene dueño.</strong>
+          El dinero que entre se está apartando para el cajero que llega.
+          En cuanto ponga su PIN, el turno queda a su nombre.
+        </div>` : ''}
 
       <div class="venta-tablero">
         <section class="tarjeta">
@@ -158,7 +170,7 @@ export async function vistaCaja(pantalla, estadoApp) {
               <button class="secundario" id="entrada">＋ Meter dinero</button>
             </div>
             <button class="grande" id="cerrar" style="margin-top:10px;width:100%">
-              Cerrar turno y contar
+              Terminar turno y contar
             </button>` : ''}
         </section>
 
@@ -194,7 +206,7 @@ export async function vistaCaja(pantalla, estadoApp) {
     if (puedeOperar) {
       pantalla.querySelector('#salida').onclick = () => nuevoMovimiento('salida');
       pantalla.querySelector('#entrada').onclick = () => nuevoMovimiento('entrada');
-      pantalla.querySelector('#cerrar').onclick = () => cerrarTurno(e);
+      pantalla.querySelector('#cerrar').onclick = () => terminarTurno(e, sinDueno);
     }
 
     pantalla.querySelectorAll('[data-anular]').forEach((b) => {
@@ -245,31 +257,54 @@ export async function vistaCaja(pantalla, estadoApp) {
   // ==========================================================
   // CERRAR: CONTAR EL DINERO
   // ==========================================================
-  async function cerrarTurno(e) {
-    const contado = await pedirTexto({
-      titulo: 'Cerrar el turno',
+  /**
+   * TERMINAR EL TURNO.
+   *
+   * Hay dos formas, y la diferencia es si el que sigue ya llegó:
+   *
+   *  · Ya llegó (o se cierra la fábrica) → se cuenta, se hace el corte y se
+   *    SALE DEL SISTEMA. El siguiente pone su PIN y ese PIN abre su turno.
+   *    Así el nombre del turno siempre es el de quien de verdad está.
+   *
+   *  · Todavía no llega (el relevo de las 2:30) → se cuenta el dinero del
+   *    que se va, y queda abierto un turno SIN DUEÑO. La venta no se para:
+   *    lo que entre se aparta para el que llega, y en cuanto ponga su PIN
+   *    el turno se le asigna.
+   */
+  async function terminarTurno(e, sinDueno) {
+    const como = sinDueno
+      ? 'cerrar'
+      : await menu({
+          titulo: 'Terminar el turno',
+          texto: '¿Ya llegó quien sigue en la caja?',
+          opciones: [
+            { valor: 'cerrar', texto: 'Sí, ya llegó',
+              detalle: 'Se hace el corte y se cierra la sesión. Quien entra pone su PIN.' },
+            { valor: 'entregar', texto: 'Todavía no llega',
+              detalle: 'Se cuenta tu dinero y la venta sigue. Lo que entre se aparta para quien llegue.' }
+          ]
+        });
+    if (!como) return;
+
+    const contado = await pedirImporte({
+      titulo: como === 'entregar' ? 'Entregar el turno' : 'Cerrar el turno',
       texto: `Cuenta todo el dinero del cajón, incluido el fondo. Deberían ser ${pesos(e.esperado)}.`,
       marcador: (e.esperado / 100).toFixed(2),
-      ok: 'Cerrar y ver el corte', largo: 12
+      ok: 'Contar y ver el corte'
     });
     if (contado === null) return;
 
-    if (!await confirmar({
-      titulo: '¿Cerrar el turno?',
-      texto: 'Una vez cerrado, el corte se congela: cancelar mañana una venta de hoy ya no lo cambia.',
-      ok: 'Sí, cerrar'
-    })) return;
-
     try {
-      const { corte } = await api.enviar('/caja/cerrar', { contado });
-      verCorte(corte.caja.id, corte);
+      const r = await api.enviar(`/caja/${como === 'entregar' ? 'entregar' : 'cerrar'}`,
+                                 { contado });
+      verCorte(r.corte.caja.id, r.corte, { cerroSesion: como === 'cerrar' });
     } catch (err) { avisar(err.message, 'error'); }
   }
 
   // ==========================================================
   // EL CORTE, CON SU TICKET
   // ==========================================================
-  async function verCorte(id, yaCargado) {
+  async function verCorte(id, yaCargado, { cerroSesion = false } = {}) {
     const { corte } = yaCargado ? { corte: yaCargado } : await api.obtener(`/caja/cortes/${id}`);
     const c = corte.caja;
 
@@ -355,12 +390,24 @@ export async function vistaCaja(pantalla, estadoApp) {
         </div>
       </div>
 
-      <div class="fila-botones no-imprimir" style="margin-top:14px">
+      <div class="fila-botones no-imprimir" style="margin-top:14px;flex-wrap:wrap">
         <button id="imprimir">🖨️ Imprimir el corte</button>
-      </div>`;
+        ${cerroSesion
+          ? '<button class="grande crece" id="siguiente-cajero">Listo · pasa el siguiente</button>'
+          : ''}
+      </div>
+
+      ${cerroSesion ? `
+        <p class="ayuda no-imprimir" style="margin-top:12px">
+          Al terminar aquí se cierra la sesión. El cajero que entra pone su
+          PIN y con eso arranca su turno.
+        </p>` : ''}`;
 
     pantalla.querySelector('#volver').onclick = pintar;
     pantalla.querySelector('#imprimir').onclick = () => window.print();
+
+    const siguiente = pantalla.querySelector('#siguiente-cajero');
+    if (siguiente) siguiente.onclick = () => alTerminar?.();
   }
 
   // ==========================================================

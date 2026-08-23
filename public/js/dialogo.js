@@ -166,30 +166,96 @@ export function pedirCantidad({ titulo, texto = '', valor = 0, ok = 'Guardar', a
 }
 
 /**
- * Pide un texto libre. Para motivos, notas y todo lo que no cabe en una
- * lista de opciones cerrada.
+ * PIDE UN IMPORTE EN PESOS.
+ *
+ * Un campo de dinero no debe dejar escribir letras: si lo que se necesita
+ * es una cantidad, teclear "doscientos" solo puede terminar mal. Aquí solo
+ * entran números y un punto.
+ *
+ * Y ENTER ACEPTA. En un campo de una sola línea, enter no tiene por qué
+ * hacer nada más; en la caja se teclea con una mano y se cobra con enter.
  */
-export function pedirTexto({ titulo, texto = '', valor = '', marcador = '', ok = 'Guardar', largo = 200 }) {
+export function pedirImporte({ titulo, texto = '', valor = '', marcador = '0.00',
+                               ok = 'Guardar', ayuda = '' }) {
   return new Promise((resolver) => {
     const { caja, salir } = montar(`
       <h3 class="dialogo-titulo">${titulo}</h3>
       ${texto ? `<p class="dialogo-texto">${texto}</p>` : ''}
-      <textarea id="texto" class="dialogo-texto-campo" rows="3"
-                maxlength="${largo}" placeholder="${marcador}">${valor}</textarea>
+      <input id="importe" class="campo-importe" inputmode="decimal"
+             autocomplete="off" placeholder="${marcador}" value="${valor}">
+      ${ayuda ? `<p class="ayuda" style="margin:10px 0 0">${ayuda}</p>` : ''}
+      <div class="dialogo-botones">
+        <button class="secundario" data-no>Cancelar</button>
+        <button data-si>${ok}</button>
+      </div>`, resolver);
+
+    const campo = caja.querySelector('#importe');
+    setTimeout(() => { campo.focus(); campo.select(); }, 220);
+
+    // Se filtra al escribir: así no hay forma de dejar dentro una letra.
+    campo.oninput = () => {
+      const limpio = campo.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
+      if (limpio !== campo.value) campo.value = limpio;
+    };
+
+    const enviar = () => {
+      const v = campo.value.trim();
+      if (v === '' || Number.isNaN(Number(v))) { campo.focus(); return; }
+      salir(v);
+    };
+
+    campo.onkeydown = (ev) => {
+      if (ev.key === 'Enter') { ev.preventDefault(); enviar(); }
+    };
+    caja.querySelector('[data-no]').onclick = () => salir(null);
+    caja.querySelector('[data-si]').onclick = enviar;
+  });
+}
+
+/**
+ * Pide un texto libre. Para motivos, notas y todo lo que no cabe en una
+ * lista de opciones cerrada.
+ *
+ * Con `unaLinea` se usa un campo de un renglón y ENTER acepta, en vez de
+ * meter un salto de línea. Para un nombre o un concepto corto, el salto de
+ * línea nunca es lo que se quería.
+ */
+export function pedirTexto({ titulo, texto = '', valor = '', marcador = '',
+                             ok = 'Guardar', largo = 200, unaLinea = false }) {
+  return new Promise((resolver) => {
+    // Un campo corto se escribe en un renglón; ahí enter acepta.
+    const corto = unaLinea || largo <= 60;
+
+    const { caja, salir } = montar(`
+      <h3 class="dialogo-titulo">${titulo}</h3>
+      ${texto ? `<p class="dialogo-texto">${texto}</p>` : ''}
+      ${corto
+        ? `<input id="texto" class="dialogo-campo-linea" maxlength="${largo}"
+                  autocomplete="off" placeholder="${marcador}" value="${valor}">`
+        : `<textarea id="texto" class="dialogo-texto-campo" rows="3"
+                     maxlength="${largo}" placeholder="${marcador}">${valor}</textarea>`}
       <div class="dialogo-botones">
         <button class="secundario" data-no>Cancelar</button>
         <button data-si>${ok}</button>
       </div>`, resolver);
 
     const campo = caja.querySelector('#texto');
-    setTimeout(() => campo.focus(), 220);
+    setTimeout(() => { campo.focus(); if (corto) campo.select(); }, 220);
 
-    caja.querySelector('[data-no]').onclick = () => salir(null);
-    caja.querySelector('[data-si]').onclick = () => {
+    const enviar = () => {
       const v = campo.value.trim();
       if (!v) { campo.focus(); return; }
       salir(v);
     };
+
+    if (corto) {
+      campo.onkeydown = (ev) => {
+        if (ev.key === 'Enter') { ev.preventDefault(); enviar(); }
+      };
+    }
+
+    caja.querySelector('[data-no]').onclick = () => salir(null);
+    caja.querySelector('[data-si]').onclick = enviar;
   });
 }
 

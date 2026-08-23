@@ -16,7 +16,7 @@
  */
 import { api } from '../api.js';
 import { esc, avisar } from '../util.js';
-import { pedirTexto, confirmar, menu } from '../dialogo.js';
+import { pedirTexto, pedirImporte, confirmar, menu } from '../dialogo.js';
 import { aTexto, pesos } from '../fracciones.js';
 
 const FRACCIONES = [
@@ -28,14 +28,15 @@ const FRACCIONES = [
 ];
 
 export async function vistaProductos(pantalla) {
-  let catalogo, listas;
+  let catalogo, listas, impresion;
 
   await cargar();
 
   async function cargar() {
-    [catalogo, listas] = await Promise.all([
+    [catalogo, listas, impresion] = await Promise.all([
       api.obtener('/catalogo'),
-      api.obtener('/ventas/precios/listas')
+      api.obtener('/ventas/precios/listas'),
+      api.obtener('/impresion/config').then((r) => r.impresion).catch(() => null)
     ]);
     pintar();
   }
@@ -75,6 +76,8 @@ export async function vistaProductos(pantalla) {
           <h3>Precio de cada fracción</h3>
           ${listas.listas.map((l) => tarjetaLista(l)).join('')}
 
+          ${impresion ? tarjetaImpresora() : ''}
+
           <details class="ayuda-bloque" style="margin-top:14px">
             <summary>¿Por qué no se divide el precio de la marqueta?</summary>
             <div class="ayuda-cuerpo">
@@ -109,6 +112,102 @@ export async function vistaProductos(pantalla) {
     pantalla.querySelectorAll('[data-sugerir]').forEach((b) => {
       b.onclick = () => sugerir(b.dataset.sugerir);
     });
+
+    if (impresion) {
+      pantalla.querySelector('#guardar-impresora').onclick = guardarImpresora;
+      pantalla.querySelector('#probar-impresora').onclick = probarImpresora;
+    }
+  }
+
+  // ==========================================================
+  // LA IMPRESORA
+  // ==========================================================
+  function tarjetaImpresora() {
+    const i = impresion;
+    return `
+      <h3>Impresora de tickets</h3>
+      <div class="tarjeta" id="tarjeta-impresora">
+        <p class="ayuda" style="margin:0 0 14px">
+          Con el nombre puesto, el ticket sale <strong>al instante</strong>,
+          sin que se asome la ventana de impresión. Sin nombre, imprime el
+          navegador y aparece el cuadro de siempre.
+        </p>
+
+        <label class="etiqueta-chica" for="imp-destino">Nombre compartido de la impresora</label>
+        <input id="imp-destino" autocomplete="off" placeholder="\\localhost\TICKET"
+               value="${esc(i.destino)}">
+
+        <div class="rejilla-config">
+          <label>
+            <span class="etiqueta-chica">Ancho del papel</span>
+            <select id="imp-ancho">
+              <option value="80" ${i.anchoMm === 80 ? 'selected' : ''}>80 mm</option>
+              <option value="58" ${i.anchoMm === 58 ? 'selected' : ''}>58 mm</option>
+            </select>
+          </label>
+          <label>
+            <span class="etiqueta-chica">Copias por venta</span>
+            <input id="imp-copias" inputmode="numeric" value="${i.copias}">
+          </label>
+        </div>
+
+        <label class="etiqueta-chica" for="imp-pie">Renglón al pie (opcional)</label>
+        <input id="imp-pie" autocomplete="off" placeholder="Tel. 999 000 0000"
+               value="${esc(i.pie)}">
+
+        <div class="fila-botones" style="margin-top:14px">
+          <button class="secundario" id="probar-impresora">Imprimir una prueba</button>
+          <button id="guardar-impresora">Guardar</button>
+        </div>
+
+        <details class="ayuda-bloque" style="margin-top:14px">
+          <summary>¿De dónde saco ese nombre?</summary>
+          <div class="ayuda-cuerpo">
+            <p>Hay que <b>compartir la impresora</b> una vez en Windows. No es
+            para que la usen otras computadoras: es para que Windows le dé un
+            nombre al que se le puede escribir directo, saltándose el motor de
+            impresión que es el que hace aparecer la ventana.</p>
+            <ol class="instrucciones">
+              <li>Panel de control → <b>Dispositivos e impresoras</b>.</li>
+              <li>Clic derecho en la térmica → <b>Propiedades de impresora</b>.</li>
+              <li>Pestaña <b>Compartir</b> → marcar <em>Compartir esta impresora</em>.</li>
+              <li>Ponle un nombre <b>corto y sin espacios</b>, por ejemplo <code>TICKET</code>.</li>
+              <li>Aquí escribe <code>\\localhost\TICKET</code> y dale a probar.</li>
+            </ol>
+            <p class="ayuda-tip">Si sale con cuadritos en vez de acentos, la
+            impresora usa otra tabla de caracteres. Avísame y la cambio: es un
+            número.</p>
+          </div>
+        </details>
+      </div>`;
+  }
+
+  function datosImpresora() {
+    return {
+      destino: pantalla.querySelector('#imp-destino').value.trim(),
+      anchoMm: Number(pantalla.querySelector('#imp-ancho').value),
+      copias: Number(pantalla.querySelector('#imp-copias').value.replace(/[^0-9]/g, '')) || 1,
+      pie: pantalla.querySelector('#imp-pie').value.trim()
+    };
+  }
+
+  async function guardarImpresora() {
+    try {
+      const r = await api.actualizar('/impresion/config', datosImpresora());
+      impresion = r.impresion;
+      avisar('Impresora guardada', 'bien');
+    } catch (e) { avisar(e.message, 'error'); }
+  }
+
+  async function probarImpresora() {
+    try {
+      // Se guarda primero: probar con lo que está escrito en pantalla, no
+      // con lo que había antes.
+      const r = await api.actualizar('/impresion/config', datosImpresora());
+      impresion = r.impresion;
+      await api.enviar('/impresion/prueba', {});
+      avisar('Salió la prueba. Revisa el papel.', 'bien');
+    } catch (e) { avisar(e.message, 'error'); }
   }
 
   function tarjetaCategoria(c) {
@@ -309,10 +408,10 @@ export async function vistaProductos(pantalla) {
       if (!d) return;
       cuerpo.dieciseisavos = Number(d);
     } else {
-      const precio = await pedirTexto({
+      const precio = await pedirImporte({
         titulo: `Precio de ${nombre}`, texto: '¿Cuánto cuesta?',
         valor: p?.precio_centavos != null ? (p.precio_centavos / 100).toFixed(2) : '',
-        marcador: '25.00', ok: 'Siguiente', largo: 12
+        marcador: '25.00', ok: 'Siguiente'
       });
       if (!precio) return;
       cuerpo.precio = precio;

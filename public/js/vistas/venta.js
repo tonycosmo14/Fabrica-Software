@@ -21,8 +21,8 @@
  * desde cero con sus propios precios.
  */
 import { api } from '../api.js';
-import { esc, avisar, soloHora } from '../util.js';
-import { pedirTexto, pedirCantidad, confirmar } from '../dialogo.js';
+import { esc, avisar, soloHora, fecha as formatoFecha } from '../util.js';
+import { pedirTexto, pedirImporte, pedirCantidad, confirmar } from '../dialogo.js';
 import { aTexto, descomponer, desglose, pesos } from '../fracciones.js';
 import { cargarMarca } from '../marca.js';
 import { imprimirTicket, limpiarImpresion } from '../imprimir.js';
@@ -42,7 +42,8 @@ const FASES = {
   // Mientras el servidor guarda, enter y esc no hacen nada: que dos toques
   // seguidos no puedan cobrar dos veces.
   guardando: { enter: 'guardando…',               esc: 'espera' },
-  cobrada:   { enter: 'imprime otro ticket',      esc: 'nueva venta' }
+  historial: { enter: 'busca',                    esc: 'volver a vender' },
+  cobrada:   { enter: 'imprime el ticket',        esc: 'siguiente venta' }
 };
 
 export async function vistaVenta(pantalla, estadoApp) {
@@ -120,6 +121,9 @@ export async function vistaVenta(pantalla, estadoApp) {
                    inputmode="numeric" placeholder="Teclea el código y enter…">
             <button class="pos-calc" id="calculadora" title="Otra cantidad de hielo">
               🧮
+            </button>
+            <button class="pos-calc" id="historial" title="Tickets de hoy (F3)">
+              🧾
             </button>
           </div>
           <div class="pos-migas" id="pos-migas"></div>
@@ -280,7 +284,8 @@ export async function vistaVenta(pantalla, estadoApp) {
     refs.pista.innerHTML = `
       <span><kbd>Enter</kbd> ${esc(f.enter)}</span>
       <span><kbd>Esc</kbd> ${esc(f.esc)}</span>
-      ${fase === 'venta' ? '<span><kbd>F10</kbd> cobrar</span>' : ''}`;
+      ${fase === 'venta'
+        ? '<span><kbd>F10</kbd> cobrar</span><span><kbd>F3</kbd> tickets</span>' : ''}`;
   }
 
   function enfocar() {
@@ -297,6 +302,15 @@ export async function vistaVenta(pantalla, estadoApp) {
     if (ev.key === 'F10') {
       ev.preventDefault();
       if (fase === 'venta') irACobro();
+      return;
+    }
+
+    // F3 abre los tickets de hoy. Se usa cuando el cliente vuelve por una
+    // copia, o cuando alguien se salió de la pantalla sin querer.
+    if (ev.key === 'F3') {
+      ev.preventDefault();
+      if (fase === 'venta') verHistorial();
+      else if (fase === 'historial') cerrarHistorial();
       return;
     }
 
@@ -328,6 +342,7 @@ export async function vistaVenta(pantalla, estadoApp) {
   }
 
   function avanzar() {
+    if (fase === 'historial') return;      // el buscador se encarga solo
     if (fase === 'venta')   return agregarPorCodigo();
     if (fase === 'cobro')   return calcularCambio();
     if (fase === 'cambio')  return registrar();
@@ -335,6 +350,7 @@ export async function vistaVenta(pantalla, estadoApp) {
   }
 
   function retroceder() {
+    if (fase === 'historial') { cerrarHistorial(); return; }
     if (fase === 'venta') {
       if (refs.codigo.value) { refs.codigo.value = ''; return; }
       if (hayAlgo()) vaciar();
@@ -481,7 +497,8 @@ export async function vistaVenta(pantalla, estadoApp) {
       fase = 'cobrada';
       pintarCobrada();
       pintarPista();
-      imprimir();                       // el primer ticket sale solo
+      // NO se imprime solo: no todos los tickets se entregan, y cada uno
+      // que sale sin que nadie lo pida es papel tirado. Enter imprime.
     } catch (e) {
       fase = 'cambio';
       pintarCobro();
@@ -502,14 +519,14 @@ export async function vistaVenta(pantalla, estadoApp) {
         </div>
 
         <button class="pos-confirmar" id="otro-ticket">
-          <span>🖨️ Imprimir otro</span><small>Enter</small>
+          <span>🖨️ Imprimir ticket</span><small>Enter</small>
         </button>
         <button class="secundario" id="siguiente" style="margin-top:10px;width:100%">
           Esc · siguiente venta
         </button>
       </div>`;
 
-    refs.cobro.querySelector('#otro-ticket').onclick = imprimir;
+    refs.cobro.querySelector('#otro-ticket').onclick = () => imprimir();
     refs.cobro.querySelector('#siguiente').onclick = nuevaVenta;
   }
 
@@ -527,9 +544,28 @@ export async function vistaVenta(pantalla, estadoApp) {
   // ==========================================================
   // EL TICKET
   // ==========================================================
-  function imprimir() {
-    if (!ventaCobrada) return;
-    imprimirTicket(ticketHTML(ventaCobrada));
+  /**
+   * Imprimir el ticket.
+   *
+   * Primero se le pide al SERVIDOR, que le manda los bytes directo a la
+   * impresora térmica: sale al instante, sin que se asome la ventana de
+   * impresión del navegador.
+   *
+   * Si no hay impresora configurada, se cae al camino de antes: armar el
+   * ticket en HTML y pedirle al navegador que lo imprima. Funciona igual,
+   * solo que aparece el cuadro de imprimir.
+   */
+  async function imprimir(venta = ventaCobrada, { copia = false } = {}) {
+    if (!venta) return;
+    try {
+      const r = await api.enviar(`/impresion/venta/${venta.id}`, { copia });
+      if (r.impreso) { avisar(copia ? 'Copia impresa' : 'Ticket impreso', 'bien'); return; }
+    } catch (e) {
+      avisar(e.message, 'error');
+      return;
+    }
+    // Sin impresora configurada: lo resuelve el navegador.
+    imprimirTicket(ticketHTML(venta, { copia }));
   }
 
   /**
@@ -537,7 +573,7 @@ export async function vistaVenta(pantalla, estadoApp) {
    * metros de papel al mes. Así que va lo mínimo, y lo que importa —cuánto
    * hielo se llevó— en grande y centrado.
    */
-  function ticketHTML(v) {
+  function ticketHTML(v, { copia = false } = {}) {
     const lineasHielo = v.lineas.filter((l) => l.dieciseisavos > 0);
     const otras = v.lineas.filter((l) => l.dieciseisavos === 0);
     const totalHielo = lineasHielo.reduce((t, l) => t + l.dieciseisavos, 0);
@@ -550,6 +586,9 @@ export async function vistaVenta(pantalla, estadoApp) {
           <span>${f.toLocaleDateString('es-MX')} ${esc(soloHora(v.fecha))}</span>
           <span>${esc((v.cajero_nombre || '').split(' ')[0])}</span>
         </div>
+
+        ${copia ? '<div class="tk-copia">*** COPIA ***</div>' : ''}
+        ${v.cancelada_en ? '<div class="tk-copia">CANCELADO</div>' : ''}
 
         ${totalHielo ? `
           <div class="tk-hielo">${esc(aTexto(totalHielo))}</div>
@@ -574,6 +613,84 @@ export async function vistaVenta(pantalla, estadoApp) {
   }
 
   // ==========================================================
+  // HISTORIAL: buscar un ticket y reimprimirlo
+  //
+  // Pasa seguido: el cliente vuelve porque perdió su ticket, o se salió sin
+  // querer de la pantalla. Se busca por número, por importe o por hora, y
+  // se vuelve a imprimir marcado como COPIA para que no se confunda con el
+  // original.
+  // ==========================================================
+  async function verHistorial(busca = '') {
+    fase = 'historial';
+    refs.cobro.hidden = false;
+    refs.cobro.innerHTML = `
+      <div class="pos-cobro-caja pos-historial">
+        <h3 style="margin:0 0 4px">Tickets</h3>
+        <p class="ayuda" style="margin:0 0 12px">
+          Por número, por el importe o por la hora.
+        </p>
+        <input id="busca-ticket" class="buscador" autocomplete="off"
+               placeholder="Número, monto u hora" value="${esc(busca)}" style="margin:0">
+        <div id="lista-tickets" class="lista-tickets"><p class="ayuda">Buscando…</p></div>
+        <button class="secundario" id="cerrar-historial" style="margin-top:12px;width:100%">
+          Esc · volver a vender
+        </button>
+      </div>`;
+
+    refs.cobro.querySelector('#cerrar-historial').onclick = cerrarHistorial;
+
+    const campo = refs.cobro.querySelector('#busca-ticket');
+    setTimeout(() => campo.focus(), 60);
+    let espera;
+    campo.oninput = () => {
+      clearTimeout(espera);
+      espera = setTimeout(() => cargarTickets(campo.value.trim()), 300);
+    };
+    campo.onkeydown = (ev) => { if (ev.key === 'Enter') ev.stopPropagation(); };
+
+    cargarTickets(busca);
+    pintarPista();
+  }
+
+  async function cargarTickets(busca) {
+    const caja = refs.cobro.querySelector('#lista-tickets');
+    if (!caja) return;
+    try {
+      const { ventas } = await api.obtener(
+        `/ventas?limite=25&busca=${encodeURIComponent(busca || '')}`);
+
+      caja.innerHTML = ventas.length ? ventas.map((v) => `
+        <div class="ticket-fila ${v.cancelada_en ? 'anulada' : ''}">
+          <div class="crece">
+            <strong>#${v.folio}</strong>
+            <small>${esc(formatoFecha(v.fecha))} · ${esc(v.cajero_nombre || '—')}</small>
+          </div>
+          <span class="ticket-fila-total">${pesos(v.total_centavos)}</span>
+          <button class="secundario chico" data-reimprimir="${esc(v.id)}">Copia</button>
+        </div>`).join('')
+        : '<p class="vacio" style="padding:20px 0">No hay tickets que coincidan.</p>';
+
+      caja.querySelectorAll('[data-reimprimir]').forEach((b) => {
+        b.onclick = async () => {
+          b.disabled = true;
+          const { venta } = await api.obtener(`/ventas/${b.dataset.reimprimir}`);
+          await imprimir(venta, { copia: true });
+          b.disabled = false;
+        };
+      });
+    } catch (e) {
+      caja.innerHTML = `<p class="vacio">${esc(e.message)}</p>`;
+    }
+  }
+
+  function cerrarHistorial() {
+    fase = 'venta';
+    refs.cobro.hidden = true;
+    pintarPista();
+    enfocar();
+  }
+
+  // ==========================================================
   // LA CALCULADORA DE FRACCIONES
   // ==========================================================
   pantalla.querySelector('#calculadora').onclick = async () => {
@@ -587,6 +704,7 @@ export async function vistaVenta(pantalla, estadoApp) {
   };
 
   pantalla.querySelector('#cobrar').onclick = irACobro;
+  pantalla.querySelector('#historial').onclick = () => verHistorial();
   refs.codigo.onkeydown = (ev) => { if (ev.key === 'Enter') ev.stopPropagation(); };
   refs.codigo.addEventListener('keyup', (ev) => {
     if (ev.key === 'Enter') agregarPorCodigo();
@@ -609,19 +727,27 @@ export async function vistaVenta(pantalla, estadoApp) {
         ? '¿En qué se usó? La gasolina, un refresco, el retiro a la caja fuerte…'
         : '¿De dónde viene? El fondo con el que arranca el cajón, cambio del banco…',
       marcador: esSalida ? 'Gasolina' : 'Fondo para cambio',
-      ok: 'Siguiente'
+      ok: 'Siguiente', largo: 60
     });
     if (!concepto) { enfocar(); return; }
 
-    const monto = await pedirTexto({
+    const monto = await pedirImporte({
       titulo: concepto, texto: '¿De cuánto es?',
-      marcador: '200', ok: esSalida ? 'Anotar la salida' : 'Anotar la entrada', largo: 12
+      marcador: '200', ok: esSalida ? 'Anotar la salida' : 'Anotar la entrada'
     });
     if (!monto) { enfocar(); return; }
 
     try {
-      await api.enviar('/caja/movimientos', { tipo, concepto, monto });
+      const r = await api.enviar('/caja/movimientos', { tipo, concepto, monto });
       avisar(esSalida ? 'Salida anotada' : 'Dinero anotado', 'bien');
+
+      // Una salida SÍ lleva papel: alguien se llevó dinero del cajón y
+      // tiene que quedar constancia firmada. Meter dinero no: nadie firma
+      // por dejar dinero.
+      if (esSalida && r.movimientoId) {
+        try { await api.enviar(`/impresion/movimiento/${r.movimientoId}`, {}); }
+        catch { avisar('Se anotó, pero no se pudo imprimir el comprobante', 'error'); }
+      }
     } catch (e) { avisar(e.message, 'error'); }
     enfocar();
   }

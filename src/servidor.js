@@ -43,6 +43,7 @@ function crearApp() {
   app.use('/api/tanques', require('./modulos/tanques/rutas'));
   app.use('/api/produccion', require('./modulos/produccion/rutas'));
   app.use('/api/existencia', require('./modulos/existencia/rutas'));
+  app.use('/api/impresion', require('./modulos/impresion/rutas'));
   app.use('/api/catalogo', require('./modulos/catalogo/rutas'));
   app.use('/api/caja', require('./modulos/caja/rutas'));
   app.use('/api/ventas', require('./modulos/ventas/rutas'));

@@ -15,6 +15,19 @@
  *    que ninguna venta supiera a cuál pertenece.
  *  · Solo para quien maneja dinero. Un operario que entra a ver los tanques
  *    no abre ninguna caja.
+ *
+ * EL TURNO SIN DUEÑO
+ *
+ * En la fábrica la existencia se entrega como a las 2:30 y el cajero que
+ * sigue llega a las 3. En ese rato el que está sigue cobrando, pero ese
+ * dinero ya es del que viene: lo va apartando y se lo entrega cuando llega.
+ *
+ * Para eso existe el turno SIN DUEÑO. A las 2:30 se entrega el turno: se
+ * cuenta el dinero del que se va y se abre uno nuevo sin cajero asignado.
+ * Las ventas siguen entrando ahí. Cuando el que sigue llega y pone su PIN,
+ * el turno se le asigna, y en cada venta queda anotado que la capturó el
+ * otro. Eso es la regla 3.6: uno es el responsable del dinero y otro el que
+ * tecleó.
  */
 const { bd } = require('../../db/conexion');
 const { nuevoId, ahora } = require('../../lib/ids');
@@ -30,7 +43,12 @@ function abrirTurnoSiHaceFalta(usuario) {
   if (!puede(usuario.rol, 'caja.operar')) return null;
 
   const abierto = sesionAbierta();
-  if (abierto) return abierto;
+  if (abierto) {
+    // Un turno esperando dueño: el que llega se hace cargo de él y del
+    // dinero que se apartó mientras no estaba.
+    if (!abierto.cajero_id) return adoptarTurno(abierto, usuario);
+    return abierto;
+  }
 
   const id = nuevoId();
   const abrir = bd.transaction(() => {
@@ -52,4 +70,17 @@ function abrirTurnoSiHaceFalta(usuario) {
   return sesionAbierta();
 }
 
-module.exports = { abrirTurnoSiHaceFalta };
+/** El que llega se hace cargo del turno que quedó esperando. */
+function adoptarTurno(turno, usuario) {
+  bd.prepare('UPDATE cajas SET cajero_id = ? WHERE id = ?').run(usuario.id, turno.id);
+
+  bitacora.registrar({
+    accion: 'caja.adoptada', entidad: 'caja', entidadId: turno.id,
+    ejecutorId: usuario.id, capturistaId: usuario.id,
+    detalle: { folio: turno.folio, abiertaEn: turno.abierta_en }
+  });
+
+  return sesionAbierta();
+}
+
+module.exports = { abrirTurnoSiHaceFalta, adoptarTurno };

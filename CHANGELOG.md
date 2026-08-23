@@ -7,6 +7,50 @@ Tipos: `nuevo` (funcionalidad nueva) · `mejora` · `arreglo` · `clave` (regla 
 
 ---
 
+## v0.11 — Impresión de verdad y relevo de turno · 23 de agosto de 2026
+
+### La impresora
+
+Tony preguntó por qué el ticket no sale instantáneo como en Aronium. La
+respuesta es que **una página web no puede hablarle a la impresora**: cuando
+el navegador imprime, arma una hoja y la manda a su motor de impresión. Con
+`--kiosk-printing` se quita el diálogo, pero la vista previa se asoma un
+instante igual. Aronium no es una página: es un programa que le manda bytes
+crudos a la térmica.
+
+- **clave** — `src/modulos/impresion/`: el ticket se arma en **ESC/POS** (el idioma de las impresoras térmicas) y lo manda **el servidor**, no el navegador. Sale al instante porque no hay nada en medio.
+- **clave** — El destino es el nombre compartido de la impresora en Windows (`\\localhost\TICKET`) y se le escribe con `copy /b`. Compartir la impresora no es para que la usen otras PC: es para que Windows le dé un nombre al que se puede escribir directo.
+- **nuevo** — Pantalla de configuración con ancho de papel (58/80 mm), copias, renglón al pie y **botón de prueba**, con las instrucciones de Windows dentro.
+- **clave** — Si no hay impresora configurada **no se rompe nada**: se cae al camino de antes (el navegador). Una impresora apagada no puede tumbar una venta ya cobrada.
+- **nuevo** — Las pruebas apuntan el destino a un **archivo** y comprueban los bytes que salieron: es la única forma de verificar esto sin papel. 17 pruebas sobre columnas, acentos, corte, copias y permisos.
+
+### El flujo de cobro
+
+- **clave** — **Ya no se imprime solo al cobrar.** Enter cobra; otro enter imprime si hace falta. No todos los tickets se entregan, y cada uno que sale sin que nadie lo pida es papel tirado.
+- **nuevo** — **F3** abre los tickets del día: se busca por número, importe u hora, y se saca una **COPIA** (marcada como tal, para que no se confunda con el original). Queda anotada en la bitácora.
+
+### El relevo de turno
+
+El problema real: la existencia se entrega ~2:30 y el cajero que sigue llega
+a las 3. En ese rato el que está sigue cobrando, pero ese dinero ya es del
+que viene. En el software viejo se seguía cobrando con el usuario del que se
+iba, y las ventas de la noche salían a nombre equivocado.
+
+- **clave** — Al terminar, el sistema pregunta **¿ya llegó quien sigue?**
+  - **Sí** → corte y **cierre de sesión**. El que entra pone su PIN y ese PIN abre su turno.
+  - **No** → `POST /caja/entregar`: se cuenta el dinero del que se va y queda abierto un turno **sin dueño** (`cajero_id NULL`). La venta no se para.
+- **clave** — Cuando el que llega pone su PIN, `abrirTurnoSiHaceFalta` **adopta** ese turno en vez de abrir otro. El dinero apartado ya es suyo.
+- **clave** — Cada venta guarda `capturista_id` (quién la tecleó) y el turno guarda `cajero_id` (de quién es el dinero). Eso es exactamente la regla 3.6, y es lo que hace que el histórico deje de mentir. Hay prueba.
+
+### Arreglos
+
+- **arreglo** — Los campos de dinero dejaban escribir letras. Nuevo `pedirImporte()`: solo números y un punto, filtrado al teclear, y **enter acepta**.
+- **arreglo** — En los campos cortos, enter metía un salto de línea en vez de aceptar. `pedirTexto` ahora usa un campo de un renglón cuando el texto es corto.
+- **arreglo** — Los cajeros veían «Configurar tanques» en el menú. La ruta pide `tanques.configurar` (solo admin). Siguen registrando producción y existencia, con su nombre en la bitácora.
+- **nuevo** — Un gasto imprime comprobante con las dos firmas (quién lo tomó, quién lo anotó). Meter dinero no: nadie firma por dejar dinero.
+
+---
+
 ## v0.10 — La caja de verdad · 23 de agosto de 2026
 
 Migración `010_productos.sql`. Rediseño del punto de venta a partir de cómo

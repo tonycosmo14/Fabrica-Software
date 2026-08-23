@@ -336,6 +336,85 @@ test('el historial de cortes los trae del más nuevo al más viejo', async () =>
 });
 
 // ============================================================
+// EL RELEVO DE LAS 2:30
+//
+// La existencia se entrega como a las 2:30 y el cajero que sigue llega a
+// las 3. En ese rato el que está sigue cobrando, pero ese dinero ya es del
+// que viene. Antes, en el software viejo, se seguía cobrando con el usuario
+// del que se iba y las ventas de la noche salían a nombre equivocado.
+// ============================================================
+
+test('entregar el turno cuenta el dinero y deja uno nuevo esperando dueño', async () => {
+  await entrarAdmin();
+  await cerrarSiHayAbierto();
+  await entrarPorNombre('Rosa', '4444');       // el turno se abre a su nombre
+
+  await venderUnaMarqueta();                    // $264 de Rosa
+
+  const antes = (await llamar('/api/caja')).json.datos.abierta;
+  const r = await llamar('/api/caja/entregar', {
+    method: 'POST', cuerpo: { contado: antes.esperado / 100 }
+  });
+  assert.equal(r.estado, 200);
+  assert.equal(r.json.datos.corte.caja.diferencia_centavos, 0);
+
+  // La venta NO se para: hay turno abierto, pero sin dueño.
+  const ahora = (await llamar('/api/caja')).json.datos;
+  assert.ok(ahora.abierta, 'quedó un turno abierto');
+  assert.equal(ahora.sinDueno, true);
+  assert.equal(ahora.abierta.vendido, 0, 'arranca limpio');
+});
+
+test('lo que se cobra en ese rato queda apartado, no se mezcla', async () => {
+  await venderUnaMarqueta();                    // Rosa teclea, pero no es suyo
+
+  const e = (await llamar('/api/caja')).json.datos.abierta;
+  assert.equal(e.vendido, 26400);
+  assert.equal(e.caja.cajero_id, null, 'todavía nadie se hizo cargo');
+});
+
+test('cuando el que entra pone su PIN, el turno se le asigna', async () => {
+  const mari = await entrarPorNombre('Mari', '7777');
+
+  const d = (await llamar('/api/caja')).json.datos;
+  assert.equal(d.sinDueno, false);
+  assert.equal(d.abierta.caja.cajero_id, mari.id, 'el turno ya es de Mari');
+  assert.equal(d.abierta.vendido, 26400, 'con el dinero que le apartaron');
+
+  // Y no se abrió un turno de más.
+  const abiertos = bd.prepare('SELECT COUNT(*) n FROM cajas WHERE cerrada_en IS NULL').get().n;
+  assert.equal(abiertos, 1);
+});
+
+/**
+ * Esto es lo que arregla el problema: la venta la tecleó Rosa, pero el
+ * dinero es de Mari. Las dos cosas quedan escritas (regla 3.6).
+ */
+test('la venta guarda quién la tecleó, aunque el turno sea de otro', async () => {
+  const turno = bd.prepare('SELECT * FROM cajas WHERE cerrada_en IS NULL').get();
+  const venta = bd.prepare(
+    'SELECT * FROM ventas WHERE caja_id = ? ORDER BY fecha LIMIT 1'
+  ).get(turno.id);
+
+  const rosa = bd.prepare("SELECT id FROM usuarios WHERE nombre = 'Rosa'").get();
+  const mari = bd.prepare("SELECT id FROM usuarios WHERE nombre = 'Mari'").get();
+
+  assert.equal(venta.capturista_id, rosa.id, 'la tecleó Rosa');
+  assert.equal(turno.cajero_id, mari.id, 'pero el dinero responde Mari');
+});
+
+test('un turno sin dueño no se puede entregar otra vez', async () => {
+  await entrarAdmin();
+  await cerrarSiHayAbierto();
+  await entrarPorNombre('Rosa', '4444');
+  await llamar('/api/caja/entregar', { method: 'POST', cuerpo: { contado: 0 } });
+
+  const otra = await llamar('/api/caja/entregar', { method: 'POST', cuerpo: { contado: 0 } });
+  assert.equal(otra.estado, 409);
+  assert.match(otra.json.error, /esperando dueño/i);
+});
+
+// ============================================================
 // QUIÉN PUEDE QUÉ
 // ============================================================
 
@@ -423,8 +502,16 @@ test('un operario no entra a la caja', async () => {
   assert.equal((await llamar('/api/caja/cortes')).estado, 403);
 });
 
-test('la bitácora deja constancia de cada apertura y cada cierre', async () => {
-  const aperturas = bd.prepare("SELECT COUNT(*) n FROM bitacora WHERE accion = 'caja.abierta'").get().n;
+test('cada turno que existe tiene su renglón en la bitácora', () => {
+  // Un turno nace de dos formas: alguien lo abre, o alguien entrega el suyo
+  // y deja este esperando dueño. Ninguno puede aparecer de la nada.
+  const aperturas = bd.prepare(
+    "SELECT COUNT(*) n FROM bitacora WHERE accion = 'caja.abierta'"
+  ).get().n;
+  const entregas = bd.prepare(
+    "SELECT COUNT(*) n FROM bitacora WHERE accion = 'caja.entregada'"
+  ).get().n;
   const cajas = bd.prepare('SELECT COUNT(*) n FROM cajas').get().n;
-  assert.equal(aperturas, cajas);
+
+  assert.equal(aperturas + entregas, cajas);
 });

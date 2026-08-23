@@ -3,7 +3,7 @@
 Sistema para la fábrica de hielo de Hunucmá, Yucatán.
 Se construye **por versiones**: cada versión es un pedazo terminado, probado y usable.
 
-**Versión actual: v0.10**
+**Versión actual: v0.11**
 
 ---
 
@@ -114,7 +114,7 @@ src/
     sesion.js          Quién está conectado y qué puede hacer
   modulos/             Un módulo por área. Agregar uno no toca los demás
     auth/  usuarios/  tanques/  produccion/  existencia/  ventas/  caja/
-    catalogo/  ayuda/  personalizacion/  versiones/  sistema/
+    catalogo/  impresion/  ayuda/  personalizacion/  versiones/  sistema/
 
 public/                La interfaz (HTML, CSS y JavaScript sin librerías)
   index.html
@@ -180,12 +180,23 @@ precios digan lo mismo.
 
 ### La impresora
 
-`INICIAR.bat` abre el sistema con Chrome o Edge en modo aplicación (sin
-barra de direcciones) y con **impresión directa**: el ticket sale por la
-impresora predeterminada sin preguntar nada.
+El ticket lo manda **el servidor** directo a la impresora térmica, en
+ESC/POS. Sale al instante porque no pasa por el navegador.
 
-Si se abre escribiendo la dirección en un navegador cualquiera, todo
-funciona igual pero volverá a aparecer el cuadro de "elegir impresora".
+Una página web no puede hablarle a una impresora: cuando el navegador
+imprime, arma una hoja y la manda a su motor de impresión, y la vista previa
+se asoma aunque sea un instante. Por eso imprime el servidor.
+
+Se configura una vez en **Productos y precios → Impresora de tickets**:
+
+1. En Windows, compartir la impresora con un nombre corto (`TICKET`).
+   No es para que la usen otras PC: es para que Windows le dé un nombre al
+   que se le pueda escribir directo.
+2. Escribir `\\localhost\TICKET` en el sistema y darle a **imprimir una
+   prueba**.
+
+Si no está configurada, imprime el navegador. Todo funciona igual, solo que
+aparece el cuadro de imprimir.
 
 ### El catálogo
 
@@ -255,6 +266,28 @@ la v0.8 no existía: iba escondido dentro de "salidas".
 
 Cada conteo guarda esos números **congelados**. Si mañana se cancela una
 venta vieja o se corrige una sacada, el corte que ya se firmó no cambia.
+
+---
+
+## El relevo de turno
+
+En la fábrica la existencia se entrega como a las **2:30** y el cajero que
+sigue llega a las **3**. En ese rato el que está sigue cobrando, pero ese
+dinero ya es del que viene: lo va apartando y se lo entrega cuando llega.
+
+Al terminar el turno, el sistema pregunta **¿ya llegó quien sigue?**
+
+| Respuesta | Qué pasa |
+|---|---|
+| **Sí, ya llegó** | Corte y cierre de sesión. El que entra pone su PIN, y ese PIN abre su turno a su nombre. |
+| **Todavía no llega** | Se cuenta el dinero del que se va y sale su corte, pero queda abierto un turno **sin dueño**. La venta no se para. Lo que entre se aparta, y en cuanto el que llega pone su PIN, el turno se le asigna. |
+
+Cada venta guarda **quién la tecleó** (`capturista_id`) y el turno guarda
+**de quién es el dinero** (`cajero_id`). Las dos cosas quedan escritas, que
+es justo la regla de oro 3.6.
+
+Antes esto no se podía registrar: se seguía cobrando con el usuario del que
+se iba, y las ventas de la noche salían a nombre de quien no era.
 
 ---
 
@@ -350,8 +383,9 @@ versión nueva le aparece un punto rojo en el menú.
 | **v0.8** | Punto de venta, conteo con fracciones, vendido vs faltante | ✅ listo |
 | **v0.9** | La Caja: turnos, gastos, arqueo y corte imprimible | ✅ listo |
 | **v0.9.1** | Manual de ayuda dentro del sistema | ✅ listo |
-| **v0.10** | Caja táctil: catálogo, teclado rápido, ticket corto, impresión directa | ✅ listo |
-| v0.11 | Clientes registrados y crédito | siguiente |
+| **v0.10** | Caja táctil: catálogo, teclado rápido, ticket corto | ✅ listo |
+| **v0.11** | Impresión ESC/POS desde el servidor, relevo de turno, reimpresión | ✅ listo |
+| v0.12 | Clientes, ventas en espera y cambios de ticket | siguiente |
 | v0.12 | Reparto, pedidos y neveras en comodato | |
 | v0.13 | Planta de agua: garrafones, botellas y depósitos | |
 | v0.14 | Mantenimiento: compresores, ósmosis, membranas, horario punta | |

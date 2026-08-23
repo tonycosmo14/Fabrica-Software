@@ -35,7 +35,7 @@ const RUTAS = {
   '#/venta':     { titulo: 'Punto de venta',    vista: vistaVenta,     permiso: 'venta.registrar', fija: true },
   '#/caja':      { titulo: 'Caja',              vista: vistaCaja,      permiso: 'caja.ver' },
   '#/existencia': { titulo: 'Existencia',       vista: vistaExistencia, permiso: 'existencia.ver' },
-  '#/config-tanques': { titulo: 'Configurar tanques', vista: vistaTanques, permiso: 'produccion.ver' },
+  '#/config-tanques': { titulo: 'Configurar tanques', vista: vistaTanques, permiso: 'tanques.configurar' },
   '#/usuarios':  { titulo: 'Usuarios',          vista: vistaUsuarios,  permiso: 'usuarios.administrar' },
   '#/productos': { titulo: 'Productos y precios', vista: vistaProductos, permiso: 'sistema.configurar' },
   '#/personalizar': { titulo: 'Personalizar',   vista: vistaPersonalizar, permiso: 'sistema.configurar' },
@@ -103,7 +103,11 @@ async function dibujar() {
   pantalla.innerHTML = '<div class="cargando">Cargando…</div>';
 
   try {
-    await ruta.vista(pantalla, estado);
+    await ruta.vista(pantalla, estado, {
+      // Al terminar un turno se sale del sistema, para que el cajero que
+      // entra tenga que poner su PIN. Ese PIN es lo que abre su turno.
+      alSalir: () => cerrarSesion({ aviso: 'Turno cerrado. Pasa el siguiente cajero.' })
+    });
   } catch (e) {
     if (e.codigo === 401) { estado.usuario = null; return dibujar(); }
     pantalla.innerHTML = `<p class="vacio">${esc(e.message)}</p>`;
@@ -214,14 +218,17 @@ menu.querySelectorAll('a').forEach((a) => {
 });
 document.getElementById('btn-atras').onclick = () => { location.hash = '#/inicio'; };
 
-document.getElementById('btn-salir').onclick = async () => {
+/** Cerrar sesión y volver a la pantalla del PIN. */
+async function cerrarSesion({ aviso = 'Sesión cerrada' } = {}) {
   try { await api.enviar('/auth/salir', {}); } catch { /* ya no habia sesion */ }
   estado.usuario = null;
   estado.permisos = [];
   abrirMenu(false);
-  avisar('Sesión cerrada');
+  if (aviso) avisar(aviso);
   dibujar();
-};
+}
+
+document.getElementById('btn-salir').onclick = () => cerrarSesion();
 
 window.addEventListener('hashchange', dibujar);
 

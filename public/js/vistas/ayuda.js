@@ -143,8 +143,9 @@ debería quedar − contado = FALTA</pre>
         <li>Tecleas <b>18</b> y <em>Enter</em> → el octavo entra al ticket.</li>
         <li><em>F10</em> → pasa a cobrar, con el cursor ya puesto.</li>
         <li>Tecleas lo que te dan y <em>Enter</em> → te dice el cambio.</li>
-        <li><em>Enter</em> otra vez → se cobra y sale el ticket.</li>
-        <li>Cada <em>Enter</em> más imprime otra copia.</li>
+        <li><em>Enter</em> otra vez → se cobra y se registra.</li>
+        <li><em>Enter</em> otra vez → <b>si quieres</b>, imprime el ticket. Cada
+        enter más saca otro. Si nadie lo pide, no se imprime nada.</li>
         <li><em>Esc</em> → listo para el siguiente cliente.</li>
       </ol>
       <p>Si pagan justo, en el paso 3 basta dar <em>Enter</em> sin teclear
@@ -152,6 +153,13 @@ debería quedar − contado = FALTA</pre>
       <p class="ayuda-tip">Abajo a la derecha hay un renglón que dice
       <b>qué hace Enter en ese momento</b>. Mirándolo dos o tres veces ya no
       hace falta acordarse.</p>
+
+      <h4>Buscar un ticket viejo o sacar una copia</h4>
+      <p><em>F3</em>, o el botón 🧾. Se busca por número, por el importe o por
+      la hora. El botón <b>Copia</b> lo vuelve a imprimir marcado como
+      <b>COPIA</b>, para que no se confunda con el original.</p>
+      <p>Sirve cuando el cliente vuelve porque perdió su ticket, o cuando te
+      saliste de la pantalla sin querer.</p>
 
       <h4>Cantidades que no tienen botón</h4>
       <p>El botón de la calculadora 🧮, arriba a la derecha, abre el teclado
@@ -203,6 +211,28 @@ debería quedar − contado = FALTA</pre>
       turno</b>. Nunca hay dos abiertos a la vez: si los hubiera, ninguna
       venta sabría a cuál pertenece.</p>
 
+      <h4>Terminar el turno: hay dos formas</h4>
+      <p>El botón <b>Terminar turno y contar</b> pregunta una sola cosa:
+      <em>¿ya llegó quien sigue?</em></p>
+
+      <ul class="instrucciones">
+        <li><b>Sí, ya llegó</b> — se cuenta el dinero, sale el corte y
+        <b>se cierra la sesión</b>. El que entra pone su PIN, y ese PIN abre
+        su turno a su nombre.</li>
+        <li><b>Todavía no llega</b> — es el relevo de las 2:30, cuando ya se
+        entregó la existencia pero el otro cajero no ha llegado. Se cuenta tu
+        dinero y sale tu corte, pero <b>la venta no se para</b>: queda abierto
+        un turno <em>esperando dueño</em>. Todo lo que entre a partir de ahí
+        se está apartando para el que llegue, y en cuanto ponga su PIN el
+        turno queda a su nombre.</li>
+      </ul>
+
+      <p class="ayuda-tip">Eso último es lo que arregla el problema de
+      siempre: antes se seguía cobrando con el usuario del que se iba y las
+      ventas de la noche salían a nombre equivocado. Ahora cada venta guarda
+      <b>quién la tecleó</b> y el turno guarda <b>de quién es el dinero</b>.
+      Las dos cosas quedan escritas.</p>
+
       <h4>Gastos y retiros</h4>
       <p>Con el botón rojo <b>− Gasto</b> de la pantalla de venta. Todo el
       dinero que sale del cajón sin ser cambio: la gasolina, los refrescos, el
@@ -235,7 +265,7 @@ debería haber − contado = DIFERENCIA</pre>
   {
     id: 'productos',
     titulo: 'Productos y precios: qué aparece en la caja',
-    busca: 'productos categorías catálogo precios códigos alta baja refrescos garrafones botones color',
+    busca: 'productos categorías catálogo precios códigos alta baja refrescos garrafones botones color impresora ticket térmica imprimir',
     cuerpo: `
       <p>Los botones de la caja se dan de alta en <b>Productos y precios</b>,
       sin tocar el programa. Solo el administrador.</p>
@@ -265,7 +295,12 @@ debería haber − contado = DIFERENCIA</pre>
       <b>los tickets viejos no cambian</b>. Nada se borra nunca.</p>
 
       <p class="ayuda-tip">Dar de baja una categoría se lleva sus productos.
-      El sistema te dice cuántos son antes de hacerlo.</p>`
+      El sistema te dice cuántos son antes de hacerlo.</p>
+
+      <h4>La impresora de tickets</h4>
+      <p>En esta misma pantalla, abajo. Con el nombre de la impresora puesto,
+      el ticket sale <b>al instante</b>; sin él, lo imprime el navegador y
+      aparece la ventana de impresión.</p>`
   },
 
   // ==========================================================
@@ -337,13 +372,16 @@ debería haber − contado = DIFERENCIA</pre>
       tiene que estar encendida con el sistema abierto. La dirección para el
       celular sale en la ventana negra al arrancar.</p>
 
-      <h4>No imprime el ticket, o pregunta qué impresora</h4>
-      <p>El ticket sale por la <b>impresora predeterminada</b> de Windows:
-      revisa que la térmica esté puesta como predeterminada y encendida.</p>
-      <p>Si cada vez aparece el cuadro de "elegir impresora", es que el
-      sistema no se abrió con <b>INICIAR.bat</b>. Ese archivo abre el programa
-      en modo impresión directa; si entras escribiendo la dirección en un
-      navegador cualquiera, el cuadro va a salir siempre.</p>
+      <h4>No imprime, o se asoma la ventana de impresión</h4>
+      <p>El ticket lo manda <b>el sistema</b> directo a la impresora, sin pasar
+      por el navegador. Para eso hay que decirle una vez cómo se llama la
+      impresora, en <b>Productos y precios → Impresora de tickets</b>. Ahí
+      mismo hay un botón para <b>imprimir una prueba</b> y las instrucciones
+      para compartir la impresora en Windows.</p>
+      <p>Mientras no esté puesto ese nombre, imprime el navegador y aparece la
+      ventana de siempre. Todo funciona igual, solo que más lento.</p>
+      <p>Si en vez de acentos salen cuadritos, la impresora usa otra tabla de
+      caracteres. Es un número que se cambia en un momento: avísame.</p>
 
       <h4>Alguien capturó algo mal</h4>
       <p>Nada se borra en este sistema, así que <b>nada se pierde por
