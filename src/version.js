@@ -12,9 +12,32 @@
  * tipo: 'nuevo' | 'mejora' | 'arreglo' | 'importante'
  */
 
-const VERSION_ACTUAL = '0.2.2';
+const VERSION_ACTUAL = '0.3';
 
 const VERSIONES = [
+  {
+    numero: '0.3',
+    nombre: 'Producción',
+    fecha: '2026-08-23',
+    resumen:
+      'La pantalla del trabajo diario: sacar y rellenar canastas, con el ' +
+      'reloj de congelación corriendo y el color diciendo el estado de un vistazo.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'Pantalla de Producción con pestañas por tanque y un paño por renglón.' },
+      { tipo: 'nuevo', texto: 'Cada canasta es un bloque de cuadritos: un cuadrito es un molde, o sea una marqueta.' },
+      { tipo: 'nuevo', texto: 'Los colores dicen el estado sin leer: azul congelando, gris lista, naranja sacada sin rellenar.' },
+      { tipo: 'nuevo', texto: 'Un tap en la canasta la saca; si estaba fuera, la rellena. Sin menús de por medio.' },
+      { tipo: 'nuevo', texto: 'Turno de producción: se abre, se registra todo dentro, y al cerrar avisa si quedaron canastas sin rellenar.' },
+      { tipo: 'nuevo', texto: 'El reloj de congelación corre solo y muestra las horas de cada paño.' },
+      { tipo: 'nuevo', texto: 'El sistema sugiere qué paño sigue: el que lleva más tiempo congelando.' },
+      { tipo: 'nuevo', texto: 'Marcar merma molde por molde cuando hace falta, con el conteo de marquetas buenas en vivo.' },
+      { tipo: 'nuevo', texto: 'Cada rellenado guarda si fue con agua purificada o potable.' },
+      { tipo: 'nuevo', texto: 'Resumen del turno: marquetas, merma y todos los movimientos con hora y responsable.' },
+      { tipo: 'importante', texto: 'Sacar y rellenar son dos cosas distintas: puedes sacar y dejar la canasta para rellenarla al rato, y el sistema no la pierde de vista.' },
+      { tipo: 'importante', texto: 'El estado no se guarda: se deduce de los movimientos. Así cualquier día del pasado se puede reconstruir tal como fue.' }
+    ],
+    siguiente: 'v0.3.1 — Traspaso a caja: el hielo pasa de producción a la custodia del cajero.'
+  },
   {
     numero: '0.2.2',
     nombre: 'Encabezado, reloj y atajos',
@@ -31,8 +54,7 @@ const VERSIONES = [
       { tipo: 'nuevo', texto: 'Agregar y quitar varios paños de un golpe, en vez de uno por uno.' },
       { tipo: 'nuevo', texto: 'La pantalla Sistema dice dónde vive la base de datos y cómo recuperar el acceso.' },
       { tipo: 'arreglo', texto: 'El logo del encabezado no quedaba centrado cuando no había botón de atrás.' }
-    ],
-    siguiente: 'v0.3 — Producción: sacar y rellenar canastas, con el reloj de congelación.'
+    ]
   },
   {
     numero: '0.2.1',

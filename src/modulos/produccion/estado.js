@@ -1,0 +1,201 @@
+/**
+ * ESTADO DE LAS CANASTAS — deducido, nunca guardado.
+ *
+ * REGLA DE ORO 3.2: no existe ninguna columna "estado" que se edite.
+ * El estado sale de mirar cuál fue el último evento de cada canasta:
+ *
+ *   último = rellenado  y aún no cumple las horas  ->  CONGELANDO
+ *   último = rellenado  y ya cumplió las horas     ->  LISTA
+ *   último = sacada                                ->  FUERA  (alerta)
+ *   sin eventos todavía                            ->  LISTA (sin registro)
+ *
+ * Lo bueno de esto: los cortes, auditorías y reportes de cualquier fecha
+ * se pueden reconstruir, porque los eventos nunca cambian.
+ */
+const { bd } = require('../../db/conexion');
+
+const ESTADOS = {
+  CONGELANDO: 'congelando',
+  LISTA: 'lista',
+  FUERA: 'fuera'
+};
+
+/** Horas transcurridas entre dos fechas ISO. */
+function horasDesde(iso, hasta = new Date()) {
+  return (hasta.getTime() - new Date(iso).getTime()) / 3600000;
+}
+
+/**
+ * Último evento de cada canasta de un tanque, en una sola consulta.
+ * Devuelve un mapa: canasta_id -> { tipo, fecha, ... }
+ */
+function ultimosEventos(tanqueId) {
+  const filas = bd.prepare(`
+    WITH eventos AS (
+      SELECT r.canasta_id, 'rellenado' AS tipo, r.fecha, r.id AS evento_id,
+             r.tipo_agua, r.ejecutor_id
+      FROM rellenados r
+      JOIN canastas c ON c.id = r.canasta_id
+      JOIN panos p    ON p.id = c.pano_id
+      WHERE p.tanque_id = ?
+
+      UNION ALL
+
+      SELECT s.canasta_id, 'sacada' AS tipo, s.fecha, s.id AS evento_id,
+             NULL AS tipo_agua, s.ejecutor_id
+      FROM sacadas s
+      JOIN canastas c ON c.id = s.canasta_id
+      JOIN panos p    ON p.id = c.pano_id
+      WHERE p.tanque_id = ?
+    )
+    SELECT e.*
+      FROM eventos e
+      JOIN (
+        SELECT canasta_id, MAX(fecha) AS ultima
+          FROM eventos GROUP BY canasta_id
+      ) u ON u.canasta_id = e.canasta_id AND u.ultima = e.fecha
+  `).all(tanqueId, tanqueId);
+
+  const mapa = new Map();
+  for (const f of filas) {
+    // Si un rellenado y una sacada cayeran en el mismo instante, manda el
+    // rellenado: es lo que ocurre al sacar y rellenar de corrido.
+    const previo = mapa.get(f.canasta_id);
+    if (!previo || f.tipo === 'rellenado') mapa.set(f.canasta_id, f);
+  }
+  return mapa;
+}
+
+/**
+ * Calcula el estado de una canasta a partir de su último evento.
+ * horasTanque = las horas de congelación configuradas en el tanque.
+ */
+function estadoDeCanasta(ultimo, horasTanque) {
+  if (!ultimo) {
+    return { estado: ESTADOS.LISTA, sinRegistro: true, horas: null, listaEn: null };
+  }
+
+  if (ultimo.tipo === 'sacada') {
+    return {
+      estado: ESTADOS.FUERA,
+      sinRegistro: false,
+      horas: horasDesde(ultimo.fecha),      // cuánto lleva fuera del tanque
+      listaEn: null,
+      desde: ultimo.fecha
+    };
+  }
+
+  const horas = horasDesde(ultimo.fecha);
+  const cumplio = horas >= horasTanque;
+  return {
+    estado: cumplio ? ESTADOS.LISTA : ESTADOS.CONGELANDO,
+    sinRegistro: false,
+    horas,
+    listaEn: cumplio ? 0 : horasTanque - horas,
+    tipoAgua: ultimo.tipo_agua,
+    desde: ultimo.fecha,
+    rellenadoId: ultimo.evento_id
+  };
+}
+
+/**
+ * Estructura completa de un tanque con el estado de cada canasta.
+ * Es lo que pinta la pantalla de producción.
+ */
+function tanqueConEstado(tanqueId) {
+  const tanque = bd.prepare('SELECT * FROM tanques WHERE id = ? AND activo = 1').get(tanqueId);
+  if (!tanque) return null;
+
+  const eventos = ultimosEventos(tanqueId);
+
+  const panos = bd.prepare(
+    'SELECT * FROM panos WHERE tanque_id = ? AND activo = 1 ORDER BY numero'
+  ).all(tanqueId);
+
+  const canastasDe = bd.prepare(
+    'SELECT * FROM canastas WHERE pano_id = ? AND activo = 1 ORDER BY numero'
+  );
+  const moldesDe = bd.prepare(
+    'SELECT id, numero FROM moldes WHERE canasta_id = ? AND activo = 1 ORDER BY numero'
+  );
+
+  for (const pano of panos) {
+    pano.canastas = canastasDe.all(pano.id).map((c) => {
+      const info = estadoDeCanasta(eventos.get(c.id), tanque.horas_congelacion);
+      return { ...c, ...info, moldes: moldesDe.all(c.id) };
+    });
+
+    pano.total_moldes = pano.canastas.reduce((n, c) => n + c.moldes.length, 0);
+
+    // El estado del paño es el de sus canastas: si alguna está fuera, el
+    // paño entero está en alerta; si todas están listas, el paño está listo.
+    const estados = pano.canastas.map((c) => c.estado);
+    pano.estado = estados.includes(ESTADOS.FUERA) ? ESTADOS.FUERA
+                : estados.every((e) => e === ESTADOS.LISTA) ? ESTADOS.LISTA
+                : ESTADOS.CONGELANDO;
+
+    // Las horas que se muestran a la derecha del paño: las de la canasta
+    // que lleva menos tiempo, que es la que marca cuándo estará listo todo.
+    const congelando = pano.canastas.filter((c) => c.estado === ESTADOS.CONGELANDO);
+    pano.horas = congelando.length ? Math.min(...congelando.map((c) => c.horas)) : null;
+    pano.sinRegistro = pano.canastas.every((c) => c.sinRegistro);
+  }
+
+  tanque.panos = panos;
+  return tanque;
+}
+
+/**
+ * SECCIÓN 6.5 — Rotación intercalada.
+ * No se configura: emerge del dato. Se sugiere el paño LISTO que lleva más
+ * tiempo congelando; la rotación 1, 3, 5... 2, 4, 6... aparece sola.
+ */
+function panoSugerido(tanque) {
+  const listos = tanque.panos.filter((p) => p.estado === ESTADOS.LISTA);
+  if (!listos.length) return null;
+
+  // Entre los listos, el que se rellenó primero (más tiempo congelando).
+  const conFecha = listos
+    .map((p) => {
+      const fechas = p.canastas.map((c) => c.desde).filter(Boolean);
+      return { pano: p, desde: fechas.length ? fechas.sort()[0] : null };
+    });
+
+  // Los que nunca se han registrado van al final: primero lo que sí tiene historia.
+  const conHistoria = conFecha.filter((x) => x.desde);
+  if (conHistoria.length) {
+    conHistoria.sort((a, b) => a.desde.localeCompare(b.desde));
+    return conHistoria[0].pano;
+  }
+  return listos[0];
+}
+
+/** Canastas que se sacaron y quedaron sin rellenar. Alerta al cerrar el turno (6.3). */
+function canastasFuera() {
+  return bd.prepare(`
+    WITH ultimo AS (
+      SELECT canasta_id, MAX(fecha) AS fecha FROM (
+        SELECT canasta_id, fecha FROM rellenados
+        UNION ALL
+        SELECT canasta_id, fecha FROM sacadas
+      ) GROUP BY canasta_id
+    )
+    SELECT s.canasta_id, s.fecha, c.numero AS canasta, p.numero AS pano, t.nombre AS tanque
+      FROM sacadas s
+      JOIN ultimo u   ON u.canasta_id = s.canasta_id AND u.fecha = s.fecha
+      JOIN canastas c ON c.id = s.canasta_id
+      JOIN panos p    ON p.id = c.pano_id
+      JOIN tanques t  ON t.id = p.tanque_id
+     WHERE c.activo = 1 AND p.activo = 1 AND t.activo = 1
+       AND NOT EXISTS (
+         SELECT 1 FROM rellenados r
+          WHERE r.canasta_id = s.canasta_id AND r.fecha >= s.fecha
+       )
+     ORDER BY t.nombre, p.numero, c.numero
+  `).all();
+}
+
+module.exports = {
+  ESTADOS, horasDesde, ultimosEventos, estadoDeCanasta,
+  tanqueConEstado, panoSugerido, canastasFuera
+};

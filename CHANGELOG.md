@@ -7,6 +7,24 @@ Tipos: `nuevo` (funcionalidad nueva) · `mejora` · `arreglo` · `clave` (regla 
 
 ---
 
+## v0.3 — Producción · 23 de agosto de 2026
+
+El trabajo diario en los tanques. Migración `004_produccion.sql`.
+
+- **clave** — El estado de la canasta (congelando / lista / fuera) **no se guarda**: se deduce del último evento de esa canasta (regla 3.2). No existe ninguna columna `estado` editable, así que cualquier fecha del pasado se reconstruye tal como fue.
+- **clave** — Sacar y rellenar son **dos eventos separados** (6.3). Una canasta sacada y no rellenada queda en estado `fuera`, sale en la alerta y bloquea el cierre del turno mientras no se resuelva.
+- **nuevo** — Turno de producción como línea de tiempo propia, independiente de la caja y del reparto (sección 4). Al cerrar avisa cuántas canastas quedaron fuera; se puede forzar y queda constancia.
+- **nuevo** — Pantalla con pestañas por tanque, un paño por renglón y las canastas como bloques de cuadritos (un cuadrito = un molde). Los 18 paños del tanque N caben en una pantalla de celular.
+- **nuevo** — Un tap: canasta lista → sacar todos los moldes bien; canasta fuera → rellenar (6.6). Las excepciones van en el menú del paño.
+- **nuevo** — La sacada calcula y guarda las **horas reales** que estuvo congelando, ligándose al rellenado del que viene. Es la base para que el sistema aprenda el tiempo real de cada tanque (6.8).
+- **nuevo** — Paño sugerido: el listo que lleva más tiempo congelando. La rotación intercalada emerge del dato, no se configura (6.5).
+- **nuevo** — Merma molde por molde con tres estados (bien / merma / hueco) y conteo en vivo de marquetas buenas.
+- **nuevo** — Tipo de agua (purificada o potable) en cada rellenado, recordado durante la sesión para no romper el flujo de un tap.
+- **nuevo** — Resumen del turno con marquetas, merma y el historial de movimientos con hora y responsable.
+- **arreglo** — `.gitignore` no cubría `datos/marca/`, así que el logo subido aparecía como cambio en Git; además se había subido por error un logo de prueba al repositorio. Ahora `/datos/` completo está fuera de Git.
+
+---
+
 ## v0.2.2 — Encabezado, reloj y atajos · 23 de agosto de 2026
 
 - **clave** — `RECUPERAR-ACCESO.bat` / `npm run recuperar`: restablece PIN y contraseña de un administrador desde la consola de la PC donde vive el sistema. Cierra sus sesiones abiertas y lo anota en la bitácora. La frontera de seguridad real de un sistema local es el acceso físico a la máquina, no una contraseña irrecuperable.

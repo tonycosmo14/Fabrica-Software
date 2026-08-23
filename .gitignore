@@ -1,8 +1,19 @@
+# ============================================================
+# Lo que NUNCA se sube al repositorio
+# ============================================================
+
+# Las piezas que instala npm. Se rehacen con "npm install".
 node_modules/
-datos/*.db
-datos/*.db-shm
-datos/*.db-wal
-datos/respaldos/
+
+# TUS DATOS. La carpeta completa: base de datos, respaldos y el logo
+# que subiste desde Personalizar.
+#
+# Esta carpeta es el negocio y vive solo en la PC de la fábrica. Por eso
+# nunca aparece en Git y nunca se pierde al actualizar el sistema.
+/datos/
+
+# Configuración de la máquina y basura del sistema operativo
 .env
 .DS_Store
+Thumbs.db
 *.log

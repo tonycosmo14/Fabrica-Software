@@ -3,7 +3,7 @@
 Sistema para la fábrica de hielo de Hunucmá, Yucatán.
 Se construye **por versiones**: cada versión es un pedazo terminado, probado y usable.
 
-**Versión actual: v0.2.2**
+**Versión actual: v0.3**
 
 ---
 
@@ -111,7 +111,7 @@ src/
   middleware/
     sesion.js          Quién está conectado y qué puede hacer
   modulos/             Un módulo por área. Agregar uno no toca los demás
-    auth/  usuarios/  tanques/  personalizacion/  versiones/  sistema/
+    auth/  usuarios/  tanques/  produccion/  personalizacion/  versiones/  sistema/
 
 public/                La interfaz (HTML, CSS y JavaScript sin librerías)
   index.html
@@ -143,7 +143,7 @@ Están escritas en el código, no solo en el documento:
 | # | Regla | Dónde vive |
 |---|---|---|
 | 3.1 | El hielo se guarda en dieciseisavos enteros, nunca decimales | `src/lib/fracciones.js` |
-| 3.2 | Todo es un movimiento inmutable | `src/lib/bitacora.js` |
+| 3.2 | Todo es un movimiento inmutable | `src/modulos/produccion/estado.js` |
 | 3.3 | UUID interno estable, nombre editable | `src/lib/ids.js` |
 | 3.4 | Nada se borra: baja con fecha | columnas `activo` / `fecha_baja` |
 | 3.5 | El precio se copia dentro de la venta | llega en v0.4 |
@@ -175,7 +175,8 @@ versión nueva le aparece un punto rojo en el menú.
 | **v0.2** | Configurador de tanques, paños, canastas y moldes | ✅ listo |
 | **v0.2.1** | Personalizar (logo propio), diálogos del sistema, quitar paños | ✅ listo |
 | **v0.2.2** | Encabezado con logo y reloj, atajos, recuperación de acceso | ✅ listo |
-| v0.3 | Producción: sacada, rellenado, estados de canasta, traspaso a caja | siguiente |
+| **v0.3** | Producción: sacar, rellenar, estados, reloj de congelación, turnos | ✅ listo |
+| v0.3.1 | Traspaso a caja: el hielo pasa a la custodia del cajero | siguiente |
 | v0.4 | Punto de venta: fracciones, precios por fracción, tickets | |
 | v0.5 | Caja: sesiones, vales, arqueos y cortes | |
 | v0.6 | Clientes, mayoreo, crédito y autorizaciones | |

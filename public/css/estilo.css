@@ -454,6 +454,144 @@ select { color-scheme: light dark; }
 }
 .subir:active { filter: brightness(.92); }
 
+
+/* ============================================================
+   PRODUCCIÓN (v0.3)
+   Cada canasta es un bloque de cuadritos: un cuadrito = un molde
+   = una marqueta. El color dice el estado de un vistazo, sin leer.
+   ============================================================ */
+
+:root {
+  --est-congelando: #3aa8e0;
+  --est-congelando-f: #d6eefa;
+  --est-lista: #93a5b1;
+  --est-lista-f: #e6ebee;
+  --est-fuera: #e8952a;
+  --est-fuera-f: #fdefd8;
+}
+:root[data-tema="oscuro"] {
+  --est-congelando: #4fb9ec;  --est-congelando-f: #16394f;
+  --est-lista: #7e93a2;       --est-lista-f: #263440;
+  --est-fuera: #f0a63f;       --est-fuera-f: #4a3213;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema="claro"]) {
+    --est-congelando: #4fb9ec;  --est-congelando-f: #16394f;
+    --est-lista: #7e93a2;       --est-lista-f: #263440;
+    --est-fuera: #f0a63f;       --est-fuera-f: #4a3213;
+  }
+}
+
+/* Pestañas de tanque */
+.pestanas { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.pestana {
+  width: auto; min-width: 62px; min-height: 44px; padding: 8px 18px;
+  font-size: 16px; font-weight: 700;
+  background: transparent; color: var(--suave);
+  border: 2px solid transparent; border-radius: 10px;
+}
+.pestana.activa {
+  background: var(--superficie); color: var(--texto);
+  border-color: var(--borde-fuerte);
+}
+
+/* Barra del turno */
+.turno-barra {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 12px; margin-bottom: 12px; border-radius: 10px;
+  background: var(--superficie); border: 1px solid var(--borde);
+  font-size: 14px; color: var(--suave);
+}
+.turno-barra.sin-turno { border-color: var(--est-fuera); background: var(--est-fuera-f); }
+.turno-barra button { width: auto; }
+.sugerencia {
+  background: var(--et-cajero-f); color: var(--et-cajero-t);
+  padding: 5px 12px; border-radius: 999px; font-weight: 700; font-size: 13px;
+  white-space: nowrap;
+}
+.alerta-fuera {
+  padding: 10px 12px; margin-bottom: 12px; border-radius: 10px;
+  background: var(--est-fuera-f); color: var(--est-fuera);
+  border: 1px solid var(--est-fuera); font-size: 14px; font-weight: 600;
+}
+
+/* Un paño */
+.panos-produccion { display: flex; flex-direction: column; gap: 6px; }
+.pano-prod {
+  display: grid; grid-template-columns: 20px 1fr auto 24px; align-items: center; gap: 6px;
+  padding: 3px 4px; border-radius: 10px; border: 2px solid transparent;
+}
+.pano-prod.sugerido { border-color: var(--verde); background: var(--superficie); }
+.pano-prod-num {
+  color: var(--suave); font-size: 13px; font-weight: 700; text-align: center;
+}
+.pano-prod-horas {
+  font-size: 12px; text-align: right; font-variant-numeric: tabular-nums;
+  color: var(--suave); font-weight: 600; white-space: nowrap; min-width: 38px;
+}
+.pano-prod-horas.congelando { color: var(--est-congelando); }
+.pano-prod-horas.fuera { color: var(--est-fuera); }
+
+.canastas-prod { display: flex; gap: 5px; align-items: center; flex-wrap: nowrap; overflow: hidden; }
+
+/* La canasta: un bloque de cuadritos, uno por molde */
+.canasta-prod {
+  display: flex; gap: 2px; align-items: center;
+  width: auto; min-width: 0; min-height: 30px; padding: 4px;
+  border-radius: 7px; border: 2px solid var(--est-lista);
+  background: var(--est-lista-f);
+}
+.canasta-prod .molde {
+  width: 13px; height: 20px; border-radius: 3px;
+  background: var(--est-lista); display: block;
+}
+.canasta-prod.congelando { border-color: var(--est-congelando); background: var(--est-congelando-f); }
+.canasta-prod.congelando .molde { background: var(--est-congelando); }
+.canasta-prod.fuera { border-color: var(--est-fuera); background: var(--est-fuera-f); }
+.canasta-prod.fuera .molde { background: var(--est-fuera); }
+.canasta-prod:active { transform: scale(.94); }
+
+.mas-canasta {
+  width: 24px; min-width: 24px; height: 32px; padding: 0;
+  background: transparent; color: var(--suave); border: 0; font-size: 16px;
+}
+
+.leyenda {
+  display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;
+  margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--borde);
+  font-size: 13px; color: var(--suave);
+}
+.leyenda span { display: flex; align-items: center; gap: 6px; }
+.punto-estado { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.punto-estado.congelando { background: var(--est-congelando); }
+.punto-estado.lista { background: var(--est-lista); }
+.punto-estado.fuera { background: var(--est-fuera); }
+
+/* Marcar merma molde por molde */
+.moldes-detalle { display: flex; flex-wrap: wrap; gap: 8px; }
+.molde-boton {
+  width: auto; min-width: 62px; min-height: 62px; padding: 6px;
+  flex-direction: column; gap: 2px;
+  border: 2px solid var(--est-lista); background: var(--est-lista-f); color: var(--texto);
+}
+.molde-boton .molde-num { font-size: 17px; font-weight: 800; }
+.molde-boton .molde-estado { font-size: 10px; text-transform: uppercase; letter-spacing: .4px; }
+.molde-boton.ok { border-color: var(--verde); background: var(--et-cajero-f); color: var(--et-cajero-t); }
+.molde-boton.merma { border-color: var(--est-fuera); background: var(--est-fuera-f); color: var(--est-fuera); }
+.molde-boton.hueco { border-color: var(--rojo); background: var(--et-baja-f); color: var(--et-baja-t); }
+
+@media (min-width: 620px) {
+  .pano-prod { grid-template-columns: 28px 1fr auto 32px; gap: 10px; padding: 5px 8px; }
+  .canasta-prod .molde { width: 16px; height: 26px; }
+  .canasta-prod { min-height: 36px; }
+  .pano-prod-horas { font-size: 13px; }
+}
+
+@media (min-width: 900px) {
+  .panos-produccion, .turno-barra, .alerta-fuera, .leyenda { max-width: 760px; }
+  .pestana { min-width: 74px; }
+}
+
 /* ============================================================
    DIÁLOGOS
    En celular suben desde abajo, en PC salen centrados.
@@ -675,9 +813,12 @@ select { color-scheme: light dark; }
   /* ...menos estos, que viven dentro de una rejilla y deben respetarla. */
   button.chico, .icono, .teclado button, .tema-opciones button, .item button,
   .canasta, .pano-menu, .contador-boton, .dialogo-botones button, .dialogo-opcion,
-  .tanque-acciones, .tachita, .tanque-tarjeta {
+  .tanque-acciones, .tachita, .tanque-tarjeta, .canasta-prod, .mas-canasta,
+  .molde-boton, .pestana {
     min-width: 0;
   }
+  .pestana { min-width: 74px; }
+  .molde-boton { min-width: 62px; }
   .contador-boton { min-width: 62px; }
   .canasta { min-width: 44px; }
   .canasta.agregar { min-width: 30px; }

@@ -6,7 +6,7 @@
 import { esc } from '../util.js';
 
 const ACCESOS = [
-  { emoji: '🏭', titulo: 'Producción',   ruta: '#/tanques',   permiso: 'produccion.registrar', desde: 'v0.3' },
+  { emoji: '🏭', titulo: 'Producción',   ruta: '#/tanques',   permiso: 'produccion.ver',       desde: null   },
   { emoji: '🧊', titulo: 'Configurar tanques', ruta: '#/config-tanques', permiso: 'produccion.ver', desde: null },
   { emoji: '🛒', titulo: 'Vender',       ruta: '#/venta',     permiso: 'venta.registrar',      desde: 'v0.4' },
   { emoji: '💵', titulo: 'Caja',         ruta: '#/caja',      permiso: 'caja.ver',             desde: 'v0.5' },
