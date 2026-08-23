@@ -25,6 +25,26 @@ export function fecha(iso) {
   });
 }
 
+/** Solo la hora: "02:23 p.m." */
+export function soloHora(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+}
+
+/**
+ * Un rato: "23 ago 2026, de 02:23 a 08:10 p.m."
+ * Si el turno cruzó la medianoche se escriben las dos fechas completas.
+ */
+export function rango(desde, hasta) {
+  if (!desde || !hasta) return '—';
+  const a = new Date(desde);
+  const b = new Date(hasta);
+  const mismoDia = a.toDateString() === b.toDateString();
+  return mismoDia
+    ? `${soloFecha(desde)}, de ${soloHora(desde)} a ${soloHora(hasta)}`
+    : `de ${fecha(desde)} a ${fecha(hasta)}`;
+}
+
 export function soloFecha(iso) {
   if (!iso) return '—';
   return new Date(iso + (iso.length === 10 ? 'T12:00:00' : '')).toLocaleDateString('es-MX', {

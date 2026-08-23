@@ -1411,3 +1411,59 @@ tr.anulada { opacity: .45; text-decoration: line-through; }
   .frac-boton { height: 70px; font-size: 22px; }
   .frac-numero { font-size: 54px; }
 }
+
+
+/* ============================================================
+   CAJA (v0.9)
+   La misma cuenta que el cuadre del cuarto frío, con billetes.
+   Por eso reusa .cuadre y .salidas: quien entendió una pantalla
+   ya entendió la otra.
+   ============================================================ */
+
+.caja-cerrada { text-align: center; padding: 30px 18px; }
+.caja-cerrada-icono { font-size: 42px; line-height: 1; margin-bottom: 10px; opacity: .75; }
+.caja-cerrada strong { display: block; font-size: 18px; }
+.caja-cerrada button { max-width: 340px; }
+
+.etiqueta-turno {
+  background: var(--et-cajero-f); color: var(--et-cajero-t);
+  padding: 5px 12px; border-radius: 999px; font-size: 13px; font-weight: 700;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.etiqueta-bien {
+  background: var(--et-cajero-f); color: var(--et-cajero-t);
+  padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  white-space: nowrap;
+}
+.etiqueta-mal {
+  background: var(--et-baja-f); color: var(--et-baja-t);
+  padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  white-space: nowrap;
+}
+
+.venta-lineas .importe.malo  { color: var(--rojo); }
+.venta-lineas .importe.bueno { color: var(--verde); }
+
+/* El aviso de que se está cobrando sin turno abierto. Tiene que verse:
+   ese dinero no va a aparecer en ningún corte. */
+.aviso-sin-caja {
+  margin-top: 14px; padding: 13px 16px; border-radius: var(--radio);
+  background: var(--et-repartidor-f); color: var(--et-repartidor-t);
+  border: 2px solid var(--ambar); font-size: 14.5px; line-height: 1.5;
+}
+.aviso-sin-caja strong { display: block; }
+.aviso-sin-caja a { color: inherit; font-weight: 700; }
+
+/* Los dos botones de dinero, siempre uno al lado del otro: son la misma
+   decisión con dos sentidos y separarlos en dos renglones los aleja. */
+.caja-acciones {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 18px;
+}
+.caja-acciones button { min-width: 0; }
+
+/* La tachita fuera de una imagen tiene que seguir siendo un círculo, no una
+   pastilla estirada por la celda de la tabla. */
+.venta-lineas .tachita {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; min-width: 34px; max-width: 34px; height: 34px; flex: none;
+}

@@ -41,6 +41,7 @@ function crearApp() {
   app.use('/api/tanques', require('./modulos/tanques/rutas'));
   app.use('/api/produccion', require('./modulos/produccion/rutas'));
   app.use('/api/existencia', require('./modulos/existencia/rutas'));
+  app.use('/api/caja', require('./modulos/caja/rutas'));
   app.use('/api/ventas', require('./modulos/ventas/rutas'));
   app.use('/api/versiones', require('./modulos/versiones/rutas'));
   app.use('/api/sistema', require('./modulos/sistema/rutas'));

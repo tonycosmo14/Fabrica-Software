@@ -7,6 +7,38 @@ Tipos: `nuevo` (funcionalidad nueva) · `mejora` · `arreglo` · `clave` (regla 
 
 ---
 
+## v0.9 — La Caja · 23 de agosto de 2026
+
+Migración `009_caja.sql`.
+
+El espejo en dinero del cuadre del cuarto frío. La cuenta tiene la misma
+forma a propósito: quien ya entendió una pantalla entiende la otra.
+
+    fondo + cobrado en efectivo + entradas − salidas = DEBERÍA HABER
+    debería haber − contado = DIFERENCIA
+
+### El turno
+
+- **clave** — No hay ninguna columna `saldo` que se vaya sumando. Lo que hay en el cajón se **calcula de los movimientos** cada vez que se pregunta (regla 3.2). Un saldo guardado se desincroniza el día que algo se corte a la mitad; una suma de movimientos, no puede.
+- **clave** — Solo puede haber **un turno abierto**. Con dos, ninguna venta sabría a cuál pertenece y los dos cortes saldrían mal. `POST /api/caja/abrir` devuelve 409 si ya hay uno.
+- **clave** — Las ventas se amarran solas al turno abierto (`ventas.caja_id`). No se copian importes a la caja: se leen de la tabla de ventas, que es donde viven. Una sola verdad.
+- **clave** — Se puede cobrar **sin** turno abierto. La fábrica no se para porque alguien olvidó abrir la caja. Pero ese dinero queda con `caja_id = NULL`, fuera de todo corte, y la pantalla de venta lo avisa en amarillo.
+- **clave** — Solo el **efectivo** entra al arqueo. Lo cobrado por otros medios se informa aparte: si se contara, la caja "sobraría" todos los días.
+- **clave** — Un corte cerrado guarda sus números **congelados** (`esperado_centavos`, `vendido_centavos`, `entradas_centavos`, `salidas_centavos`, `diferencia_centavos`). Cancelar mañana una venta de hoy no cambia un corte firmado. Hay prueba.
+- **nuevo** — Folio de turno consecutivo, asignado dentro de la transacción, igual que los tickets.
+- **nuevo** — Gastos, retiros y entradas de dinero, con doble responsable (quién se lo llevó, quién lo anotó — regla 3.6).
+- **nuevo** — Anular un movimiento mal capturado: se marca, no se borra (regla 3.4). Y no se puede tocar un movimiento de un turno ya cerrado.
+- **nuevo** — Corte imprimible de 80 mm con el desglose, los movimientos y la firma.
+- **nuevo** — Historial de cortes con lo que sobró o faltó en cada turno.
+- **nuevo** — Permisos: `caja.operar` (cajero y gerente) abre, mueve dinero y cierra; anular un movimiento pide `venta.cancelar` (gerente y admin).
+
+### Detalles
+
+- **mejora** — `soloHora()` y `rango()` en `util.js`: un turno del mismo día se lee "23 ago 2026, de 02:23 a 08:10 p.m." en vez de repetir la fecha dos veces.
+- **arreglo** — La tachita se estiraba a pastilla dentro de una celda de tabla; ahora se mantiene circular.
+
+---
+
 ## v0.8 — Punto de venta · 23 de agosto de 2026
 
 Migraciones `007_ventas.sql` y `008_cuadre_ventas.sql`.

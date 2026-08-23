@@ -12,9 +12,33 @@
  * tipo: 'nuevo' | 'mejora' | 'arreglo' | 'importante'
  */
 
-const VERSION_ACTUAL = '0.8';
+const VERSION_ACTUAL = '0.9';
 
 const VERSIONES = [
+  {
+    numero: '0.9',
+    nombre: 'La Caja',
+    fecha: '2026-08-23',
+    resumen:
+      'El espejo en dinero del cuadre del cuarto frío. Se abre el turno con ' +
+      'un fondo, las ventas se pegan solas, y al cerrar se cuentan los ' +
+      'billetes: el sistema dice si sobra o falta.',
+    cambios: [
+      { tipo: 'importante', texto: 'Turno de caja: se abre con el fondo para dar cambio y se cierra contando el dinero. La cuenta es la misma que la del hielo: fondo + cobrado + entradas − gastos = lo que debería haber.' },
+      { tipo: 'importante', texto: 'Las ventas se pegan solas al turno abierto. No hay que capturar nada dos veces.' },
+      { tipo: 'nuevo', texto: 'Gastos y retiros: la gasolina, los refrescos, el retiro a la caja fuerte. Con quién se lo llevó y quién lo anotó.' },
+      { tipo: 'nuevo', texto: 'Entradas de dinero, para cuando se trae cambio del banco a media tarde.' },
+      { tipo: 'importante', texto: 'Corte de caja imprimible, con firma. Dice cuánto sobró o faltó y por qué suele pasar.' },
+      { tipo: 'importante', texto: 'Un corte cerrado se congela: cancelar mañana una venta de hoy ya no lo cambia. Un papel firmado no se mueve solo.' },
+      { tipo: 'nuevo', texto: 'Cancelar una venta baja sola lo que debería haber en el cajón, mientras el turno siga abierto.' },
+      { tipo: 'nuevo', texto: 'Historial de cortes: un renglón por turno, con lo que sobró o faltó en cada uno.' },
+      { tipo: 'importante', texto: 'Solo puede haber UN turno abierto a la vez. Con dos, ninguna venta sabría a cuál pertenece.' },
+      { tipo: 'importante', texto: 'Si nadie abrió la caja, se puede cobrar igual: la fábrica no se para por eso. Pero la pantalla de venta lo avisa en amarillo, porque ese dinero no entra en ningún corte.' },
+      { tipo: 'nuevo', texto: 'Solo el efectivo entra al arqueo. Lo cobrado por otros medios se informa aparte: ese dinero nunca pasó por el cajón.' },
+      { tipo: 'nuevo', texto: 'El cajero abre, mueve dinero y cierra. Anular un movimiento es del gerente y del administrador.' }
+    ],
+    siguiente: 'v0.10 — Clientes, mayoreo y crédito.'
+  },
   {
     numero: '0.8',
     nombre: 'Punto de venta',
@@ -37,7 +61,6 @@ const VERSIONES = [
       { tipo: 'nuevo', texto: 'El cajero vende; cancelar es del gerente y del administrador; los precios, solo del administrador.' },
       { tipo: 'arreglo', texto: 'Mover la carpeta de datos ahora se lleva también la base de datos, no solo los respaldos.' }
     ],
-    siguiente: 'v0.9 — Caja: vales, arqueo y corte del día.'
   },
   {
     numero: '0.7',

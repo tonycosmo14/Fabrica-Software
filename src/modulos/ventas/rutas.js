@@ -20,6 +20,7 @@ const { aCentavos } = require('../../lib/dinero');
 const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
 const { listaActiva, preciosDe, precioDe, sugerencia } = require('./precios');
+const { sesionAbierta } = require('../caja/calculo');
 
 const router = express.Router();
 
@@ -47,7 +48,16 @@ router.get('/contexto', vender, (req, res) => {
 
   const ultimoFolio = bd.prepare('SELECT COALESCE(MAX(folio), 0) n FROM ventas').get().n;
 
-  return ok(res, { lista, precios, almacenes, siguienteFolio: ultimoFolio + 1 });
+  // Se puede cobrar sin turno de caja abierto: la fábrica no se para porque
+  // alguien olvidó abrirla. Pero ese dinero no entra en ningún corte, así
+  // que la pantalla tiene que decirlo bien claro.
+  const caja = sesionAbierta();
+
+  return ok(res, {
+    lista, precios, almacenes,
+    siguienteFolio: ultimoFolio + 1,
+    caja: caja ? { folio: caja.folio, cajero: caja.cajero_nombre } : null
+  });
 });
 
 /** Cuánto costaría una cantidad, sin registrar nada. */
@@ -117,6 +127,10 @@ router.post('/', vender, (req, res) => {
   const id = nuevoId();
   const fecha = ahora();
 
+  // La venta queda amarrada al turno de caja abierto en este momento. Si no
+  // hay turno abierto se cobra igual, pero queda fuera de todo corte.
+  const turno = sesionAbierta();
+
   // El folio se toma dentro de la transacción para que dos cajas al mismo
   // tiempo no puedan sacar el mismo número.
   const guardar = bd.transaction(() => {
@@ -125,11 +139,12 @@ router.post('/', vender, (req, res) => {
     bd.prepare(`
       INSERT INTO ventas (id, folio, fecha, cajero_id, capturista_id, almacen_id,
                           lista_id, lista_nombre, total_centavos, pago_centavos,
-                          cambio_centavos, forma_pago, notas)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                          cambio_centavos, forma_pago, notas, caja_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(id, folio, fecha, req.body?.cajeroId || req.usuario.id, req.usuario.id,
            almacen?.id || null, lista.id, lista.nombre, total, pago, cambio,
-           req.body?.formaPago || 'efectivo', req.body?.notas || null);
+           req.body?.formaPago || 'efectivo', req.body?.notas || null,
+           turno?.id || null);
 
     const insertar = bd.prepare(`
       INSERT INTO venta_lineas (id, venta_id, concepto, dieciseisavos, precio_centavos, desglose)
@@ -146,7 +161,7 @@ router.post('/', vender, (req, res) => {
   bitacora.registrar({
     accion: 'venta.registrada', entidad: 'venta', entidadId: id,
     ejecutorId: req.body?.cajeroId || req.usuario.id, capturistaId: req.usuario.id,
-    detalle: { folio, total, lineas: preparadas.length }
+    detalle: { folio, total, lineas: preparadas.length, cajaFolio: turno?.folio || null }
   });
 
   return ok(res, { venta: detalleVenta(id) }, 201);

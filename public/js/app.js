@@ -13,6 +13,7 @@ import { vistaEntrar } from './vistas/entrar.js';
 import { vistaInicio } from './vistas/inicio.js';
 import { vistaExistencia } from './vistas/existencia.js';
 import { vistaVenta } from './vistas/venta.js';
+import { vistaCaja } from './vistas/caja.js';
 import { vistaProduccion } from './vistas/produccion.js';
 import { vistaTanques } from './vistas/tanques.js';
 import { vistaUsuarios } from './vistas/usuarios.js';
@@ -30,6 +31,7 @@ const RUTAS = {
   '#/inicio':    { titulo: 'Inicio',            vista: vistaInicio },
   '#/tanques':   { titulo: 'Producción',        vista: vistaProduccion, permiso: 'produccion.ver' },
   '#/venta':     { titulo: 'Punto de venta',    vista: vistaVenta,     permiso: 'venta.registrar' },
+  '#/caja':      { titulo: 'Caja',              vista: vistaCaja,      permiso: 'caja.ver' },
   '#/existencia': { titulo: 'Existencia',       vista: vistaExistencia, permiso: 'existencia.ver' },
   '#/config-tanques': { titulo: 'Configurar tanques', vista: vistaTanques, permiso: 'produccion.ver' },
   '#/usuarios':  { titulo: 'Usuarios',          vista: vistaUsuarios,  permiso: 'usuarios.administrar' },

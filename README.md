@@ -3,7 +3,7 @@
 Sistema para la fábrica de hielo de Hunucmá, Yucatán.
 Se construye **por versiones**: cada versión es un pedazo terminado, probado y usable.
 
-**Versión actual: v0.8**
+**Versión actual: v0.9**
 
 ---
 
@@ -85,7 +85,8 @@ Lo que quedó desde la primera versión y sigue siendo la base de todo:
 - Se ve bien en celular **y** en la pantalla grande de la PC (en la PC el PIN
   también se escribe con el teclado)
 
-Lo que **todavía no existe** (aparece en gris en el inicio): caja (v0.9).
+Todos los módulos del inicio ya funcionan. Lo que falta son áreas nuevas
+(clientes, reparto, planta de agua, mantenimiento), no piezas de estas.
 
 ---
 
@@ -112,7 +113,7 @@ src/
   middleware/
     sesion.js          Quién está conectado y qué puede hacer
   modulos/             Un módulo por área. Agregar uno no toca los demás
-    auth/  usuarios/  tanques/  produccion/  existencia/  ventas/
+    auth/  usuarios/  tanques/  produccion/  existencia/  ventas/  caja/
     personalizacion/  versiones/  sistema/
 
 public/                La interfaz (HTML, CSS y JavaScript sin librerías)
@@ -199,6 +200,32 @@ venta vieja o se corrige una sacada, el corte que ya se firmó no cambia.
 
 ---
 
+## El corte de caja (v0.9)
+
+La caja se cuadra igual que el cuarto frío, pero con billetes:
+
+```
+    fondo + cobrado en efectivo + entradas − gastos = debería haber
+    debería haber − contado = DIFERENCIA
+```
+
+El turno se abre con el fondo para dar cambio, las ventas **se pegan solas**,
+se anotan los gastos (gasolina, refrescos, retiros a la caja fuerte) y al
+final se cuentan los billetes. El sistema dice si sobra o falta, y por qué
+suele pasar cada caso.
+
+**Un corte cerrado no cambia nunca más.** Si mañana cancelas una venta de
+hoy, el corte que ya se firmó se queda como está. Es un papel firmado.
+
+**Si nadie abrió la caja, se cobra igual.** La fábrica no se para porque
+alguien olvidó abrir el turno. Pero la pantalla de venta lo avisa en
+amarillo, porque ese dinero no va a aparecer en ningún corte.
+
+Solo el efectivo entra al arqueo. Lo que se cobre por otros medios se
+informa aparte: ese dinero nunca pasó por el cajón.
+
+---
+
 ## Las reglas de oro (del plan)
 
 Están escritas en el código, no solo en el documento:
@@ -245,8 +272,8 @@ versión nueva le aparece un punto rojo en el menú.
 | **v0.6** | Respaldos automáticos dentro y fuera de la PC | ✅ listo |
 | **v0.7** | La Existencia: conteo del cuarto frío y cuadre del día | ✅ listo |
 | **v0.8** | Punto de venta, conteo con fracciones, vendido vs faltante | ✅ listo |
-| v0.9 | Caja: sesiones, vales, arqueos y cortes | siguiente |
-| v0.10 | Clientes, mayoreo, crédito y autorizaciones | |
+| **v0.9** | La Caja: turnos, gastos, arqueo y corte imprimible | ✅ listo |
+| v0.10 | Clientes, mayoreo, crédito y autorizaciones | siguiente |
 | v0.11 | Mantenimiento: equipos, tareas, insumos, checklists | |
 | v0.12 | Planta de agua y garrafones | |
 | v0.13 | Reparto, mapas y neveras en comodato | |

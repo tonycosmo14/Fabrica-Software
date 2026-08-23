@@ -61,10 +61,19 @@ export async function vistaVenta(pantalla, estadoApp) {
         <h2>Punto de venta</h2>
         <div class="venta-cabeza-datos">
           <span class="etiqueta-folio">ticket #${contexto.siguienteFolio}</span>
+          ${contexto.caja ? `<span class="etiqueta-turno">turno #${contexto.caja.folio}</span>` : ''}
           <button class="secundario chico" id="buscar">Buscar tickets</button>
           ${puedePrecios ? '<button class="secundario chico" id="precios">Precios</button>' : ''}
         </div>
       </div>
+
+      ${contexto.caja
+        ? ''
+        : `<div class="aviso-sin-caja no-imprimir">
+             <strong>No hay turno de caja abierto.</strong>
+             Puedes cobrar igual, pero estas ventas no entrarán en ningún corte.
+             <a href="#/caja">Abrir la caja</a>
+           </div>`}
 
       <div class="venta-tablero">
         <section class="venta-teclado tarjeta">
