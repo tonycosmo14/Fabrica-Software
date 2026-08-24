@@ -18,7 +18,7 @@ const express = require('express');
 const { bd } = require('../../db/conexion');
 const { nuevoId, ahora } = require('../../lib/ids');
 const { ok, error } = require('../../lib/respuestas');
-const { aCentavos } = require('../../lib/dinero');
+const { leerPesos } = require('../../lib/dinero');
 const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
 const {
@@ -31,17 +31,13 @@ const verCaja = exigirPermiso('caja.ver');
 const operarCaja = exigirPermiso('caja.operar');
 const corregir = exigirPermiso('venta.cancelar');   // gerente y administrador
 
-const MAX_CENTAVOS = 100000000;   // un millón de pesos: tope de cordura
-
-/** Lee un importe en pesos y lo pasa a centavos. null si no se entiende. */
+/**
+ * Lee un importe tecleado. Vive en lib/dinero porque el mismo error
+ * —limpiar la cadena a la brava y quedarse con un 0 que nadie escribió—
+ * ya apareció en tres módulos distintos.
+ */
 function leerImporte(valor, { permitirCero = true } = {}) {
-  if (valor === undefined || valor === null || valor === '') return null;
-  let centavos;
-  try { centavos = aCentavos(String(valor).replace(/[^0-9.]/g, '')); }
-  catch { return null; }
-  if (!Number.isInteger(centavos) || centavos > MAX_CENTAVOS) return null;
-  if (!permitirCero && centavos === 0) return null;
-  return centavos;
+  return leerPesos(valor, { permitirCero });
 }
 
 // ============================================================

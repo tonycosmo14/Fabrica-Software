@@ -53,6 +53,23 @@ function vendidoSinEfectivo(cajaId) {
   `).get(cajaId).n;
 }
 
+/**
+ * Lo que salió FIADO en el turno.
+ *
+ * Va aparte de "otros medios" porque no es lo mismo: una transferencia ya
+ * se cobró y solo entró por otro lado; lo fiado todavía está en la calle.
+ * Al hacer el corte, esa diferencia es la que importa.
+ */
+function vendidoAlCredito(cajaId) {
+  return bd.prepare(`
+    SELECT COALESCE(SUM(total_centavos), 0) n
+      FROM ventas
+     WHERE caja_id = ?
+       AND cancelada_en IS NULL
+       AND forma_pago = 'credito'
+  `).get(cajaId).n;
+}
+
 /** Entradas y salidas de dinero que no son ventas. Las anuladas no cuentan. */
 function movimientos(cajaId, { incluirAnulados = false } = {}) {
   return bd.prepare(`
@@ -92,6 +109,7 @@ function conteoVentas(cajaId) {
 function estadoCaja(caja) {
   const vendido = vendidoEnEfectivo(caja.id);
   const otros = vendidoSinEfectivo(caja.id);
+  const fiado = vendidoAlCredito(caja.id);
   const entradas = sumaPorTipo(caja.id, 'entrada');
   const salidas = sumaPorTipo(caja.id, 'salida');
 
@@ -100,6 +118,9 @@ function estadoCaja(caja) {
     fondo: caja.fondo_centavos,
     vendido,
     vendidoOtrosMedios: otros,
+    // Lo fiado va aparte: eso todavía está en la calle, no cobrado.
+    vendidoFiado: fiado,
+    vendidoTransferencia: otros - fiado,
     entradas,
     salidas,
     // Lo que tiene que haber físicamente en el cajón.
@@ -109,6 +130,6 @@ function estadoCaja(caja) {
 }
 
 module.exports = {
-  sesionAbierta, vendidoEnEfectivo, vendidoSinEfectivo,
+  sesionAbierta, vendidoEnEfectivo, vendidoSinEfectivo, vendidoAlCredito,
   movimientos, sumaPorTipo, conteoVentas, estadoCaja
 };

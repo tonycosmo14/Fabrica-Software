@@ -11,6 +11,58 @@ solo para arreglos de algo que ya estaba, o para cambios de puro aspecto.
 
 ---
 
+## v1.6 — Clientes y crédito · 24 de agosto de 2026
+
+Migración `015_clientes.sql`.
+
+### Lo que Tony no había definido, y cómo se resolvió
+
+De crédito solo había una regla firme: *se le fía a los clientes que
+previamente registramos, no al público en general*. Faltaban límite,
+autorización, plazo y cobranza.
+
+En vez de inventarle una política a la fábrica, **se construyó la cuenta y
+se dejó la política configurable**. La cuenta —quién debe, de qué tickets y
+qué ha abonado— es la misma con cualquier política; lo de arriba se ajusta
+sin tocar el código. Está anotado en `docs/REGLAS-DEL-NEGOCIO.md`.
+
+| Punto | Cómo quedó |
+|---|---|
+| Límite | Campo por cliente. Vacío = sin límite |
+| Pasarse | No bloquea: pide PIN de gerente y guarda quién y por qué |
+| Plazo | Días por cliente, solo para marcar lo vencido |
+| Cobranza | Abonos a la cuenta, en efectivo o transferencia |
+
+### El saldo no se guarda (regla 3.2)
+
+```
+    lo que se llevó fiado  −  lo que ha abonado  =  DEBE
+```
+
+- **clave** — No hay columna de saldo. Hay una prueba que revisa el esquema y falla si alguien la agrega: un número guardado se desincroniza el día que se cancele un ticket viejo o se anule un abono, y ese día el papel del cliente y la pantalla de la fábrica dejan de decir lo mismo.
+- **clave** — Los abonos **no se aplican a un ticket concreto**. El cliente llega y deja $500 a cuenta, no dice "esto es del ticket 412"; amarrarlo obligaría al cajero a decidir algo que el cliente no dijo. Lo vencido se resuelve por antigüedad: lo abonado tapa primero lo más viejo.
+- **nuevo** — Cancelar un ticket fiado o anular un abono **corrige la cuenta solo**, sin tocar nada más.
+
+### Fiar desde la caja
+
+- **nuevo** — Botón **Fiar a un cliente** en la pantalla de cobro. Abre la lista de los registrados: no hay forma de escribir un nombre a mano.
+- **clave** — Antes de confirmar se enseña **lo que va a deber después de este ticket**: `debía + este ticket = va a deber`, con su límite al lado. Ese es el número por el que se decide, y hacerlo de cabeza con gente enfrente es como se cometen los errores caros.
+- **clave** — Pasarse del límite responde **403 con `requiereAutorizacion`**, no un rechazo. La pantalla pide el PIN y el motivo; el motivo se guarda en las notas del ticket, porque "lo autorizó Lupe" sin el porqué no explica nada al mes.
+- **nuevo** — El ticket sale marcado **FIADO**, con el nombre del cliente y línea para firmar: ese papel es el vale.
+- **arreglo** — `formaPago` ahora se valida contra una lista cerrada. Antes se guardaba cualquier cosa que mandara la pantalla, y como el arqueo solo cuenta `'efectivo'`, una forma de pago inventada sacaba una venta del corte sin que nadie lo notara.
+
+### El dinero, en el sitio correcto
+
+- **clave** — Una venta fiada **no entra al arqueo del cajón**: ese dinero nunca pasó por ahí y contarlo haría que la caja faltara todos los días.
+- **clave** — Un abono **en efectivo sí entra**, con su renglón en el cajón. Anularlo se lo quita también, o el corte quedaría con un ingreso que ya no existe.
+- **mejora** — El corte separa ahora **lo fiado** (dinero en la calle) de **lo cobrado por transferencia** (ya cobrado, solo entró por otro lado). Antes los dos decían "otros medios".
+
+### Un error que ya iba tres veces
+
+- **arreglo** — Limpiar un importe tecleado quitándole todo lo que no fuera dígito convertía `"mucho"` en `0` y `"-500"` en `500`. Un cero que nadie escribió apaga límites y avisos sin que nadie se entere. Ahora hay un solo lector de importes, `leerPesos()` en `lib/dinero.js`, que acepta lo que de verdad se teclea (`1,200.50`, `$45`, ` 80 `) y rechaza lo demás.
+
+---
+
 ## v1.5 — La caja avisa y la pantalla rinde · 24 de agosto de 2026
 
 Migración `014_avisos.sql`.

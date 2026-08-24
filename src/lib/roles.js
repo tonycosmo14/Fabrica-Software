@@ -19,7 +19,13 @@ const PERMISOS_POR_ROL = {
     'existencia.contar',
     // Del inventario solo ve cuántas hay, para poder ir a contar con la
     // hoja impresa. Ni los costos ni los movimientos son cosa suya.
-    'inventario.ver'
+    'inventario.ver',
+    // El cajero fía y cobra: es quien está en el mostrador cuando el
+    // cliente llega a pagar. Dar de alta clientes y ponerles límite no,
+    // eso es decidir a quién se le fía y cuánto.
+    'clientes.ver',
+    'venta.credito',
+    'credito.cobrar'
   ],
   repartidor: ['reparto.ver', 'reparto.operar'],
 
@@ -44,6 +50,13 @@ const PERMISOS_POR_ROL = {
     'costos.ver',
     // Dar de alta y de baja productos y categorías.
     'productos.administrar',
+    // Decide a quién se le fía, cuánto y con qué plazo, y autoriza que
+    // alguien se pase de su límite.
+    'clientes.ver',
+    'clientes.administrar',
+    'venta.credito',
+    'credito.cobrar',
+    'credito.autorizar',
     'reparto.ver'
   ],
   admin: ['*'] // el comodin abre todo

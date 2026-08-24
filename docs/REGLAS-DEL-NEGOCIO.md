@@ -19,8 +19,32 @@ después el código.
 - Un cliente de crédito es una ficha que existe antes de la venta: si no
   está dado de alta, no hay crédito.
 
-**Falta por definir:** límite de crédito por cliente, quién autoriza
-pasarse del límite, plazo y forma de cobranza.
+### Lo que se decidió al construir la v1.6
+
+Tony no había definido límite, autorización, plazo ni cobranza. En vez de
+inventarle una política a la fábrica, **se construyó la cuenta y se dejó la
+política configurable**. La cuenta —quién debe, de qué tickets y qué ha
+abonado— es la misma con cualquier política; lo de arriba se ajusta sin
+tocar el código.
+
+| Punto | Cómo quedó | Cómo se cambia |
+|---|---|---|
+| Límite de crédito | Campo por cliente. **Vacío = sin límite.** | En la ficha del cliente |
+| Pasarse del límite | **No se bloquea: se pide PIN** de gerente o administrador, y queda quién autorizó | Permiso `credito.autorizar` |
+| Plazo | Días por cliente, **solo para marcar lo vencido**. Nunca impide vender | En la ficha del cliente |
+| Cobranza | Abonos a la cuenta, en efectivo o transferencia. El efectivo entra al cajón como cualquier ingreso | — |
+
+Y dos reglas que sí son del negocio, no configurables:
+
+- Una **venta a crédito no es efectivo**: no entra en el arqueo del cajón,
+  porque ese dinero no pasó por ahí. Contarlo haría que la caja faltara
+  todos los días.
+- Un **abono en efectivo sí entra**, porque el billete sí llegó al cajón.
+
+**Falta por definir todavía:** si se cobra interés o recargo por atraso, y
+si hay días de corte fijos (todos cortan el día 15, por ejemplo) o cada
+cliente lleva su propio plazo desde la fecha de cada ticket. Hoy es lo
+segundo.
 
 ---
 

@@ -19,11 +19,14 @@ const { aTexto, validar } = require('../../lib/fracciones');
 const { aCentavos, formato } = require('../../lib/dinero');
 const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
+const { puede } = require('../../lib/roles');
 const { listaActiva, preciosDe, precioDe, sugerencia } = require('./precios');
 const { sesionAbierta } = require('../caja/calculo');
 const { productoPorId, productoPorCodigo, cotizar,
         categoriasActivas, productosActivos } = require('../catalogo/catalogo');
 const { alcanza, avisos } = require('../catalogo/avisos');
+const { cabeElCredito, estadoCliente, clientesConEstado } = require('../clientes/calculo');
+const { comprobar: comprobarAutorizacion, responsables } = require('../../lib/autorizacion');
 
 const router = express.Router();
 
@@ -32,6 +35,10 @@ const vender = exigirPermiso('venta.registrar');
 const configurarPrecios = exigirPermiso('precios.configurar');
 
 const MAX_DIECISEISAVOS = 16 * 500;      // 500 marquetas de tope por venta
+
+// Lista cerrada a propósito: el arqueo del cajón solo cuenta 'efectivo', y
+// una forma de pago inventada dejaría dinero fuera del corte sin aviso.
+const FORMAS_DE_PAGO = ['efectivo', 'transferencia', 'credito'];
 
 // ============================================================
 // LO QUE NECESITA LA PANTALLA DE VENTA
@@ -62,7 +69,17 @@ router.get('/contexto', vender, (req, res) => {
     caja: caja ? { folio: caja.folio, cajero: caja.cajero_nombre } : null,
     categorias: categoriasActivas(),
     productos: productosActivos(),
-    avisos: avisos()
+    avisos: avisos(),
+    // A quién se le puede fiar. Va con el contexto para que el cajero no
+    // espere a que cargue una lista con el cliente enfrente.
+    puedeFiar: puede(req.usuario.rol, 'venta.credito'),
+    clientes: puede(req.usuario.rol, 'venta.credito')
+      ? clientesConEstado().map((c) => ({
+          id: c.id, nombre: c.nombre, negocio: c.negocio,
+          saldo: c.estado.saldo, limite: c.estado.limite,
+          disponible: c.estado.disponible, vencido: c.estado.vencido
+        }))
+      : []
   });
 });
 
@@ -100,12 +117,30 @@ router.post('/', vender, (req, res) => {
   const preparadas = prepararLineas(lineas, lista);
   if (preparadas.error) return error(res, preparadas.error, preparadas.codigo || 400);
 
+  // --- Forma de pago ---
+  // Se valida contra una lista cerrada: el arqueo del cajón solo cuenta lo
+  // que dice 'efectivo', así que una forma de pago inventada sacaría dinero
+  // del corte sin que nadie lo notara.
+  const formaPago = req.body?.formaPago || 'efectivo';
+  if (!FORMAS_DE_PAGO.includes(formaPago)) {
+    return error(res, 'Esa forma de pago no existe.');
+  }
+
+  // --- A crédito ---
+  const credito = formaPago === 'credito'
+    ? revisarCredito(req, preparadas.total)
+    : { ok: true };
+  if (!credito.ok) return error(res, credito.mensaje, credito.codigo, credito.extra || {});
+
   // --- Pago ---
   let pago = null;
   if (req.body?.pago !== undefined && req.body.pago !== null && req.body.pago !== '') {
     try { pago = aCentavos(req.body.pago); } catch { return error(res, 'El pago no es un importe válido.'); }
     if (pago < preparadas.total) return error(res, 'El pago es menor que el total.');
   }
+  // Fiado quiere decir que no pagó. Guardar un pago aquí haría que el
+  // ticket dijera "pagó" y la cuenta del cliente dijera "debe".
+  if (formaPago === 'credito') pago = null;
 
   const venta = crearVenta({
     lineas: preparadas.lineas,
@@ -115,19 +150,85 @@ router.post('/', vender, (req, res) => {
     almacenId: almacen?.id || null,
     cajeroId: req.body?.cajeroId || req.usuario.id,
     capturistaId: req.usuario.id,
-    formaPago: req.body?.formaPago || 'efectivo',
-    notas: req.body?.notas || null
+    formaPago,
+    notas: req.body?.notas || null,
+    clienteId: credito.cliente?.id || null,
+    autorizadoPor: credito.autorizadoPor || null
   });
 
   bitacora.registrar({
-    accion: 'venta.registrada', entidad: 'venta', entidadId: venta.id,
+    accion: credito.cliente ? 'venta.credito' : 'venta.registrada',
+    entidad: 'venta', entidadId: venta.id,
     ejecutorId: req.body?.cajeroId || req.usuario.id, capturistaId: req.usuario.id,
     detalle: { folio: venta.folio, total: preparadas.total,
-               lineas: preparadas.lineas.length, cajaFolio: venta.cajaFolio }
+               lineas: preparadas.lineas.length, cajaFolio: venta.cajaFolio,
+               cliente: credito.cliente?.nombre,
+               autorizo: credito.autorizadoPorNombre }
   });
 
-  return ok(res, { venta: detalleVenta(venta.id) }, 201);
+  return ok(res, {
+    venta: detalleVenta(venta.id),
+    cliente: credito.cliente
+      ? { ...credito.cliente, estado: estadoCliente(credito.cliente) }
+      : null
+  }, 201);
 });
+
+/**
+ * FIARLE A ALGUIEN.
+ *
+ * Regla del negocio: se le fía SOLO a clientes registrados, nunca al
+ * público en general. Y pasarse del límite no se rechaza a secas: se pide
+ * el PIN de un responsable. Al de la ferretería que lleva veinte años
+ * comprando no se le para la venta por un número que alguien escribió hace
+ * meses; lo que sí queda es escrito quién dijo que sí.
+ */
+function revisarCredito(req, total) {
+  if (!puede(req.usuario.rol, 'venta.credito')) {
+    return { ok: false, codigo: 403, mensaje: 'Tu usuario no puede fiar.' };
+  }
+
+  const cliente = bd.prepare('SELECT * FROM clientes WHERE id = ?')
+    .get(req.body?.clienteId ?? null);
+  if (!cliente) {
+    return { ok: false, codigo: 400,
+             mensaje: 'A crédito solo se le vende a un cliente registrado.' };
+  }
+  if (!cliente.activo) {
+    return { ok: false, codigo: 409, mensaje: `${cliente.nombre} está dado de baja.` };
+  }
+
+  const cabe = cabeElCredito(cliente, total);
+  if (cabe.alcanza) return { ok: true, cliente };
+
+  if (!cabe.autorizable) {
+    return { ok: false, codigo: 409, mensaje: cabe.motivo };
+  }
+
+  // Se pasa del límite: hace falta que un responsable lo autorice ahí mismo.
+  if (!req.body?.autorizacion) {
+    return {
+      ok: false, codigo: 403,
+      mensaje: `${cabe.motivo} Debe ${formato(cabe.estado.saldo)} de ` +
+               `${formato(cabe.estado.limite)} y este ticket es de ${formato(total)}. ` +
+               'Hace falta que lo autorice un responsable.',
+      extra: { requiereAutorizacion: true, permiso: 'credito.autorizar',
+               saldo: cabe.estado.saldo, limite: cabe.estado.limite,
+               responsables: responsables() }
+    };
+  }
+
+  const comprobado = comprobarAutorizacion(req.body.autorizacion, 'credito.autorizar');
+  if (comprobado.error) {
+    return { ok: false, codigo: 403, mensaje: comprobado.error,
+             extra: { requiereAutorizacion: true, permiso: 'credito.autorizar',
+                      responsables: responsables() } };
+  }
+
+  return { ok: true, cliente,
+           autorizadoPor: comprobado.usuario.id,
+           autorizadoPorNombre: comprobado.usuario.nombre };
+}
 
 /**
  * Cotiza todas las líneas de una venta.
@@ -198,7 +299,8 @@ function prepararLineas(lineas, lista) {
  * para que dos cajas cobrando al mismo tiempo no saquen el mismo número.
  */
 function crearVenta({ lineas, total, pago, lista, almacenId, cajeroId, capturistaId,
-                      formaPago = 'efectivo', notas = null, cambioDe = null }) {
+                      formaPago = 'efectivo', notas = null, cambioDe = null,
+                      clienteId = null, autorizadoPor = null }) {
   const id = nuevoId();
   const fecha = ahora();
   const cambio = pago === null || pago === undefined ? null : pago - total;
@@ -213,11 +315,13 @@ function crearVenta({ lineas, total, pago, lista, almacenId, cajeroId, capturist
     bd.prepare(`
       INSERT INTO ventas (id, folio, fecha, cajero_id, capturista_id, almacen_id,
                           lista_id, lista_nombre, total_centavos, pago_centavos,
-                          cambio_centavos, forma_pago, notas, caja_id, cambio_de_venta_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                          cambio_centavos, forma_pago, notas, caja_id, cambio_de_venta_id,
+                          cliente_id, credito_autorizado_por)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(id, folio, fecha, cajeroId, capturistaId, almacenId,
            lista.id, lista.nombre, total, pago ?? null, cambio,
-           formaPago, notas, turno?.id || null, cambioDe);
+           formaPago, notas, turno?.id || null, cambioDe,
+           clienteId, autorizadoPor);
 
     const insertar = bd.prepare(`
       INSERT INTO venta_lineas
@@ -239,11 +343,15 @@ function crearVenta({ lineas, total, pago, lista, almacenId, cajeroId, capturist
 function detalleVenta(id) {
   const venta = bd.prepare(`
     SELECT v.*, u.nombre AS cajero_nombre, a.nombre AS almacen_nombre,
-           c.nombre AS cancelada_por_nombre
+           c.nombre AS cancelada_por_nombre,
+           cl.nombre AS cliente_nombre, cl.negocio AS cliente_negocio,
+           au.nombre AS credito_autorizado_nombre
       FROM ventas v
       LEFT JOIN usuarios u  ON u.id = v.cajero_id
       LEFT JOIN almacenes a ON a.id = v.almacen_id
       LEFT JOIN usuarios c  ON c.id = v.cancelada_por
+      LEFT JOIN clientes cl ON cl.id = v.cliente_id
+      LEFT JOIN usuarios au ON au.id = v.credito_autorizado_por
      WHERE v.id = ?
   `).get(id);
   if (!venta) return null;
@@ -266,8 +374,9 @@ router.get('/', verVentas, (req, res) => {
   if (busca) {
     const comoNumero = Number(busca.replace(/[^0-9.]/g, ''));
     filas = bd.prepare(`
-      SELECT v.*, u.nombre AS cajero_nombre FROM ventas v
-        LEFT JOIN usuarios u ON u.id = v.cajero_id
+      SELECT v.*, u.nombre AS cajero_nombre, cl.nombre AS cliente_nombre FROM ventas v
+        LEFT JOIN usuarios u  ON u.id = v.cajero_id
+        LEFT JOIN clientes cl ON cl.id = v.cliente_id
        WHERE v.folio = ?
           OR v.total_centavos = ?
           OR v.fecha LIKE ?
@@ -275,8 +384,9 @@ router.get('/', verVentas, (req, res) => {
     `).all(Math.trunc(comoNumero) || -1, Math.round(comoNumero * 100) || -1, `%${busca}%`, limite);
   } else {
     filas = bd.prepare(`
-      SELECT v.*, u.nombre AS cajero_nombre FROM ventas v
-        LEFT JOIN usuarios u ON u.id = v.cajero_id
+      SELECT v.*, u.nombre AS cajero_nombre, cl.nombre AS cliente_nombre FROM ventas v
+        LEFT JOIN usuarios u  ON u.id = v.cajero_id
+        LEFT JOIN clientes cl ON cl.id = v.cliente_id
        ORDER BY v.fecha DESC LIMIT ?
     `).all(limite);
   }

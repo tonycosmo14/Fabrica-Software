@@ -17,9 +17,32 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '1.5';
+const VERSION_ACTUAL = '1.6';
 
 const VERSIONES = [
+  {
+    numero: '1.6',
+    nombre: 'Clientes y crédito',
+    fecha: '2026-08-24',
+    resumen:
+      'A quién se le fía, cuánto debe cada quien y cuánto hay en la calle. ' +
+      'El saldo se calcula solo: nunca se guarda un número que pueda mentir.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'PANTALLA DE CLIENTES: la lista a la izquierda con lo que debe cada uno, y a la derecha su cuenta completa. Arriba, lo que se pregunta todos los días: cuánto hay en la calle y a quién ya se le venció.' },
+      { tipo: 'importante', texto: 'SOLO SE LE FÍA A CLIENTES REGISTRADOS, como en la fábrica. Al público en general no. En la caja, el botón "Fiar a un cliente" abre la lista; no hay forma de escribir un nombre a mano con gente esperando.' },
+      { tipo: 'importante', texto: 'Antes de confirmar, la pantalla enseña lo que va a deber DESPUÉS de este ticket: debía + este ticket = va a deber. Ese es el número por el que se decide, y hacerlo de cabeza con gente enfrente es como se cometen los errores caros.' },
+      { tipo: 'importante', texto: 'EL LÍMITE NO BLOQUEA: pasarse pide el PIN de un gerente y queda escrito quién lo autorizó y por qué. Al de la ferretería que lleva veinte años comprando no se le para la venta por un número que alguien escribió hace meses. Y el límite vacío quiere decir sin límite.' },
+      { tipo: 'nuevo', texto: 'El ticket fiado sale marcado FIADO, con el nombre del cliente y su línea para firmar: ese papel es el vale.' },
+      { tipo: 'nuevo', texto: 'ABONOS: el cliente pasa y deja lo que trae, no se aplica a un ticket concreto porque él tampoco lo dice así. En efectivo o por transferencia. Si paga de más, queda a su favor y se le avisa.' },
+      { tipo: 'importante', texto: 'Un abono EN EFECTIVO entra al cajón como cualquier ingreso, porque el billete sí llegó ahí y el corte tiene que cuadrar. Uno por transferencia no. Y anular un abono también le quita su renglón al cajón.' },
+      { tipo: 'importante', texto: 'UNA VENTA FIADA NO ES EFECTIVO: no entra en el arqueo del cajón. En el corte se ve aparte cuánto salió fiado en el turno, que es dinero en la calle, y aparte lo cobrado por transferencia, que ya se cobró.' },
+      { tipo: 'nuevo', texto: 'Plazo en días por cliente, solo para marcar lo vencido. Nunca impide vender.' },
+      { tipo: 'importante', texto: 'EL SALDO NO SE GUARDA: se suma cada vez. Así, cancelar un ticket viejo o anular un abono corrige la cuenta solo, y el papel del cliente y la pantalla de la fábrica no pueden decir cosas distintas.' },
+      { tipo: 'nuevo', texto: 'Un cliente que todavía debe no se puede dar de baja: desaparecería de la cobranza con dinero en la calle.' },
+      { tipo: 'arreglo', texto: 'Los importes tecleados ya no se limpian a la brava. Escribir "mucho" en un límite o en un fondo de caja se leía como 0, y un "-500" como 500. El mismo error había aparecido tres veces; ahora hay un solo lector de importes para todo el sistema.' }
+    ],
+    siguiente: 'v1.7 — Reparto: pedidos, rutas y neveras en comodato.'
+  },
   {
     numero: '1.5',
     nombre: 'La caja avisa y la pantalla rinde',

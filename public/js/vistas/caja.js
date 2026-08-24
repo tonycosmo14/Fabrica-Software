@@ -152,10 +152,15 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
             </div>
           </div>
 
-          ${e.vendidoOtrosMedios ? `
+          ${e.vendidoFiado ? `
             <p class="ayuda" style="margin:12px 0 0">
-              Además se cobraron ${pesos(e.vendidoOtrosMedios)} por otros medios.
-              Ese dinero no pasó por el cajón, así que no se cuenta aquí.
+              Salieron <strong>${pesos(e.vendidoFiado)} fiados</strong> en este turno.
+              Ese dinero está en la calle: no pasó por el cajón y no se cuenta aquí.
+            </p>` : ''}
+          ${e.vendidoTransferencia ? `
+            <p class="ayuda" style="margin:8px 0 0">
+              Además se cobraron ${pesos(e.vendidoTransferencia)} por transferencia.
+              Tampoco pasaron por el cajón.
             </p>` : ''}
           ${e.ventas.canceladas ? `
             <p class="ayuda" style="margin:8px 0 0">

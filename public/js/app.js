@@ -21,6 +21,7 @@ import { vistaNovedades, hayVersionNueva } from './vistas/novedades.js';
 import { vistaAyuda } from './vistas/ayuda.js';
 import { vistaPersonalizar } from './vistas/personalizar.js';
 import { vistaProductos } from './vistas/productos.js';
+import { vistaClientes } from './vistas/clientes.js';
 import { vistaSistema } from './vistas/sistema.js';
 
 const pantalla = document.getElementById('pantalla');
@@ -42,6 +43,7 @@ const RUTAS = {
   '#/usuarios':  { titulo: 'Usuarios',          vista: vistaUsuarios,  permiso: 'usuarios.administrar' },
   // El cajero entra con vista limitada: ve cuántas hay e imprime la hoja.
   '#/productos': { titulo: 'Productos y precios', vista: vistaProductos, permiso: 'inventario.ver', fija: true },
+  '#/clientes':  { titulo: 'Clientes',           vista: vistaClientes,  permiso: 'clientes.ver', fija: true },
   '#/personalizar': { titulo: 'Personalizar',   vista: vistaPersonalizar, permiso: 'sistema.configurar' },
   '#/sistema':   { titulo: 'Sistema',           vista: vistaSistema,   permiso: 'sistema.ver' },
   '#/ayuda':     { titulo: 'Ayuda',              vista: vistaAyuda },

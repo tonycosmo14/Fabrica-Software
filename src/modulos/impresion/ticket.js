@@ -74,6 +74,22 @@ function ticketVenta(venta, { copia = false, negocio = '' } = {}) {
       `Pago ${formato(venta.pago_centavos)} - cambio ${formato(venta.cambio_centavos)}`);
   }
 
+  // FIADO. Va en grande y con el nombre porque este papel es el vale: el
+  // cliente se lleva su copia y con eso los dos saben lo mismo. Y lleva la
+  // línea para firmar, que es lo que hace que sirva de algo al reclamar.
+  if (venta.forma_pago === 'credito') {
+    t.separador();
+    t.centro().negrita().tamano(2, 2).linea('FIADO').normal();
+    if (venta.cliente_nombre) t.centro().negrita().linea(venta.cliente_nombre).negrita(false);
+    if (venta.cliente_negocio) t.centro().linea(venta.cliente_negocio);
+    t.izquierda().saltos(2);
+    t.centro().linea('_____________________');
+    t.linea('Firma de recibido');
+    t.izquierda();
+  } else if (venta.forma_pago === 'transferencia') {
+    t.centro().linea('Pagado por transferencia');
+  }
+
   if (negocio || cfg.pie) {
     t.separador();
     t.centro();

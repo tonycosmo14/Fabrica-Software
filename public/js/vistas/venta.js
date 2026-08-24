@@ -22,7 +22,8 @@
  */
 import { api } from '../api.js';
 import { esc, avisar, soloHora, fecha as formatoFecha, ETIQUETAS_ROL } from '../util.js';
-import { pedirTexto, pedirImporte, pedirCantidad, confirmar } from '../dialogo.js';
+import { pedirTexto, pedirImporte, pedirCantidad, confirmar,
+         pedirAutorizacion } from '../dialogo.js';
 import { aTexto, descomponer, desglose, pesos } from '../fracciones.js';
 import { cargarMarca } from '../marca.js';
 import { imprimirTicket, limpiarImpresion } from '../imprimir.js';
@@ -46,6 +47,7 @@ const FASES = {
   espera:    { enter: 'nada',                     esc: 'volver a vender' },
   avisos:    { enter: 'nada',                     esc: 'volver a vender' },
   movimientos: { enter: 'nada',                   esc: 'volver a vender' },
+  clientes:  { enter: 'nada',                     esc: 'volver al cobro' },
   cobrada:   { enter: 'imprime el ticket',        esc: 'siguiente venta' }
 };
 
@@ -54,6 +56,7 @@ export async function vistaVenta(pantalla, estadoApp) {
   const puedeOperarCaja = tiene('caja.operar');
   const puedeVerCaja = tiene('caja.ver');
   const puedeContarHielo = tiene('existencia.ver');
+  const puedeFiar = tiene('venta.credito');
   const puedeRepartirNumeros = tiene('produccion.autorizar');
 
   const marca = await cargarMarca();
@@ -98,11 +101,21 @@ export async function vistaVenta(pantalla, estadoApp) {
   // ---- Cambio de ticket: lo que el cliente trae a favor ----
   let cambiando = null;          // { venta, aFavor }
 
+  /**
+   * A QUIÉN SE LE ESTÁ FIANDO ESTE TICKET.
+   *
+   * null es lo normal: el público paga y se va. Solo se fía a clientes
+   * registrados, así que esto siempre sale de la lista, nunca de un nombre
+   * escrito a mano con el cliente enfrente.
+   */
+  let fiadoA = null;
+
   // ---- La fase del teclado ----
   let fase = 'venta';
   let pago = 0;                  // centavos tecleados en el cobro
   let ventaCobrada = null;
   let ultimoCambio = null;       // el resultado del último cambio de ticket
+  let fiadoCobrado = null;       // a quién se le acaba de fiar, para decírselo
 
   pantalla.innerHTML = armazon();
   const refs = {
@@ -787,7 +800,11 @@ export async function vistaVenta(pantalla, estadoApp) {
    * alto— se le devuelve a los botones.
    */
   function pintarPista() {
-    const f = FASES[fase];
+    // Fiando, enter no cobra: fía. El cartel de abajo es lo que hace que el
+    // teclado se aprenda sin manual, así que tiene que decir la verdad.
+    const f = fase === 'cambio' && fiadoA
+      ? { enter: 'fía y registra', esc: 'mejor cobrarle' }
+      : FASES[fase];
     refs.pista.innerHTML = `
       <span class="pos-reloj">
         <strong id="pos-hora">—</strong>
@@ -893,6 +910,7 @@ export async function vistaVenta(pantalla, estadoApp) {
     if (fase === 'espera') return;
     if (fase === 'avisos') return;
     if (fase === 'movimientos') return;
+    if (fase === 'clientes') return;
     if (fase === 'venta')   return agregarPorCodigo();
     if (fase === 'cobro')   return calcularCambio();
     if (fase === 'cambio')  return registrar();
@@ -904,6 +922,7 @@ export async function vistaVenta(pantalla, estadoApp) {
     if (fase === 'espera') { cerrarEspera(); return; }
     if (fase === 'avisos') { cerrarAvisos(); return; }
     if (fase === 'movimientos') { cerrarAvisos(); return; }
+    if (fase === 'clientes') { fase = 'cobro'; pintarCobro(); pintarPista(); return; }
     if (fase === 'venta') {
       if (refs.codigo.value) { refs.codigo.value = ''; return; }
       if (cambiando) { cambiando = null; pintarTodo(); return; }
@@ -911,7 +930,10 @@ export async function vistaVenta(pantalla, estadoApp) {
       return;
     }
     if (fase === 'cobro')   { cerrarCobro(); return; }
-    if (fase === 'cambio')  { fase = 'cobro'; pintarCobro(); return; }
+    if (fase === 'cambio')  {
+      if (fiadoA) { fiadoA = null; }
+      fase = 'cobro'; pintarCobro(); pintarPista(); return;
+    }
     if (fase === 'cobrada') { nuevaVenta(); }
   }
 
@@ -951,12 +973,16 @@ export async function vistaVenta(pantalla, estadoApp) {
 
   function cerrarCobro() {
     fase = 'venta';
+    fiadoA = null;
     refs.cobro.hidden = true;
     pintarPista();
     enfocar();
   }
 
   function pintarCobro() {
+    // Fiando no hay nada que cobrar ahora: el panel es otro.
+    if (fiadoA) return pintarFiado();
+
     // En un cambio, el cliente ya pagó el ticket que trae: lo único que
     // se mueve es la diferencia. Puede ser a cobrar o a devolver.
     const aPagar = cambiando ? Math.max(total() - cambiando.aFavor, 0) : total();
@@ -1000,6 +1026,11 @@ export async function vistaVenta(pantalla, estadoApp) {
             <button class="secundario chico" data-billete="justo">Justo</button>
           </div>
 
+          ${puedeFiar && !cambiando ? `
+            <button class="secundario pos-fiar" id="fiar">
+              🧾 Fiar a un cliente
+            </button>` : ''}
+
           ${enConfirmacion ? `
             <div class="pos-cambio ${vuelto === 0 ? 'sin-cambio' : ''}">
               <span>${vuelto === 0 ? 'Pagó justo' : 'Cambio'}</span>
@@ -1038,11 +1069,150 @@ export async function vistaVenta(pantalla, estadoApp) {
       };
     });
 
+    const botonFiar = refs.cobro.querySelector('#fiar');
+    if (botonFiar) botonFiar.onclick = () => verClientes();
+
     const calcular = refs.cobro.querySelector('#calcular');
     if (calcular) calcular.onclick = calcularCambio;
     const btnConfirmar = refs.cobro.querySelector('#confirmar');
     if (btnConfirmar) btnConfirmar.onclick = registrar;
     refs.cobro.querySelector('#salir-cobro').onclick = cerrarCobro;
+  }
+
+  /**
+   * EL PANEL DE FIAR.
+   *
+   * Enseña lo que va a deber DESPUÉS de este ticket, no lo que debe ahora:
+   * ese es el número por el que el cajero decide si le fía o llama al
+   * gerente, y hacerlo de cabeza con gente esperando es como se cometen los
+   * errores caros.
+   */
+  function pintarFiado() {
+    const t = total();
+    const saldoDespues = fiadoA.saldo + t;
+    const disponible = fiadoA.disponible;
+    const seExcede = disponible !== null && t > disponible;
+
+    fase = 'cambio';
+    refs.cobro.hidden = false;
+    refs.cobro.innerHTML = `
+      <div class="pos-cobro-caja">
+        <div class="pos-cobro-total">
+          <span>Se le fía a</span>
+          <strong class="pos-fiado-nombre">${esc(fiadoA.nombre)}</strong>
+        </div>
+        ${fiadoA.negocio ? `<p class="ayuda" style="margin:-12px 0 14px;text-align:center">
+          ${esc(fiadoA.negocio)}</p>` : ''}
+
+        <div class="cuadre">
+          <div class="cuadre-linea"><span>Debía</span><strong>${pesos(fiadoA.saldo)}</strong></div>
+          <div class="cuadre-linea suma"><span>+ Este ticket</span><strong>${pesos(t)}</strong></div>
+          <div class="cuadre-linea total">
+            <span>= Va a deber</span>
+            <strong class="${seExcede ? 'malo' : ''}">${pesos(saldoDespues)}</strong>
+          </div>
+          ${disponible !== null ? `
+            <div class="cuadre-linea">
+              <span>Su límite</span><strong>${pesos(fiadoA.limite)}</strong>
+            </div>` : ''}
+        </div>
+
+        ${seExcede ? `
+          <div class="aviso-sin-caja" style="margin-top:12px">
+            <strong>Se pasa de su límite.</strong>
+            Se puede fiar igual, pero lo tiene que autorizar un gerente con su PIN.
+          </div>` : ''}
+        ${fiadoA.vencido ? `
+          <div class="aviso-sin-caja" style="margin-top:12px">
+            <strong>Ya se le venció el plazo</strong> de lo que debe de antes.
+          </div>` : ''}
+
+        <button class="pos-confirmar" id="confirmar" style="margin-top:14px">
+          <span>Fiar ${pesos(t)}</span><small>Enter</small>
+        </button>
+        <button class="secundario" id="quitar-fiado" style="margin-top:10px;width:100%">
+          Mejor cobrarle
+        </button>
+        <button class="secundario" id="salir-cobro" style="margin-top:10px;width:100%">
+          Esc · volver al ticket
+        </button>
+      </div>`;
+
+    setTimeout(() => refs.cobro.querySelector('#confirmar')?.focus(), 0);
+    refs.cobro.querySelector('#confirmar').onclick = registrar;
+    refs.cobro.querySelector('#quitar-fiado').onclick = () => {
+      fiadoA = null; fase = 'cobro'; pago = 0; pintarCobro(); pintarPista();
+    };
+    refs.cobro.querySelector('#salir-cobro').onclick = cerrarCobro;
+    pintarPista();
+  }
+
+  /**
+   * A QUIÉN SE LE FÍA.
+   *
+   * Solo los que están dados de alta: es la regla del negocio, y por eso la
+   * lista no tiene "cliente nuevo". Dar de alta a alguien se hace en su
+   * pantalla, con calma, no en medio del cobro con gente esperando.
+   */
+  function verClientes(busca = '') {
+    fase = 'clientes';
+    refs.cobro.hidden = false;
+
+    const filtro = busca.trim().toLowerCase();
+    const lista = (ctx.clientes || []).filter((c) =>
+      !filtro || `${c.nombre} ${c.negocio || ''}`.toLowerCase().includes(filtro));
+
+    refs.cobro.innerHTML = `
+      <div class="pos-cobro-caja pos-historial">
+        <h3 style="margin:0 0 4px">¿A quién se le fía?</h3>
+        <p class="ayuda" style="margin:0 0 12px">
+          Solo a clientes dados de alta. Al público en general no se le fía.
+        </p>
+        <input id="busca-cliente" class="buscador" autocomplete="off"
+               placeholder="Nombre o negocio" value="${esc(busca)}" style="margin:0">
+        <div class="lista-tickets">
+          ${lista.slice(0, 40).map((c) => `
+            <div class="ticket-fila">
+              <div class="crece">
+                <strong>${esc(c.nombre)}</strong>
+                <small>${c.negocio ? esc(c.negocio) + ' · ' : ''}${
+                  c.saldo > 0 ? 'debe ' + pesos(c.saldo) : 'no debe nada'}${
+                  c.limite !== null ? ' · límite ' + pesos(c.limite) : ''}</small>
+              </div>
+              ${c.vencido ? '<span class="aviso-quedan agotado">vencido</span>' : ''}
+              <button class="secundario chico" data-cliente="${esc(c.id)}">Fiarle</button>
+            </div>`).join('')
+            || `<p class="vacio" style="padding:20px 0">${
+                 (ctx.clientes || []).length
+                   ? 'Ningún cliente con ese nombre.'
+                   : 'Todavía no hay clientes dados de alta.'}</p>`}
+        </div>
+        <button class="secundario" id="cerrar-clientes" style="margin-top:12px;width:100%">
+          Esc · volver al cobro
+        </button>
+      </div>`;
+
+    const campo = refs.cobro.querySelector('#busca-cliente');
+    setTimeout(() => campo.focus(), 60);
+    campo.oninput = () => {
+      const donde = campo.selectionStart;
+      verClientes(campo.value);
+      const nuevo = refs.cobro.querySelector('#busca-cliente');
+      nuevo.focus();
+      nuevo.setSelectionRange(donde, donde);
+    };
+    campo.onkeydown = (ev) => { if (ev.key === 'Enter') ev.stopPropagation(); };
+
+    refs.cobro.querySelectorAll('[data-cliente]').forEach((b) => {
+      b.onclick = () => {
+        fiadoA = (ctx.clientes || []).find((c) => c.id === b.dataset.cliente) || null;
+        if (fiadoA) pintarFiado();
+      };
+    });
+    refs.cobro.querySelector('#cerrar-clientes').onclick = () => {
+      fase = 'cobro'; pintarCobro(); pintarPista();
+    };
+    pintarPista();
   }
 
   function calcularCambio() {
@@ -1065,8 +1235,8 @@ export async function vistaVenta(pantalla, estadoApp) {
     pintarPista();
   }
 
-  async function registrar() {
-    if (fase !== 'cambio') return;
+  async function registrar(autorizacion = null) {
+    if (fase !== 'cambio' && fase !== 'guardando') return;
     fase = 'guardando';
     pintarPista();
 
@@ -1086,14 +1256,26 @@ export async function vistaVenta(pantalla, estadoApp) {
         : await api.enviar('/ventas', {
             almacenId: ctx.almacenes[0]?.id,
             lineas,
-            pago: (pago / 100).toFixed(2)
+            // Fiado no lleva pago: el cliente no pagó nada.
+            ...(fiadoA
+              ? { formaPago: 'credito', clienteId: fiadoA.id,
+                  ...(autorizacion
+                    // El porqué se guarda con el ticket: al mes, "lo
+                    // autorizó Lupe" sin el motivo no explica nada.
+                    ? { autorizacion, notas: `Sobre su límite: ${autorizacion.motivo}` }
+                    : {}) }
+              : { pago: (pago / 100).toFixed(2) })
           });
 
       const venta = respuesta.venta;
       ultimoCambio = cambiando ? respuesta : null;
       cambiando = null;
       ventaCobrada = venta;
+      // Lo que quedó debiendo, para poder decírselo al cliente en la cara.
+      fiadoCobrado = respuesta.cliente || null;
       ctx.siguienteFolio = venta.folio + 1;
+      if (fiadoA && respuesta.cliente) refrescarCliente(respuesta.cliente);
+      fiadoA = null;
       fase = 'cobrada';
       pintarCobrada();
       pintarPista();
@@ -1103,11 +1285,35 @@ export async function vistaVenta(pantalla, estadoApp) {
       // NO se imprime solo: no todos los tickets se entregan, y cada uno
       // que sale sin que nadie lo pida es papel tirado. Enter imprime.
     } catch (e) {
+      // Se pasó de su límite: no se rechaza a secas, se pide el PIN de un
+      // responsable. Al de la ferretería que lleva veinte años comprando no
+      // se le para la venta por un número que alguien escribió hace meses.
+      if (e.requiereAutorizacion && fiadoA && !autorizacion) {
+        const auth = await pedirAutorizacion({
+          titulo: `${fiadoA.nombre} se pasa de su límite`,
+          texto: e.message,
+          responsables: e.responsables || [],
+          motivoSugerido: 'Cliente de siempre, siempre paga'
+        });
+        if (auth) return registrar(auth);
+      }
       fase = 'cambio';
       pintarCobro();
       pintarPista();
       avisar(e.message, 'error');
     }
+  }
+
+  /** Deja la lista del contexto con el saldo nuevo, sin ir al servidor. */
+  function refrescarCliente(actualizado) {
+    const i = (ctx.clientes || []).findIndex((c) => c.id === actualizado.id);
+    if (i < 0) return;
+    ctx.clientes[i] = {
+      ...ctx.clientes[i],
+      saldo: actualizado.estado.saldo,
+      disponible: actualizado.estado.disponible,
+      vencido: actualizado.estado.vencido
+    };
   }
 
   function pintarCobrada() {
@@ -1119,16 +1325,33 @@ export async function vistaVenta(pantalla, estadoApp) {
     const aDevolver = c ? c.porDevolver : 0;
     const vuelto = c ? 0 : (v.cambio_centavos || 0);
 
+    // Fiado: lo que hay que decirle al cliente no es el cambio, es cuánto
+    // debe ahora. Es el momento en que lo va a oír, y el único en que puede
+    // decir "no, yo ya te pagué".
+    const fiado = v.forma_pago === 'credito';
+
     refs.cobro.innerHTML = `
       <div class="pos-cobro-caja pos-cobrada">
         <div class="pos-cobrada-folio">
           Ticket #${v.folio}${c ? ` · cambio del #${c.anterior.folio}` : ''}
         </div>
 
-        <div class="pos-cambio grande ${(aDevolver || vuelto) ? '' : 'sin-cambio'}">
-          <span>${aDevolver ? 'Devuélvele' : vuelto ? 'Cambio' : 'Pagó justo'}</span>
-          <strong>${pesos(aDevolver || vuelto)}</strong>
-        </div>
+        ${fiado ? `
+          <div class="pos-cambio grande pos-fiado">
+            <span>${esc(v.cliente_nombre || 'Fiado')} ahora debe</span>
+            <strong>${pesos(fiadoCobrado?.estado?.saldo ?? v.total_centavos)}</strong>
+          </div>
+          ${v.credito_autorizado_nombre ? `
+            <p class="ayuda" style="margin:0 0 10px;text-align:center">
+              Autorizó ${esc(v.credito_autorizado_nombre)}
+            </p>` : ''}
+          <p class="ayuda" style="margin:0 0 10px;text-align:center">
+            El ticket sale marcado <strong>FIADO</strong>, con línea para firmar.
+          </p>` : `
+          <div class="pos-cambio grande ${(aDevolver || vuelto) ? '' : 'sin-cambio'}">
+            <span>${aDevolver ? 'Devuélvele' : vuelto ? 'Cambio' : 'Pagó justo'}</span>
+            <strong>${pesos(aDevolver || vuelto)}</strong>
+          </div>`}
 
         <button class="pos-confirmar" id="otro-ticket">
           <span>🖨️ Imprimir ticket</span><small>Enter</small>
@@ -1144,7 +1367,7 @@ export async function vistaVenta(pantalla, estadoApp) {
 
   function nuevaVenta() {
     hielo = 0; articulos = []; pago = 0; ventaCobrada = null;
-    ultimoCambio = null; cambiando = null;
+    ultimoCambio = null; cambiando = null; fiadoA = null;
     fase = 'venta';
     refs.cobro.hidden = true;
     limpiarImpresion();
@@ -1219,6 +1442,11 @@ export async function vistaVenta(pantalla, estadoApp) {
           </table>` : ''}
 
         <div class="tk-total">${pesos(v.total_centavos)}</div>
+
+        ${v.forma_pago === 'credito' ? `
+          <div class="tk-copia">FIADO</div>
+          ${v.cliente_nombre ? `<div class="tk-pie"><b>${esc(v.cliente_nombre)}</b></div>` : ''}
+          <div class="tk-firma">_____________________<br>Firma de recibido</div>` : ''}
 
         ${v.pago_centavos && v.cambio_centavos ? `
           <div class="tk-pago">
@@ -1335,9 +1563,11 @@ export async function vistaVenta(pantalla, estadoApp) {
         <div class="ticket-fila ${v.cancelada_en ? 'anulada' : ''}">
           <div class="crece">
             <strong>#${v.folio}</strong>
-            <small>${esc(formatoFecha(v.fecha))} · ${esc(v.cajero_nombre || '—')}</small>
+            <small>${esc(formatoFecha(v.fecha))} · ${esc(v.cajero_nombre || '—')}${
+              v.cliente_nombre ? ' · fiado a ' + esc(v.cliente_nombre) : ''}</small>
           </div>
-          <span class="ticket-fila-total">${pesos(v.total_centavos)}</span>
+          <span class="ticket-fila-total ${v.forma_pago === 'credito' ? 'fiado' : ''}">
+            ${pesos(v.total_centavos)}</span>
           <button class="secundario chico" data-ver="${esc(v.id)}">Ver</button>
           <button class="secundario chico" data-reimprimir="${esc(v.id)}">Copia</button>
         </div>
@@ -1395,6 +1625,12 @@ export async function vistaVenta(pantalla, estadoApp) {
           <p class="ayuda" style="margin:6px 0 0">
             Pagó ${pesos(venta.pago_centavos)}${venta.cambio_centavos
               ? ` · cambio ${pesos(venta.cambio_centavos)}` : ' justo'}
+          </p>` : ''}
+        ${venta.forma_pago === 'credito' ? `
+          <p class="ayuda" style="margin:6px 0 0">
+            <strong>Fiado</strong> a ${esc(venta.cliente_nombre || '—')}${
+              venta.credito_autorizado_nombre
+                ? ` · autorizó ${esc(venta.credito_autorizado_nombre)}` : ''}
           </p>` : ''}
         ${venta.cancelada_en ? `
           <p class="ayuda" style="margin:6px 0 0">

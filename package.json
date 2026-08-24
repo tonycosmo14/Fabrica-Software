@@ -1,6 +1,6 @@
 {
   "name": "fabrica-hielo",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Sistema de gestion para fabrica de hielo y planta de agua",
   "private": true,
   "type": "commonjs",

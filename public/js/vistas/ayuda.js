@@ -187,6 +187,11 @@ debería quedar − contado = FALTA</pre>
       <p>Sirve cuando el cliente vuelve porque perdió su ticket, o cuando te
       saliste de la pantalla sin querer.</p>
 
+      <h4>Fiar</h4>
+      <p>En la pantalla de cobro, <b>🧾 Fiar a un cliente</b>. Solo a los que
+      están dados de alta. Está explicado completo en
+      <b>Clientes y crédito</b>.</p>
+
       <h4>Cuando algo se está acabando</h4>
       <p>Arriba a la derecha aparece un <b>⚠ con una bolita</b>. El número de
       la bolita es cuántos productos están bajos o ya se acabaron. Al tocarlo
@@ -305,6 +310,14 @@ debería quedar − contado = FALTA</pre>
       <p>Con el botón rojo <b>− Gasto</b> de la pantalla de venta. Todo el
       dinero que sale del cajón sin ser cambio: la gasolina, los refrescos, el
       retiro a la caja fuerte. Verde entra, rojo sale.</p>
+
+      <h4>Lo fiado no está en el cajón</h4>
+      <p>Si en el turno salió mercancía <b>fiada</b>, el corte lo dice aparte:
+      ese dinero está en la calle, no en los billetes, y no se cuenta en el
+      arqueo. Lo mismo lo cobrado por transferencia, que ya se cobró pero
+      entró por otro lado.</p>
+      <p>Lo que sí entra al cajón son los <b>abonos en efectivo</b>: ese
+      billete sí llegó ahí.</p>
 
       <h4>Cerrar y contar</h4>
       <p>Cuentas <b>todo</b> el dinero del cajón, incluido el fondo, y lo
@@ -435,6 +448,86 @@ debería haber − contado = FALTA</pre>
       <p>En esta misma pantalla, abajo. Con el nombre de la impresora puesto,
       el ticket sale <b>al instante</b>; sin él, lo imprime el navegador y
       aparece la ventana de impresión.</p>`
+  },
+
+  // ==========================================================
+  {
+    id: 'clientes',
+    titulo: 'Clientes y crédito: a quién se le fía',
+    busca: 'clientes crédito fiar fiado deuda debe abono abonar cobranza límite plazo vencido saldo cuenta a favor cartera calle',
+    cuerpo: `
+      <p>La regla de la fábrica es que <b>se le fía solo a los clientes que
+      damos de alta</b>. Al público en general no. Por eso en la caja el
+      botón de fiar abre una lista: no hay forma de escribir un nombre a
+      mano con gente esperando.</p>
+
+      <h4>Dar de alta a alguien</h4>
+      <p>En <b>Clientes</b>, botón <b>＋ Cliente</b>. Solo se pide el nombre;
+      lo demás —negocio, teléfono, límite, plazo— se llena tocándolo en su
+      ficha, y casi nunca se sabe todo el primer día.</p>
+
+      <h4>Fiar en la caja</h4>
+      <ol class="instrucciones">
+        <li>Se marca lo que se lleva, como cualquier venta.</li>
+        <li><em>F10</em> para cobrar, y ahí <b>🧾 Fiar a un cliente</b>.</li>
+        <li>Se busca por nombre o negocio y se toca <b>Fiarle</b>.</li>
+        <li>La pantalla enseña <b>lo que va a deber después de este ticket</b>:
+        debía + este ticket = va a deber. <em>Enter</em> lo registra.</li>
+      </ol>
+      <p>El ticket sale marcado <b>FIADO</b>, con su nombre y la línea para
+      firmar. Ese papel es el vale: el cliente se lleva su copia y los dos
+      saben lo mismo.</p>
+
+      <h4>El límite avisa, no impide</h4>
+      <p>Si el cliente tiene límite y este ticket lo pasa, <b>no se rechaza la
+      venta</b>: se pide el <b>PIN de un gerente</b> y el porqué. Queda escrito
+      quién lo autorizó y por qué, en el ticket y en la bitácora.</p>
+      <p class="ayuda-tip">Al cliente que lleva veinte años comprando no se le
+      para la venta por un número que alguien escribió hace meses. Pero
+      tampoco se le fía de más sin que nadie se entere.</p>
+      <p>El límite <b>vacío quiere decir sin límite</b>. Un límite de cero sí
+      es un límite: a ese no se le fía nada.</p>
+
+      <h4>Cuando el cliente pasa a pagar</h4>
+      <p>En su ficha, <b>＋ Recibir abono</b>. Se escribe lo que deja y ya.</p>
+      <ul>
+        <li>El abono va <b>a su cuenta</b>, no a un ticket concreto: es como lo
+        dice el cliente, que llega y deja $500.</li>
+        <li>Si paga <b>de más</b>, lo que sobra le queda a favor y se le
+        descuenta la próxima vez.</li>
+        <li>En efectivo, ese dinero <b>entra al cajón</b> y sale en el corte.
+        Por transferencia no, porque no pasó por ahí.</li>
+      </ul>
+      <p>Si se anotó mal, el gerente lo anula con la ✕ de su renglón. No se
+      borra: queda marcado, con el motivo, y su renglón del cajón se anula
+      también.</p>
+
+      <h4>Su cuenta</h4>
+      <p>Arriba, en grande, lo que debe. Abajo la cuenta de siempre:</p>
+      <pre class="ayuda-formula">se ha llevado fiado − ha pagado = DEBE</pre>
+      <p>Y después, renglón por renglón, lo que se llevó y lo que pagó. Es lo
+      que se le enseña al cliente cuando pregunta.</p>
+      <p class="ayuda-tip"><b>El saldo no está guardado en ningún lado: se
+      suma cada vez.</b> Por eso cancelar un ticket viejo o anular un abono
+      corrige la cuenta solo, y el papel del cliente y esta pantalla no
+      pueden decir cosas distintas.</p>
+
+      <h4>La cobranza</h4>
+      <p>Arriba de la pantalla, <b>cuánto hay en la calle</b> y cuántos deben.
+      El botón <b>Solo los que deben</b> deja la lista lista para salir a
+      cobrar. Si le pusiste <b>días de plazo</b> a un cliente, los que se
+      pasaron salen marcados en rojo como <b>vencidos</b>.</p>
+      <p>El plazo <b>solo avisa</b>: nunca impide venderle.</p>
+
+      <h4>En el corte</h4>
+      <p>Lo que salió fiado <b>no se cuenta en el cajón</b>: ese dinero está en
+      la calle, no en los billetes. El corte lo dice aparte, para que sepas
+      cuánto se fió en el turno.</p>
+
+      <h4>Dar de baja a un cliente</h4>
+      <p>Solo si <b>no debe nada</b>. Uno que debe no se puede dar de baja:
+      desaparecería de la cobranza con dinero afuera. Sus tickets viejos no
+      cambian, y se puede recuperar cuando sea.</p>`
   },
 
   // ==========================================================

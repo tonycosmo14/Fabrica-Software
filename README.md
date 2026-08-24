@@ -3,7 +3,7 @@
 Sistema para la fábrica de hielo de Hunucmá, Yucatán.
 Se construye **por versiones**: cada versión es un pedazo terminado, probado y usable.
 
-**Versión actual: v1.5**
+**Versión actual: v1.6**
 
 ---
 
@@ -326,6 +326,50 @@ caer.
 
 ---
 
+## Clientes y crédito (v1.6)
+
+Regla de la fábrica: **se le fía solo a clientes registrados**, nunca al
+público en general. Por eso el cliente es una ficha que existe antes de la
+venta, y en la caja el botón *Fiar* abre una lista, no un campo de texto.
+
+### La cuenta no se guarda
+
+```
+    lo que se llevó fiado  −  lo que ha abonado  =  DEBE
+```
+
+No hay columna de saldo (regla 3.2), y hay una prueba que falla si alguien
+la agrega. Un número guardado se desincroniza el día que se cancele un
+ticket viejo o se anule un abono, y ese día el papel del cliente y la
+pantalla de la fábrica dejan de decir lo mismo. Una suma no puede.
+
+Los abonos van **a la cuenta**, no a un ticket concreto: el cliente llega y
+deja $500, no dice "esto es del ticket 412". Lo vencido se resuelve por
+antigüedad, que es como lo cuenta cualquiera en el mostrador.
+
+### El límite avisa, no bloquea
+
+| | Cómo quedó |
+|---|---|
+| Límite | Por cliente. **Vacío = sin límite** |
+| Pasarse | Pide el PIN de un gerente y guarda quién y por qué |
+| Plazo | Días por cliente, solo para marcar lo vencido |
+
+Al de la ferretería que lleva veinte años comprando no se le para la venta
+por un número que alguien escribió hace meses. Lo que sí queda es escrito
+quién dijo que sí.
+
+### Dónde cae el dinero
+
+- Una **venta fiada no es efectivo**: no entra al arqueo del cajón. Ese
+  dinero nunca pasó por ahí, y contarlo haría que la caja faltara todos los
+  días. En el corte se ve aparte cuánto salió fiado en el turno.
+- Un **abono en efectivo sí entra**, con su renglón en el cajón: el billete
+  sí llegó. Anularlo se lo quita también.
+- Un abono **por transferencia** no toca el cajón.
+
+---
+
 ## El relevo de turno
 
 En la fábrica la existencia se entrega como a las **2:30** y el cajero que
@@ -448,8 +492,8 @@ versión nueva le aparece un punto rojo en el menú.
 | **v1.3** | Productos con foto, costo e inventario | ✅ listo |
 | **v1.4** | Editar sin formularios, recuperar bajas, márgenes | ✅ listo |
 | **v1.5** | Avisos de inventario, no vender lo que no hay, más pantalla para vender | ✅ listo |
-| v1.6 | Clientes registrados y crédito | siguiente |
-| v1.7 | Reparto, pedidos y neveras en comodato | |
+| **v1.6** | Clientes registrados, crédito y cobranza | ✅ listo |
+| v1.7 | Reparto, pedidos y neveras en comodato | siguiente |
 | v1.8 | Planta de agua: garrafones, botellas y depósitos | |
 | v1.9 | Mantenimiento: compresores, ósmosis, membranas, horario punta | |
 | v2.0 | Estadísticas y sistema completo en producción | |
