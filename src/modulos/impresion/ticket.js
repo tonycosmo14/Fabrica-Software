@@ -90,6 +90,14 @@ function ticketVenta(venta, { copia = false, negocio = '' } = {}) {
     t.centro().linea('Pagado por transferencia');
   }
 
+  // MAYOREO. En un ticket pagado de contado el nombre del cliente no
+  // sobraría por gusto: es lo que explica por qué la marqueta salió a $240
+  // y no a $264. Un renglón, y solo cuando de verdad hubo mayoreo.
+  if (venta.forma_pago !== 'credito' && venta.lista_tipo === 'mayoreo') {
+    t.centro().linea(`${venta.cliente_nombre || 'Mayoreo'} - ${venta.lista_nombre}`);
+    t.izquierda();
+  }
+
   if (negocio || cfg.pie) {
     t.separador();
     t.centro();

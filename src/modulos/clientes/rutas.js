@@ -21,6 +21,7 @@ const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
 const { comprobarAdmin, administradores } = require('../../lib/autorizacion');
 const { sesionAbierta } = require('../caja/calculo');
+const { listasDeMayoreo, minimoMayoreo } = require('../ventas/mayoreo');
 const {
   estadoCliente, cuentaCorriente, clientesConEstado, resumenCartera
 } = require('./calculo');
@@ -54,7 +55,10 @@ function clientePorId(id) {
 }
 
 function conEstado(c) {
-  return { ...c, estado: estadoCliente(c) };
+  const lista = c.lista_id
+    ? bd.prepare('SELECT id, nombre, activo FROM listas_precios WHERE id = ?').get(c.lista_id)
+    : null;
+  return { ...c, estado: estadoCliente(c), lista: lista || null };
 }
 
 // ============================================================
@@ -76,7 +80,14 @@ router.get('/', verClientes, (req, res) => {
       `${c.nombre} ${c.negocio || ''} ${c.telefono || ''}`.toLowerCase().includes(busca));
   }
 
-  return ok(res, { clientes, cartera: resumenCartera() });
+  // Las listas de mayoreo van con la lista de clientes: la pantalla las
+  // necesita para el selector de cada ficha, y son cinco renglones.
+  return ok(res, {
+    clientes,
+    cartera: resumenCartera(),
+    listas: listasDeMayoreo().map((l) => ({ id: l.id, nombre: l.nombre })),
+    minimoMayoreo: minimoMayoreo()
+  });
 });
 
 /** Un cliente con su cuenta corriente: es la ficha completa. */
@@ -169,6 +180,22 @@ router.put('/:id', administrar, (req, res) => {
     const plazo = leerEnteroOpcional(req.body.diasPlazo, 3650);
     if (plazo.error) return error(res, 'El plazo se escribe en días, con números.');
     campos.dias_plazo = plazo.valor;
+  }
+
+  // A qué precio le toca. Vacío = precio de público, que es casi todo el
+  // mundo. Solo listas de MAYOREO: asignarle la de público a un cliente
+  // sería una forma silenciosa de dejarlo fuera cuando se cambie la activa.
+  if (req.body?.listaId !== undefined) {
+    const id = String(req.body.listaId || '').trim();
+    if (!id) {
+      campos.lista_id = null;
+    } else {
+      const l = bd.prepare(
+        "SELECT * FROM listas_precios WHERE id = ? AND activo = 1 AND tipo = 'mayoreo'"
+      ).get(id);
+      if (!l) return error(res, 'Esa lista de mayoreo no existe.');
+      campos.lista_id = l.id;
+    }
   }
 
   const claves = Object.keys(campos);

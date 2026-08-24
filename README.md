@@ -3,7 +3,7 @@
 Sistema para la fábrica de hielo de Hunucmá, Yucatán.
 Se construye **por versiones**: cada versión es un pedazo terminado, probado y usable.
 
-**Versión actual: v1.8**
+**Versión actual: v1.9**
 
 ---
 
@@ -374,6 +374,65 @@ Y lo único que no se borra nunca es **la constancia de que alguien borró**.
 
 ---
 
+## Precios de mayoreo (v1.9)
+
+*"Algunos clientes gozan de mayoreo, a partir de 1/2 marqueta."*
+
+**El mayoreo es una LISTA, no un descuento.** No es *"a Don Carlos le bajas
+el 10%"*: es la lista **Mayoreo 1**, donde la marqueta vale $240 en vez de
+$264 y cada fracción tiene su propio precio. Varios clientes comparten la
+misma lista, y subirle el precio a la lista se lo sube a todos de una vez,
+que es como se maneja de verdad.
+
+Y no es un porcentaje parejo: el 1/16 cuesta más de lo proporcional porque
+cortar da trabajo, y ese trabajo no desaparece por vender mucho (regla 7.2).
+La tabla `listas_precios` ya traía `tipo IN ('publico','mayoreo')` desde la
+v0.8; esta versión no inventó el molde, lo usó.
+
+### El flujo
+
+Capturar → **F6** → *"es él"* → el precio cambia en la pantalla → cobrar
+como siempre. Identificar al cliente **no es fiarle**: son dos botones en la
+misma lista, porque la mayoría de los mayoristas pagan en el momento.
+
+### Cuándo aplica
+
+Desde el mínimo configurable (por omisión **8 dieciseisavos**, media
+marqueta), medido sobre **todo el hielo del ticket**: un cuarto y un cuarto
+son media marqueta. Por debajo se cobra público y la pantalla dice cuánto
+falta, que es lo que se le dice al cliente en la cara.
+
+Alcanzar el mínimo no convierte dos cuartos en un medio: cada fracción se
+sigue cobrando a su precio de mayoreo. Dos cuartos son dos cortes.
+
+### Quién decide el precio
+
+**El servidor, siempre.** `listaParaVenta()` vuelve a resolver la lista al
+cobrar, desde cero: mandar el `clienteId` de un mayorista no alcanza para
+llevarse su precio. La pantalla calcula lo mismo solo para que se vea al
+instante — esperar medio segundo con el cliente enfrente es el peor momento
+para esperar.
+
+El precio queda **copiado** en el ticket (regla 3.5). Un cliente dado de
+baja pierde su mayoreo; una lista dada de baja se cobra a público.
+
+---
+
+## El corte: dos columnas y WhatsApp (v1.9)
+
+Los movimientos del corte salen en **dos columnas** —gastos de un lado,
+entradas del otro, cada una con su suma—. Un día de gastos son quince
+renglones y las entradas son dos: partido en dos cabe en la mitad de papel,
+todos los días. Si solo hay de un tipo no se parte.
+
+El botón **📲 Mandar por WhatsApp** dibuja el corte en un `canvas`, renglón
+por renglón, y lo comparte con `navigator.share`. Sin librerías: el programa
+corre en la fábrica, sin internet y sin que nadie instale nada, y la imagen
+sale idéntica en todos los aparatos. En la PC, que no tiene menú de
+compartir, baja el PNG y abre WhatsApp Web con el resumen escrito.
+
+---
+
 ## El Historial (v1.8)
 
 *"¿Qué hizo Mari el jueves entre las 3 y las 8?"*
@@ -566,8 +625,8 @@ versión nueva le aparece un punto rojo en el menú.
 | **v1.6.1** | Sin etiquetas de teclado en el celular; pruebas sin copy-paste | ✅ listo |
 | **v1.7** | Ajustes de la primera prueba a fondo: cantidades, F1, dinero sin decimales | ✅ listo |
 | **v1.8** | Historial con filtros, y borrar de verdad | ✅ listo |
-| v1.9 | Mayoreo, corte en dos columnas y compartir por WhatsApp | siguiente |
-| v2.0 | Reparto, pedidos y neveras en comodato |  |
+| **v1.9** | Precios de mayoreo, corte en dos columnas y compartir por WhatsApp | ✅ listo |
+| v2.0 | Reparto, pedidos y neveras en comodato | siguiente |
 | v2.1 | Planta de agua: garrafones, botellas y depósitos | |
 | v2.2 | Mantenimiento: compresores, ósmosis, membranas, horario punta | |
 | v2.3 | Estadísticas y sistema completo en producción | |

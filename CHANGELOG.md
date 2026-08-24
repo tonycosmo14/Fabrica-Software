@@ -11,6 +11,89 @@ solo para arreglos de algo que ya estaba, o para cambios de puro aspecto.
 
 ---
 
+## v1.9 — Mayoreo, papel y WhatsApp · 24 de agosto de 2026
+
+Migración `016_mayoreo.sql`: una columna `lista_id` en `clientes` y el
+ajuste `mayoreo_minimo_dieciseisavos` en `configuracion`. No toca nada de lo
+que ya había.
+
+### El mayoreo es una lista, no un descuento
+
+La distinción la puso Tony: *"el precio de mayoreo 1 es de $240"*. No es
+"a Don Carlos le bajas el 10%": es **la lista Mayoreo 1**, donde la marqueta
+vale $240, y a ella se apuntan los clientes que la tienen. Subirle el precio
+a la lista se lo sube a todos de una vez, que es como se maneja de verdad.
+
+Y no es un porcentaje parejo. En la fábrica el 1/16 cuesta más de lo
+proporcional porque cortar da trabajo, y ese trabajo no desaparece por
+vender mucho (regla 7.2). Por eso el mayoreo es su propia lista, con su
+precio por fracción, y no una regla de tres sobre la de público.
+
+La tabla `listas_precios` ya traía `tipo IN ('publico','mayoreo')` desde la
+v0.8. Esta versión no inventó el molde: lo usó.
+
+### El flujo de Tony, tal cual
+
+> *"Me dicen 5 marquetas, yo rápido lo capturo, le doy enter, y en la parte
+> donde pongo con cuánto me pagan... el sistema detecta quién es y le da el
+> precio que él tiene de mayoreo, enseguida cambia el precio en pantalla y
+> yo sigo mi flujo normal."*
+
+- **F6** (o el botón **Cliente**) abre la lista en cualquier momento.
+- **"Es él"** le pone nombre al ticket y el precio cambia en el acto:
+  el total, los botones de la rejilla, todo.
+- **"Fiarle"** sigue siendo aparte: identificar no es fiar, y la mayoría de
+  los mayoristas pagan en el momento.
+- El renglón del cliente va **hasta arriba del ticket**, porque cambia los
+  precios de abajo, y se pinta en verde cuando el mayoreo ya aplica.
+
+### Desde media marqueta, y no antes
+
+El mínimo se configura en **Productos y precios** (viene en 8 dieciseisavos)
+y se mide sobre **todo el hielo del ticket**: quien pide un cuarto y un
+cuarto está pidiendo media marqueta. Por debajo del mínimo se cobra público
+aunque sea el mayorista, y la pantalla lo dice sin que haya que preguntar:
+*"le falta 1/4 de hielo para su precio de Mayoreo 1"*.
+
+Alcanzar el mínimo **no** convierte dos cuartos en un medio: cada fracción
+se sigue cobrando a su precio, el de mayoreo. Dos cuartos son dos cortes.
+
+### El precio lo decide el servidor
+
+La pantalla calcula lo mismo para que el precio cambie al instante —esperar
+medio segundo con el cliente enfrente es el peor momento para esperar—, pero
+al cobrar el servidor lo vuelve a decidir desde cero. Mandar el `clienteId`
+de un mayorista no alcanza para llevarse su precio, y el que se cobró queda
+**copiado** en el ticket (regla 3.5): subirle el precio a la lista mañana no
+toca los tickets de hoy.
+
+Un cliente dado de baja pierde su precio de mayoreo junto con la baja. Una
+lista dada de baja se cobra a público: cobrar con precios que ya nadie
+mantiene sería peor.
+
+### El corte, en dos columnas
+
+> *"Los gastos suelen ser muchos y se va haciendo largo. Para ahorrar papel."*
+
+Los movimientos del corte salen ahora en dos columnas —gastos de un lado,
+entradas del otro—, cada una con su suma. Un día de gastos son quince
+renglones y las entradas son dos; partido en dos cabe en la mitad. Si solo
+hay de un tipo no se parte: media hoja en blanco al lado de tres renglones
+no ahorra nada.
+
+### El corte por WhatsApp
+
+Un botón en el corte arma la **imagen del ticket** y abre el menú de
+compartir del celular, donde WhatsApp sale arriba. En la computadora, que no
+tiene ese menú, baja la imagen y abre WhatsApp Web con el resumen escrito.
+
+La imagen se dibuja renglón por renglón en un canvas, sin ninguna librería:
+el programa corre en la fábrica, sin internet y sin que nadie instale nada.
+Y sale idéntica en todos los aparatos, con fondo blanco y letra grande, que
+es lo que se lee en un WhatsApp.
+
+---
+
 ## v1.8 — Historial, y borrar de verdad · 24 de agosto de 2026
 
 Sin migración. Dos cosas que se tocan entre sí.

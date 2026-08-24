@@ -14,7 +14,7 @@
 import { api } from '../api.js';
 import { esc, avisar, fecha as formatoFecha } from '../util.js';
 import { pedirTexto, pedirImporte, confirmar, menu, pedirContrasena } from '../dialogo.js';
-import { pesos, paraEditar } from '../fracciones.js';
+import { pesos, paraEditar, aTexto } from '../fracciones.js';
 
 export async function vistaClientes(pantalla, estadoApp) {
   const puede = (p) => estadoApp.permisos.includes('*') || estadoApp.permisos.includes(p);
@@ -24,7 +24,9 @@ export async function vistaClientes(pantalla, estadoApp) {
   // Borrar de verdad es solo del administrador.
   const esAdmin = estadoApp.permisos.includes('*');
 
-  let datos = { clientes: [], cartera: null };
+  let datos = { clientes: [], cartera: null, listas: [] };
+  let listas = [];              // las listas de mayoreo que se pueden asignar
+  let minimo = 0;               // desde cuánto hielo aplica el mayoreo
   let ficha = null;             // { cliente, cuenta }
   let seleccionado = null;      // id
   let soloDeben = false;
@@ -40,6 +42,8 @@ export async function vistaClientes(pantalla, estadoApp) {
     if (busca) query.set('busca', busca);
 
     datos = await api.obtener(`/clientes?${query}`);
+    listas = datos.listas || [];
+    minimo = datos.minimoMayoreo || 0;
 
     if (seleccionado && !datos.clientes.some((c) => c.id === seleccionado)) {
       // Sigue existiendo, solo que el filtro lo escondió: se deselecciona
@@ -121,6 +125,7 @@ export async function vistaClientes(pantalla, estadoApp) {
             ${c.activo ? '' : ' · dado de baja'}
           </small>
         </span>
+        ${c.lista_id ? '<span class="etiqueta-mayoreo">🏷️</span>' : ''}
         <span class="cliente-saldo ${e.vencido ? 'vencido' : e.saldo > 0 ? 'debe' : ''}">
           ${e.saldo > 0 ? pesos(e.saldo) : e.saldo < 0 ? 'a favor' : '—'}
         </span>
@@ -221,6 +226,7 @@ export async function vistaClientes(pantalla, estadoApp) {
                 { ayuda: 'vacío = sin límite', marcador: 'sin límite' })}
         ${campo('Días de plazo', 'diasPlazo', c.dias_plazo ?? '',
                 { ayuda: 'solo para avisar de lo vencido', marcador: 'sin plazo' })}
+        ${selectorDeLista(c)}
       </div>
       ${administra ? `
         <p class="ayuda" style="margin-top:8px">
@@ -247,6 +253,41 @@ export async function vistaClientes(pantalla, estadoApp) {
         <div class="fila-botones" style="margin-top:18px">
           <button class="secundario chico" id="alta">Volver a dar de alta</button>
         </div>` : ''}`;
+  }
+
+  /**
+   * SU PRECIO  (v1.9)
+   *
+   * A quien tiene lista de mayoreo se le cobra esa lista sola, en la caja,
+   * en cuanto el cajero dice quién es. No es un descuento que se teclea:
+   * es su precio, y por eso vive aquí, en su ficha, y no en el ticket.
+   *
+   * Solo desde media marqueta —o desde donde esté puesto el mínimo—, que es
+   * el trato de verdad: al que lleva un cuarto no se le hace precio.
+   */
+  function selectorDeLista(c) {
+    const suya = c.lista_id;
+    if (!administra) {
+      return `
+        <div class="cuadre-linea">
+          <span>Precio de mayoreo</span>
+          <strong>${c.lista ? esc(c.lista.nombre) : 'precio de público'}</strong>
+        </div>`;
+    }
+    return `
+      <div class="cuadre-linea campo-vivo">
+        <span>Precio de mayoreo<small>desde ${
+          minimo ? esc(aTexto(minimo)) : 'media marqueta'} de hielo</small></span>
+        <select data-lista>
+          <option value="">Precio de público</option>
+          ${listas.map((l) => `
+            <option value="${esc(l.id)}" ${suya === l.id ? 'selected' : ''}>
+              ${esc(l.nombre)}
+            </option>`).join('')}
+        </select>
+        ${c.lista && !c.lista.activo
+          ? '<small class="malo">esa lista se dio de baja: se le cobra público</small>' : ''}
+      </div>`;
   }
 
   function renglonCuenta(m) {
@@ -304,6 +345,19 @@ export async function vistaClientes(pantalla, estadoApp) {
       el.onblur = () => guardarCampo(el);
       el.onkeydown = (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); el.blur(); } };
     });
+
+    const selLista = pantalla.querySelector('[data-lista]');
+    if (selLista) selLista.onchange = async () => {
+      try {
+        const r = await api.actualizar(`/clientes/${ficha.cliente.id}`,
+                                       { listaId: selLista.value });
+        ficha.cliente = r.cliente;
+        avisar(r.cliente.lista
+          ? `${r.cliente.nombre} paga precio de ${r.cliente.lista.nombre}`
+          : `${r.cliente.nombre} paga precio de público`, 'bien');
+        await cargar();
+      } catch (e) { avisar(e.message, 'error'); await abrir(ficha.cliente.id); }
+    };
 
     const abonar = q('#abonar');
     if (abonar) abonar.onclick = () => recibirAbono('efectivo');

@@ -46,6 +46,29 @@ si hay días de corte fijos (todos cortan el día 15, por ejemplo) o cada
 cliente lleva su propio plazo desde la fecha de cada ticket. Hoy es lo
 segundo.
 
+### Mayoreo (v1.9)
+
+- Hay clientes que **gozan de precio de mayoreo**, y ese precio arranca
+  **a partir de 1/2 marqueta**. Al que lleva menos se le cobra público
+  aunque sea el mayorista.
+- El mayoreo es una **lista de precios**, no un descuento por cliente:
+  *"el precio de mayoreo 1 es de $240"*. Varios clientes comparten la misma
+  lista y se les sube el precio a todos de una vez.
+- **Cada fracción lleva su propio precio también en mayoreo** (regla 7.2):
+  el 1/16 no sale de dividir la marqueta entre dieciséis, porque cortar da
+  trabajo y ese trabajo no baja por vender más.
+- El mínimo se mide sobre **todo el hielo del ticket**, no renglón por
+  renglón: quien pide un cuarto y un cuarto está pidiendo media marqueta.
+- Aplica **pagando en efectivo igual que fiado**. Casi todos los mayoristas
+  pagan en el momento.
+- El mínimo (hoy 8 dieciseisavos) es **configurable**: es un número del
+  negocio, y de esos no se hardcodea ninguno.
+
+**Falta por definir todavía:** identificar al cliente **por huella** en la
+caja, para que el cajero no tenga que buscarlo en una lista. Tony lo pidió
+como fase propia: *"si esto es muy complicado, déjalo para una fase
+completamente sola"*.
+
 ---
 
 ## 2. Reparto

@@ -662,6 +662,28 @@ select { color-scheme: light dark; }
 .ticket-tabla td { padding: 3px 0; }
 .ticket-tabla td:last-child { text-align: right; font-weight: 700; }
 .ticket-tabla tr.fuerte td { border-top: 1px solid #000; padding-top: 6px; font-size: 14px; }
+.ticket-tabla tr.anulada td { text-decoration: line-through; opacity: .6; }
+
+/* ---------- Los movimientos del corte en dos columnas (v1.9) ----------
+
+   Un día de gastos son quince renglones y las entradas son dos: en una sola
+   tira eso es un palmo de papel por corte, todos los días. Partido en dos
+   cabe en la mitad, y el papel térmico se paga.
+
+   Cuando solo hay de un tipo NO se parte: media hoja en blanco al lado de
+   tres renglones no ahorra nada. */
+.ticket-movimientos.dos-columnas {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start;
+}
+.ticket-movimientos.dos-columnas .ticket-tabla { font-size: 10.5px; }
+/* El importe nunca se parte en dos renglones: "−$1,890" cortado a la mitad
+   se lee como otro número. */
+.ticket-movimientos .ticket-tabla td:last-child { white-space: nowrap; padding-left: 6px; }
+.ticket-movimientos.dos-columnas .ticket-tabla tr.fuerte td { font-size: 11.5px; }
+.ticket-movimientos.dos-columnas .ticket-columna + .ticket-columna {
+  border-left: 1px dashed #000; padding-left: 8px;
+}
+.ticket-movimientos .ticket-nombre { border-bottom: 1px dashed #000; padding-bottom: 3px; }
 
 @media (min-width: 900px) {
   .existencia-tarjeta { max-width: 560px; }
@@ -2220,6 +2242,34 @@ body.pantalla-fija main {
 .pos-linea-credito .pos-cant { color: var(--primario); font-size: 22px; }
 .pos-linea-credito .pos-importe { color: var(--primario); }
 
+/* ---------- De quién es el ticket (v1.9) ----------
+
+   El renglón del cliente va hasta arriba del ticket porque cambia los
+   precios de abajo. Cuando además le tocó su precio de mayoreo se pinta en
+   verde: es la señal de que el ticket ya no va a precio de público, y tiene
+   que verse de reojo, sin leerlo. */
+.pos-linea-cliente {
+  background: var(--superficie-alt); border-radius: 8px; padding: 10px 8px;
+}
+.pos-linea-cliente .pos-cant { font-size: 22px; }
+.pos-linea-cliente.con-mayoreo {
+  background: var(--et-cajero-f); color: var(--et-cajero-t);
+}
+.pos-linea-cliente.con-mayoreo .pos-desc small { color: var(--et-cajero-t); opacity: .85; }
+.pos-accion-cliente { border-color: var(--verde); color: var(--verde); }
+.etiqueta-mayoreo {
+  background: var(--et-cajero-f); color: var(--et-cajero-t);
+  border-radius: 999px; padding: 2px 9px; font-size: 12px; font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Cada lista de mayoreo en su propia tarjeta: son varias, y sin una caja
+   alrededor los precios de una se leen como los de la otra. */
+.tarjeta-mayoreo {
+  border: 2px solid var(--borde); border-radius: 10px;
+  padding: 12px; margin-bottom: 12px; background: var(--superficie);
+}
+
 .pos-total.devolver strong { color: var(--ambar); }
 .pos-cobro-total.devolver strong { color: var(--ambar); }
 .pos-cobro-cambio-aviso {
@@ -2372,6 +2422,10 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
   padding: 7px 10px; min-height: 0;
   /* En reposo parece texto: el borde solo aparece al acercarse. */
   background: transparent; border: 2px solid transparent;
+}
+.campo-vivo select {
+  margin: 0; width: auto; max-width: 220px;
+  font-size: 15px; font-weight: 700; padding: 7px 10px; min-height: 0;
 }
 .campo-vivo input:hover { border-color: var(--borde); background: var(--superficie-alt); }
 .campo-vivo input:focus {

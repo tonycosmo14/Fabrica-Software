@@ -15,6 +15,7 @@ import { esc, avisar, fecha as formatoFecha, soloHora, rango } from '../util.js'
 import { pedirTexto, pedirImporte, confirmar, menu, pedirContrasena } from '../dialogo.js';
 import { pesos, paraEditar } from '../fracciones.js';
 import { cargarMarca } from '../marca.js';
+import { compartirCorte } from '../corte-imagen.js';
 
 export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
   // Al cerrar el turno se sale del sistema: así el siguiente cajero tiene
@@ -430,17 +431,7 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
               <td>${pesos(Math.abs(dif))}</td></tr>
         </table>
 
-        ${corte.movimientos.length ? `
-          <div class="ticket-tanque" style="margin-top:10px">
-            <div class="ticket-nombre">MOVIMIENTOS</div>
-            <table class="ticket-tabla">
-              ${corte.movimientos.map((m) => `
-                <tr>
-                  <td>${m.anulado_en ? '(anulado) ' : ''}${esc(m.concepto)}</td>
-                  <td>${m.tipo === 'salida' ? '−' : '+'}${pesos(m.centavos)}</td>
-                </tr>`).join('')}
-            </table>
-          </div>` : ''}
+        ${movimientosEnDosColumnas(corte.movimientos)}
 
         <div class="ticket-pie">
           <div>Cerró: ${esc(c.cerrada_por_nombre || '—')}</div>
@@ -450,6 +441,7 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
 
       <div class="fila-botones no-imprimir" style="margin-top:14px;flex-wrap:wrap">
         <button id="imprimir">🖨️ Imprimir el corte</button>
+        <button class="secundario" id="compartir">📲 Mandar por WhatsApp</button>
         ${cerroSesion
           ? '<button class="grande crece" id="siguiente-cajero">Listo · pasa el siguiente</button>'
           : ''}
@@ -464,8 +456,68 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
     pantalla.querySelector('#volver').onclick = pintar;
     pantalla.querySelector('#imprimir').onclick = () => window.print();
 
+    // La imagen del corte se arma en el momento, en el aparato: no se sube
+    // a ningún lado ni pasa por el servidor.
+    pantalla.querySelector('#compartir').onclick = async (ev) => {
+      const boton = ev.currentTarget;
+      boton.disabled = true;
+      try {
+        const como = await compartirCorte({
+          negocio: marca.nombreNegocio, corte,
+          pesos, fecha: formatoFecha, rango
+        });
+        if (como === 'descargado') {
+          avisar('Se bajó la imagen del corte. Arrástrala al chat de WhatsApp.', '');
+        } else if (como === 'compartido') {
+          avisar('Corte compartido', 'bien');
+        }
+      } catch (e) {
+        avisar('No se pudo armar la imagen del corte: ' + e.message, 'error');
+      }
+      boton.disabled = false;
+    };
+
     const siguiente = pantalla.querySelector('#siguiente-cajero');
     if (siguiente) siguiente.onclick = () => alTerminar?.();
+  }
+
+  /**
+   * LOS MOVIMIENTOS DEL CORTE, EN DOS COLUMNAS  (v1.9)
+   *
+   * Un día de gastos son quince renglones —gasolina, refacción, la comida—
+   * y las entradas son dos. En una sola columna eso es un palmo de papel
+   * por cada corte, todos los días. Partido en dos, cabe en la mitad.
+   *
+   * Si un lado va vacío no se parte: media hoja en blanco al lado de tres
+   * renglones no ahorra nada y se lee peor.
+   */
+  function movimientosEnDosColumnas(movimientos) {
+    if (!movimientos.length) return '';
+
+    const gastos = movimientos.filter((m) => m.tipo === 'salida');
+    const entradas = movimientos.filter((m) => m.tipo !== 'salida');
+    const suma = (lista) => lista.filter((m) => !m.anulado_en)
+                                 .reduce((t, m) => t + m.centavos, 0);
+
+    const columna = (titulo, lista, signo) => !lista.length ? '' : `
+      <div class="ticket-columna">
+        <div class="ticket-nombre">${titulo} (${lista.length})</div>
+        <table class="ticket-tabla">
+          ${lista.map((m) => `
+            <tr class="${m.anulado_en ? 'anulada' : ''}">
+              <td>${m.anulado_en ? '(anulado) ' : ''}${esc(m.concepto)}</td>
+              <td>${m.anulado_en ? '—' : signo + pesos(m.centavos)}</td>
+            </tr>`).join('')}
+          <tr class="fuerte"><td>Suman</td><td>${signo}${pesos(suma(lista))}</td></tr>
+        </table>
+      </div>`;
+
+    const dos = gastos.length && entradas.length;
+    return `
+      <div class="ticket-movimientos ${dos ? 'dos-columnas' : ''}" style="margin-top:10px">
+        ${columna('GASTOS', gastos, '−')}
+        ${columna('ENTRADAS', entradas, '+')}
+      </div>`;
   }
 
   // ==========================================================

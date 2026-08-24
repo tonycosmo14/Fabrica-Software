@@ -57,13 +57,35 @@ export async function vistaVenta(pantalla, estadoApp) {
   const puedeVerCaja = tiene('caja.ver');
   const puedeContarHielo = tiene('existencia.ver');
   const puedeFiar = tiene('venta.credito');
+  // Ver clientes basta para ponerle nombre al ticket: el precio de mayoreo
+  // no es fiar, es cobrarle lo suyo a quien lo tiene.
+  const puedeVerClientes = tiene('clientes.ver');
   const puedeRepartirNumeros = tiene('produccion.numeros');
 
   const marca = await cargarMarca();
   let ctx = await api.obtener('/ventas/contexto');
 
   // Precios del hielo por fracción, para cotizar sin ir al servidor.
-  let tarifa = new Map(ctx.precios.map((p) => [p.dieciseisavos, p.centavos]));
+  const preciosPublico = new Map(ctx.precios.map((p) => [p.dieciseisavos, p.centavos]));
+
+  /**
+   * EL MAYOREO  (v1.9)
+   *
+   * Las listas de mayoreo llegan enteras con el contexto, con todos sus
+   * precios. No es por ahorrarse una llamada: es para que al decir de quién
+   * es el ticket el precio cambie EN LA PANTALLA, en el acto, con el cliente
+   * enfrente. Pedirle el precio al servidor sería medio segundo de espera en
+   * el peor momento.
+   *
+   * El servidor vuelve a decidir el precio al cobrar, desde cero. Esto es
+   * nada más lo que se ve.
+   */
+  const listasMayoreo = new Map((ctx.mayoreo?.listas || []).map((l) => [l.id, {
+    id: l.id,
+    nombre: l.nombre,
+    precios: new Map(l.precios.map((p) => [p.dieciseisavos, p.centavos]))
+  }]));
+  const MINIMO_MAYOREO = ctx.mayoreo?.minimo ?? 8;
 
   /**
    * LO QUE SE ESTÁ ACABANDO.
@@ -105,18 +127,29 @@ export async function vistaVenta(pantalla, estadoApp) {
   let cambiando = null;          // { venta, aFavor }
 
   /**
-   * A QUIÉN SE LE ESTÁ FIANDO ESTE TICKET.
+   * DE QUIÉN ES ESTE TICKET.
    *
-   * null es lo normal: el público paga y se va. Solo se fía a clientes
-   * registrados, así que esto siempre sale de la lista, nunca de un nombre
-   * escrito a mano con el cliente enfrente.
+   * null es lo normal: el público paga y se va. Ponerle nombre a un ticket
+   * sirve para dos cosas distintas, y por eso son dos variables:
+   *
+   *  · `cliente` es QUIÉN ES. Si tiene lista de mayoreo y lleva suficiente
+   *    hielo, el precio de la pantalla cambia solo. Pagando en efectivo
+   *    también: el de la nevería paga y se va, pero paga su precio.
+   *  · `fiar` es SI SE LO LLEVA FIADO. Eso ya es otra cosa, se necesita
+   *    permiso, y el panel del cobro es distinto.
+   *
+   * Siempre salen de la lista de clientes dados de alta, nunca de un nombre
+   * escrito a mano con la gente esperando.
    */
-  let fiadoA = null;
+  let cliente = null;
+  let fiar = false;
+  let volverDeClientes = 'cobro';   // a dónde regresa Esc en la lista de clientes
 
   // ---- La fase del teclado ----
   let fase = 'venta';
   let pago = 0;                  // centavos tecleados en el cobro
   let ventaCobrada = null;
+  let mayoreoCobrado = null;     // con qué lista salió el último ticket
   let ultimoCambio = null;       // el resultado del último cambio de ticket
   let fiadoCobrado = null;       // a quién se le acaba de fiar, para decírselo
 
@@ -158,6 +191,10 @@ export async function vistaVenta(pantalla, estadoApp) {
           <button class="pos-accion" id="historial">
             <span>🧾 Tickets</span><small>F3</small>
           </button>
+          ${puedeVerClientes ? `
+            <button class="pos-accion pos-accion-cliente" id="quien-es">
+              <span>👤 Cliente</span><small>F6</small>
+            </button>` : ''}
           <div class="pos-derecha">
           <div class="pos-avisos" id="pos-avisos"></div>
 
@@ -271,12 +308,16 @@ export async function vistaVenta(pantalla, estadoApp) {
     enEspera.push({
       hielo,
       articulos: articulos.map((a) => ({ productoId: a.producto.id, cantidad: a.cantidad })),
+      // El cliente se va con su ticket: al retomarlo tiene que volver a
+      // salir su precio, no el de público.
+      clienteId: cliente?.id || null,
       hora: new Date().toISOString()
     });
     guardarEnEspera();
 
     hielo = 0;
     articulos = [];
+    cliente = null; fiar = false;
     pintarTodo();
     avisar('Venta apartada. Sigue el siguiente cliente.', 'bien');
     enfocar();
@@ -302,6 +343,9 @@ export async function vistaVenta(pantalla, estadoApp) {
       }))
       // Un producto dado de baja mientras esperaba ya no se puede cobrar.
       .filter((a) => a.producto);
+    cliente = v.clienteId
+      ? (ctx.clientes || []).find((c) => c.id === v.clienteId) || null : null;
+    fiar = false;
 
     fase = 'venta';
     refs.cobro.hidden = true;
@@ -382,9 +426,37 @@ export async function vistaVenta(pantalla, estadoApp) {
   // ==========================================================
   // COTIZAR (el mismo reparto que hace el servidor)
   // ==========================================================
+  /**
+   * CÓMO VA ESTE TICKET DE MAYOREO.
+   *
+   * Devuelve null si no hay nada que decir —no hay cliente, o no tiene lista
+   * de mayoreo—. Si lo tiene, dice si ya alcanzó el mínimo y, si no, cuánto
+   * le falta: eso es lo que se le dice al cliente en la cara ("con un cuarto
+   * más te lo dejo a precio de mayoreo").
+   *
+   * Se mide sobre TODO el hielo del ticket, igual que en el servidor: quien
+   * pide un cuarto y un cuarto está pidiendo media marqueta.
+   */
+  function mayoreo() {
+    const lista = cliente?.listaId ? listasMayoreo.get(cliente.listaId) : null;
+    if (!lista) return null;
+    return {
+      lista,
+      aplica: hielo >= MINIMO_MAYOREO,
+      faltan: Math.max(MINIMO_MAYOREO - hielo, 0)
+    };
+  }
+
+  /** Los precios con los que se cotiza AHORA: los suyos o los de público. */
+  function tarifa() {
+    const m = mayoreo();
+    return m?.aplica ? m.lista.precios : preciosPublico;
+  }
+
   function precioHielo(dieciseisavos) {
+    const precios = tarifa();
     let centavos = 0;
-    for (const parte of descomponer(dieciseisavos)) centavos += tarifa.get(parte) ?? 0;
+    for (const parte of descomponer(dieciseisavos)) centavos += precios.get(parte) ?? 0;
     return centavos;
   }
 
@@ -739,6 +811,24 @@ export async function vistaVenta(pantalla, estadoApp) {
         </div>`);
     }
 
+    // DE QUIÉN ES EL TICKET. Va arriba de todo porque cambia los precios de
+    // abajo: verlo después de los importes sería verlo tarde.
+    if (cliente) {
+      const m = mayoreo();
+      filas.push(`
+        <div class="pos-linea pos-linea-cliente ${m?.aplica ? 'con-mayoreo' : ''}">
+          <div class="pos-cant">${m?.aplica ? '🏷️' : '👤'}</div>
+          <div class="pos-desc">
+            ${esc(cliente.nombre)}
+            <small>${
+              m?.aplica ? `precio de ${esc(m.lista.nombre)}`
+              : m ? `le falta ${esc(aTexto(m.faltan))} de hielo para su precio de ${esc(m.lista.nombre)}`
+              : fiar ? 'se le fía a él' : 'cliente'}</small>
+          </div>
+          <button class="tachita" data-quita-cliente aria-label="Quitar el cliente">×</button>
+        </div>`);
+    }
+
     if (hielo > 0) {
       filas.push(`
         <div class="pos-linea pos-linea-hielo">
@@ -799,6 +889,13 @@ export async function vistaVenta(pantalla, estadoApp) {
 
     const quitaHielo = refs.lineas.querySelector('[data-quita-hielo]');
     if (quitaHielo) quitaHielo.onclick = () => { hielo = 0; pintarTodo(); enfocar(); };
+
+    // Quitar al cliente devuelve los precios de público en el acto: se
+    // confundió de persona, y el ticket no se puede quedar con su precio.
+    const quitaCliente = refs.lineas.querySelector('[data-quita-cliente]');
+    if (quitaCliente) quitaCliente.onclick = () => {
+      cliente = null; fiar = false; pintarTodo(); enfocar();
+    };
 
     refs.lineas.querySelectorAll('[data-quita]').forEach((b) => {
       b.onclick = () => {
@@ -881,7 +978,7 @@ export async function vistaVenta(pantalla, estadoApp) {
   function pintarPista() {
     // Fiando, enter no cobra: fía. El cartel de abajo es lo que hace que el
     // teclado se aprenda sin manual, así que tiene que decir la verdad.
-    const f = fase === 'cambio' && fiadoA
+    const f = fase === 'cambio' && fiar
       ? { enter: 'fía y registra', esc: 'mejor cobrarle' }
       : FASES[fase];
     refs.pista.innerHTML = `
@@ -898,7 +995,8 @@ export async function vistaVenta(pantalla, estadoApp) {
           <span><kbd>F10</kbd> cobrar</span>
           <span><kbd>F2</kbd> nueva venta</span>
           <span><kbd>F3</kbd> tickets</span>
-          <span><kbd>F4</kbd> cambio</span>` : ''}
+          <span><kbd>F4</kbd> cambio</span>
+          ${puedeVerClientes ? '<span><kbd>F6</kbd> cliente</span>' : ''}` : ''}
       </span>`;
     pintarHora();
   }
@@ -957,6 +1055,16 @@ export async function vistaVenta(pantalla, estadoApp) {
       return;
     }
 
+    // F6 le pone nombre al ticket. Es la tecla del mayoreo: se captura lo
+    // que pidieron, se dice quién es, y el precio cambia solo.
+    if (ev.key === 'F6') {
+      ev.preventDefault();
+      if (!puedeVerClientes) return;
+      if (fase === 'venta') verClientes('', { volverA: 'venta' });
+      else if (fase === 'clientes') cerrarClientes();
+      return;
+    }
+
     if (ev.key === 'Escape') {
       ev.preventDefault();
       retroceder();
@@ -1001,7 +1109,7 @@ export async function vistaVenta(pantalla, estadoApp) {
     if (fase === 'espera') { cerrarEspera(); return; }
     if (fase === 'avisos') { cerrarAvisos(); return; }
     if (fase === 'movimientos') { cerrarAvisos(); return; }
-    if (fase === 'clientes') { fase = 'cobro'; pintarCobro(); pintarPista(); return; }
+    if (fase === 'clientes') { cerrarClientes(); return; }
     if (fase === 'venta') {
       if (refs.codigo.value) { refs.codigo.value = ''; return; }
       if (cambiando) { cambiando = null; pintarTodo(); return; }
@@ -1010,7 +1118,9 @@ export async function vistaVenta(pantalla, estadoApp) {
     }
     if (fase === 'cobro')   { cerrarCobro(); return; }
     if (fase === 'cambio')  {
-      if (fiadoA) { fiadoA = null; }
+      // Se arrepintió de fiarle, pero sigue siendo él: se le cobra, y a
+      // su precio. Quitarle el nombre aquí le subiría el precio sin avisar.
+      if (fiar) { fiar = false; pintarTodo(); }
       fase = 'cobro'; pintarCobro(); pintarPista(); return;
     }
     if (fase === 'cobrada') { nuevaVenta(); }
@@ -1066,7 +1176,9 @@ export async function vistaVenta(pantalla, estadoApp) {
 
   function cerrarCobro() {
     fase = 'venta';
-    fiadoA = null;
+    // El cliente se queda con el ticket: volver a capturar no cambia de
+    // persona. Lo que se cancela es el fiado, que se decide al cobrar.
+    fiar = false;
     refs.cobro.hidden = true;
     pintarPista();
     enfocar();
@@ -1074,7 +1186,7 @@ export async function vistaVenta(pantalla, estadoApp) {
 
   function pintarCobro() {
     // Fiando no hay nada que cobrar ahora: el panel es otro.
-    if (fiadoA) return pintarFiado();
+    if (fiar && cliente) return pintarFiado();
 
     // En un cambio, el cliente ya pagó el ticket que trae: lo único que
     // se mueve es la diferencia. Puede ser a cobrar o a devolver.
@@ -1119,6 +1231,10 @@ export async function vistaVenta(pantalla, estadoApp) {
             <button class="secundario chico" data-billete="justo">Justo</button>
           </div>
 
+          ${puedeVerClientes && !cambiando ? `
+            <button class="secundario pos-fiar" id="quien-es-cobro">
+              👤 ${cliente ? esc(cliente.nombre) : '¿Quién es? (precio de mayoreo)'}
+            </button>` : ''}
           ${puedeFiar && !cambiando ? `
             <button class="secundario pos-fiar" id="fiar">
               🧾 Fiar a un cliente
@@ -1163,7 +1279,9 @@ export async function vistaVenta(pantalla, estadoApp) {
     });
 
     const botonFiar = refs.cobro.querySelector('#fiar');
-    if (botonFiar) botonFiar.onclick = () => verClientes();
+    if (botonFiar) botonFiar.onclick = () => verClientes('', { volverA: 'cobro' });
+    const botonQuien = refs.cobro.querySelector('#quien-es-cobro');
+    if (botonQuien) botonQuien.onclick = () => verClientes('', { volverA: 'cobro' });
 
     const calcular = refs.cobro.querySelector('#calcular');
     if (calcular) calcular.onclick = calcularCambio;
@@ -1182,8 +1300,8 @@ export async function vistaVenta(pantalla, estadoApp) {
    */
   function pintarFiado() {
     const t = total();
-    const saldoDespues = fiadoA.saldo + t;
-    const disponible = fiadoA.disponible;
+    const saldoDespues = cliente.saldo + t;
+    const disponible = cliente.disponible;
     const seExcede = disponible !== null && t > disponible;
 
     fase = 'cambio';
@@ -1192,13 +1310,13 @@ export async function vistaVenta(pantalla, estadoApp) {
       <div class="pos-cobro-caja">
         <div class="pos-cobro-total">
           <span>Se le fía a</span>
-          <strong class="pos-fiado-nombre">${esc(fiadoA.nombre)}</strong>
+          <strong class="pos-fiado-nombre">${esc(cliente.nombre)}</strong>
         </div>
-        ${fiadoA.negocio ? `<p class="ayuda" style="margin:-12px 0 14px;text-align:center">
-          ${esc(fiadoA.negocio)}</p>` : ''}
+        ${cliente.negocio ? `<p class="ayuda" style="margin:-12px 0 14px;text-align:center">
+          ${esc(cliente.negocio)}</p>` : ''}
 
         <div class="cuadre">
-          <div class="cuadre-linea"><span>Debía</span><strong>${pesos(fiadoA.saldo)}</strong></div>
+          <div class="cuadre-linea"><span>Debía</span><strong>${pesos(cliente.saldo)}</strong></div>
           <div class="cuadre-linea suma"><span>+ Este ticket</span><strong>${pesos(t)}</strong></div>
           <div class="cuadre-linea total">
             <span>= Va a deber</span>
@@ -1206,7 +1324,7 @@ export async function vistaVenta(pantalla, estadoApp) {
           </div>
           ${disponible !== null ? `
             <div class="cuadre-linea">
-              <span>Su límite</span><strong>${pesos(fiadoA.limite)}</strong>
+              <span>Su límite</span><strong>${pesos(cliente.limite)}</strong>
             </div>` : ''}
         </div>
 
@@ -1215,7 +1333,7 @@ export async function vistaVenta(pantalla, estadoApp) {
             <strong>Se pasa de su límite.</strong>
             Se puede fiar igual, pero lo tiene que autorizar un gerente con su PIN.
           </div>` : ''}
-        ${fiadoA.vencido ? `
+        ${cliente.vencido ? `
           <div class="aviso-sin-caja" style="margin-top:12px">
             <strong>Ya se le venció el plazo</strong> de lo que debe de antes.
           </div>` : ''}
@@ -1234,20 +1352,35 @@ export async function vistaVenta(pantalla, estadoApp) {
     setTimeout(() => refs.cobro.querySelector('#confirmar')?.focus(), 0);
     refs.cobro.querySelector('#confirmar').onclick = registrar;
     refs.cobro.querySelector('#quitar-fiado').onclick = () => {
-      fiadoA = null; fase = 'cobro'; pago = 0; pintarCobro(); pintarPista();
+      fiar = false; fase = 'cobro'; pago = 0; pintarTodo(); pintarCobro(); pintarPista();
     };
     refs.cobro.querySelector('#salir-cobro').onclick = cerrarCobro;
     pintarPista();
   }
 
   /**
-   * A QUIÉN SE LE FÍA.
+   * QUIÉN ES EL CLIENTE.
+   *
+   * La misma lista sirve para las dos cosas que se hacen con un nombre:
+   * decir de quién es el ticket —para que le salga SU precio— y fiárselo.
+   * Son botones distintos porque son decisiones distintas: la mayoría de
+   * los mayoristas pagan en el momento.
    *
    * Solo los que están dados de alta: es la regla del negocio, y por eso la
    * lista no tiene "cliente nuevo". Dar de alta a alguien se hace en su
    * pantalla, con calma, no en medio del cobro con gente esperando.
    */
-  function verClientes(busca = '') {
+  function verClientes(busca = '', opciones = {}) {
+    // En un cambio de ticket no se cambia de cliente: lo que se está
+    // liquidando es un ticket que ya se cobró, con el precio que llevaba.
+    if (cambiando) {
+      avisar('Termina el cambio antes de ponerle cliente al ticket', '');
+      enfocar();
+      return;
+    }
+    // Se puede llegar aquí desde el ticket (F6) o desde el cobro. Esc tiene
+    // que regresar a donde se estaba, no a un lugar cualquiera.
+    if (opciones.volverA) volverDeClientes = opciones.volverA;
     fase = 'clientes';
     refs.cobro.hidden = false;
 
@@ -1257,14 +1390,17 @@ export async function vistaVenta(pantalla, estadoApp) {
 
     refs.cobro.innerHTML = `
       <div class="pos-cobro-caja pos-historial">
-        <h3 style="margin:0 0 4px">¿A quién se le fía?</h3>
+        <h3 style="margin:0 0 4px">¿Quién es el cliente?</h3>
         <p class="ayuda" style="margin:0 0 12px">
-          Solo a clientes dados de alta. Al público en general no se le fía.
+          Al ponerle nombre al ticket, si tiene precio de mayoreo se le
+          aplica solo.${puedeFiar ? ' Fiar es aparte: ese botón es el otro.' : ''}
         </p>
         <input id="busca-cliente" class="buscador" autocomplete="off"
                placeholder="Nombre o negocio" value="${esc(busca)}" style="margin:0">
         <div class="lista-tickets">
-          ${lista.slice(0, 40).map((c) => `
+          ${lista.slice(0, 40).map((c) => {
+            const suya = c.listaId ? listasMayoreo.get(c.listaId) : null;
+            return `
             <div class="ticket-fila">
               <div class="crece">
                 <strong>${esc(c.nombre)}</strong>
@@ -1272,16 +1408,19 @@ export async function vistaVenta(pantalla, estadoApp) {
                   c.saldo > 0 ? 'debe ' + pesos(c.saldo) : 'no debe nada'}${
                   c.limite !== null ? ' · límite ' + pesos(c.limite) : ''}</small>
               </div>
+              ${suya ? `<span class="etiqueta-mayoreo">🏷️ ${esc(suya.nombre)}</span>` : ''}
               ${c.vencido ? '<span class="aviso-quedan agotado">vencido</span>' : ''}
-              <button class="secundario chico" data-cliente="${esc(c.id)}">Fiarle</button>
-            </div>`).join('')
+              <button class="secundario chico" data-cliente="${esc(c.id)}">Es él</button>
+              ${puedeFiar
+                ? `<button class="secundario chico" data-fiar="${esc(c.id)}">Fiarle</button>` : ''}
+            </div>`; }).join('')
             || `<p class="vacio" style="padding:20px 0">${
                  (ctx.clientes || []).length
                    ? 'Ningún cliente con ese nombre.'
                    : 'Todavía no hay clientes dados de alta.'}</p>`}
         </div>
         <button class="secundario" id="cerrar-clientes" style="margin-top:12px;width:100%">
-          <span class="tecla-dice">Esc · </span>volver al cobro
+          <span class="tecla-dice">Esc · </span>volver ${volverDeClientes === 'venta' ? 'al ticket' : 'al cobro'}
         </button>
       </div>`;
 
@@ -1296,16 +1435,44 @@ export async function vistaVenta(pantalla, estadoApp) {
     };
     campo.onkeydown = (ev) => { if (ev.key === 'Enter') ev.stopPropagation(); };
 
+    // "Es él": el ticket ya es suyo y el precio cambia a la vista. No se
+    // cobra ni se fía todavía; el cajero sigue su flujo normal.
     refs.cobro.querySelectorAll('[data-cliente]').forEach((b) => {
       b.onclick = () => {
-        fiadoA = (ctx.clientes || []).find((c) => c.id === b.dataset.cliente) || null;
-        if (fiadoA) pintarFiado();
+        const elegido = (ctx.clientes || []).find((c) => c.id === b.dataset.cliente);
+        if (!elegido) return;
+        cliente = elegido; fiar = false;
+        const m = mayoreo();
+        if (m?.aplica) avisar(`Precio de ${m.lista.nombre} para ${elegido.nombre}`, 'bien');
+        else if (m) avisar(`Le falta ${aTexto(m.faltan)} de hielo para su precio de mayoreo`, '');
+        pintarTodo();
+        cerrarClientes();
       };
     });
-    refs.cobro.querySelector('#cerrar-clientes').onclick = () => {
-      fase = 'cobro'; pintarCobro(); pintarPista();
-    };
+
+    refs.cobro.querySelectorAll('[data-fiar]').forEach((b) => {
+      b.onclick = () => {
+        const elegido = (ctx.clientes || []).find((c) => c.id === b.dataset.fiar);
+        if (!elegido) return;
+        cliente = elegido; fiar = true;
+        pintarTodo();
+        pintarFiado();
+      };
+    });
+
+    refs.cobro.querySelector('#cerrar-clientes').onclick = cerrarClientes;
     pintarPista();
+  }
+
+  function cerrarClientes() {
+    if (volverDeClientes === 'venta') {
+      fase = 'venta';
+      refs.cobro.hidden = true;
+      pintarPista();
+      enfocar();
+      return;
+    }
+    fase = 'cobro'; pintarCobro(); pintarPista();
   }
 
   function calcularCambio() {
@@ -1350,25 +1517,30 @@ export async function vistaVenta(pantalla, estadoApp) {
             almacenId: ctx.almacenes[0]?.id,
             lineas,
             // Fiado no lleva pago: el cliente no pagó nada.
-            ...(fiadoA
-              ? { formaPago: 'credito', clienteId: fiadoA.id,
+            ...(fiar && cliente
+              ? { formaPago: 'credito', clienteId: cliente.id,
                   ...(autorizacion
                     // El porqué se guarda con el ticket: al mes, "lo
                     // autorizó Lupe" sin el motivo no explica nada.
                     ? { autorizacion, notas: `Sobre su límite: ${autorizacion.motivo}` }
                     : {}) }
-              : { pago: (pago / 100).toFixed(2) })
+              // Pagando en efectivo el cliente también va: es lo que hace
+              // que el servidor le cobre SU precio, y queda de quién fue el
+              // ticket aunque lo haya pagado en el momento.
+              : { pago: (pago / 100).toFixed(2),
+                  ...(cliente ? { clienteId: cliente.id } : {}) })
           });
 
       const venta = respuesta.venta;
+      mayoreoCobrado = respuesta.mayoreo || null;
       ultimoCambio = cambiando ? respuesta : null;
       cambiando = null;
       ventaCobrada = venta;
       // Lo que quedó debiendo, para poder decírselo al cliente en la cara.
       fiadoCobrado = respuesta.cliente || null;
       ctx.siguienteFolio = venta.folio + 1;
-      if (fiadoA && respuesta.cliente) refrescarCliente(respuesta.cliente);
-      fiadoA = null;
+      if (cliente && respuesta.cliente) refrescarCliente(respuesta.cliente);
+      cliente = null; fiar = false;
       fase = 'cobrada';
       pintarCobrada();
       pintarPista();
@@ -1381,9 +1553,9 @@ export async function vistaVenta(pantalla, estadoApp) {
       // Se pasó de su límite: no se rechaza a secas, se pide el PIN de un
       // responsable. Al de la ferretería que lleva veinte años comprando no
       // se le para la venta por un número que alguien escribió hace meses.
-      if (e.requiereAutorizacion && fiadoA && !autorizacion) {
+      if (e.requiereAutorizacion && fiar && cliente && !autorizacion) {
         const auth = await pedirAutorizacion({
-          titulo: `${fiadoA.nombre} se pasa de su límite`,
+          titulo: `${cliente.nombre} se pasa de su límite`,
           texto: e.message,
           responsables: e.responsables || [],
           motivoSugerido: 'Cliente de siempre, siempre paga'
@@ -1429,6 +1601,11 @@ export async function vistaVenta(pantalla, estadoApp) {
           Ticket #${v.folio}${c ? ` · cambio del #${c.anterior.folio}` : ''}
         </div>
 
+        ${mayoreoCobrado ? `
+          <p class="ayuda" style="margin:-6px 0 10px;text-align:center">
+            🏷️ Salió a precio de <strong>${esc(mayoreoCobrado.lista)}</strong>
+          </p>` : ''}
+
         ${fiado ? `
           <div class="pos-cambio grande pos-fiado">
             <span>${esc(v.cliente_nombre || 'Fiado')} ahora debe</span>
@@ -1460,7 +1637,8 @@ export async function vistaVenta(pantalla, estadoApp) {
 
   function nuevaVenta() {
     hielo = 0; articulos = []; pago = 0; ventaCobrada = null;
-    ultimoCambio = null; cambiando = null; fiadoA = null;
+    ultimoCambio = null; cambiando = null; cliente = null; fiar = false;
+    mayoreoCobrado = null;
     fase = 'venta';
     refs.cobro.hidden = true;
     limpiarImpresion();
@@ -1839,6 +2017,8 @@ export async function vistaVenta(pantalla, estadoApp) {
   pantalla.querySelector('#historial').onclick = () => verHistorial();
   pantalla.querySelector('#nueva-venta').onclick = () => verEnEspera();
   pantalla.querySelector('#cambio').onclick = () => iniciarCambio();
+  const btnQuienEs = pantalla.querySelector('#quien-es');
+  if (btnQuienEs) btnQuienEs.onclick = () => verClientes('', { volverA: 'venta' });
   // El campo del código se queda con el enter SOLO mientras se está
   // capturando. En el cobro no hay nada que agregar, y si se lo tragara,
   // el enter que confirma no llegaría a ningún lado.

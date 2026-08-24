@@ -36,10 +36,12 @@ function nombreNegocio() {
 function ventaCompleta(id) {
   const venta = bd.prepare(`
     SELECT v.*, u.nombre AS cajero_nombre,
-           cl.nombre AS cliente_nombre, cl.negocio AS cliente_negocio
+           cl.nombre AS cliente_nombre, cl.negocio AS cliente_negocio,
+           lp.tipo AS lista_tipo
       FROM ventas v
       LEFT JOIN usuarios u  ON u.id = v.cajero_id
       LEFT JOIN clientes cl ON cl.id = v.cliente_id
+      LEFT JOIN listas_precios lp ON lp.id = v.lista_id
      WHERE v.id = ?
   `).get(id);
   if (!venta) return null;

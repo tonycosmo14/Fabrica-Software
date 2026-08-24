@@ -40,6 +40,7 @@ export async function vistaProductos(pantalla, estadoApp) {
   const esAdmin = estadoApp.permisos.includes('*');
 
   let catalogo, listas, inventario, existencia, alertas;
+  let minimoMayoreo = 8;        // desde cuánto hielo aplica el precio de mayoreo
   let categoriaAbierta = ID_HIELO;
   let seleccionado = null;
   let verBajas = false;
@@ -55,6 +56,8 @@ export async function vistaProductos(pantalla, estadoApp) {
       api.obtener('/inventario/avisos').catch(() => ({ hielo: null }))
     ]);
 
+    if (Number.isInteger(listas.minimoMayoreo)) minimoMayoreo = listas.minimoMayoreo;
+
     if (!catalogo.categorias.some((c) => c.id === categoriaAbierta)) {
       categoriaAbierta = catalogo.categorias[0]?.id || null;
     }
@@ -69,7 +72,12 @@ export async function vistaProductos(pantalla, estadoApp) {
   function esHielo() { return categoriaAbierta === ID_HIELO; }
 
   function listaActiva() {
-    return listas.listas.find((l) => l.activa) || listas.listas[0];
+    // Ojo con el respaldo: desde v1.9 hay listas de mayoreo en el mismo
+    // arreglo, y la primera del orden podría ser una de ellas. La de público
+    // es la que manda en esta pantalla.
+    return listas.listas.find((l) => l.activa)
+        || listas.listas.find((l) => l.tipo === 'publico')
+        || listas.listas[0];
   }
 
   function precioDeHielo(dieciseisavos) {
@@ -461,8 +469,73 @@ export async function vistaProductos(pantalla, estadoApp) {
             <strong>Los tickets ya cobrados no cambian</strong> si subes un precio.
           </p>` : ''}` : ''}
 
+      ${panelMayoreo()}
       ${panelExistenciaHielo()}
       ${panelAvisoHielo()}`;
+  }
+
+  /**
+   * LOS PRECIOS DE MAYOREO  (v1.9)
+   *
+   * El mayoreo es una LISTA, no un descuento: "Mayoreo 1" es la lista donde
+   * la marqueta vale $240, y a ella se apuntan los clientes que la tienen.
+   * Subirle el precio a la lista se lo sube a todos de una vez, que es como
+   * se maneja de verdad.
+   *
+   * Cada fracción lleva su propio precio, igual que en la de público: el
+   * cuarto no sale de dividir la marqueta entre cuatro ni aquí ni allá.
+   */
+  function panelMayoreo() {
+    if (!precios) return '';
+    const deMayoreo = listas.listas.filter((l) => l.tipo === 'mayoreo' && l.activo !== 0);
+
+    return `
+      <h4 class="cfg-subtitulo">🏷️ Precios de mayoreo</h4>
+      <p class="ayuda">
+        A cada cliente se le apunta su lista en su ficha, en Clientes. En la
+        caja el precio cambia solo en cuanto el cajero dice quién es.
+      </p>
+
+      <div class="cuadre" style="margin-bottom:14px">
+        <div class="cuadre-linea campo-vivo">
+          <span>Desde cuánto hielo aplica<small>en dieciseisavos: 8 es media marqueta</small></span>
+          <input inputmode="numeric" id="mayoreo-minimo" value="${esc(String(minimoMayoreo))}">
+        </div>
+      </div>
+
+      ${deMayoreo.map((l) => `
+        <div class="tarjeta-mayoreo">
+          <div class="fila-botones" style="justify-content:space-between;align-items:center">
+            <strong>${esc(l.nombre)}</strong>
+            <small class="ayuda" style="margin:0">${
+              l.clientes ? `${l.clientes} cliente${l.clientes === 1 ? '' : 's'}` : 'sin clientes todavía'}</small>
+          </div>
+          <div class="precios-rejilla" data-lista-precios="${esc(l.id)}">
+            ${FRACCIONES.map((f) => {
+              const p = l.precios.find((x) => x.dieciseisavos === f.d);
+              return `
+                <label class="precio-celda">
+                  <span>${esc(f.d === 16 ? '1' : aTexto(f.d))}</span>
+                  <input inputmode="decimal" data-precio="${f.d}"
+                         value="${paraEditar(p?.centavos ?? 0)}">
+                </label>`;
+            }).join('')}
+          </div>
+          <div class="fila-botones" style="margin-top:10px">
+            <button class="secundario chico" data-guardar-lista="${esc(l.id)}">
+              Guardar ${esc(l.nombre)}
+            </button>
+          </div>
+        </div>`).join('')
+        || '<p class="ayuda">Todavía no hay ninguna lista de mayoreo.</p>'}
+
+      <div class="fila-botones" style="margin-top:12px">
+        <button class="secundario chico" id="nueva-lista">＋ Nueva lista de mayoreo</button>
+      </div>
+      <p class="ayuda">
+        Una lista nueva nace con los precios de público copiados, para que
+        nunca quede a medio llenar: se bajan los que toque y ya.
+      </p>`;
   }
 
   /**
@@ -584,7 +657,18 @@ export async function vistaProductos(pantalla, estadoApp) {
     if (contar) contar.onclick = () => contarProducto(seleccionado);
 
     const guardar = q('#guardar-precios');
-    if (guardar) guardar.onclick = guardarPrecios;
+    if (guardar) guardar.onclick = () => guardarPrecios();
+
+    pantalla.querySelectorAll('[data-guardar-lista]').forEach((b) => {
+      b.onclick = () => guardarPrecios(b.dataset.guardarLista);
+    });
+    const nuevaLista = q('#nueva-lista');
+    if (nuevaLista) nuevaLista.onclick = crearListaMayoreo;
+    const minMay = q('#mayoreo-minimo');
+    if (minMay) {
+      minMay.onblur = () => guardarMinimoMayoreo(minMay);
+      minMay.onkeydown = (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); minMay.blur(); } };
+    }
     const sug = q('#sugerir');
     if (sug) sug.onclick = sugerir;
 
@@ -1086,8 +1170,10 @@ export async function vistaProductos(pantalla, estadoApp) {
   // ==========================================================
   // PRECIOS DEL HIELO
   // ==========================================================
-  async function guardarPrecios() {
-    const tarjeta = pantalla.querySelector('[data-lista-precios]');
+  async function guardarPrecios(listaId = null) {
+    const tarjeta = listaId
+      ? pantalla.querySelector(`[data-lista-precios="${listaId}"]`)
+      : pantalla.querySelector('[data-lista-precios]');
     const lista = [...tarjeta.querySelectorAll('[data-precio]')].map((c) => ({
       dieciseisavos: Number(c.dataset.precio),
       pesos: Number(c.value.replace(/[^0-9.]/g, '')) || 0
@@ -1097,6 +1183,34 @@ export async function vistaProductos(pantalla, estadoApp) {
       avisar('Precios guardados', 'bien');
       cargar();
     } catch (e) { avisar(e.message, 'error'); }
+  }
+
+  async function crearListaMayoreo() {
+    const nombre = await pedirTexto({
+      titulo: 'Nueva lista de mayoreo',
+      texto: 'Nace copiando los precios de público. Después le bajas los que toque.',
+      marcador: 'Mayoreo 1', ok: 'Crearla', largo: 60, unaLinea: true
+    });
+    if (!nombre) return;
+    try {
+      await api.enviar('/ventas/precios/listas', { nombre });
+      avisar(`Lista ${nombre} creada`, 'bien');
+      await cargar();
+    } catch (e) { avisar(e.message, 'error'); }
+  }
+
+  async function guardarMinimoMayoreo(campoEl) {
+    const crudo = campoEl.value.trim();
+    try {
+      const r = await api.actualizar('/ventas/precios/mayoreo-minimo', { dieciseisavos: crudo });
+      minimoMayoreo = r.minimo;
+      campoEl.classList.add('guardado');
+      setTimeout(() => campoEl.classList.remove('guardado'), 900);
+      avisar(`El mayoreo aplica desde ${aTexto(r.minimo)} de hielo`, 'bien');
+    } catch (e) {
+      avisar(e.message, 'error');
+      campoEl.value = String(minimoMayoreo);
+    }
   }
 
   async function sugerir() {

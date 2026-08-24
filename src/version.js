@@ -17,9 +17,30 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '1.8';
+const VERSION_ACTUAL = '1.9';
 
 const VERSIONES = [
+  {
+    numero: '1.9',
+    nombre: 'Mayoreo, papel y WhatsApp',
+    fecha: '2026-08-24',
+    resumen:
+      'El cliente de mayoreo dice quién es y el precio cambia en la ' +
+      'pantalla, el corte gasta la mitad de papel, y se manda por WhatsApp.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'PRECIO DE MAYOREO. Capturas lo que te pidieron, aprietas F6 (o el botón CLIENTE), dices quién es, y el precio cambia al instante en la pantalla. Sigues tu flujo normal.' },
+      { tipo: 'importante', texto: 'EL MAYOREO ES UNA LISTA, NO UN DESCUENTO. "Mayoreo 1" es la lista donde la marqueta vale $240 en vez de $264, y a ella se apuntan los clientes que la tienen. Subirle el precio a la lista se lo sube a todos de una vez.' },
+      { tipo: 'importante', texto: 'Y CADA FRACCIÓN LLEVA SU PROPIO PRECIO, igual que en la de público: el cuarto no sale de dividir la marqueta entre cuatro, porque cortar da trabajo y ese trabajo no desaparece por vender mucho.' },
+      { tipo: 'nuevo', texto: 'APLICA DESDE MEDIA MARQUETA, y ese mínimo lo pones tú en Productos y precios. Al que lleva un cuarto no se le hace precio, y la pantalla se lo dice: "le falta 1/4 para su precio de mayoreo".' },
+      { tipo: 'nuevo', texto: 'Se mide sobre TODO el hielo del ticket: quien pide un cuarto y un cuarto está pidiendo media marqueta.' },
+      { tipo: 'nuevo', texto: 'Vale igual pagando en efectivo que fiado. El de la nevería paga y se va, pero paga su precio, y el ticket queda a su nombre para que se sepa por qué salió a $240.' },
+      { tipo: 'nuevo', texto: 'La lista de mayoreo de cada cliente se pone en su ficha, en CLIENTES. Las listas se crean y se les cambia el precio en PRODUCTOS Y PRECIOS. Una lista nueva nace copiando los precios de público, para que nunca quede a medio llenar.' },
+      { tipo: 'mejora', texto: 'EL CORTE GASTA LA MITAD DE PAPEL: los movimientos salen en dos columnas, gastos de un lado y entradas del otro, cada uno con su suma. Un día de gastos son quince renglones, y eso todos los días.' },
+      { tipo: 'nuevo', texto: 'MANDAR EL CORTE POR WHATSAPP. Un botón en el corte arma la imagen del ticket y abre el menú de compartir del celular. En la computadora baja la imagen y abre WhatsApp Web con el resumen escrito.' },
+      { tipo: 'importante', texto: 'EL PRECIO LO DECIDE EL SERVIDOR. La pantalla lo calcula para que se vea al instante, pero al cobrar se vuelve a decidir desde cero: mandar el nombre de un mayorista no alcanza para llevarse su precio.' }
+    ],
+    siguiente: 'v2.0 — Reparto: rutas, neveras en comodato y liquidación del repartidor.'
+  },
   {
     numero: '1.8',
     nombre: 'Historial, y borrar de verdad',

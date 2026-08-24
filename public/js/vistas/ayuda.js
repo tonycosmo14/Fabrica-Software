@@ -166,6 +166,15 @@ debería quedar − contado = FALTA</pre>
       <b>qué hace Enter en ese momento</b>. Mirándolo dos o tres veces ya no
       hace falta acordarse.</p>
 
+      <h4>Decir de quién es el ticket</h4>
+      <p><em>F6</em>, o el botón <b>👤 Cliente</b>. Sirve para dos cosas: para
+      que al cliente de mayoreo <b>le salga su precio</b>, y para fiarle. Son
+      dos botones distintos en la misma lista, porque son dos decisiones
+      distintas: la mayoría de los mayoristas pagan en el momento.</p>
+      <p>Se puede hacer en cualquier momento, antes o durante el cobro. El
+      precio cambia en la pantalla en el acto. Está explicado completo en
+      <b>Precios de mayoreo</b>.</p>
+
       <h4>Dos clientes a la vez</h4>
       <p>Llega uno, pide 1/8 y se queda pensando. Detrás llega otro que ya
       sabe lo que quiere. Con <b>Nueva venta</b> (<em>F2</em>) el ticket a
@@ -354,7 +363,19 @@ debería haber − contado = DIFERENCIA</pre>
       no se anotó. Si <b>sobra</b>: un cambio que no se dio, o una venta
       cobrada sin registrar.</p>
 
-      <p>El corte se imprime con espacio para la firma.</p>
+      <p>El corte se imprime con espacio para la firma. Los gastos y las
+      entradas salen <b>en dos columnas</b>, cada una con su suma: un día de
+      gastos son quince renglones, y así cabe en la mitad de papel.</p>
+
+      <h4>Mandar el corte por WhatsApp</h4>
+      <p>Abajo del corte, <b>📲 Mandar por WhatsApp</b>. El sistema arma la
+      <b>imagen del ticket</b> y abre el menú de compartir del celular, donde
+      WhatsApp sale arriba.</p>
+      <p>En la computadora no existe ese menú: ahí se <b>baja la imagen</b> y
+      se abre WhatsApp Web con el resumen ya escrito. La imagen se arrastra al
+      chat.</p>
+      <p class="ayuda-tip">La imagen se arma <b>en el aparato</b>: no se sube
+      a ningún lado ni pasa por internet hasta que tú la mandas.</p>
 
       <h4>Cosas que conviene saber</h4>
       <ul class="instrucciones">
@@ -553,6 +574,85 @@ debería haber − contado = FALTA</pre>
       <p>Solo si <b>no debe nada</b>. Uno que debe no se puede dar de baja:
       desaparecería de la cobranza con dinero afuera. Sus tickets viejos no
       cambian, y se puede recuperar cuando sea.</p>`
+  },
+
+  // ==========================================================
+  {
+    id: 'mayoreo',
+    titulo: 'Precios de mayoreo',
+    busca: 'mayoreo precio especial lista mayorista nevería descuento medio marqueta mínimo F6 cliente precio distinto',
+    cuerpo: `
+      <p>Hay clientes que compran en cantidad y tienen <b>su propio precio</b>.
+      El sistema lo resuelve en un toque: capturas lo que te pidieron, dices
+      quién es, y el precio cambia solo en la pantalla.</p>
+
+      <h4>Es una LISTA, no un descuento</h4>
+      <p><b>Mayoreo 1</b> es una lista de precios completa, donde la marqueta
+      vale $240 en vez de $264. A esa lista se apuntan los clientes que la
+      tienen. Subirle el precio a la lista <b>se lo sube a todos de una
+      vez</b>, que es como se maneja de verdad.</p>
+      <p>Y cada fracción lleva <b>su propio precio</b>, igual que en la de
+      público: el cuarto no sale de dividir la marqueta entre cuatro. Cortar
+      da trabajo, y ese trabajo no desaparece por vender mucho.</p>
+
+      <h4>Cobrarle en la caja</h4>
+      <ol class="instrucciones">
+        <li>Marcas lo que te pidieron, como en cualquier venta.</li>
+        <li><em>F6</em>, o el botón <b>👤 Cliente</b>.</li>
+        <li>Buscas su nombre y tocas <b>Es él</b>.</li>
+        <li>El precio cambia al instante: el total, los botones, todo. Sigues
+        tu flujo normal y cobras como siempre.</li>
+      </ol>
+      <p>Arriba del ticket queda su nombre en verde, diciendo con qué lista se
+      le está cobrando. La <b>✕</b> de ese renglón lo quita y devuelve los
+      precios de público, por si te confundiste de persona.</p>
+      <p class="ayuda-tip"><b>Es él</b> no es <b>Fiarle</b>. Decir quién es
+      sirve para el precio; fiarle es otra cosa y tiene su propio botón. Un
+      mayorista puede pagar en efectivo y llevarse su precio igual.</p>
+
+      <h4>Desde media marqueta</h4>
+      <p>El mayoreo <b>no aplica por cualquier cosa</b>: arranca desde media
+      marqueta. Al que lleva un cuarto se le cobra público aunque sea el
+      mayorista, y la pantalla te lo dice: <em>"le falta 1/4 de hielo para su
+      precio de Mayoreo 1"</em>. Eso es justo lo que se le dice al cliente:
+      <em>"con un cuarto más te lo dejo a precio de mayoreo"</em>.</p>
+      <p>Se mide sobre <b>todo el hielo del ticket</b>: quien pide un cuarto y
+      un cuarto está pidiendo media marqueta.</p>
+      <p>Alcanzar el mínimo no convierte dos cuartos en un medio: cada
+      fracción se sigue cobrando a su precio, el de mayoreo. Dos cuartos son
+      dos cortes.</p>
+
+      <h4>Crear una lista y ponerle precios</h4>
+      <p>En <b>Productos y precios</b>, en la categoría <b>Hielo</b>, hasta
+      abajo: <b>🏷️ Precios de mayoreo</b>.</p>
+      <ul>
+        <li><b>＋ Nueva lista de mayoreo</b> y le pones nombre. Nace copiando
+        los precios de público, para que nunca quede a medio llenar: le bajas
+        los que toque y <b>Guardar</b>.</li>
+        <li><b>Desde cuánto hielo aplica</b> se escribe en dieciseisavos: 8 es
+        media marqueta, 16 es una entera.</li>
+        <li>Cada lista dice <b>cuántos clientes</b> la usan, para que sepas a
+        cuántos les estás cambiando el precio.</li>
+      </ul>
+
+      <h4>Apuntar a un cliente</h4>
+      <p>En <b>Clientes</b>, en su ficha, el renglón <b>Precio de mayoreo</b>.
+      Se elige su lista y queda guardado en el acto. En la lista de la
+      izquierda, los que tienen mayoreo salen con 🏷️.</p>
+      <p>Dejarlo en <b>Precio de público</b> se lo quita.</p>
+
+      <h4>Lo que no puede pasar</h4>
+      <ul>
+        <li><b>El precio lo decide el servidor.</b> La pantalla lo calcula
+        para que se vea al instante, pero al cobrar se vuelve a decidir desde
+        cero.</li>
+        <li><b>El precio queda copiado en el ticket.</b> Subirle mañana a la
+        lista no cambia los tickets de hoy.</li>
+        <li>Un cliente <b>dado de baja</b> pierde su precio de mayoreo. Una
+        lista dada de baja se cobra a público.</li>
+        <li>El ticket impreso dice <b>de quién fue y con qué lista</b>: es lo
+        que explica por qué esa marqueta salió a $240.</li>
+      </ul>`
   },
 
   // ==========================================================

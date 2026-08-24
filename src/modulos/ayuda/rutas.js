@@ -40,10 +40,21 @@ const ACCIONES = [
   { grupo: 'Caja',       permiso: 'caja.ver',             texto: 'Ver la caja y los cortes' },
   { grupo: 'Caja',       permiso: 'caja.operar',          texto: 'Abrir el turno, anotar gastos y cerrar' },
 
+  { grupo: 'Clientes',   permiso: 'clientes.ver',         texto: 'Ver los clientes y ponerle nombre al ticket (precio de mayoreo)' },
+  { grupo: 'Clientes',   permiso: 'clientes.administrar', texto: 'Dar de alta clientes, su límite y su lista de mayoreo' },
+  { grupo: 'Clientes',   permiso: 'venta.credito',        texto: 'Fiar' },
+  { grupo: 'Clientes',   permiso: 'credito.cobrar',       texto: 'Recibir abonos' },
+  { grupo: 'Clientes',   permiso: 'credito.autorizar',    texto: 'Autorizar fiar por encima del límite' },
+
+  { grupo: 'Inventario', permiso: 'inventario.ver',       texto: 'Ver lo que queda de cada producto' },
+  { grupo: 'Inventario', permiso: 'inventario.mover',     texto: 'Registrar entradas, salidas y conteos' },
+  { grupo: 'Inventario', permiso: 'productos.administrar', texto: 'Dar de alta productos y categorías' },
+
   { grupo: 'Sistema',    permiso: 'usuarios.administrar', texto: 'Dar de alta y de baja usuarios' },
   { grupo: 'Sistema',    permiso: 'sistema.configurar',   texto: 'Configurar tanques, cuartos fríos, logo y respaldos' },
   { grupo: 'Sistema',    permiso: 'precios.configurar',   texto: 'Cambiar los precios' },
-  { grupo: 'Sistema',    permiso: 'sistema.ver',          texto: 'Ver la bitácora y el estado del sistema' }
+  { grupo: 'Sistema',    permiso: 'sistema.ver',          texto: 'Ver la bitácora y el estado del sistema' },
+  { grupo: 'Sistema',    permiso: 'historial.ver',        texto: 'Ver el historial de todo lo que se ha hecho' }
 ];
 
 /**

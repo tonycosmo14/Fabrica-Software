@@ -26,6 +26,8 @@ const { productoPorId, productoPorCodigo, cotizar,
         categoriasActivas, productosActivos } = require('../catalogo/catalogo');
 const { alcanza, avisos } = require('../catalogo/avisos');
 const { cabeElCredito, estadoCliente, clientesConEstado } = require('../clientes/calculo');
+const { listaParaVenta, hieloDe, minimoMayoreo, guardarMinimoMayoreo,
+        listasDeMayoreo } = require('./mayoreo');
 const { comprobar: comprobarAutorizacion, responsables } = require('../../lib/autorizacion');
 
 const router = express.Router();
@@ -74,14 +76,28 @@ router.get('/contexto', vender, (req, res) => {
     categorias: categoriasActivas(),
     productos: productosActivos(),
     avisos: avisos(),
+    // Las listas de mayoreo, con sus precios: la caja tiene que poder
+    // recalcular al instante cuando el cajero dice de quién es el ticket.
+    // El servidor vuelve a decidir al cobrar; esto es solo para la pantalla.
+    mayoreo: {
+      minimo: minimoMayoreo(),
+      listas: listasDeMayoreo().map((l) => ({
+        id: l.id, nombre: l.nombre,
+        precios: [...preciosDe(l.id).entries()]
+          .map(([dieciseisavos, centavos]) => ({ dieciseisavos, centavos }))
+      }))
+    },
     // A quién se le puede fiar. Va con el contexto para que el cajero no
     // espere a que cargue una lista con el cliente enfrente.
     puedeFiar: puede(req.usuario.rol, 'venta.credito'),
-    clientes: puede(req.usuario.rol, 'venta.credito')
+    // La lista de clientes la usan DOS cosas: fiar y el precio de mayoreo.
+    // Por eso basta con poder verlos, no con poder fiarles.
+    clientes: puede(req.usuario.rol, 'clientes.ver')
       ? clientesConEstado().map((c) => ({
           id: c.id, nombre: c.nombre, negocio: c.negocio,
           saldo: c.estado.saldo, limite: c.estado.limite,
-          disponible: c.estado.disponible, vencido: c.estado.vencido
+          disponible: c.estado.disponible, vencido: c.estado.vencido,
+          listaId: c.lista_id || null
         }))
       : []
   });
@@ -107,8 +123,7 @@ router.post('/', vender, (req, res) => {
   if (!Array.isArray(lineas) || !lineas.length) return error(res, 'La venta está vacía.');
   if (lineas.length > 50) return error(res, 'Demasiadas líneas en una sola venta.');
 
-  const lista = listaActiva();
-  if (!lista) return error(res, 'No hay ninguna lista de precios activa.', 409);
+  if (!listaActiva()) return error(res, 'No hay ninguna lista de precios activa.', 409);
 
   // Ojo: a SQLite hay que darle null, nunca undefined. Si la pantalla no
   // manda almacén, se cobra contra el cuarto frío que recibe la producción.
@@ -117,6 +132,20 @@ router.post('/', vender, (req, res) => {
   ).get(req.body?.almacenId ?? null) || bd.prepare(
     'SELECT * FROM almacenes WHERE activo = 1 AND recibe_produccion = 1 ORDER BY orden LIMIT 1'
   ).get();
+
+  // ---- QUIÉN ES, Y CON QUÉ LISTA SE LE COBRA ----
+  //
+  // Esto va ANTES de cotizar, porque el mayoreo cambia el precio de cada
+  // fracción. Y se decide AQUÍ desde cero aunque la pantalla ya lo haya
+  // calculado: si no, bastaría con mandar el clienteId de un mayorista para
+  // llevarse su precio.
+  const clienteDelTicket = req.body?.clienteId
+    ? bd.prepare('SELECT * FROM clientes WHERE id = ?').get(req.body.clienteId)
+    : null;
+
+  const hielo = hieloDe(lineas, { porId: productoPorId, porCodigo: productoPorCodigo });
+  const cotizacion = listaParaVenta(clienteDelTicket, hielo);
+  const lista = cotizacion.lista;
 
   const preparadas = prepararLineas(lineas, lista);
   if (preparadas.error) return error(res, preparadas.error, preparadas.codigo || 400);
@@ -132,7 +161,7 @@ router.post('/', vender, (req, res) => {
 
   // --- A crédito ---
   const credito = formaPago === 'credito'
-    ? revisarCredito(req, preparadas.total)
+    ? revisarCredito(req, preparadas.total, clienteDelTicket)
     : { ok: true };
   if (!credito.ok) return error(res, credito.mensaje, credito.codigo, credito.extra || {});
 
@@ -156,7 +185,9 @@ router.post('/', vender, (req, res) => {
     capturistaId: req.usuario.id,
     formaPago,
     notas: req.body?.notas || null,
-    clienteId: credito.cliente?.id || null,
+    // El cliente se guarda aunque haya pagado en efectivo: es lo que
+    // explica por qué ese ticket salió a precio de mayoreo.
+    clienteId: clienteDelTicket?.id || null,
     autorizadoPor: credito.autorizadoPor || null
   });
 
@@ -166,15 +197,18 @@ router.post('/', vender, (req, res) => {
     ejecutorId: req.body?.cajeroId || req.usuario.id, capturistaId: req.usuario.id,
     detalle: { folio: venta.folio, total: preparadas.total,
                lineas: preparadas.lineas.length, cajaFolio: venta.cajaFolio,
-               cliente: credito.cliente?.nombre,
+               cliente: clienteDelTicket?.nombre,
+               mayoreo: cotizacion.esMayoreo ? lista.nombre : null,
                autorizo: credito.autorizadoPorNombre }
   });
 
   return ok(res, {
     venta: detalleVenta(venta.id),
-    cliente: credito.cliente
-      ? { ...credito.cliente, estado: estadoCliente(credito.cliente) }
-      : null
+    cliente: clienteDelTicket
+      ? { ...clienteDelTicket, estado: estadoCliente(clienteDelTicket) }
+      : null,
+    // Para que la caja pueda decir "salió a precio de Mayoreo 1".
+    mayoreo: cotizacion.esMayoreo ? { lista: lista.nombre, id: lista.id } : null
   }, 201);
 });
 
@@ -187,13 +221,11 @@ router.post('/', vender, (req, res) => {
  * comprando no se le para la venta por un número que alguien escribió hace
  * meses; lo que sí queda es escrito quién dijo que sí.
  */
-function revisarCredito(req, total) {
+function revisarCredito(req, total, cliente) {
   if (!puede(req.usuario.rol, 'venta.credito')) {
     return { ok: false, codigo: 403, mensaje: 'Tu usuario no puede fiar.' };
   }
 
-  const cliente = bd.prepare('SELECT * FROM clientes WHERE id = ?')
-    .get(req.body?.clienteId ?? null);
   if (!cliente) {
     return { ok: false, codigo: 400,
              mensaje: 'A crédito solo se le vende a un cliente registrado.' };
@@ -349,13 +381,15 @@ function detalleVenta(id) {
     SELECT v.*, u.nombre AS cajero_nombre, a.nombre AS almacen_nombre,
            c.nombre AS cancelada_por_nombre,
            cl.nombre AS cliente_nombre, cl.negocio AS cliente_negocio,
-           au.nombre AS credito_autorizado_nombre
+           au.nombre AS credito_autorizado_nombre,
+           lp.tipo AS lista_tipo
       FROM ventas v
       LEFT JOIN usuarios u  ON u.id = v.cajero_id
       LEFT JOIN almacenes a ON a.id = v.almacen_id
       LEFT JOIN usuarios c  ON c.id = v.cancelada_por
       LEFT JOIN clientes cl ON cl.id = v.cliente_id
       LEFT JOIN usuarios au ON au.id = v.credito_autorizado_por
+      LEFT JOIN listas_precios lp ON lp.id = v.lista_id
      WHERE v.id = ?
   `).get(id);
   if (!venta) return null;
@@ -578,11 +612,76 @@ router.get('/precios/listas', verVentas, (req, res) => {
   const listas = bd.prepare('SELECT * FROM listas_precios WHERE activo = 1 ORDER BY tipo, nombre').all()
     .map((l) => ({
       ...l,
+      // Cuántos clientes cobran con esta lista: es lo que dice si bajarle
+      // un precio le toca a uno o a veinte.
+      clientes: bd.prepare('SELECT COUNT(*) n FROM clientes WHERE lista_id = ? AND activo = 1')
+                  .get(l.id).n,
       precios: [...preciosDe(l.id).entries()]
         .map(([dieciseisavos, centavos]) => ({ dieciseisavos, centavos, etiqueta: aTexto(dieciseisavos) }))
         .sort((a, b) => b.dieciseisavos - a.dieciseisavos)
     }));
-  return ok(res, { listas });
+  return ok(res, { listas, minimoMayoreo: minimoMayoreo() });
+});
+
+/**
+ * UNA LISTA DE MAYOREO NUEVA.
+ *
+ * Nace con los precios de la lista de público: así el administrador solo
+ * baja los que quiera en vez de capturar cinco desde cero, y mientras tanto
+ * nadie paga de más por una lista a medio llenar.
+ */
+router.post('/precios/listas', configurarPrecios, (req, res) => {
+  const nombre = String(req.body?.nombre || '').trim();
+  if (!nombre) return error(res, 'Ponle nombre a la lista. Por ejemplo, "Mayoreo 1".');
+
+  const repetida = bd.prepare(
+    "SELECT 1 FROM listas_precios WHERE activo = 1 AND lower(nombre) = lower(?)"
+  ).get(nombre);
+  if (repetida) return error(res, `Ya hay una lista que se llama ${nombre}.`);
+
+  const publico = listaActiva();
+  const id = nuevoId();
+
+  const crear = bd.transaction(() => {
+    bd.prepare(`
+      INSERT INTO listas_precios (id, nombre, tipo, activa, fecha_alta, creado_por)
+      VALUES (?, ?, 'mayoreo', 0, ?, ?)
+    `).run(id, nombre.slice(0, 60), ahora(), req.usuario.id);
+
+    if (publico) {
+      const insertar = bd.prepare(`
+        INSERT INTO precios (id, lista_id, dieciseisavos, centavos, actualizado_en, actualizado_por)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
+      for (const [dieciseisavos, centavos] of preciosDe(publico.id)) {
+        insertar.run(nuevoId(), id, dieciseisavos, centavos, ahora(), req.usuario.id);
+      }
+    }
+  });
+  crear();
+
+  bitacora.registrar({
+    accion: 'precios.lista-nueva', entidad: 'lista_precios', entidadId: id,
+    ejecutorId: req.usuario.id, detalle: { nombre, tipo: 'mayoreo' }
+  });
+
+  const lista = bd.prepare('SELECT * FROM listas_precios WHERE id = ?').get(id);
+  return ok(res, { lista }, 201);
+});
+
+/** Desde cuánto hielo aplica el mayoreo. */
+router.put('/precios/mayoreo-minimo', configurarPrecios, (req, res) => {
+  const crudo = String(req.body?.dieciseisavos ?? '').trim();
+  const n = Number(crudo);
+  if (!/^\d+$/.test(crudo) || !Number.isInteger(n) || n < 1 || n > 16 * 500) {
+    return error(res, 'Escribe desde cuánto hielo aplica el mayoreo.');
+  }
+  guardarMinimoMayoreo(n, req.usuario.id);
+  bitacora.registrar({
+    accion: 'precios.mayoreo-minimo', entidad: 'configuracion',
+    ejecutorId: req.usuario.id, detalle: { dieciseisavos: n }
+  });
+  return ok(res, { minimo: minimoMayoreo() });
 });
 
 router.put('/precios/:listaId', configurarPrecios, (req, res) => {
