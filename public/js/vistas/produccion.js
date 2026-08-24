@@ -31,6 +31,10 @@ export async function vistaProduccion(pantalla, estado) {
                          estado.permisos.includes('produccion.registrar');
   const puedeAutorizar = estado.permisos.includes('*') ||
                          estado.permisos.includes('produccion.autorizar');
+  // Los números que siguen los imprime también el cajero: el obrero
+  // pregunta en el mostrador y ahí no siempre hay un gerente.
+  const puedeVerNumeros = estado.permisos.includes('*') ||
+                          estado.permisos.includes('produccion.numeros');
   const puedeCorregir = estado.permisos.includes('*') ||
                         estado.permisos.includes('produccion.corregir');
 
@@ -64,7 +68,7 @@ export async function vistaProduccion(pantalla, estado) {
           </span>
         </button>` : ''}
 
-      ${puedeAutorizar ? `
+      ${puedeVerNumeros ? `
         <button id="siguientes" class="secundario accion-secundaria">
           🖨️ Números a sacar
         </button>` : ''}
@@ -118,7 +122,7 @@ export async function vistaProduccion(pantalla, estado) {
     });
     pantalla.querySelector('#ver-hoy').onclick = verHoy;
 
-    if (puedeAutorizar) pantalla.querySelector('#siguientes').onclick = numerosASacar;
+    if (puedeVerNumeros) pantalla.querySelector('#siguientes').onclick = numerosASacar;
     if (!puedeRegistrar) return;
 
     pantalla.querySelector('#registrar').onclick = capturaEnLote;

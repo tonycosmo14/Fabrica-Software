@@ -227,6 +227,28 @@ menu.querySelectorAll('a').forEach((a) => {
 });
 document.getElementById('btn-atras').onclick = () => { location.hash = '#/inicio'; };
 
+/**
+ * F1 = A VENDER, desde donde sea.
+ *
+ * El cajero acaba de mirar la existencia, o el corte, o los precios, y
+ * llega un cliente. Sin esto tiene que buscar el menú, abrirlo y encontrar
+ * el renglón; con esto es una tecla, y siempre la misma.
+ *
+ * Se escucha aquí arriba, en toda la aplicación, para que funcione
+ * también en las pantallas que no saben nada del teclado.
+ */
+document.addEventListener('keydown', (ev) => {
+  if (ev.key !== 'F1') return;
+  // Con un diálogo abierto manda el diálogo: F1 encima de una pregunta a
+  // medias dejaría el registro a la mitad.
+  if (document.querySelector('.dialogo')) return;
+  ev.preventDefault();
+  if (!estado.usuario || !puede('venta.registrar')) return;
+  abrirMenu(false);
+  if (location.hash === '#/venta') return;
+  location.hash = '#/venta';
+});
+
 /** Cerrar sesión y volver a la pantalla del PIN. */
 async function cerrarSesion({ aviso = 'Sesión cerrada' } = {}) {
   try { await api.enviar('/auth/salir', {}); } catch { /* ya no habia sesion */ }

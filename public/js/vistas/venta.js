@@ -22,9 +22,9 @@
  */
 import { api } from '../api.js';
 import { esc, avisar, soloHora, fecha as formatoFecha, ETIQUETAS_ROL } from '../util.js';
-import { pedirTexto, pedirImporte, pedirCantidad, confirmar,
+import { pedirTexto, pedirImporte, pedirCantidad, pedirEntero, confirmar,
          pedirAutorizacion } from '../dialogo.js';
-import { aTexto, descomponer, desglose, pesos } from '../fracciones.js';
+import { aTexto, descomponer, desglose, pesos, paraEditar } from '../fracciones.js';
 import { cargarMarca } from '../marca.js';
 import { imprimirTicket, limpiarImpresion } from '../imprimir.js';
 
@@ -57,7 +57,7 @@ export async function vistaVenta(pantalla, estadoApp) {
   const puedeVerCaja = tiene('caja.ver');
   const puedeContarHielo = tiene('existencia.ver');
   const puedeFiar = tiene('venta.credito');
-  const puedeRepartirNumeros = tiene('produccion.autorizar');
+  const puedeRepartirNumeros = tiene('produccion.numeros');
 
   const marca = await cargarMarca();
   let ctx = await api.obtener('/ventas/contexto');
@@ -83,6 +83,9 @@ export async function vistaVenta(pantalla, estadoApp) {
   let hielo = 0;                 // dieciseisavos, TODO en una sola línea
   let articulos = [];            // { producto, cantidad }
   let categoriaAbierta = null;   // null = se ven las categorías
+
+  /** Lo último que entró al ticket, para que enter en vacío lo repita. */
+  let ultimoAgregado = null;
 
   /**
    * VENTAS EN ESPERA.
@@ -187,10 +190,23 @@ export async function vistaVenta(pantalla, estadoApp) {
           <div class="pos-ticket-cabeza">
             <span class="etiqueta-folio" id="etiqueta-folio">ticket #${ctx.siguienteFolio}</span>
             ${ctx.caja
-              ? `<span class="etiqueta-turno">turno #${ctx.caja.folio}</span>`
+              ? `<span class="etiqueta-turno ${ctx.caja.sinDueno ? 'esperando' : ''}">
+                   turno #${ctx.caja.folio}
+                 </span>`
               : '<span class="etiqueta-mal">sin turno</span>'}
             <span class="etiqueta-espera" id="etiqueta-espera" hidden></span>
           </div>
+
+          ${ctx.caja?.sinDueno ? `
+            <div class="pos-sin-dueno" id="pos-sin-dueno">
+              <div class="crece">
+                <strong>Este turno no tiene dueño</strong>
+                <small>
+                  Lo que se cobra se está apartando para el cajero que entra.
+                </small>
+              </div>
+              <button class="chico" id="tomar-turno">Tomar el turno</button>
+            </div>` : ''}
 
           <div class="pos-lineas" id="pos-lineas"></div>
 
@@ -399,6 +415,7 @@ export async function vistaVenta(pantalla, estadoApp) {
 
     if (p.tipo === 'hielo') {
       hielo += p.dieciseisavos * cuantos;  // se SUMA, no se agrega otro renglón
+      ultimoAgregado = p;
       pintarTodo();
       return;
     }
@@ -422,7 +439,58 @@ export async function vistaVenta(pantalla, estadoApp) {
 
     if (ya) ya.cantidad += cuantos;
     else articulos.push({ producto: p, cantidad: cuantos });
+    ultimoAgregado = p;
     pintarTodo();
+  }
+
+  /**
+   * CAMBIAR LA CANTIDAD DE UN RENGLÓN TOCÁNDOLA.
+   *
+   * "Me das 50 marquetas." Tocar el botón cincuenta veces no es una forma
+   * de trabajar. Se toca el número, se teclea 50 y ya. Poner 0 quita el
+   * renglón, que es lo que la mano hace sola.
+   */
+  async function cambiarCantidad(indice) {
+    if (fase !== 'venta') return;
+    const a = articulos[indice];
+    if (!a) return;
+
+    const quedan = quedanDe(a.producto);
+    const n = await pedirEntero({
+      titulo: a.producto.nombre,
+      texto: Number.isFinite(quedan)
+        ? `¿Cuántas? Quedan ${quedan}. Pon 0 para quitarlo del ticket.`
+        : '¿Cuántas? Pon 0 para quitarlo del ticket.',
+      valor: String(a.cantidad), ok: 'Cambiar'
+    });
+    if (n === null) { enfocar(); return; }
+
+    if (n === 0) { articulos.splice(indice, 1); pintarTodo(); enfocar(); return; }
+    if (Number.isFinite(quedan) && n > quedan) {
+      avisar(quedan === 1
+        ? `Solo queda 1 de ${a.producto.nombre}`
+        : `Solo quedan ${quedan} de ${a.producto.nombre}`, 'error');
+      enfocar();
+      return;
+    }
+
+    a.cantidad = n;
+    pintarTodo();
+    enfocar();
+  }
+
+  /** Tocar la fracción del hielo abre la calculadora, ya cargada. */
+  async function ponerOtroHielo() {
+    if (fase !== 'venta') return;
+    const n = await pedirCantidad({
+      titulo: 'Cuánto hielo se lleva',
+      texto: 'Reemplaza lo que ya está en el ticket. En cero, se quita.',
+      valor: hielo, ok: 'Poner esta cantidad'
+    });
+    if (n === null || n === undefined) { enfocar(); return; }
+    hielo = n;
+    pintarTodo();
+    enfocar();
   }
 
   function porCodigo(codigo) {
@@ -674,7 +742,8 @@ export async function vistaVenta(pantalla, estadoApp) {
     if (hielo > 0) {
       filas.push(`
         <div class="pos-linea pos-linea-hielo">
-          <div class="pos-cant">${esc(aTexto(hielo))}</div>
+          <button class="pos-cant pos-cant-tocable" data-cambia-hielo
+                  title="Tocar para poner otra cantidad">${esc(aTexto(hielo))}</button>
           <div class="pos-desc">
             Hielo
             ${desglose(hielo) !== aTexto(hielo)
@@ -688,7 +757,8 @@ export async function vistaVenta(pantalla, estadoApp) {
     for (const [i, a] of articulos.entries()) {
       filas.push(`
         <div class="pos-linea">
-          <div class="pos-cant">${a.cantidad}</div>
+          <button class="pos-cant pos-cant-tocable" data-cantidad="${i}"
+                  title="Tocar para cambiar la cantidad">${a.cantidad}</button>
           <div class="pos-desc">${esc(a.producto.nombre)}</div>
           <div class="pos-importe">${pesos(a.producto.precio_centavos * a.cantidad)}</div>
           <button class="tachita" data-quita="${i}" aria-label="Quitar">×</button>
@@ -736,6 +806,15 @@ export async function vistaVenta(pantalla, estadoApp) {
         pintarTodo(); enfocar();
       };
     });
+
+    // TOCAR LA CANTIDAD Y ESCRIBIRLA.
+    // Si piden 50 marquetas, tocar el botón cincuenta veces es absurdo: se
+    // toca el número y se teclea 50.
+    refs.lineas.querySelectorAll('[data-cantidad]').forEach((b) => {
+      b.onclick = () => cambiarCantidad(Number(b.dataset.cantidad));
+    });
+    const otroHielo = refs.lineas.querySelector('[data-cambia-hielo]');
+    if (otroHielo) otroHielo.onclick = () => ponerOtroHielo();
   }
 
   function pintarRejilla() {
@@ -939,7 +1018,11 @@ export async function vistaVenta(pantalla, estadoApp) {
 
   function agregarPorCodigo() {
     const codigo = refs.codigo.value.trim();
-    if (!codigo) return;
+
+    // ENTER CON EL CAMPO VACÍO REPITE LO ÚLTIMO.
+    // "Dame otro igual" es media venta del mostrador: dos refrescos, tres
+    // bolsas. Repetir es una tecla en vez de buscar el botón otra vez.
+    if (!codigo) { repetirUltimo(); return; }
 
     const p = porCodigo(codigo);
     if (!p) { avisar(`No hay ningún producto con el código ${codigo}`, 'error'); return; }
@@ -948,6 +1031,16 @@ export async function vistaVenta(pantalla, estadoApp) {
     // en el campo, el siguiente que teclee sale pegado al anterior.
     refs.codigo.value = '';
     agregarProducto(p);
+  }
+
+  function repetirUltimo() {
+    if (!ultimoAgregado) return;
+    if (ultimoAgregado.tipo === 'hielo') {
+      hielo += ultimoAgregado.dieciseisavos;
+      pintarTodo();
+      return;
+    }
+    agregarProducto(ultimoAgregado);
   }
 
   async function vaciar() {
@@ -1016,9 +1109,9 @@ export async function vistaVenta(pantalla, estadoApp) {
           </button>` : `
           <label class="etiqueta-chica" for="pos-pago">¿Con cuánto paga?</label>
           <input id="pos-pago" class="pos-pago" inputmode="decimal" autocomplete="off"
-                 placeholder="${(aPagar / 100).toFixed(2)}"
+                 placeholder="${paraEditar(aPagar)}"
                  ${enConfirmacion ? 'disabled' : ''}
-                 value="${pago ? (pago / 100).toFixed(2) : ''}">
+                 value="${pago ? paraEditar(pago) : ''}">
 
           <div class="pos-billetes">
             ${BILLETES.filter((b) => b * 100 >= aPagar).slice(0, 4)
@@ -1064,7 +1157,7 @@ export async function vistaVenta(pantalla, estadoApp) {
     refs.cobro.querySelectorAll('[data-billete]').forEach((b) => {
       b.onclick = () => {
         pago = b.dataset.billete === 'justo' ? aPagar : Number(b.dataset.billete) * 100;
-        if (campo) campo.value = (pago / 100).toFixed(2);
+        if (campo) campo.value = paraEditar(pago);
         calcularCambio();
       };
     });
@@ -1524,7 +1617,7 @@ export async function vistaVenta(pantalla, estadoApp) {
       <div class="pos-cobro-caja pos-historial">
         <h3 style="margin:0 0 4px">Tickets</h3>
         <p class="ayuda" style="margin:0 0 12px">
-          Por número, por el importe o por la hora.
+          Los de <strong>hoy</strong>, por número, importe u hora.
         </p>
         <input id="busca-ticket" class="buscador" autocomplete="off"
                placeholder="Número, monto u hora" value="${esc(busca)}" style="margin:0">
@@ -1553,8 +1646,10 @@ export async function vistaVenta(pantalla, estadoApp) {
     const caja = refs.cobro.querySelector('#lista-tickets');
     if (!caja) return;
     try {
+      // Solo los de HOY: en la caja se busca el ticket que el cliente
+      // acaba de perder. El histórico completo vive en su propio módulo.
       const { ventas } = await api.obtener(
-        `/ventas?limite=25&busca=${encodeURIComponent(busca || '')}`);
+        `/ventas?limite=50&hoy=1&busca=${encodeURIComponent(busca || '')}`);
 
       // «Ver» abre lo que traía el ticket sin salir de la lista. Es la
       // pregunta de verdad —"¿qué se llevó?"— y antes había que imprimir
@@ -1688,6 +1783,53 @@ export async function vistaVenta(pantalla, estadoApp) {
   if (irTurno) irTurno.onclick = () => salirA('#/caja');
   const verMovs = pantalla.querySelector('#ver-movimientos');
   if (verMovs) verMovs.onclick = () => verMovimientos();
+
+  /**
+   * TOMAR EL TURNO QUE ESPERA DUEÑO.
+   *
+   * Es el relevo de las 2:30: el que se fue ya entregó su dinero y lo que
+   * se cobró desde entonces está apartado para el que entra. Con esto el
+   * que llega lo toma sin salir de la pantalla ni buscar el menú.
+   *
+   * Se hace ENTRANDO con su PIN, no marcando una casilla: el turno tiene
+   * que quedar a nombre de quien de verdad está en la caja, y a partir de
+   * ahí cada venta se registra con su nombre.
+   */
+  const btnTomar = pantalla.querySelector('#tomar-turno');
+  if (btnTomar) btnTomar.onclick = tomarTurno;
+
+  async function tomarTurno() {
+    let usuarios = [];
+    try {
+      usuarios = (await api.obtener('/auth/usuarios-disponibles')).usuarios || [];
+    } catch (e) { avisar(e.message, 'error'); return; }
+
+    const quienes = usuarios.filter((u) => u.rol === 'cajero' || u.rol === 'gerente' || u.rol === 'admin');
+    if (!quienes.length) { avisar('No hay nadie con PIN que pueda tomar la caja', 'error'); return; }
+
+    const quien = await pedirAutorizacion({
+      titulo: 'Tomar el turno',
+      texto: 'Quien entra pone su PIN. El turno y el dinero apartado quedan a su nombre.',
+      responsables: quienes.map((u) => ({
+        id: u.id, nombre: u.nombre, rolEtiqueta: ETIQUETAS_ROL[u.rol] || ''
+      })),
+      motivoSugerido: 'Relevo de turno'
+    });
+    if (!quien) { enfocar(); return; }
+
+    // Lo que esté capturado se aparta: cambiar de cajero a media venta
+    // dejaría un ticket a nombre de quien ya no está.
+    if (hayAlgo() && !cambiando) apartarVenta();
+
+    try {
+      await api.enviar('/auth/entrar-pin', { usuarioId: quien.usuarioId, pin: quien.pin });
+    } catch (e) { avisar(e.message, 'error'); return; }
+
+    // Se vuelve a cargar entera: cambió quién está dentro, y eso lo tocan
+    // el encabezado, los permisos y el turno. Lo apartado vive en el
+    // aparato, así que no se pierde nada.
+    location.reload();
+  }
 
   // El menú es el de siempre; aquí solo se le presta un botón.
   pantalla.querySelector('#pos-menu').onclick =

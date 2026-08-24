@@ -13,10 +13,13 @@ export async function vistaSistema(pantalla, estadoApp) {
   await pintar();
 
   async function pintar() {
-  const [estado, { eventos }, resp] = await Promise.all([
+  const [estado, { eventos }, resp, impresion] = await Promise.all([
     api.obtener('/sistema/estado'),
     api.obtener('/sistema/bitacora?limite=40'),
-    api.obtener('/sistema/respaldos')
+    api.obtener('/sistema/respaldos'),
+    // La impresora es un aparato de esta PC, como el disco de los
+    // respaldos. Vivía en Productos, donde nadie la buscaba.
+    api.obtener('/impresion/config').then((r) => r.impresion).catch(() => null)
   ]);
 
   pantalla.innerHTML = `
@@ -96,6 +99,8 @@ export async function vistaSistema(pantalla, estadoApp) {
         </div>
       </details>` : ''}
 
+    ${impresion ? panelImpresora(impresion) : ''}
+
     <h3>Dónde viven los datos</h3>
     <div class="tarjeta plana">
       <table class="tabla">
@@ -173,6 +178,12 @@ export async function vistaSistema(pantalla, estadoApp) {
       } catch (e) { avisar(e.message, 'error'); }
     };
 
+    const guardarImp = pantalla.querySelector('#guardar-impresora');
+    if (guardarImp) {
+      guardarImp.onclick = () => guardarImpresora();
+      pantalla.querySelector('#probar-impresora').onclick = () => guardarImpresora({ probar: true });
+    }
+
     pantalla.querySelector('#frecuencia').onclick = async () => {
       const horas = await pedirNumero({
         titulo: '¿Cada cuántas horas se respalda?',
@@ -187,5 +198,85 @@ export async function vistaSistema(pantalla, estadoApp) {
         pintar();
       } catch (e) { avisar(e.message, 'error'); }
     };
+  }
+
+  // ==========================================================
+  // LA IMPRESORA DE TICKETS
+  //
+  // Es un aparato de esta computadora, igual que el disco donde caen los
+  // respaldos: por eso vive aquí y no en Productos, que es donde estaba y
+  // donde nadie la iba a buscar.
+  // ==========================================================
+  function panelImpresora(i) {
+    return `
+      <h3>Impresora de tickets</h3>
+      <div class="tarjeta">
+        <p class="ayuda" style="margin:0 0 12px">
+          Con el nombre puesto, el ticket sale <strong>al instante</strong>, sin
+          que se asome la ventana de impresión del navegador.
+        </p>
+
+        <label class="etiqueta-chica" for="imp-destino">Nombre compartido de la impresora</label>
+        <input id="imp-destino" autocomplete="off" placeholder="\\\\localhost\\TICKET"
+               value="${esc(i.destino)}" ${puedeConfigurar ? '' : 'disabled'}>
+
+        <div class="rejilla-config">
+          <label>
+            <span class="etiqueta-chica">Ancho del papel</span>
+            <select id="imp-ancho" ${puedeConfigurar ? '' : 'disabled'}>
+              <option value="80" ${i.anchoMm === 80 ? 'selected' : ''}>80 mm</option>
+              <option value="58" ${i.anchoMm === 58 ? 'selected' : ''}>58 mm</option>
+            </select>
+          </label>
+          <label>
+            <span class="etiqueta-chica">Copias por venta</span>
+            <input id="imp-copias" inputmode="numeric" value="${i.copias}"
+                   ${puedeConfigurar ? '' : 'disabled'}>
+          </label>
+        </div>
+
+        <label class="etiqueta-chica" for="imp-pie">Renglón al pie (opcional)</label>
+        <input id="imp-pie" autocomplete="off" placeholder="Tel. 999 000 0000"
+               value="${esc(i.pie)}" ${puedeConfigurar ? '' : 'disabled'}>
+
+        ${puedeConfigurar ? `
+          <div class="fila-botones" style="margin-top:14px">
+            <button class="secundario" id="probar-impresora">Imprimir una prueba</button>
+            <button id="guardar-impresora">Guardar</button>
+          </div>` : ''}
+
+        <details class="ayuda-bloque" style="margin-top:14px">
+          <summary>¿De dónde saco ese nombre?</summary>
+          <div class="ayuda-cuerpo">
+            <p>Hay que <b>compartir la impresora</b> una vez en Windows: es para
+            que Windows le dé un nombre al que se le puede escribir directo,
+            saltándose el motor de impresión.</p>
+            <ol class="instrucciones">
+              <li>Panel de control → <b>Dispositivos e impresoras</b>.</li>
+              <li>Clic derecho en la térmica → <b>Propiedades de impresora</b>.</li>
+              <li>Pestaña <b>Compartir</b> → nombre corto, por ejemplo <code>TICKET</code>.</li>
+              <li>Aquí escribe <code>\\\\localhost\\TICKET</code> y dale a probar.</li>
+            </ol>
+          </div>
+        </details>
+      </div>`;
+  }
+
+  async function guardarImpresora({ probar = false } = {}) {
+    const datos = {
+      destino: pantalla.querySelector('#imp-destino').value.trim(),
+      anchoMm: Number(pantalla.querySelector('#imp-ancho').value),
+      copias: Number(pantalla.querySelector('#imp-copias').value.replace(/[^0-9]/g, '')) || 1,
+      pie: pantalla.querySelector('#imp-pie').value.trim()
+    };
+    try {
+      await api.actualizar('/impresion/config', datos);
+      if (probar) {
+        await api.enviar('/impresion/prueba', {});
+        avisar('Salió la prueba. Revisa el papel.', 'bien');
+      } else {
+        avisar('Impresora guardada', 'bien');
+      }
+    } catch (e) { avisar(e.message, 'error'); }
   }
 }

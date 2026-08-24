@@ -16,7 +16,7 @@
 import { api } from '../api.js';
 import { esc, avisar, fecha as formatoFecha } from '../util.js';
 import { pedirTexto, pedirImporte, confirmar, menu, pedirAutorizacion } from '../dialogo.js';
-import { aTexto, pesos } from '../fracciones.js';
+import { aTexto, pesos, paraEditar } from '../fracciones.js';
 
 const FRACCIONES = [
   { d: 16, etiqueta: 'Una marqueta' },
@@ -35,7 +35,7 @@ export async function vistaProductos(pantalla, estadoApp) {
   const mueve = puede('inventario.mover');
   const precios = puede('*');           // la lista de precios es del administrador
 
-  let catalogo, listas, impresion, inventario, existencia, alertas;
+  let catalogo, listas, inventario, existencia, alertas;
   let categoriaAbierta = ID_HIELO;
   let seleccionado = null;
   let verBajas = false;
@@ -43,11 +43,9 @@ export async function vistaProductos(pantalla, estadoApp) {
   await cargar();
 
   async function cargar() {
-    [catalogo, listas, impresion, inventario, existencia, alertas] = await Promise.all([
+    [catalogo, listas, inventario, existencia, alertas] = await Promise.all([
       api.obtener(`/catalogo${verBajas ? '?incluirBajas=1' : ''}`),
       api.obtener('/ventas/precios/listas').catch(() => ({ listas: [] })),
-      administra ? api.obtener('/impresion/config').then((r) => r.impresion).catch(() => null)
-                 : Promise.resolve(null),
       api.obtener('/inventario').catch(() => ({ inventario: [], bajos: 0 })),
       api.obtener('/existencia').catch(() => ({ almacenes: [] })),
       api.obtener('/inventario/avisos').catch(() => ({ hielo: null }))
@@ -102,7 +100,7 @@ export async function vistaProductos(pantalla, estadoApp) {
               <button class="secundario chico ${verBajas ? 'activo' : ''}" id="ver-bajas">
                 ${verBajas ? 'Ocultar dados de baja' : 'Ver dados de baja'}
               </button>
-              <button class="secundario chico" id="ver-impresora">Impresora</button>` : ''}
+              ` : ''}
           </div>
         </div>
 
@@ -237,6 +235,7 @@ export async function vistaProductos(pantalla, estadoApp) {
               <input type="file" id="foto" accept="image/png,image/jpeg,image/webp" hidden>
             </label>` : ''}
         </div>
+        ${!esDeHielo && veCostos ? margen(p) : ''}
       </div>
 
       <div class="cuadre">
@@ -253,13 +252,12 @@ export async function vistaProductos(pantalla, estadoApp) {
             <span>Cuesta hoy</span><strong>${pesos(precio)}</strong>
           </div>`
         : `
-          ${campo('Precio de venta', 'precio', (p.precio_centavos / 100).toFixed(2), { tipo: 'dinero' })}
+          ${campo('Precio de venta', 'precio', paraEditar(p.precio_centavos), { tipo: 'dinero' })}
           ${veCostos
             ? campo('Te cuesta', 'costo',
-                    p.costo_centavos != null ? (p.costo_centavos / 100).toFixed(2) : '',
+                    paraEditar(p.costo_centavos),
                     { tipo: 'dinero' })
-            : ''}
-          ${veCostos ? margen(p) : ''}`}
+            : ''}`}
       </div>
 
       ${administra ? `
@@ -302,13 +300,9 @@ export async function vistaProductos(pantalla, estadoApp) {
     }[nivel];
 
     return `
-      <div class="margen ${nivel}">
+      <div class="margen ${nivel}" title="${esc(lectura)} ${sobreVenta}% de lo que cobras.">
         <strong>${ganancia < 0 ? '−' : ''}${sobreCosto < 0 ? -sobreCosto : sobreCosto}%</strong>
-        <span>
-          le ganas ${pesos(Math.abs(ganancia))} por pieza
-          · ${sobreVenta}% de lo que cobras
-        </span>
-        <small>${lectura}</small>
+        <span>${pesos(Math.abs(ganancia))} por pieza</span>
       </div>`;
   }
 
@@ -443,7 +437,7 @@ export async function vistaProductos(pantalla, estadoApp) {
               <label class="precio-celda">
                 <span>${esc(f.d === 16 ? '1' : aTexto(f.d))}</span>
                 <input inputmode="decimal" data-precio="${f.d}" ${precios ? '' : 'disabled'}
-                       value="${((p?.centavos ?? 0) / 100).toFixed(2)}">
+                       value="${paraEditar(p?.centavos ?? 0)}">
               </label>`;
           }).join('')}
         </div>
@@ -508,62 +502,6 @@ export async function vistaProductos(pantalla, estadoApp) {
   }
 
   // ==========================================================
-  // PANEL: LA IMPRESORA
-  // ==========================================================
-  function panelImpresora() {
-    const i = impresion;
-    if (!i) return '<p class="vacio">No se pudo leer la configuración.</p>';
-
-    return `
-      <h3 style="margin:0 0 4px">Impresora de tickets</h3>
-      <p class="ayuda">
-        Con el nombre puesto, el ticket sale <strong>al instante</strong>, sin
-        que se asome la ventana de impresión.
-      </p>
-
-      <label class="etiqueta-chica" for="imp-destino">Nombre compartido de la impresora</label>
-      <input id="imp-destino" autocomplete="off" placeholder="\\\\localhost\\TICKET"
-             value="${esc(i.destino)}">
-
-      <div class="rejilla-config">
-        <label>
-          <span class="etiqueta-chica">Ancho del papel</span>
-          <select id="imp-ancho">
-            <option value="80" ${i.anchoMm === 80 ? 'selected' : ''}>80 mm</option>
-            <option value="58" ${i.anchoMm === 58 ? 'selected' : ''}>58 mm</option>
-          </select>
-        </label>
-        <label>
-          <span class="etiqueta-chica">Copias por venta</span>
-          <input id="imp-copias" inputmode="numeric" value="${i.copias}">
-        </label>
-      </div>
-
-      <label class="etiqueta-chica" for="imp-pie">Renglón al pie (opcional)</label>
-      <input id="imp-pie" autocomplete="off" placeholder="Tel. 999 000 0000" value="${esc(i.pie)}">
-
-      <div class="fila-botones" style="margin-top:14px">
-        <button class="secundario" id="probar-impresora">Imprimir una prueba</button>
-        <button id="guardar-impresora">Guardar</button>
-      </div>
-
-      <details class="ayuda-bloque" style="margin-top:14px">
-        <summary>¿De dónde saco ese nombre?</summary>
-        <div class="ayuda-cuerpo">
-          <p>Hay que <b>compartir la impresora</b> una vez en Windows: es para
-          que Windows le dé un nombre al que se le puede escribir directo,
-          saltándose el motor de impresión.</p>
-          <ol class="instrucciones">
-            <li>Panel de control → <b>Dispositivos e impresoras</b>.</li>
-            <li>Clic derecho en la térmica → <b>Propiedades de impresora</b>.</li>
-            <li>Pestaña <b>Compartir</b> → nombre corto, por ejemplo <code>TICKET</code>.</li>
-            <li>Aquí escribe <code>\\\\localhost\\TICKET</code> y dale a probar.</li>
-          </ol>
-        </div>
-      </details>`;
-  }
-
-  // ==========================================================
   // ENGANCHAR
   // ==========================================================
   function enganchar() {
@@ -574,12 +512,6 @@ export async function vistaProductos(pantalla, estadoApp) {
 
     const bajas = q('#ver-bajas');
     if (bajas) bajas.onclick = () => { verBajas = !verBajas; cargar(); };
-    const imp = q('#ver-impresora');
-    if (imp) imp.onclick = () => {
-      seleccionado = null;
-      q('#detalle').innerHTML = panelImpresora();
-      engancharImpresora();
-    };
     const nuevaCat = q('#nueva-cat');
     if (nuevaCat) nuevaCat.onclick = nuevaCategoria;
     const nuevoProd = q('#nuevo-prod');
@@ -674,11 +606,6 @@ export async function vistaProductos(pantalla, estadoApp) {
     }
   }
 
-  function engancharImpresora() {
-    pantalla.querySelector('#guardar-impresora').onclick = guardarImpresora;
-    pantalla.querySelector('#probar-impresora').onclick = probarImpresora;
-  }
-
   /** Guarda un campo del producto en cuanto se sale de él. */
   async function guardarCampo(campoEl) {
     const clave = campoEl.dataset.campo;
@@ -691,10 +618,10 @@ export async function vistaProductos(pantalla, estadoApp) {
 
       // Se devuelve el valor ya normalizado: quien escribió "30" ve "30.00",
       // que es lo que de verdad quedó guardado.
-      if (clave === 'precio') campoEl.value = (r.producto.precio_centavos / 100).toFixed(2);
+      if (clave === 'precio') campoEl.value = paraEditar(r.producto.precio_centavos);
       if (clave === 'costo') {
         campoEl.value = r.producto.costo_centavos != null
-          ? (r.producto.costo_centavos / 100).toFixed(2) : '';
+          ? paraEditar(r.producto.costo_centavos) : '';
       }
       if (clave === 'codigo') campoEl.value = r.producto.codigo || '';
       campoEl.defaultValue = campoEl.value;
@@ -990,7 +917,7 @@ export async function vistaProductos(pantalla, estadoApp) {
       const costo = await pedirImporte({
         titulo: '¿A cómo te salió cada una?',
         texto: 'Queda guardado tal cual: si mañana sube el proveedor, esta compra no cambia.',
-        valor: p.costo_centavos != null ? (p.costo_centavos / 100).toFixed(2) : '',
+        valor: paraEditar(p.costo_centavos),
         marcador: '18.00', ok: 'Registrar la entrada'
       });
       if (costo !== null) cuerpo.costo = costo;
@@ -1096,36 +1023,9 @@ export async function vistaProductos(pantalla, estadoApp) {
       const { sugerencias } = await api.obtener(`/ventas/precios/sugerencia?marqueta=${marqueta}`);
       for (const s of sugerencias) {
         const campoEl = tarjeta.querySelector(`[data-precio="${s.dieciseisavos}"]`);
-        if (campoEl) campoEl.value = (s.centavos / 100).toFixed(2);
+        if (campoEl) campoEl.value = paraEditar(s.centavos);
       }
       avisar('Es solo la parte proporcional. Súbelos si el corte da trabajo.', '');
-    } catch (e) { avisar(e.message, 'error'); }
-  }
-
-  // ==========================================================
-  // IMPRESORA
-  // ==========================================================
-  function datosImpresora() {
-    return {
-      destino: pantalla.querySelector('#imp-destino').value.trim(),
-      anchoMm: Number(pantalla.querySelector('#imp-ancho').value),
-      copias: Number(pantalla.querySelector('#imp-copias').value.replace(/[^0-9]/g, '')) || 1,
-      pie: pantalla.querySelector('#imp-pie').value.trim()
-    };
-  }
-
-  async function guardarImpresora() {
-    try {
-      impresion = (await api.actualizar('/impresion/config', datosImpresora())).impresion;
-      avisar('Impresora guardada', 'bien');
-    } catch (e) { avisar(e.message, 'error'); }
-  }
-
-  async function probarImpresora() {
-    try {
-      impresion = (await api.actualizar('/impresion/config', datosImpresora())).impresion;
-      await api.enviar('/impresion/prueba', {});
-      avisar('Salió la prueba. Revisa el papel.', 'bien');
     } catch (e) { avisar(e.message, 'error'); }
   }
 }

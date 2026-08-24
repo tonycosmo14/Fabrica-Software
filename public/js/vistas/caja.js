@@ -13,7 +13,7 @@
 import { api } from '../api.js';
 import { esc, avisar, fecha as formatoFecha, soloHora, rango } from '../util.js';
 import { pedirTexto, pedirImporte, confirmar, menu } from '../dialogo.js';
-import { pesos } from '../fracciones.js';
+import { pesos, paraEditar } from '../fracciones.js';
 import { cargarMarca } from '../marca.js';
 
 export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
@@ -294,7 +294,7 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
     const contado = await pedirImporte({
       titulo: como === 'entregar' ? 'Entregar el turno' : 'Cerrar el turno',
       texto: `Cuenta todo el dinero del cajón, incluido el fondo. Deberían ser ${pesos(e.esperado)}.`,
-      marcador: (e.esperado / 100).toFixed(2),
+      marcador: paraEditar(e.esperado),
       ok: 'Contar y ver el corte'
     });
     if (contado === null) return;

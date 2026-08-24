@@ -59,8 +59,14 @@ export function confirmar({ titulo, texto = '', ok = 'Aceptar', peligro = false 
         <button class="${peligro ? 'peligro' : ''}" data-si>${ok}</button>
       </div>`, resolver, false);
 
+    const si = caja.querySelector('[data-si]');
     caja.querySelector('[data-no]').onclick = () => salir(false);
-    caja.querySelector('[data-si]').onclick = () => salir(true);
+    si.onclick = () => salir(true);
+
+    // ENTER ACEPTA. Quien viene tecleando —Esc para vaciar, por ejemplo—
+    // sigue tecleando: parar la mano para buscar el ratón rompe el ritmo.
+    // El foco va al botón, así que también se ve cuál se va a activar.
+    setTimeout(() => si.focus(), 220);
   });
 }
 
@@ -175,6 +181,45 @@ export function pedirCantidad({ titulo, texto = '', valor = 0, ok = 'Guardar', a
  * Y ENTER ACEPTA. En un campo de una sola línea, enter no tiene por qué
  * hacer nada más; en la caja se teclea con una mano y se cobra con enter.
  */
+/**
+ * Un número entero de piezas: "¿cuántas?".
+ *
+ * Solo dígitos, y el cero se acepta a propósito: poner 0 es la forma
+ * natural de quitar un renglón del ticket sin buscar la tachita.
+ */
+export function pedirEntero({ titulo, texto = '', valor = '', marcador = '1',
+                              ok = 'Guardar', maximo = 100000 }) {
+  return new Promise((resolver) => {
+    const { caja, salir } = montar(`
+      <h3 class="dialogo-titulo">${titulo}</h3>
+      ${texto ? `<p class="dialogo-texto">${texto}</p>` : ''}
+      <input id="cuantos" class="campo-importe" inputmode="numeric"
+             autocomplete="off" placeholder="${marcador}" value="${valor}">
+      <div class="dialogo-botones">
+        <button class="secundario" data-no>Cancelar</button>
+        <button data-si>${ok}</button>
+      </div>`, resolver);
+
+    const campo = caja.querySelector('#cuantos');
+    setTimeout(() => { campo.focus(); campo.select(); }, 220);
+
+    campo.oninput = () => {
+      const limpio = campo.value.replace(/[^0-9]/g, '');
+      if (limpio !== campo.value) campo.value = limpio;
+    };
+
+    const enviar = () => {
+      const v = campo.value.trim();
+      if (!/^\d+$/.test(v) || Number(v) > maximo) { campo.focus(); campo.select(); return; }
+      salir(Number(v));
+    };
+
+    campo.onkeydown = (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); enviar(); } };
+    caja.querySelector('[data-no]').onclick = () => salir(null);
+    caja.querySelector('[data-si]').onclick = enviar;
+  });
+}
+
 export function pedirImporte({ titulo, texto = '', valor = '', marcador = '0.00',
                                ok = 'Guardar', ayuda = '' }) {
   return new Promise((resolver) => {

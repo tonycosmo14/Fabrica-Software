@@ -389,16 +389,25 @@ test('el molde cuenta las veces SEGUIDAS que falla', async () => {
   assert.equal(m2.ultimoResultado, 'ok');
 });
 
-test('los números a sacar solo los ve gerente o administrador', async () => {
+test('los números a sacar los ve quien atiende, no solo quien autoriza', async () => {
+  // El obrero llega al mostrador a preguntar qué paño le toca. Si esa lista
+  // fuera solo del gerente, habría que ir a buscarlo para leerle un número.
   await entrarAdmin();
   const r = await llamar('/api/produccion/siguientes');
   assert.equal(r.estado, 200);
   assert.ok(r.json.datos.lista.length > 0);
   assert.ok(Array.isArray(r.json.datos.lista[0].siguientes));
 
+  await llamar('/api/usuarios', {
+    method: 'POST', cuerpo: { nombre: 'Cajera Ana', rol: 'cajero', pin: '9090' }
+  });
+  await entrarPorNombre('Cajera Ana', '9090');
+  assert.equal((await llamar('/api/produccion/siguientes')).estado, 200,
+               'el cajero los imprime');
+
+  // El operario no: él saca el hielo, no reparte el trabajo.
   await entrarPorNombre('Don Chema', '2222');
-  const negado = await llamar('/api/produccion/siguientes');
-  assert.equal(negado.estado, 403);
+  assert.equal((await llamar('/api/produccion/siguientes')).estado, 403);
 });
 
 test('un gerente puede autorizar y corregir; un cajero no', async () => {

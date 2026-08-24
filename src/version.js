@@ -17,9 +17,34 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '1.6.1';
+const VERSION_ACTUAL = '1.7';
 
 const VERSIONES = [
+  {
+    numero: '1.7',
+    nombre: 'La caja obedece',
+    fecha: '2026-08-24',
+    resumen:
+      'Cambios de la primera prueba a fondo: listas que no se aprietan, ' +
+      'cantidades que se tocan, F1 para vender y el dinero sin decimales.',
+    cambios: [
+      { tipo: 'arreglo', texto: 'ARREGLADO: con muchos productos en una categoría, la lista los iba aplastando hasta dejarlos en la mitad de su alto. Ahora cada renglón conserva su tamaño y la lista se desplaza, que es lo que se espera.' },
+      { tipo: 'importante', texto: 'LA CANTIDAD SE TOCA Y SE ESCRIBE. Si te piden 50 marquetas ya no hay que tocar el botón cincuenta veces: se toca el número del renglón y se teclea 50. Poner 0 lo quita del ticket.' },
+      { tipo: 'importante', texto: 'ENTER CON EL CAMPO VACÍO REPITE lo último que agregaste. "Dame otro igual" es media venta del mostrador.' },
+      { tipo: 'nuevo', texto: 'F1 lleva a VENDER desde donde estés. Estabas viendo la existencia y llegó un cliente: una tecla y ya.' },
+      { tipo: 'mejora', texto: 'EL DINERO SIN DECIMALES: $264 en vez de $264.00. Si un número sí trae centavos se enseñan completos, porque redondear sería decirle al cliente algo que no es.' },
+      { tipo: 'mejora', texto: 'El margen de ganancia ya no es un cartel de tres renglones: es una etiqueta chica junto a la foto del producto.' },
+      { tipo: 'mejora', texto: 'La impresora de tickets se mudó de Productos a SISTEMA, junto a los respaldos. Es un aparato de la computadora, no un producto.' },
+      { tipo: 'nuevo', texto: 'CLIENTES ya aparece en la pantalla de inicio.' },
+      { tipo: 'arreglo', texto: 'ARREGLADO Y GRAVE: el turno que quedaba esperando dueño se adoptaba solo al recargar la pantalla, así que el cajero que acababa de entregar se lo volvía a quedar sin darse cuenta. Ahora solo lo adopta quien teclea su PIN.' },
+      { tipo: 'nuevo', texto: 'Y ese aviso ya sale en VENDER, con un botón "Tomar el turno": el que entra pone su PIN ahí mismo y el turno y el dinero apartado quedan a su nombre.' },
+      { tipo: 'mejora', texto: 'Los tickets que se buscan desde la caja son solo los de HOY. Para el histórico completo viene un módulo aparte.' },
+      { tipo: 'mejora', texto: 'Al vaciar el ticket con Esc, otro Enter acepta: la mano no tiene que soltar el teclado.' },
+      { tipo: 'importante', texto: 'Los CAJEROS ya pueden imprimir los números que siguen en los tanques. El obrero pregunta en el mostrador y ahí no siempre hay un gerente.' },
+      { tipo: 'arreglo', texto: 'El ticket fiado se imprimía diciendo FIADO pero sin el nombre del cliente, que es justo lo que lo convierte en un vale.' }
+    ],
+    siguiente: 'v1.8 — Eliminar de verdad, y el módulo de Historial.'
+  },
   {
     numero: '1.6.1',
     nombre: 'Sin teclas en el celular',
@@ -31,7 +56,7 @@ const VERSIONES = [
       { tipo: 'arreglo', texto: 'En el celular desaparecen las etiquetas de teclado: F2, F3, F4, F10, Enter y el "Esc ·" de los botones. En un teléfono no hay esas teclas, así que solo estorbaban. En la PC y en tableta siguen igual.' },
       { tipo: 'mejora', texto: 'Por dentro: las pruebas automáticas ya no repiten treinta y cinco renglones de arranque en cada archivo. Son 465 líneas menos, las mismas 279 pruebas y los mismos 5 segundos.' }
     ],
-    siguiente: 'v1.7 — Reparto: pedidos, rutas y neveras en comodato.'
+    siguiente: 'v1.7 — Los ajustes de la primera prueba a fondo.'
   },
   {
     numero: '1.6',

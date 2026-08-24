@@ -130,9 +130,13 @@ router.post('/autorizar', registrar, (req, res) => {
 
 /**
  * LOS NÚMEROS QUE SIGUEN, para imprimirlos y dárselos a los obreros.
- * Solo gerente o administrador: son ellos quienes reparten el trabajo.
+ *
+ * Permiso propio, distinto del de autorizar: el cajero es quien está en el
+ * mostrador cuando el obrero llega a preguntar qué paño toca, y hacerlo
+ * esperar a que aparezca un gerente para leerle una lista no tiene sentido.
+ * Decidir que se saque uno FUERA de orden sigue siendo del gerente.
  */
-router.get('/siguientes', exigirPermiso('produccion.autorizar'), (req, res) => {
+router.get('/siguientes', exigirPermiso('produccion.numeros'), (req, res) => {
   const tanques = bd.prepare(
     'SELECT id, nombre FROM tanques WHERE activo = 1 ORDER BY orden, nombre'
   ).all();

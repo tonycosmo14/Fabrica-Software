@@ -14,7 +14,7 @@
 import { api } from '../api.js';
 import { esc, avisar, fecha as formatoFecha } from '../util.js';
 import { pedirTexto, pedirImporte, confirmar, menu } from '../dialogo.js';
-import { pesos } from '../fracciones.js';
+import { pesos, paraEditar } from '../fracciones.js';
 
 export async function vistaClientes(pantalla, estadoApp) {
   const puede = (p) => estadoApp.permisos.includes('*') || estadoApp.permisos.includes(p);
@@ -215,7 +215,7 @@ export async function vistaClientes(pantalla, estadoApp) {
         ${campo('Teléfono', 'telefono', c.telefono, { marcador: '999 123 4567' })}
         ${campo('Dirección', 'direccion', c.direccion)}
         ${campo('Límite de crédito', 'limite',
-                c.limite_centavos === null ? '' : (c.limite_centavos / 100).toFixed(2),
+                paraEditar(c.limite_centavos),
                 { ayuda: 'vacío = sin límite', marcador: 'sin límite' })}
         ${campo('Días de plazo', 'diasPlazo', c.dias_plazo ?? '',
                 { ayuda: 'solo para avisar de lo vencido', marcador: 'sin plazo' })}
@@ -362,7 +362,7 @@ export async function vistaClientes(pantalla, estadoApp) {
       texto: c.estado.saldo > 0
         ? `Debe ${pesos(c.estado.saldo)}. ¿Cuánto está dejando?`
         : 'No debe nada. Lo que deje queda a su favor.',
-      marcador: c.estado.saldo > 0 ? (c.estado.saldo / 100).toFixed(2) : '100',
+      marcador: c.estado.saldo > 0 ? paraEditar(c.estado.saldo) : '100',
       ok: formaPago === 'efectivo' ? 'Recibir el dinero' : 'Anotar la transferencia'
     });
     if (!monto) return;

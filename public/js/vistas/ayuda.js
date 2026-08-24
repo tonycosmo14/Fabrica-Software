@@ -136,6 +136,18 @@ debería quedar − contado = FALTA</pre>
         <li><b>Cobrar</b>, tocas el billete con el que pagan y listo.</li>
       </ol>
 
+      <h4>Atajos que ahorran el día</h4>
+      <ul>
+        <li><b>F1</b> te trae aquí <b>desde cualquier pantalla</b>. Estabas
+        viendo la existencia y llegó un cliente: una tecla y ya.</li>
+        <li><b>Enter con el campo vacío repite lo último</b> que agregaste.
+        "Dame otro igual" es media venta del mostrador.</li>
+        <li><b>Toca el número</b> de un renglón y escribe la cantidad. Si te
+        piden 50 marquetas no hay que tocar el botón cincuenta veces.
+        Poniendo <b>0</b> se quita del ticket.</li>
+        <li><em>Esc</em> pregunta si vaciar; otro <em>Enter</em> acepta.</li>
+      </ul>
+
       <h4>Sin soltar el teclado (así es más rápido)</h4>
       <p>Cada producto tiene un <b>código</b>. El del octavo es <b>18</b>. No
       hay que buscar el botón: se teclea y se da enter.</p>
@@ -175,9 +187,10 @@ debería quedar − contado = FALTA</pre>
       <p>El ticket viejo queda cancelado y amarrado al nuevo, el hielo
       vuelve al cuarto frío solo y la caja cuadra sola. Todo queda anotado.</p>
 
-      <h4>Buscar un ticket viejo, verlo o sacar una copia</h4>
+      <h4>Buscar un ticket de hoy, verlo o sacar una copia</h4>
       <p><em>F3</em>, o el botón 🧾. Se busca por número, por el importe o por
-      la hora.</p>
+      la hora, entre <b>los de hoy</b>: aquí se busca el ticket que el cliente
+      acaba de perder, no el de hace tres semanas.</p>
       <ul>
         <li><b>Ver</b> abre ahí mismo <b>qué traía</b> ese ticket, sin
         imprimir nada. Es lo que se pregunta casi siempre.</li>
@@ -186,6 +199,17 @@ debería quedar − contado = FALTA</pre>
       </ul>
       <p>Sirve cuando el cliente vuelve porque perdió su ticket, o cuando te
       saliste de la pantalla sin querer.</p>
+
+      <h4>Si el turno no tiene dueño</h4>
+      <p>Cuando alguien entregó su turno y el que sigue no ha llegado, arriba
+      del ticket sale un cartel: <b>lo que se cobra se está apartando</b> para
+      quien entre.</p>
+      <p>En cuanto llegue, el botón <b>Tomar el turno</b> le pide su PIN ahí
+      mismo. El turno y el dinero apartado quedan a su nombre, y de ahí en
+      adelante las ventas salen con el suyo.</p>
+      <p class="ayuda-tip">Refrescar la pantalla <b>ya no</b> se queda el
+      turno. Antes sí pasaba, y el que acababa de entregar se lo volvía a
+      quedar sin darse cuenta.</p>
 
       <h4>Fiar</h4>
       <p>En la pantalla de cobro, <b>🧾 Fiar a un cliente</b>. Solo a los que
@@ -346,7 +370,7 @@ debería haber − contado = DIFERENCIA</pre>
   {
     id: 'productos',
     titulo: 'Productos y precios: qué aparece en la caja',
-    busca: 'productos categorías catálogo precios códigos alta baja refrescos garrafones botones color impresora ticket térmica imprimir inventario costo ganancia foto pedir mínimo contar existencias piezas',
+    busca: 'productos categorías catálogo precios códigos alta baja refrescos garrafones botones color inventario costo ganancia margen foto pedir mínimo contar existencias piezas',
     cuerpo: `
       <p>Los botones de la caja se dan de alta en <b>Productos y precios</b>,
       sin tocar el programa. Solo el administrador.</p>
@@ -445,9 +469,10 @@ debería haber − contado = FALTA</pre>
       El sistema te dice cuántos son antes de hacerlo.</p>
 
       <h4>La impresora de tickets</h4>
-      <p>En esta misma pantalla, abajo. Con el nombre de la impresora puesto,
-      el ticket sale <b>al instante</b>; sin él, lo imprime el navegador y
-      aparece la ventana de impresión.</p>`
+      <p>Se configura en <b>Sistema</b>, junto a los respaldos: es un aparato
+      de esta computadora, no un producto. Con el nombre de la impresora
+      puesto, el ticket sale <b>al instante</b>; sin él, lo imprime el
+      navegador y aparece la ventana de impresión.</p>`
   },
 
   // ==========================================================
@@ -541,8 +566,8 @@ debería haber − contado = FALTA</pre>
   // ==========================================================
   {
     id: 'respaldos',
-    titulo: 'Respaldos: no perder los datos',
-    busca: 'respaldo copia seguridad usb drive restaurar disco perder datos',
+    titulo: 'Respaldos y la impresora',
+    busca: 'respaldo copia seguridad usb drive restaurar disco perder datos impresora ticket térmica imprimir compartir windows',
     cuerpo: `
       <p>El sistema se respalda <b>solo</b>: cada 4 horas y cada vez que se
       enciende. No hay que acordarse de nada.</p>
@@ -557,6 +582,14 @@ debería haber − contado = FALTA</pre>
 
       <p>Si la USB se desconecta, la copia local se sigue haciendo igual y la
       pantalla de Sistema te avisa que la de fuera está fallando.</p>
+
+      <h4>La impresora de tickets</h4>
+      <p>Se configura en la misma pantalla de <b>Sistema</b>, más abajo. Con el
+      <b>nombre compartido</b> puesto, el ticket sale al instante; sin él lo
+      imprime el navegador y aparece la ventana de impresión.</p>
+      <p>Ese nombre sale de compartir la impresora una vez en Windows. En la
+      pantalla están los pasos, y el botón <b>Imprimir una prueba</b> dice si
+      quedó bien sin tener que hacer una venta.</p>
 
       <h4>Si hay que restaurar</h4>
       <p>Las instrucciones están en la propia pantalla de Sistema, paso por

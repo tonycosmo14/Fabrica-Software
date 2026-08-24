@@ -13,6 +13,7 @@ const ACCESOS = [
   { emoji: '💵', titulo: 'Caja',         ruta: '#/caja',      permiso: 'caja.ver',             desde: null   },
   { emoji: '👥', titulo: 'Usuarios',     ruta: '#/usuarios',  permiso: 'usuarios.administrar', desde: null   },
   { emoji: '🏷️', titulo: 'Productos y precios', ruta: '#/productos', permiso: 'inventario.ver', desde: null },
+  { emoji: '🧾', titulo: 'Clientes',      ruta: '#/clientes',  permiso: 'clientes.ver',         desde: null   },
   { emoji: '🎨', titulo: 'Personalizar', ruta: '#/personalizar', permiso: 'sistema.configurar', desde: null },
   { emoji: '⚙️', titulo: 'Sistema',      ruta: '#/sistema',   permiso: 'sistema.ver',          desde: null   },
   { emoji: '❓', titulo: 'Ayuda',        ruta: '#/ayuda',     permiso: null,                   desde: null   },

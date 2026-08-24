@@ -117,7 +117,9 @@ router.post('/entrar-pin', (req, res) => {
 
   crearSesion(res, u, req.headers['user-agent']);
   bitacora.registrar({ accion: 'sesion.inicio', entidad: 'usuario', entidadId: u.id, ejecutorId: u.id, detalle: { via: 'pin' } });
-  return ok(res, datosSesion(u, abrirTurnoSiHaceFalta(u)));
+  // Teclear el PIN es la señal de que el cajero que entra ya llegó: aquí sí
+  // se adopta el turno que quedó esperando dueño.
+  return ok(res, datosSesion(u, abrirTurnoSiHaceFalta(u, { adoptar: true })));
 });
 
 /** Entrar con usuario y contraseña (admin). */
@@ -132,15 +134,19 @@ router.post('/entrar-contrasena', (req, res) => {
 
   crearSesion(res, u, req.headers['user-agent']);
   bitacora.registrar({ accion: 'sesion.inicio', entidad: 'usuario', entidadId: u.id, ejecutorId: u.id, detalle: { via: 'contrasena' } });
-  return ok(res, datosSesion(u, abrirTurnoSiHaceFalta(u)));
+  return ok(res, datosSesion(u, abrirTurnoSiHaceFalta(u, { adoptar: true })));
 });
 
 /**
  * Quién soy. El frontend lo llama al abrir para saber si ya hay sesión.
  *
- * Aquí también se abre el turno: la sesión dura 30 días, así que la mayoría
+ * Aquí también se ABRE el turno: la sesión dura 30 días, así que la mayoría
  * de las mañanas nadie vuelve a teclear el PIN. Si el turno solo se abriera
  * al teclearlo, el primer día se abriría y los siguientes no.
+ *
+ * Pero NO se ADOPTA el que quedó esperando dueño. Refrescar la pantalla no
+ * es que haya llegado nadie: si adoptara, el cajero que acaba de entregar
+ * su turno se lo volvería a quedar sin darse cuenta.
  */
 router.get('/yo', (req, res) => {
   if (!req.usuario) return ok(res, { usuario: null, permisos: [] });

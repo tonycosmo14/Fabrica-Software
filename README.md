@@ -3,7 +3,7 @@
 Sistema para la fábrica de hielo de Hunucmá, Yucatán.
 Se construye **por versiones**: cada versión es un pedazo terminado, probado y usable.
 
-**Versión actual: v1.6.1**
+**Versión actual: v1.7**
 
 ---
 
@@ -516,7 +516,11 @@ versión nueva le aparece un punto rojo en el menú.
 | **v1.5** | Avisos de inventario, no vender lo que no hay, más pantalla para vender | ✅ listo |
 | **v1.6** | Clientes registrados, crédito y cobranza | ✅ listo |
 | **v1.6.1** | Sin etiquetas de teclado en el celular; pruebas sin copy-paste | ✅ listo |
-| v1.7 | Reparto, pedidos y neveras en comodato | siguiente |
-| v1.8 | Planta de agua: garrafones, botellas y depósitos | |
-| v1.9 | Mantenimiento: compresores, ósmosis, membranas, horario punta | |
-| v2.0 | Estadísticas y sistema completo en producción | |
+| **v1.7** | Ajustes de la primera prueba a fondo: cantidades, F1, dinero sin decimales | ✅ listo |
+| v1.8 | Eliminar de verdad, y el módulo de Historial | siguiente |
+| v1.9 | Precios de mayoreo por cliente |  |
+| v2.0 | Reparto, pedidos y neveras en comodato |  |
+| v2.1 | Planta de agua: garrafones, botellas y depósitos | |
+| v2.2 | Mantenimiento: compresores, ósmosis, membranas, horario punta | |
+| v2.3 | Estadísticas y sistema completo en producción | |
+| — | Identificación por huella en la caja (fase propia) | |

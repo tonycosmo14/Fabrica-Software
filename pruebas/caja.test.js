@@ -532,3 +532,34 @@ test('el cajero ve el historial; el operario no', async () => {
   await entrarPorNombre('Chema', '5555');
   assert.equal((await llamar('/api/caja/movimientos')).estado, 403);
 });
+
+// ============================================================
+// EL TURNO SIN DUEÑO NO SE ADOPTA SOLO  (v1.7)
+// ============================================================
+
+test('refrescar la pantalla NO adopta el turno que espera dueño', async () => {
+  await entrarAdmin();
+  await cerrarSiHayAbierto();
+  await llamar('/api/caja/abrir', { method: 'POST', cuerpo: { fondo: 0 } });
+  await llamar('/api/caja/entregar', { method: 'POST', cuerpo: { contado: 0 } });
+
+  assert.equal((await llamar('/api/caja')).json.datos.sinDueno, true);
+
+  // /auth/yo es lo que corre en cada arranque de la pantalla. Si adoptara,
+  // el cajero que acaba de entregar se quedaría el turno con solo refrescar
+  // el navegador, y el relevo de las 2:30 no serviría de nada.
+  await llamar('/api/auth/yo');
+  await llamar('/api/auth/yo');
+  assert.equal((await llamar('/api/caja')).json.datos.sinDueno, true,
+               'sigue esperando a quien de verdad llegue');
+});
+
+test('teclear el PIN sí lo adopta, y la caja lo dice', async () => {
+  const antes = (await llamar('/api/ventas/contexto')).json.datos.caja;
+  assert.equal(antes.sinDueno, true, 'la pantalla de venta tiene que saberlo');
+
+  await entrarPorNombre('Mari', '7777');
+  const despues = (await llamar('/api/ventas/contexto')).json.datos.caja;
+  assert.equal(despues.sinDueno, false);
+  assert.equal(despues.cajero, 'Mari');
+});

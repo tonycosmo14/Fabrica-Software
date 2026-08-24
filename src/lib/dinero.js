@@ -47,10 +47,20 @@ function aPesos(centavos) {
   return (Number(centavos) || 0) / 100;
 }
 
-/** Formato mexicano: $1,234.50 */
+/**
+ * Formato mexicano. Sin decimales cuando son cero: en la fábrica todo se
+ * cobra en pesos enteros y ese ".00" en cada renglón del ticket son
+ * milímetros de papel al día. Si un número SÍ trae centavos se enseñan
+ * completos: más vale un renglón largo que decir un número que no es.
+ *
+ *   26400 -> $264      1250 -> $12.50
+ */
 function formato(centavos) {
-  return aPesos(centavos).toLocaleString('es-MX', {
-    style: 'currency', currency: 'MXN', minimumFractionDigits: 2
+  const n = Number(centavos) || 0;
+  return aPesos(n).toLocaleString('es-MX', {
+    style: 'currency', currency: 'MXN',
+    minimumFractionDigits: n % 100 === 0 ? 0 : 2,
+    maximumFractionDigits: 2
   });
 }
 

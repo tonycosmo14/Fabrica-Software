@@ -11,6 +11,38 @@ solo para arreglos de algo que ya estaba, o para cambios de puro aspecto.
 
 ---
 
+## v1.7 — La caja obedece · 24 de agosto de 2026
+
+Sin migración. Todo esto sale de la primera prueba a fondo de Tony.
+
+### Dos errores que costaban de verdad
+
+- **arreglo** — **La lista de productos se aplastaba.** `.cfg-lista` era `display: grid`, y una rejilla REPARTE el alto entre sus renglones: con 26 productos cada uno bajaba a 25 px cuando su contenido mide 38, y se veía cada vez más apretada conforme se daban de alta más cosas. Ahora es columna flexible: cada renglón conserva su tamaño y lo que sobra se desplaza.
+- **clave** — **El turno sin dueño se adoptaba solo al recargar la pantalla.** `/auth/yo` corre en cada arranque y llamaba a `abrirTurnoSiHaceFalta`, que adoptaba. Así que el cajero que acababa de entregar su turno a las 2:30 se lo volvía a quedar con solo refrescar el navegador, y el relevo entero no servía de nada. Ahora ABRIR un turno y ADOPTAR el que espera dueño son cosas distintas: lo segundo solo lo hace quien teclea su PIN.
+- **arreglo** — El ticket fiado se imprimía con la palabra FIADO pero **sin el nombre del cliente**: `ventaCompleta()` en el módulo de impresión no unía la tabla de clientes. El nombre es lo que convierte ese papel en un vale.
+
+### Vender
+
+- **clave** — **La cantidad se toca y se escribe.** "Me das 50 marquetas" no puede ser tocar el botón cincuenta veces. Se toca el número del renglón y se teclea. Poner 0 lo quita del ticket, que es lo que la mano hace sola.
+- **clave** — **Enter con el campo vacío repite lo último.** "Dame otro igual" es media venta del mostrador.
+- **nuevo** — Al vaciar con Esc, otro **Enter acepta**: el diálogo enfoca su botón, así que quien viene tecleando sigue tecleando.
+- **nuevo** — Aviso de **turno sin dueño dentro de la caja**, con botón **Tomar el turno**: el que entra pone su PIN ahí mismo y el turno y el dinero apartado quedan a su nombre.
+- **mejora** — Los tickets que se buscan desde la caja son **solo los de hoy** (`?hoy=1`, con `date('now','localtime')` para que a las 6 de la tarde "hoy" no sea ya mañana). El histórico completo será su propio módulo.
+
+### En toda la aplicación
+
+- **nuevo** — **F1 lleva a Vender** desde cualquier pantalla. Se escucha en `app.js`, así que funciona también donde la vista no sabe nada del teclado. Con un diálogo abierto manda el diálogo.
+- **mejora** — **El dinero, sin decimales cuando son cero**: `$264` en vez de `$264.00`. En la fábrica todo se cobra en pesos enteros y ese `.00` repetido en cada renglón del ticket son milímetros de papel al día. **Si un número sí trae centavos se enseñan completos**: redondear sería decirle al cliente algo que no es. Vale para la pantalla (`pesos()`), para el papel (`formato()`) y para los campos que se editan (`paraEditar()`).
+- **nuevo** — **Clientes** ya aparece en la pantalla de inicio.
+
+### Dónde vive cada cosa
+
+- **mejora** — El **margen de ganancia** pasó de ser un cartel de tres renglones debajo del precio a una etiqueta chica junto a la foto. El porcentaje es lo que se mira de reojo; la lectura completa vive en el `title`.
+- **mejora** — La **impresora de tickets** se mudó de Productos a **Sistema**, al lado de los respaldos. Es un aparato de esta computadora, no un producto, y en Productos nadie la buscaba.
+- **importante** — Permiso nuevo `produccion.numeros`, que tienen cajero, gerente y administrador: **el cajero ya imprime los números que siguen en los tanques**. El obrero pregunta en el mostrador y ahí no siempre hay un gerente. Autorizar que se saque uno FUERA de orden sigue siendo del gerente.
+
+---
+
 ## v1.6.1 — Sin teclas en el celular · 24 de agosto de 2026
 
 Sin migración. Un arreglo de aspecto y una limpieza por dentro.

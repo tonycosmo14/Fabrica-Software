@@ -66,3 +66,24 @@ test('el desglose junta los repetidos para que quepa en el ticket', () => {
 test('descomponer no acepta medias fracciones', () => {
   assert.throws(() => descomponer(2.5));
 });
+
+// ============================================================
+// EL DINERO EN PANTALLA  (v1.7)
+// ============================================================
+
+test('el dinero redondo se escribe sin decimales', () => {
+  const { formato } = require('../src/lib/dinero');
+  // En la fábrica todo se cobra en pesos enteros y ese ".00" repetido en
+  // cada renglón del ticket son milímetros de papel al día.
+  assert.equal(formato(26400), '$264');
+  assert.equal(formato(7000), '$70');
+  assert.equal(formato(0), '$0');
+});
+
+test('pero los centavos NUNCA se esconden', () => {
+  const { formato } = require('../src/lib/dinero');
+  // Redondear aquí sería decirle al cliente un número que no es el suyo.
+  assert.equal(formato(1250), '$12.50');
+  assert.equal(formato(5), '$0.05');
+  assert.equal(formato(100015), '$1,000.15');
+});

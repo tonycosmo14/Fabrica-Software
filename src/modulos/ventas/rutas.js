@@ -66,7 +66,11 @@ router.get('/contexto', vender, (req, res) => {
   return ok(res, {
     lista, precios, almacenes,
     siguienteFolio: ultimoFolio + 1,
-    caja: caja ? { folio: caja.folio, cajero: caja.cajero_nombre } : null,
+    // sinDueno: el turno del relevo de las 2:30, que sigue cobrando
+    // mientras el cajero que entra no llega. La caja tiene que decirlo.
+    caja: caja
+      ? { folio: caja.folio, cajero: caja.cajero_nombre, sinDueno: !caja.cajero_id }
+      : null,
     categorias: categoriasActivas(),
     productos: productosActivos(),
     avisos: avisos(),
@@ -366,30 +370,41 @@ function detalleVenta(id) {
 // ============================================================
 
 /** Buscador rápido: por folio, monto u hora. Abre con las últimas 20 (7.3). */
+/**
+ * Buscador de tickets: por folio, monto u hora.
+ *
+ * Con ?hoy=1 solo los de hoy. Es lo que pide la caja: ahí se busca el
+ * ticket que el cliente acaba de perder, no el de hace tres semanas.
+ * Para el histórico completo está el módulo de Historial.
+ */
 router.get('/', verVentas, (req, res) => {
   const limite = Math.min(Number(req.query.limite) || 20, 200);
   const busca = String(req.query.busca || '').trim();
+  const soloHoy = req.query.hoy === '1';
 
-  let filas;
+  const filtros = [];
+  const valores = [];
+
   if (busca) {
     const comoNumero = Number(busca.replace(/[^0-9.]/g, ''));
-    filas = bd.prepare(`
-      SELECT v.*, u.nombre AS cajero_nombre, cl.nombre AS cliente_nombre FROM ventas v
-        LEFT JOIN usuarios u  ON u.id = v.cajero_id
-        LEFT JOIN clientes cl ON cl.id = v.cliente_id
-       WHERE v.folio = ?
-          OR v.total_centavos = ?
-          OR v.fecha LIKE ?
-       ORDER BY v.fecha DESC LIMIT ?
-    `).all(Math.trunc(comoNumero) || -1, Math.round(comoNumero * 100) || -1, `%${busca}%`, limite);
-  } else {
-    filas = bd.prepare(`
-      SELECT v.*, u.nombre AS cajero_nombre, cl.nombre AS cliente_nombre FROM ventas v
-        LEFT JOIN usuarios u  ON u.id = v.cajero_id
-        LEFT JOIN clientes cl ON cl.id = v.cliente_id
-       ORDER BY v.fecha DESC LIMIT ?
-    `).all(limite);
+    filtros.push('(v.folio = ? OR v.total_centavos = ? OR v.fecha LIKE ?)');
+    valores.push(Math.trunc(comoNumero) || -1,
+                 Math.round(comoNumero * 100) || -1,
+                 `%${busca}%`);
   }
+  if (soloHoy) {
+    // date('now','localtime'): el día del reloj de la fábrica, no el de UTC.
+    // Sin eso, a partir de las 6 de la tarde "hoy" ya sería mañana.
+    filtros.push("date(v.fecha) = date('now', 'localtime')");
+  }
+
+  const filas = bd.prepare(`
+    SELECT v.*, u.nombre AS cajero_nombre, cl.nombre AS cliente_nombre FROM ventas v
+      LEFT JOIN usuarios u  ON u.id = v.cajero_id
+      LEFT JOIN clientes cl ON cl.id = v.cliente_id
+     ${filtros.length ? 'WHERE ' + filtros.join(' AND ') : ''}
+     ORDER BY v.fecha DESC LIMIT ?
+  `).all(...valores, limite);
 
   return ok(res, { ventas: filas });
 });

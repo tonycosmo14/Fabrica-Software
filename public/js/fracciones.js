@@ -129,9 +129,30 @@ export function desglose(dieciseisavos) {
 
 /** Pesos a partir de centavos, con formato mexicano. */
 export function pesos(centavos) {
-  return ((Number(centavos) || 0) / 100).toLocaleString('es-MX', {
-    style: 'currency', currency: 'MXN', minimumFractionDigits: 2
+  const n = Number(centavos) || 0;
+  // SIN DECIMALES CUANDO SON CERO. En la fábrica todo se cobra en pesos
+  // enteros —$264, $70, $36— y ese ".00" repetido en cada renglón solo
+  // ensucia. Pero si un número SÍ trae centavos se enseñan completos: es
+  // preferible un renglón más largo a decirle al cliente un número que no
+  // es el suyo.
+  const cerrados = n % 100 === 0;
+  return (n / 100).toLocaleString('es-MX', {
+    style: 'currency', currency: 'MXN',
+    minimumFractionDigits: cerrados ? 0 : 2,
+    maximumFractionDigits: 2
   });
+}
+
+/**
+ * El mismo importe, pero para ESCRIBIRLO en un campo: sin el signo, sin
+ * las comas de los miles y sin el ".00" cuando son pesos redondos.
+ *
+ *   26400 -> "264"      1250 -> "12.50"      null -> ""
+ */
+export function paraEditar(centavos) {
+  if (centavos === null || centavos === undefined || centavos === '') return '';
+  const n = Number(centavos) || 0;
+  return n % 100 === 0 ? String(n / 100) : (n / 100).toFixed(2);
 }
 
 // ============================================================

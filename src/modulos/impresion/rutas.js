@@ -27,11 +27,19 @@ function nombreNegocio() {
     .get()?.valor || 'Hielo LOLHA';
 }
 
-/** Arma la venta completa, como la necesita el ticket. */
+/**
+ * Arma la venta completa, como la necesita el ticket.
+ *
+ * El cliente se trae aunque casi nunca haya: en un ticket fiado su nombre
+ * es lo que convierte el papel en un vale. Sin él salía "FIADO" a secas.
+ */
 function ventaCompleta(id) {
   const venta = bd.prepare(`
-    SELECT v.*, u.nombre AS cajero_nombre FROM ventas v
-      LEFT JOIN usuarios u ON u.id = v.cajero_id
+    SELECT v.*, u.nombre AS cajero_nombre,
+           cl.nombre AS cliente_nombre, cl.negocio AS cliente_negocio
+      FROM ventas v
+      LEFT JOIN usuarios u  ON u.id = v.cajero_id
+      LEFT JOIN clientes cl ON cl.id = v.cliente_id
      WHERE v.id = ?
   `).get(id);
   if (!venta) return null;

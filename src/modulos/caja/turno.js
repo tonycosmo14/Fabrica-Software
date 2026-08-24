@@ -38,15 +38,27 @@ const { sesionAbierta } = require('./calculo');
 /**
  * Abre el turno si hace falta. Devuelve el turno vigente, o null si este
  * usuario no maneja caja.
+ *
+ * `adoptar` distingue DOS COSAS QUE NO SON LO MISMO:
+ *
+ *  · ABRIR un turno cuando no hay ninguno. Eso pasa también al recargar la
+ *    la pantalla, y está bien: la sesión dura 30 días y casi ninguna mañana
+ *    se vuelve a teclear el PIN.
+ *
+ *  · ADOPTAR el turno que quedó esperando dueño. Eso solo lo hace quien
+ *    TECLEA su PIN, porque es la señal de que el cajero que entra ya llegó.
+ *    Si lo hiciera cualquier arranque de pantalla, el que acaba de entregar
+ *    su turno se lo volvería a quedar con solo refrescar el navegador, y el
+ *    relevo de las 2:30 no serviría de nada.
  */
-function abrirTurnoSiHaceFalta(usuario) {
+function abrirTurnoSiHaceFalta(usuario, { adoptar = false } = {}) {
   if (!puede(usuario.rol, 'caja.operar')) return null;
 
   const abierto = sesionAbierta();
   if (abierto) {
     // Un turno esperando dueño: el que llega se hace cargo de él y del
     // dinero que se apartó mientras no estaba.
-    if (!abierto.cajero_id) return adoptarTurno(abierto, usuario);
+    if (!abierto.cajero_id && adoptar) return adoptarTurno(abierto, usuario);
     return abierto;
   }
 
