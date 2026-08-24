@@ -4,46 +4,12 @@
  */
 const test = require('node:test');
 const assert = require('node:assert');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
+const { fabricaDePrueba } = require('./ayudante');
 
-// Base de datos desechable: no toca la real.
-const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'fabrica-prueba-'));
-process.env.CARPETA_DATOS = carpeta;
-process.env.ARCHIVO_BD = path.join(carpeta, 'prueba.db');
-
-const { migrar } = require('../src/db/migrar');
-const { crearApp } = require('../src/servidor');
-
-migrar({ silencioso: true });
-
-// El sistema arranca sin usuarios: el admin se crea desde el asistente.
+// Sin administrador a propósito: esta prueba es del primer arranque, cuando
+// el sistema todavía no tiene ninguna cuenta.
 const admin = { nombre: 'Tony', usuario: 'tony', contrasena: 'clavelarga1', pin: '1234' };
-
-let servidor, base, cookie = '';
-
-async function llamar(ruta, opciones = {}) {
-  const r = await fetch(base + ruta, {
-    headers: { 'Content-Type': 'application/json', ...(cookie ? { cookie } : {}) },
-    ...opciones,
-    body: opciones.cuerpo ? JSON.stringify(opciones.cuerpo) : undefined
-  });
-  const set = r.headers.get('set-cookie');
-  if (set) cookie = set.split(';')[0];
-  return { estado: r.status, json: await r.json() };
-}
-
-test.before(async () => {
-  servidor = crearApp().listen(0);
-  await new Promise((r) => servidor.once('listening', r));
-  base = `http://127.0.0.1:${servidor.address().port}`;
-});
-
-test.after(() => {
-  servidor.close();
-  fs.rmSync(carpeta, { recursive: true, force: true });
-});
+const { llamar, sinSesion } = fabricaDePrueba('api', { admin, sinAdmin: true });
 
 test('un sistema recien instalado se reporta como no configurado', async () => {
   const { json } = await llamar('/api/auth/estado-inicial');
@@ -85,10 +51,7 @@ test('el servidor responde y reporta su version', async () => {
 });
 
 test('sin sesion no se pueden ver los usuarios', async () => {
-  const guardada = cookie;
-  cookie = '';
-  const { estado } = await llamar('/api/usuarios');
-  cookie = guardada;
+  const { estado } = await sinSesion(() => llamar('/api/usuarios'));
   assert.equal(estado, 401);
 });
 

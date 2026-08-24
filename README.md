@@ -3,7 +3,7 @@
 Sistema para la fábrica de hielo de Hunucmá, Yucatán.
 Se construye **por versiones**: cada versión es un pedazo terminado, probado y usable.
 
-**Versión actual: v1.6**
+**Versión actual: v1.6.1**
 
 ---
 
@@ -128,9 +128,31 @@ public/                La interfaz (HTML, CSS y JavaScript sin librerías)
   js/vistas/           Una pantalla por archivo
 
 herramientas/          Utilidades del proyecto (genera el icono)
-pruebas/               Pruebas automáticas
+pruebas/
+  ayudante.js          ⭐ La fábrica de mentira que usan todas las pruebas
+  *.test.js            Una por módulo
 datos/                 Base de datos, respaldos, logo y fotos (no se sube a GitHub)
 ```
+
+### Las pruebas
+
+Corren con `npm run prueba`: **279 pruebas en unos 5 segundos**, cada archivo
+en su propio proceso y todos a la vez.
+
+Cada archivo levanta su propia fábrica de mentira —carpeta nueva, base nueva,
+servidor propio— con una sola línea:
+
+```js
+const { llamar, entrarAdmin, bd } = fabricaDePrueba('ventas');
+```
+
+Lo que ese archivo necesite listo antes va en `preparar()`, **nunca en un
+segundo `test.before`**: los `before` de Node no se esperan entre sí, arrancan
+a la vez, y eso produce fallas que aparecen y desaparecen solas.
+
+Lo que se prueba es lo que puede costar dinero: que el folio no se repita, que
+un corte cerrado no cambie, que el saldo de un cliente se calcule y no se
+guarde, que lo agotado no se venda. No se prueba que un botón sea azul.
 
 ### La idea de fondo
 
@@ -493,6 +515,7 @@ versión nueva le aparece un punto rojo en el menú.
 | **v1.4** | Editar sin formularios, recuperar bajas, márgenes | ✅ listo |
 | **v1.5** | Avisos de inventario, no vender lo que no hay, más pantalla para vender | ✅ listo |
 | **v1.6** | Clientes registrados, crédito y cobranza | ✅ listo |
+| **v1.6.1** | Sin etiquetas de teclado en el celular; pruebas sin copy-paste | ✅ listo |
 | v1.7 | Reparto, pedidos y neveras en comodato | siguiente |
 | v1.8 | Planta de agua: garrafones, botellas y depósitos | |
 | v1.9 | Mantenimiento: compresores, ósmosis, membranas, horario punta | |

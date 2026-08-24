@@ -12,45 +12,12 @@
  */
 const test = require('node:test');
 const assert = require('node:assert');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
+const { fabricaDePrueba } = require('./ayudante');
 
-const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'fabrica-venta-'));
-process.env.CARPETA_DATOS = carpeta;
-process.env.ARCHIVO_BD = path.join(carpeta, 'prueba.db');
+const { llamar, entrarAdmin, entrarPorNombre, bd, preparar } = fabricaDePrueba('venta');
 
-const { migrar } = require('../src/db/migrar');
-const { crearApp } = require('../src/servidor');
-const { bd } = require('../src/db/conexion');
+let tanqueId, almacenId;
 
-migrar({ silencioso: true });
-
-let servidor, base, cookie = '', tanqueId, almacenId;
-
-async function llamar(ruta, opciones = {}) {
-  const r = await fetch(base + ruta, {
-    headers: { 'Content-Type': 'application/json', ...(cookie ? { cookie } : {}) },
-    ...opciones,
-    body: opciones.cuerpo ? JSON.stringify(opciones.cuerpo) : undefined
-  });
-  const set = r.headers.get('set-cookie');
-  if (set) cookie = set.split(';')[0];
-  return { estado: r.status, json: await r.json() };
-}
-
-async function entrarAdmin() {
-  await llamar('/api/auth/entrar-contrasena', {
-    method: 'POST', cuerpo: { usuario: 'tony', contrasena: 'clavelarga1' }
-  });
-}
-
-async function entrarPorNombre(nombre, pin) {
-  const lista = (await llamar('/api/auth/usuarios-disponibles')).json.datos.usuarios;
-  const u = lista.find((x) => x.nombre === nombre);
-  await llamar('/api/auth/entrar-pin', { method: 'POST', cuerpo: { usuarioId: u.id, pin } });
-  return u;
-}
 
 /** Vende y devuelve la venta ya guardada. */
 async function vender(dieciseisavos, extra = {}) {
@@ -61,16 +28,7 @@ async function vender(dieciseisavos, extra = {}) {
   return r;
 }
 
-test.before(async () => {
-  servidor = crearApp().listen(0);
-  await new Promise((r) => servidor.once('listening', r));
-  base = `http://127.0.0.1:${servidor.address().port}`;
-
-  await llamar('/api/auth/configuracion-inicial', {
-    method: 'POST',
-    cuerpo: { nombre: 'Tony', usuario: 'tony', contrasena: 'clavelarga1', pin: '1111' }
-  });
-
+preparar(async () => {
   const t = await llamar('/api/tanques', {
     method: 'POST',
     cuerpo: { nombre: '2N', panos: 6, plantilla: [3, 3], horasCongelacion: 24 }
@@ -82,11 +40,6 @@ test.before(async () => {
   await llamar('/api/usuarios', { method: 'POST', cuerpo: { nombre: 'Rosa', rol: 'cajero', pin: '4444' } });
   await llamar('/api/usuarios', { method: 'POST', cuerpo: { nombre: 'Mari', rol: 'gerente', pin: '7777' } });
   await llamar('/api/usuarios', { method: 'POST', cuerpo: { nombre: 'Chema', rol: 'operario', pin: '5555' } });
-});
-
-test.after(() => {
-  servidor.close();
-  fs.rmSync(carpeta, { recursive: true, force: true });
 });
 
 // ============================================================
@@ -377,7 +330,7 @@ test('el gerente sí puede cancelar', async () => {
   assert.equal(r.estado, 200);
 });
 
-test('un operario no entra a la caja', async () => {
+test('un operario no puede vender ni ver tickets', async () => {
   await entrarAdmin();
   await entrarPorNombre('Chema', '5555');
 

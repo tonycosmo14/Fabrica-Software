@@ -11,6 +11,38 @@ solo para arreglos de algo que ya estaba, o para cambios de puro aspecto.
 
 ---
 
+## v1.6.1 — Sin teclas en el celular · 24 de agosto de 2026
+
+Sin migración. Un arreglo de aspecto y una limpieza por dentro.
+
+### En el teléfono no hay F10
+
+La pantalla de venta enseñaba las teclas rápidas también en el celular:
+`F2`, `F3`, `F4`, `F10`, `Enter` y el `Esc ·` de cada botón de volver. En un
+teléfono ninguna de esas teclas existe, así que eran tres renglones y un
+puñado de etiquetas ocupando sitio sin decir nada.
+
+- **arreglo** — Todas se esconden por debajo de 620 px de ancho: el renglón de pistas de abajo, las etiquetas pegadas a los botones y el prefijo `Esc ·`, que ahora va en su propio `<span class="tecla-dice">` para poder ocultarlo. El reloj y el nombre del negocio se quedan.
+- En PC y en tableta no cambia nada.
+
+### Las pruebas, sin el copy-paste
+
+Tony preguntó si 279 pruebas no eran demasiadas. Medido: **279 pruebas en 5.4
+segundos**, cada archivo en su proceso y todos a la vez. Ni son muchas para
+un sistema que maneja dinero, ni son lentas.
+
+Lo que sí sobraba era el **arranque repetido**: dieciséis archivos con los
+mismos treinta y cinco renglones para crear una carpeta temporal, migrar,
+levantar el servidor y escribir `llamar()`. Ochocientas líneas que no
+probaban nada y que había que corregir dieciséis veces.
+
+- **mejora** — Nuevo `pruebas/ayudante.js`: `fabricaDePrueba('ventas')` devuelve `llamar`, `entrarAdmin`, `entrarPorNombre`, `bd` y demás, y se encarga de abrir y cerrar todo. **465 líneas menos en total**, con las mismas 279 pruebas.
+- **clave** — Se descubrió en el camino que **los `test.before` de Node no se esperan entre sí**: dos hooks en el mismo archivo arrancan a la vez. Por eso el ayudante tiene UNO solo y lo que cada archivo necesita preparar se registra con `preparar()`. Si alguien lo intenta con un segundo `test.before`, `llamar()` falla con el motivo escrito en claro.
+- **mejora** — El `llamar()` compartido ya no revienta con respuestas que no son JSON (un PNG, un ticket en bytes): devuelve `json: null` y las cabeceras.
+- **mejora** — Auditadas las 279 una por una: **ninguna está obsoleta**. Se renombró una que mentía (`ventas.test.js` decía "un operario no entra a la caja" y lo que prueba es que no puede vender).
+
+---
+
 ## v1.6 — Clientes y crédito · 24 de agosto de 2026
 
 Migración `015_clientes.sql`.

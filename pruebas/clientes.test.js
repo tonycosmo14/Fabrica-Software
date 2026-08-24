@@ -15,45 +15,12 @@
  */
 const test = require('node:test');
 const assert = require('node:assert');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
+const { fabricaDePrueba } = require('./ayudante');
 
-const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'fabrica-clientes-'));
-process.env.CARPETA_DATOS = carpeta;
-process.env.ARCHIVO_BD = path.join(carpeta, 'prueba.db');
+const { llamar, entrarAdmin, entrarPorNombre, bd, preparar } = fabricaDePrueba('clientes');
 
-const { migrar } = require('../src/db/migrar');
-const { crearApp } = require('../src/servidor');
-const { bd } = require('../src/db/conexion');
+let mary, publico;
 
-migrar({ silencioso: true });
-
-let servidor, base, cookie = '', mary, publico;
-
-async function llamar(ruta, opciones = {}) {
-  const r = await fetch(base + ruta, {
-    headers: { 'Content-Type': 'application/json', ...(cookie ? { cookie } : {}) },
-    ...opciones,
-    body: opciones.cuerpo ? JSON.stringify(opciones.cuerpo) : undefined
-  });
-  const set = r.headers.get('set-cookie');
-  if (set) cookie = set.split(';')[0];
-  return { estado: r.status, json: await r.json() };
-}
-
-async function entrarAdmin() {
-  await llamar('/api/auth/entrar-contrasena', {
-    method: 'POST', cuerpo: { usuario: 'tony', contrasena: 'clavelarga1' }
-  });
-}
-
-async function entrarPorNombre(nombre, pin) {
-  const lista = (await llamar('/api/auth/usuarios-disponibles')).json.datos.usuarios;
-  const u = lista.find((x) => x.nombre === nombre);
-  await llamar('/api/auth/entrar-pin', { method: 'POST', cuerpo: { usuarioId: u.id, pin } });
-  return u;
-}
 
 /** Fía una marqueta ($264) al cliente. */
 async function fiar(clienteId, dieciseisavos = 16, extra = {}) {
@@ -65,16 +32,7 @@ async function fiar(clienteId, dieciseisavos = 16, extra = {}) {
 
 const ficha = async (id) => (await llamar(`/api/clientes/${id}`)).json.datos;
 
-test.before(async () => {
-  servidor = crearApp().listen(0);
-  await new Promise((r) => servidor.once('listening', r));
-  base = `http://127.0.0.1:${servidor.address().port}`;
-
-  await llamar('/api/auth/configuracion-inicial', {
-    method: 'POST',
-    cuerpo: { nombre: 'Tony', usuario: 'tony', contrasena: 'clavelarga1', pin: '1111' }
-  });
-
+preparar(async () => {
   for (const [nombre, rol, pin] of [
     ['Mari', 'cajero', '7777'], ['Lupe', 'gerente', '8888'], ['Chema', 'operario', '5555']
   ]) {
@@ -90,11 +48,6 @@ test.before(async () => {
   publico = (await llamar('/api/clientes', {
     method: 'POST', cuerpo: { nombre: 'Don Beto' }   // sin límite ni plazo
   })).json.datos.cliente;
-});
-
-test.after(() => {
-  servidor.close();
-  fs.rmSync(carpeta, { recursive: true, force: true });
 });
 
 // ============================================================

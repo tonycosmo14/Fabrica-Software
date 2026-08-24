@@ -2001,9 +2001,16 @@ body.pantalla-fija main {
   .pos-rapidos { margin-left: auto; }
   .pos-aviso { width: 48px; min-width: 48px; max-width: 48px; }
   .pos-chico { width: 42px; min-width: 42px; max-width: 42px; }
-  /* Sin teclado no hay teclas que recordar: tres renglones de pistas que
-     en un teléfono solo estorban. El reloj y el negocio sí se quedan. */
+  /* SIN TECLADO NO HAY TECLAS QUE RECORDAR.
+     En un teléfono no existen F2, F10 ni Esc, así que cada etiqueta que las
+     nombra es un renglón que no sirve y que le quita sitio a los botones.
+     Se van todas: el renglón de pistas de abajo y las etiquetas pegadas a
+     cada botón. El reloj y el nombre del negocio sí se quedan. */
   .pos-teclas { display: none; }
+  .pos-cobrar small,
+  .pos-confirmar small { display: none; }
+  /* "Esc · volver" se queda en "volver": en el teléfono no hay Esc. */
+  .tecla-dice { display: none; }
 }
 
 .pos-lista-avisos .lista-tickets { max-height: 46vh; overflow-y: auto; }

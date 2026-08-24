@@ -4,55 +4,16 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
-const os = require('node:os');
 const path = require('node:path');
+const { fabricaDePrueba } = require('./ayudante');
 
-const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'fabrica-marca-'));
-process.env.CARPETA_DATOS = carpeta;
-process.env.ARCHIVO_BD = path.join(carpeta, 'prueba.db');
-
-const { migrar } = require('../src/db/migrar');
-const { crearApp } = require('../src/servidor');
-
-migrar({ silencioso: true });
+const { llamar, carpeta, preparar } = fabricaDePrueba('marca');
 
 // PNG mínimo real de 1x1, para tener bytes con firma válida.
 const PNG_1X1 = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
   'base64');
 
-let servidor, base, cookie = '';
-
-async function llamar(ruta, opciones = {}) {
-  const r = await fetch(base + ruta, {
-    headers: { 'Content-Type': 'application/json', ...(cookie ? { cookie } : {}) },
-    ...opciones,
-    body: opciones.cuerpo ? JSON.stringify(opciones.cuerpo) : undefined
-  });
-  const set = r.headers.get('set-cookie');
-  if (set) cookie = set.split(';')[0];
-  const tipo = r.headers.get('content-type') || '';
-  return {
-    estado: r.status,
-    cabeceras: r.headers,
-    json: tipo.includes('json') ? await r.json() : null
-  };
-}
-
-test.before(async () => {
-  servidor = crearApp().listen(0);
-  await new Promise((r) => servidor.once('listening', r));
-  base = `http://127.0.0.1:${servidor.address().port}`;
-  await llamar('/api/auth/configuracion-inicial', {
-    method: 'POST',
-    cuerpo: { nombre: 'Tony', usuario: 'tony', contrasena: 'clavelarga1', pin: '1234' }
-  });
-});
-
-test.after(() => {
-  servidor.close();
-  fs.rmSync(carpeta, { recursive: true, force: true });
-});
 
 test('sin logo puesto, la ruta del logo responde 404', async () => {
   const r = await llamar('/marca/logo');

@@ -10,48 +10,17 @@
  */
 const test = require('node:test');
 const assert = require('node:assert');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
+const { fabricaDePrueba } = require('./ayudante');
 
-const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'fabrica-prod-'));
-process.env.CARPETA_DATOS = carpeta;
-process.env.ARCHIVO_BD = path.join(carpeta, 'prueba.db');
+const { llamar, entrarAdmin, entrarPorNombre, bd, preparar } = fabricaDePrueba('prod');
 
-const { migrar } = require('../src/db/migrar');
-const { crearApp } = require('../src/servidor');
-const { bd } = require('../src/db/conexion');
+let tanqueId, panos, operarioId;
 
-migrar({ silencioso: true });
-
-let servidor, base, cookie = '', tanqueId, panos, operarioId;
-
-async function llamar(ruta, opciones = {}) {
-  const r = await fetch(base + ruta, {
-    headers: { 'Content-Type': 'application/json', ...(cookie ? { cookie } : {}) },
-    ...opciones,
-    body: opciones.cuerpo ? JSON.stringify(opciones.cuerpo) : undefined
-  });
-  const set = r.headers.get('set-cookie');
-  if (set) cookie = set.split(';')[0];
-  return { estado: r.status, json: await r.json() };
-}
 
 /** Entra como el admin. Las pruebas dicen SIEMPRE quién está usando la
  *  pantalla: si no, cada prueba hereda la sesión de la anterior y el orden
  *  en que se escriben cambia el resultado. */
-async function entrarAdmin() {
-  await llamar('/api/auth/entrar-contrasena', {
-    method: 'POST', cuerpo: { usuario: 'tony', contrasena: 'clavelarga1' }
-  });
-}
 
-async function entrarPorNombre(nombre, pin) {
-  const { json } = await llamar('/api/auth/usuarios-disponibles');
-  const u = json.datos.usuarios.find((x) => x.nombre === nombre);
-  await llamar('/api/auth/entrar-pin', { method: 'POST', cuerpo: { usuarioId: u.id, pin } });
-  return u;
-}
 
 function idAdmin() {
   return bd.prepare("SELECT id FROM usuarios WHERE usuario = 'tony'").get().id;
@@ -62,16 +31,7 @@ async function estadoTanque() {
   return json.datos;
 }
 
-test.before(async () => {
-  servidor = crearApp().listen(0);
-  await new Promise((r) => servidor.once('listening', r));
-  base = `http://127.0.0.1:${servidor.address().port}`;
-
-  await llamar('/api/auth/configuracion-inicial', {
-    method: 'POST',
-    cuerpo: { nombre: 'Tony', usuario: 'tony', contrasena: 'clavelarga1', pin: '1111' }
-  });
-
+preparar(async () => {
   const r = await llamar('/api/tanques', {
     method: 'POST',
     cuerpo: { nombre: '2N', panos: 6, plantilla: [3, 3], horasCongelacion: 24 }
@@ -83,11 +43,6 @@ test.before(async () => {
     method: 'POST', cuerpo: { nombre: 'Don Chema', rol: 'operario', pin: '2222' }
   });
   operarioId = o.json.datos.usuario.id;
-});
-
-test.after(() => {
-  servidor.close();
-  fs.rmSync(carpeta, { recursive: true, force: true });
 });
 
 test('el primero de la rotación es el paño 1', async () => {

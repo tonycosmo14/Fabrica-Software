@@ -330,7 +330,7 @@ export async function vistaVenta(pantalla, estadoApp) {
         </div>
         <div class="fila-botones" style="margin-top:12px">
           <button class="secundario crece" id="apartar-esta">Apartar la de ahora</button>
-          <button class="secundario crece" id="cerrar-espera">Esc · volver</button>
+          <button class="secundario crece" id="cerrar-espera"><span class="tecla-dice">Esc · </span>volver</button>
         </div>
       </div>`;
 
@@ -506,7 +506,7 @@ export async function vistaVenta(pantalla, estadoApp) {
             || '<p class="vacio" style="padding:20px 0">No falta nada.</p>'}
         </div>
         <button class="secundario" id="cerrar-avisos" style="margin-top:12px;width:100%">
-          Esc · volver a vender
+          <span class="tecla-dice">Esc · </span>volver a vender
         </button>
       </div>`;
     refs.cobro.querySelector('#cerrar-avisos').onclick = cerrarAvisos;
@@ -546,7 +546,7 @@ export async function vistaVenta(pantalla, estadoApp) {
             : 'Todavía nadie ha capturado producción. Por eso marca en cero.'}
         </p>
         <button class="secundario" id="cerrar-avisos" style="margin-top:14px;width:100%">
-          Esc · volver a vender
+          <span class="tecla-dice">Esc · </span>volver a vender
         </button>
       </div>`;
     refs.cobro.querySelector('#cerrar-avisos').onclick = cerrarAvisos;
@@ -630,7 +630,7 @@ export async function vistaVenta(pantalla, estadoApp) {
           ${filas.join('') || '<p class="vacio" style="padding:20px 0">Todavía no hay movimientos.</p>'}
         </div>
         <button class="secundario" id="cerrar-avisos" style="margin-top:12px;width:100%">
-          Esc · volver a vender
+          <span class="tecla-dice">Esc · </span>volver a vender
         </button>
       </div>`;
 
@@ -1045,7 +1045,7 @@ export async function vistaVenta(pantalla, estadoApp) {
             </button>`}`}
 
         <button class="secundario" id="salir-cobro" style="margin-top:10px;width:100%">
-          Esc · volver al ticket
+          <span class="tecla-dice">Esc · </span>volver al ticket
         </button>
       </div>`;
 
@@ -1134,7 +1134,7 @@ export async function vistaVenta(pantalla, estadoApp) {
           Mejor cobrarle
         </button>
         <button class="secundario" id="salir-cobro" style="margin-top:10px;width:100%">
-          Esc · volver al ticket
+          <span class="tecla-dice">Esc · </span>volver al ticket
         </button>
       </div>`;
 
@@ -1188,7 +1188,7 @@ export async function vistaVenta(pantalla, estadoApp) {
                    : 'Todavía no hay clientes dados de alta.'}</p>`}
         </div>
         <button class="secundario" id="cerrar-clientes" style="margin-top:12px;width:100%">
-          Esc · volver al cobro
+          <span class="tecla-dice">Esc · </span>volver al cobro
         </button>
       </div>`;
 
@@ -1357,7 +1357,7 @@ export async function vistaVenta(pantalla, estadoApp) {
           <span>🖨️ Imprimir ticket</span><small>Enter</small>
         </button>
         <button class="secundario" id="siguiente" style="margin-top:10px;width:100%">
-          Esc · ${enEspera.length ? 'volver a la venta pendiente' : 'siguiente venta'}
+          <span class="tecla-dice">Esc · </span>${enEspera.length ? 'volver a la venta pendiente' : 'siguiente venta'}
         </button>
       </div>`;
 
@@ -1530,7 +1530,7 @@ export async function vistaVenta(pantalla, estadoApp) {
                placeholder="Número, monto u hora" value="${esc(busca)}" style="margin:0">
         <div id="lista-tickets" class="lista-tickets"><p class="ayuda">Buscando…</p></div>
         <button class="secundario" id="cerrar-historial" style="margin-top:12px;width:100%">
-          Esc · volver a vender
+          <span class="tecla-dice">Esc · </span>volver a vender
         </button>
       </div>`;
 

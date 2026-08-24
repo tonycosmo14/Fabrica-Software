@@ -9,38 +9,12 @@
  */
 const test = require('node:test');
 const assert = require('node:assert');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
+const { fabricaDePrueba } = require('./ayudante');
 
-const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'fabrica-cambio-'));
-process.env.CARPETA_DATOS = carpeta;
-process.env.ARCHIVO_BD = path.join(carpeta, 'prueba.db');
+const { llamar, entrarAdmin, bd, preparar } = fabricaDePrueba('cambio');
 
-const { migrar } = require('../src/db/migrar');
-const { crearApp } = require('../src/servidor');
-const { bd } = require('../src/db/conexion');
+let almacenId;
 
-migrar({ silencioso: true });
-
-let servidor, base, cookie = '', almacenId;
-
-async function llamar(ruta, opciones = {}) {
-  const r = await fetch(base + ruta, {
-    headers: { 'Content-Type': 'application/json', ...(cookie ? { cookie } : {}) },
-    ...opciones,
-    body: opciones.cuerpo ? JSON.stringify(opciones.cuerpo) : undefined
-  });
-  const set = r.headers.get('set-cookie');
-  if (set) cookie = set.split(';')[0];
-  return { estado: r.status, json: await r.json() };
-}
-
-async function entrarAdmin() {
-  await llamar('/api/auth/entrar-contrasena', {
-    method: 'POST', cuerpo: { usuario: 'tony', contrasena: 'clavelarga1' }
-  });
-}
 
 /** Vende y devuelve la venta. */
 async function vender(dieciseisavos, extra = {}) {
@@ -53,21 +27,9 @@ async function vender(dieciseisavos, extra = {}) {
 const esperadoCaja = async () =>
   (await llamar('/api/caja')).json.datos.abierta.esperado;
 
-test.before(async () => {
-  servidor = crearApp().listen(0);
-  await new Promise((r) => servidor.once('listening', r));
-  base = `http://127.0.0.1:${servidor.address().port}`;
-  await llamar('/api/auth/configuracion-inicial', {
-    method: 'POST',
-    cuerpo: { nombre: 'Tony', usuario: 'tony', contrasena: 'clavelarga1', pin: '1111' }
-  });
+preparar(async () => {
   await llamar('/api/auth/yo');                 // abre el turno
   almacenId = (await llamar('/api/existencia/almacenes')).json.datos.almacenes[0].id;
-});
-
-test.after(() => {
-  servidor.close();
-  fs.rmSync(carpeta, { recursive: true, force: true });
 });
 
 // ============================================================

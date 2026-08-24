@@ -13,44 +13,16 @@
  */
 const test = require('node:test');
 const assert = require('node:assert');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
+const { fabricaDePrueba } = require('./ayudante');
 
-const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'fabrica-avisos-'));
-process.env.CARPETA_DATOS = carpeta;
-process.env.ARCHIVO_BD = path.join(carpeta, 'prueba.db');
+const { llamar, preparar } = fabricaDePrueba('avisos');
 
-const { migrar } = require('../src/db/migrar');
-const { crearApp } = require('../src/servidor');
+let catId, coca, agua;
 
-migrar({ silencioso: true });
-
-let servidor, base, cookie = '', catId, coca, agua;
-
-async function llamar(ruta, opciones = {}) {
-  const r = await fetch(base + ruta, {
-    headers: { 'Content-Type': 'application/json', ...(cookie ? { cookie } : {}) },
-    ...opciones,
-    body: opciones.cuerpo ? JSON.stringify(opciones.cuerpo) : undefined
-  });
-  const set = r.headers.get('set-cookie');
-  if (set) cookie = set.split(';')[0];
-  return { estado: r.status, json: await r.json() };
-}
 
 const avisos = async () => (await llamar('/api/inventario/avisos')).json.datos;
 
-test.before(async () => {
-  servidor = crearApp().listen(0);
-  await new Promise((r) => servidor.once('listening', r));
-  base = `http://127.0.0.1:${servidor.address().port}`;
-
-  await llamar('/api/auth/configuracion-inicial', {
-    method: 'POST',
-    cuerpo: { nombre: 'Tony', usuario: 'tony', contrasena: 'clavelarga1', pin: '1111' }
-  });
-
+preparar(async () => {
   catId = (await llamar('/api/catalogo/categorias', {
     method: 'POST', cuerpo: { nombre: 'Refrescos' }
   })).json.datos.categoria.id;
@@ -67,11 +39,6 @@ test.before(async () => {
     cuerpo: { nombre: 'Agua 1 L', categoriaId: catId, tipo: 'simple',
               precio: 10, codigo: 'AGUA' }
   })).json.datos.producto;
-});
-
-test.after(() => {
-  servidor.close();
-  fs.rmSync(carpeta, { recursive: true, force: true });
 });
 
 // ============================================================

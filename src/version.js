@@ -17,9 +17,22 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '1.6';
+const VERSION_ACTUAL = '1.6.1';
 
 const VERSIONES = [
+  {
+    numero: '1.6.1',
+    nombre: 'Sin teclas en el celular',
+    fecha: '2026-08-24',
+    resumen:
+      'En el teléfono ya no salen las teclas que no existen, y por dentro ' +
+      'las pruebas se limpiaron.',
+    cambios: [
+      { tipo: 'arreglo', texto: 'En el celular desaparecen las etiquetas de teclado: F2, F3, F4, F10, Enter y el "Esc ·" de los botones. En un teléfono no hay esas teclas, así que solo estorbaban. En la PC y en tableta siguen igual.' },
+      { tipo: 'mejora', texto: 'Por dentro: las pruebas automáticas ya no repiten treinta y cinco renglones de arranque en cada archivo. Son 465 líneas menos, las mismas 279 pruebas y los mismos 5 segundos.' }
+    ],
+    siguiente: 'v1.7 — Reparto: pedidos, rutas y neveras en comodato.'
+  },
   {
     numero: '1.6',
     nombre: 'Clientes y crédito',

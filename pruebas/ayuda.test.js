@@ -7,47 +7,11 @@
  */
 const test = require('node:test');
 const assert = require('node:assert');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
-
-const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'fabrica-ayuda-'));
-process.env.CARPETA_DATOS = carpeta;
-process.env.ARCHIVO_BD = path.join(carpeta, 'prueba.db');
-
-const { migrar } = require('../src/db/migrar');
-const { crearApp } = require('../src/servidor');
+const { fabricaDePrueba } = require('./ayudante');
 const { puede } = require('../src/lib/roles');
 
-migrar({ silencioso: true });
+const { llamar, preparar, sinSesion } = fabricaDePrueba('ayuda');
 
-let servidor, base, cookie = '';
-
-async function llamar(ruta, opciones = {}) {
-  const r = await fetch(base + ruta, {
-    headers: { 'Content-Type': 'application/json', ...(cookie ? { cookie } : {}) },
-    ...opciones,
-    body: opciones.cuerpo ? JSON.stringify(opciones.cuerpo) : undefined
-  });
-  const set = r.headers.get('set-cookie');
-  if (set) cookie = set.split(';')[0];
-  return { estado: r.status, json: await r.json() };
-}
-
-test.before(async () => {
-  servidor = crearApp().listen(0);
-  await new Promise((r) => servidor.once('listening', r));
-  base = `http://127.0.0.1:${servidor.address().port}`;
-  await llamar('/api/auth/configuracion-inicial', {
-    method: 'POST',
-    cuerpo: { nombre: 'Tony', usuario: 'tony', contrasena: 'clavelarga1', pin: '1111' }
-  });
-});
-
-test.after(() => {
-  servidor.close();
-  fs.rmSync(carpeta, { recursive: true, force: true });
-});
 
 test('la tabla de permisos dice la verdad, rol por rol', async () => {
   const { json } = await llamar('/api/ayuda/permisos');
@@ -91,9 +55,6 @@ test('cada acción descrita corresponde a un permiso que alguien tiene', async (
 });
 
 test('la ayuda pide sesión: no se lee desde fuera', async () => {
-  const guardada = cookie;
-  cookie = '';
-  const r = await llamar('/api/ayuda/permisos');
+  const r = await sinSesion(() => llamar('/api/ayuda/permisos'));
   assert.equal(r.estado, 401);
-  cookie = guardada;
 });

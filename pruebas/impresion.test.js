@@ -9,32 +9,14 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
-const os = require('node:os');
 const path = require('node:path');
-
-const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'fabrica-imp-'));
-process.env.CARPETA_DATOS = carpeta;
-process.env.ARCHIVO_BD = path.join(carpeta, 'prueba.db');
-
-const { migrar } = require('../src/db/migrar');
-const { crearApp } = require('../src/servidor');
+const { fabricaDePrueba } = require('./ayudante');
 const { Ticket } = require('../src/modulos/impresion/escpos');
 
-migrar({ silencioso: true });
+const { llamar, carpeta, preparar } = fabricaDePrueba('imp');
 
-let servidor, base, cookie = '';
 const salida = path.join(carpeta, 'impresora.bin');
 
-async function llamar(ruta, opciones = {}) {
-  const r = await fetch(base + ruta, {
-    headers: { 'Content-Type': 'application/json', ...(cookie ? { cookie } : {}) },
-    ...opciones,
-    body: opciones.cuerpo ? JSON.stringify(opciones.cuerpo) : undefined
-  });
-  const set = r.headers.get('set-cookie');
-  if (set) cookie = set.split(';')[0];
-  return { estado: r.status, json: await r.json() };
-}
 
 /**
  * El último renglón de papel de un ticket.
@@ -57,20 +39,6 @@ function limpiarPapel() {
   try { fs.unlinkSync(salida); } catch { /* no había */ }
 }
 
-test.before(async () => {
-  servidor = crearApp().listen(0);
-  await new Promise((r) => servidor.once('listening', r));
-  base = `http://127.0.0.1:${servidor.address().port}`;
-  await llamar('/api/auth/configuracion-inicial', {
-    method: 'POST',
-    cuerpo: { nombre: 'Tony', usuario: 'tony', contrasena: 'clavelarga1', pin: '1111' }
-  });
-});
-
-test.after(() => {
-  servidor.close();
-  fs.rmSync(carpeta, { recursive: true, force: true });
-});
 
 // ============================================================
 // LAS ÓRDENES ESC/POS

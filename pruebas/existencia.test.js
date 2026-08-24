@@ -8,38 +8,12 @@
  */
 const test = require('node:test');
 const assert = require('node:assert');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
+const { fabricaDePrueba } = require('./ayudante');
 
-const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), 'fabrica-exis-'));
-process.env.CARPETA_DATOS = carpeta;
-process.env.ARCHIVO_BD = path.join(carpeta, 'prueba.db');
+const { llamar, entrarAdmin, bd, preparar } = fabricaDePrueba('exis');
 
-const { migrar } = require('../src/db/migrar');
-const { crearApp } = require('../src/servidor');
-const { bd } = require('../src/db/conexion');
+let tanqueId, panos, almacenId;
 
-migrar({ silencioso: true });
-
-let servidor, base, cookie = '', tanqueId, panos, almacenId;
-
-async function llamar(ruta, opciones = {}) {
-  const r = await fetch(base + ruta, {
-    headers: { 'Content-Type': 'application/json', ...(cookie ? { cookie } : {}) },
-    ...opciones,
-    body: opciones.cuerpo ? JSON.stringify(opciones.cuerpo) : undefined
-  });
-  const set = r.headers.get('set-cookie');
-  if (set) cookie = set.split(';')[0];
-  return { estado: r.status, json: await r.json() };
-}
-
-async function entrarAdmin() {
-  await llamar('/api/auth/entrar-contrasena', {
-    method: 'POST', cuerpo: { usuario: 'tony', contrasena: 'clavelarga1' }
-  });
-}
 
 /** Saca el paño que toca en el tanque, sin pedir autorización. */
 async function sacarElQueToca() {
@@ -51,16 +25,7 @@ async function sacarElQueToca() {
   return json.datos.tanque.panos.find((p) => p.id === toca.id).total_moldes;
 }
 
-test.before(async () => {
-  servidor = crearApp().listen(0);
-  await new Promise((r) => servidor.once('listening', r));
-  base = `http://127.0.0.1:${servidor.address().port}`;
-
-  await llamar('/api/auth/configuracion-inicial', {
-    method: 'POST',
-    cuerpo: { nombre: 'Tony', usuario: 'tony', contrasena: 'clavelarga1', pin: '1111' }
-  });
-
+preparar(async () => {
   const r = await llamar('/api/tanques', {
     method: 'POST',
     cuerpo: { nombre: '2N', panos: 6, plantilla: [3, 3], horasCongelacion: 24 }
@@ -70,11 +35,6 @@ test.before(async () => {
 
   const a = await llamar('/api/existencia/almacenes');
   almacenId = a.json.datos.almacenes[0].id;
-});
-
-test.after(() => {
-  servidor.close();
-  fs.rmSync(carpeta, { recursive: true, force: true });
 });
 
 test('el sistema arranca con un cuarto frío listo', async () => {
