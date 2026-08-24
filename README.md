@@ -3,7 +3,7 @@
 Sistema para la fábrica de hielo de Hunucmá, Yucatán.
 Se construye **por versiones**: cada versión es un pedazo terminado, probado y usable.
 
-**Versión actual: v1.7**
+**Versión actual: v1.8**
 
 ---
 
@@ -348,6 +348,54 @@ caer.
 
 ---
 
+## Dar de baja, y borrar de verdad (v1.8)
+
+Son dos cosas distintas y la diferencia es del negocio:
+
+| | **Dar de baja** | **Eliminar** |
+|---|---|---|
+| Para qué | Lo de temporada, lo que va a volver | Lo que nunca debió estar |
+| Qué pasa | Deja de salir en la caja | Desaparece de la base |
+| Se recupera | Sí, cuando toca | No |
+| Quién | Gerente o administrador | **Solo el administrador** |
+| Con qué | Su PIN | **Su contraseña** |
+
+**Solo se puede eliminar lo que nunca se usó.** En cuanto un producto se
+vendió, su nombre vive en tickets ya cobrados y en las cuentas del día;
+borrarlo dejaría el histórico mintiendo. El servidor lo comprueba y
+responde diciendo qué hacer en su lugar. Lo mismo con un cliente que ya
+tiene movimientos y con una categoría que todavía tiene productos dentro.
+
+La contraseña y no el PIN es a propósito: el PIN se teclea veinte veces al
+día delante de quien sea y sirve para decir *"yo estoy aquí"*. Esto
+respalda algo que no se deshace.
+
+Y lo único que no se borra nunca es **la constancia de que alguien borró**.
+
+---
+
+## El Historial (v1.8)
+
+*"¿Qué hizo Mari el jueves entre las 3 y las 8?"*
+
+Ventas, gastos, entradas y abonos en una sola lista, filtrable por persona,
+por días, por horas y por tipo. Es lo único que un cajero puede hacer con
+el dinero, así que es lo único que hay que poder revisar.
+
+**Sale de las tablas de siempre, no de una copia.** No hay tabla
+`historial` que llenar: una copia se desincroniza el día que se cancele un
+ticket, y entonces el historial diría una cosa y la caja otra.
+
+Se agrupa por **quién capturó**, no por de quién era el turno: la pregunta
+es qué hizo esa persona, y quien tecleó el ticket es quien lo hizo (regla
+3.6, el relevo de las 2:30).
+
+**No es la bitácora.** La bitácora dice `venta.registrada` con un id y es
+para quien programa. Esto dice *"Mari cobró el ticket #412 por $264 a las
+3:15"*.
+
+---
+
 ## Clientes y crédito (v1.6)
 
 Regla de la fábrica: **se le fía solo a clientes registrados**, nunca al
@@ -517,8 +565,8 @@ versión nueva le aparece un punto rojo en el menú.
 | **v1.6** | Clientes registrados, crédito y cobranza | ✅ listo |
 | **v1.6.1** | Sin etiquetas de teclado en el celular; pruebas sin copy-paste | ✅ listo |
 | **v1.7** | Ajustes de la primera prueba a fondo: cantidades, F1, dinero sin decimales | ✅ listo |
-| v1.8 | Eliminar de verdad, y el módulo de Historial | siguiente |
-| v1.9 | Precios de mayoreo por cliente |  |
+| **v1.8** | Historial con filtros, y borrar de verdad | ✅ listo |
+| v1.9 | Mayoreo, corte en dos columnas y compartir por WhatsApp | siguiente |
 | v2.0 | Reparto, pedidos y neveras en comodato |  |
 | v2.1 | Planta de agua: garrafones, botellas y depósitos | |
 | v2.2 | Mantenimiento: compresores, ósmosis, membranas, horario punta | |

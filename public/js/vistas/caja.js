@@ -12,7 +12,7 @@
  */
 import { api } from '../api.js';
 import { esc, avisar, fecha as formatoFecha, soloHora, rango } from '../util.js';
-import { pedirTexto, pedirImporte, confirmar, menu } from '../dialogo.js';
+import { pedirTexto, pedirImporte, confirmar, menu, pedirContrasena } from '../dialogo.js';
 import { pesos, paraEditar } from '../fracciones.js';
 import { cargarMarca } from '../marca.js';
 
@@ -24,6 +24,9 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
                       estadoApp.permisos.includes('caja.operar');
   const puedeCorregir = estadoApp.permisos.includes('*') ||
                         estadoApp.permisos.includes('venta.cancelar');
+  // Anular deja el renglón tachado; borrar lo quita. Lo segundo es del
+  // administrador y con su contraseña.
+  const esAdmin = estadoApp.permisos.includes('*');
 
   const marca = await cargarMarca();
 
@@ -199,6 +202,10 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
                     <td class="quitar">
                       <button class="tachita" data-anular="${esc(m.id)}"
                               aria-label="Anular este movimiento">×</button>
+                      ${esAdmin ? `
+                        <button class="tachita borrar" data-borrar="${esc(m.id)}"
+                                title="Borrarlo de verdad"
+                                aria-label="Borrar este movimiento">🗑</button>` : ''}
                     </td>` : ''}
                 </tr>`).join('')}
             </table>`
@@ -230,6 +237,52 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
         } catch (err) { avisar(err.message, 'error'); }
       };
     });
+
+    pantalla.querySelectorAll('[data-borrar]').forEach((b) => {
+      b.onclick = () => borrarMovimiento(b.dataset.borrar);
+    });
+  }
+
+  /**
+   * BORRARLO DE VERDAD.
+   *
+   * Anular deja el renglón tachado con su motivo, y para el día a día es lo
+   * correcto: se ve qué pasó. Pero un gasto capturado tres veces por un
+   * dedazo deja tres renglones tachados en una lista que ya es larga.
+   */
+  async function borrarMovimiento(id) {
+    if (!await confirmar({
+      titulo: '¿Borrar este movimiento?',
+      texto: 'Desaparece de la lista y del cajón. Si lo que quieres es que se vea ' +
+             'qué pasó, mejor anúlalo: queda tachado con su motivo.',
+      ok: 'Sí, borrar', peligro: true
+    })) return;
+
+    try {
+      await api.borrar(`/caja/movimientos/${id}`, {});
+    } catch (e) {
+      if (!e.requiereContrasena) { avisar(e.message, 'error'); return; }
+
+      const clave = await pedirContrasena({
+        titulo: 'Borrar el movimiento',
+        texto: 'Borrar no se deshace, así que va con la contraseña del administrador.',
+        administradores: e.administradores || [],
+        aviso: e.turnoCerrado
+          ? `<strong>Es de un turno ya cortado (#${e.folio}).</strong> Los totales de ` +
+            'ese corte están congelados y no cambian, pero si lo vuelves a imprimir ' +
+            'la lista de movimientos ya no va a coincidir con el papel que se firmó.'
+          : '',
+        ok: 'Borrar'
+      });
+      if (!clave) return;
+
+      try {
+        await api.borrar(`/caja/movimientos/${id}`, { autorizacion: clave });
+      } catch (err) { avisar(err.message, 'error'); return; }
+    }
+
+    avisar('Movimiento borrado', 'bien');
+    pintar();
   }
 
   async function nuevoMovimiento(tipo) {

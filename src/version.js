@@ -17,9 +17,29 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '1.7';
+const VERSION_ACTUAL = '1.8';
 
 const VERSIONES = [
+  {
+    numero: '1.8',
+    nombre: 'Historial, y borrar de verdad',
+    fecha: '2026-08-24',
+    resumen:
+      'Una pantalla para revisar todo lo que ha pasado en la caja, y la ' +
+      'posibilidad de borrar lo que nunca debió estar.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'HISTORIAL, solo para el administrador. Todo lo que ha pasado en la caja: ventas, gastos, entradas y abonos, de quien sea y de cuando sea, en una sola lista.' },
+      { tipo: 'nuevo', texto: 'Se filtra por lo que uno se pregunta de verdad: por persona, por días, por horas y por tipo. "¿Qué hizo Mari el jueves entre las 3 y las 8?" son cuatro toques.' },
+      { tipo: 'nuevo', texto: 'Arriba, los cuatro números: cuánto se cobró, cuánto salió, cuánto entró y cuánto abonaron. Suman TODO lo que cae en el filtro, no solo lo que se alcanza a ver.' },
+      { tipo: 'importante', texto: 'ELIMINAR ya no es lo mismo que DAR DE BAJA. La baja es para lo de temporada: se recupera. Eliminar es para el producto de prueba, el que se dio de alta dos veces, el que ya no va a volver.' },
+      { tipo: 'importante', texto: 'PERO SOLO SE BORRA LO QUE NUNCA SE USÓ. En cuanto algo se vendió, su nombre está en tickets ya cobrados, y borrarlo dejaría el histórico mintiendo. Eso se da de baja, y el sistema lo dice con esas palabras.' },
+      { tipo: 'importante', texto: 'BORRAR PIDE LA CONTRASEÑA DEL ADMINISTRADOR, no un PIN. El PIN se teclea veinte veces al día delante de quien sea; esto no se deshace. Y solo el administrador: dar de baja lo puede hacer un gerente.' },
+      { tipo: 'nuevo', texto: 'El administrador también puede BORRAR UN GASTO capturado por error, en vez de dejarlo tachado. Si es de un turno ya cortado, la pantalla avisa antes de que el papel firmado deje de coincidir.' },
+      { tipo: 'nuevo', texto: 'Se pueden eliminar categorías vacías y clientes que nunca tuvieron movimientos.' },
+      { tipo: 'importante', texto: 'Lo único que no se borra nunca es la constancia de que alguien borró: todo queda en la bitácora con nombre y detalle.' }
+    ],
+    siguiente: 'v1.9 — Precios de mayoreo, corte en dos columnas y compartir por WhatsApp.'
+  },
   {
     numero: '1.7',
     nombre: 'La caja obedece',
@@ -43,7 +63,7 @@ const VERSIONES = [
       { tipo: 'importante', texto: 'Los CAJEROS ya pueden imprimir los números que siguen en los tanques. El obrero pregunta en el mostrador y ahí no siempre hay un gerente.' },
       { tipo: 'arreglo', texto: 'El ticket fiado se imprimía diciendo FIADO pero sin el nombre del cliente, que es justo lo que lo convierte en un vale.' }
     ],
-    siguiente: 'v1.8 — Eliminar de verdad, y el módulo de Historial.'
+    siguiente: 'v1.8 — Historial, y borrar de verdad.'
   },
   {
     numero: '1.6.1',

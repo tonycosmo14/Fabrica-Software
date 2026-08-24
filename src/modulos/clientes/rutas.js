@@ -19,6 +19,7 @@ const { ok, error } = require('../../lib/respuestas');
 const { leerPesos } = require('../../lib/dinero');
 const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
+const { comprobarAdmin, administradores } = require('../../lib/autorizacion');
 const { sesionAbierta } = require('../caja/calculo');
 const {
   estadoCliente, cuentaCorriente, clientesConEstado, resumenCartera
@@ -343,6 +344,47 @@ router.post('/abonos/:id/anular', corregir, (req, res) => {
   });
 
   return ok(res, { cliente: conEstado(clientePorId(a.cliente_id)) });
+});
+
+/**
+ * BORRAR UN CLIENTE DE VERDAD.
+ *
+ * Solo al que nunca tuvo movimientos: el que se dio de alta dos veces, el
+ * que se escribió mal. En cuanto alguien se llevó algo fiado o dejó un
+ * abono, su nombre está en tickets ya cobrados y en cuentas del día, y
+ * borrarlo dejaría el histórico mintiendo. A ese se le da de baja.
+ *
+ * Pide la CONTRASEÑA del administrador, no un PIN.
+ */
+router.delete('/:id', administrar, (req, res) => {
+  const c = clientePorId(req.params.id);
+  if (!c) return error(res, 'Ese cliente no existe.', 404);
+
+  const tickets = bd.prepare('SELECT COUNT(*) n FROM ventas WHERE cliente_id = ?').get(c.id).n;
+  const abonos = bd.prepare('SELECT COUNT(*) n FROM abonos WHERE cliente_id = ?').get(c.id).n;
+  if (tickets || abonos) {
+    return error(res,
+      `${c.nombre} ya tiene movimientos: ${tickets} ticket${tickets === 1 ? '' : 's'} ` +
+      `y ${abonos} abono${abonos === 1 ? '' : 's'}. Eso no se borra, porque su nombre ` +
+      'está en tickets ya cobrados. Dale de baja.',
+      409, { tickets, abonos, sugerencia: 'baja' });
+  }
+
+  const auth = comprobarAdmin(req.body?.autorizacion);
+  if (auth.error) {
+    return error(res, auth.error, 403, {
+      requiereContrasena: true, administradores: administradores()
+    });
+  }
+
+  bd.prepare('DELETE FROM clientes WHERE id = ?').run(c.id);
+  bitacora.registrar({
+    accion: 'cliente.eliminado', entidad: 'cliente', entidadId: c.id,
+    ejecutorId: auth.usuario.id, capturistaId: req.usuario.id,
+    detalle: { nombre: c.nombre }
+  });
+
+  return ok(res, { eliminado: c.nombre });
 });
 
 module.exports = router;

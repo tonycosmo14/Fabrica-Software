@@ -31,5 +31,8 @@ async function pedir(ruta, opciones = {}) {
 export const api = {
   obtener: (ruta) => pedir(ruta),
   enviar:  (ruta, cuerpo) => pedir(ruta, { method: 'POST', cuerpo }),
-  actualizar: (ruta, cuerpo) => pedir(ruta, { method: 'PUT', cuerpo })
+  actualizar: (ruta, cuerpo) => pedir(ruta, { method: 'PUT', cuerpo }),
+  // Borrar de verdad. Casi nada se borra en este sistema; lo que se puede,
+  // pide la contraseña del administrador y va por aquí.
+  borrar: (ruta, cuerpo) => pedir(ruta, { method: 'DELETE', cuerpo })
 };

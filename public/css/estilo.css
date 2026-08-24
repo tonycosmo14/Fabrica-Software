@@ -2020,6 +2020,61 @@ body.pantalla-fija main {
 
 .pos-lista-avisos .lista-tickets { max-height: 46vh; overflow-y: auto; }
 
+/* ---------- Historial (v1.8) ---------- */
+
+.hist-filtros { display: flex; flex-direction: column; gap: 12px; }
+.hist-fila { display: flex; gap: 12px; flex-wrap: wrap; }
+.hist-fila label { display: flex; flex-direction: column; gap: 3px; flex: 1 1 150px; min-width: 0; }
+.hist-fila input, .hist-fila select { margin: 0; }
+.hist-tipos { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Los cuatro números que se miran primero. */
+.hist-resumen {
+  display: grid; gap: 10px; margin: 14px 0;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+.hist-dato {
+  display: flex; flex-direction: column; gap: 1px;
+  padding: 12px 14px; border-radius: var(--radio);
+  background: var(--superficie); border: 1px solid var(--borde);
+}
+.hist-dato small { font-size: 11.5px; color: var(--suave); }
+.hist-dato strong {
+  font-size: 22px; font-weight: 800; line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Una tabla de revisar merece toda la pantalla: aquí se comparan renglones
+   de arriba abajo, y una columna estrecha obliga a partir cada dato. */
+.ancho-completo { max-width: none; }
+.ancho-completo .tarjeta, .ancho-completo .tabla { max-width: none; }
+
+.hist-tabla td { vertical-align: top; }
+/* La celda del tipo no se parte: "Entradas" en dos renglones no se lee. */
+.hist-tabla td:nth-child(2) { white-space: nowrap; width: 1%; }
+.hist-tabla small { display: block; font-size: 11.5px; color: var(--suave); }
+.hist-cuando { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.hist-importe { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hist-detalle { max-width: 320px; }
+.der { text-align: right; }
+
+/* Cada tipo con su color: se distinguen de reojo, sin leer. */
+.hist-tipo {
+  display: inline-block; white-space: nowrap;
+  padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700;
+}
+.hist-tipo.venta   { background: var(--et-cajero-f);     color: var(--et-cajero-t); }
+.hist-tipo.gasto   { background: var(--et-baja-f);       color: var(--et-baja-t); }
+.hist-tipo.entrada { background: var(--et-operario-f);   color: var(--et-operario-t); }
+.hist-tipo.abono   { background: var(--et-repartidor-f); color: var(--et-repartidor-t); }
+
+.hist-tabla .anulada { opacity: .55; }
+.hist-tabla .anulada .hist-importe { text-decoration: line-through; }
+
+/* La papelera vive junto a la tachita de anular; se ve que es otra cosa. */
+.tachita.borrar { background: transparent; border-color: var(--borde); font-size: 13px; }
+.tachita.borrar:hover { border-color: var(--rojo); }
+
 /* ---------- Ajustes de la v1.7 ---------- */
 
 /* La cantidad del ticket se toca para cambiarla: tiene que verse tocable. */

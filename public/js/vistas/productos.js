@@ -15,7 +15,8 @@
  */
 import { api } from '../api.js';
 import { esc, avisar, fecha as formatoFecha } from '../util.js';
-import { pedirTexto, pedirImporte, confirmar, menu, pedirAutorizacion } from '../dialogo.js';
+import { pedirTexto, pedirImporte, confirmar, menu,
+         pedirAutorizacion, pedirContrasena } from '../dialogo.js';
 import { aTexto, pesos, paraEditar } from '../fracciones.js';
 
 const FRACCIONES = [
@@ -34,6 +35,9 @@ export async function vistaProductos(pantalla, estadoApp) {
   const veCostos = puede('costos.ver');
   const mueve = puede('inventario.mover');
   const precios = puede('*');           // la lista de precios es del administrador
+  // Borrar de verdad es solo del administrador. Dar de baja se recupera;
+  // borrar no.
+  const esAdmin = estadoApp.permisos.includes('*');
 
   let catalogo, listas, inventario, existencia, alertas;
   let categoriaAbierta = ID_HIELO;
@@ -265,6 +269,8 @@ export async function vistaProductos(pantalla, estadoApp) {
           ${p.activo
             ? '<button class="secundario chico peligro" id="baja-prod">Dar de baja</button>'
             : '<button class="chico" id="alta-prod">Volver a dar de alta</button>'}
+          ${esAdmin
+            ? '<button class="secundario chico peligro" id="borrar-prod">Eliminar</button>' : ''}
         </div>` : ''}
 
       ${esDeHielo ? panelExistenciaHielo() : panelInventario(p, inv)}`;
@@ -564,6 +570,8 @@ export async function vistaProductos(pantalla, estadoApp) {
 
     const baja = q('#baja-prod');
     if (baja) baja.onclick = () => darDeBaja(seleccionado);
+    const borrar = q('#borrar-prod');
+    if (borrar) borrar.onclick = () => eliminarProducto(seleccionado);
     const alta = q('#alta-prod');
     if (alta) alta.onclick = () => darDeAlta(seleccionado);
     const activar = q('#activar-inv');
@@ -747,12 +755,18 @@ export async function vistaProductos(pantalla, estadoApp) {
   async function menuCategoria(c) {
     const que = await menu({
       titulo: c.nombre,
-      opciones: c.activo
-        ? [
-            { valor: 'abrir', texto: 'Ver y editar', detalle: 'Nombre, color e imagen' },
-            { valor: 'baja', texto: 'Dar de baja', detalle: 'Se lleva sus productos', peligro: true }
-          ]
-        : [{ valor: 'alta', texto: 'Volver a dar de alta' }]
+      opciones: [
+        ...(c.activo
+          ? [
+              { valor: 'abrir', texto: 'Ver y editar', detalle: 'Nombre, color e imagen' },
+              { valor: 'baja', texto: 'Dar de baja', detalle: 'Se lleva sus productos', peligro: true }
+            ]
+          : [{ valor: 'alta', texto: 'Volver a dar de alta' }]),
+        ...(esAdmin
+          ? [{ valor: 'borrar', texto: 'Eliminar',
+               detalle: 'Se borra de verdad. Solo si está vacía', peligro: true }]
+          : [])
+      ]
     });
     if (!que) return;
 
@@ -769,6 +783,8 @@ export async function vistaProductos(pantalla, estadoApp) {
       } catch (e) { avisar(e.message, 'error'); }
       return;
     }
+
+    if (que === 'borrar') { await eliminarCategoria(c); return; }
 
     const suyos = catalogo.productos.filter((p) => p.categoria_id === c.id && p.activo).length;
     if (!await confirmar({
@@ -870,6 +886,75 @@ export async function vistaProductos(pantalla, estadoApp) {
         cargar();
       } catch (err) { avisar(err.message, 'error'); }
     }
+  }
+
+  /**
+   * ELIMINAR DE VERDAD.
+   *
+   * Dar de baja es para lo de temporada: vuelve. Esto es para lo que nunca
+   * debió estar —el producto de prueba, el que se dio de alta dos veces—.
+   * El servidor solo lo permite si NUNCA se vendió: en cuanto algo salió en
+   * un ticket, su nombre vive ahí y borrarlo dejaría el histórico mintiendo.
+   */
+  async function eliminarCategoria(c) {
+    if (!await confirmar({
+      titulo: `¿Eliminar ${c.nombre}?`,
+      texto: 'Se borra de verdad. Solo se puede si ya no tiene productos dentro.',
+      ok: 'Sí, eliminar', peligro: true
+    })) return;
+
+    try {
+      await api.borrar(`/catalogo/categorias/${c.id}`, {});
+    } catch (e) {
+      if (!e.requiereContrasena) { avisar(e.message, 'error'); return; }
+      const clave = await pedirContrasena({
+        titulo: `Eliminar ${c.nombre}`,
+        texto: 'Borrar no se deshace, así que va con la contraseña del administrador.',
+        administradores: e.administradores || [], ok: 'Eliminar'
+      });
+      if (!clave) return;
+      try {
+        await api.borrar(`/catalogo/categorias/${c.id}`, { autorizacion: clave });
+      } catch (err) { avisar(err.message, 'error'); return; }
+    }
+
+    avisar(`${c.nombre} eliminada`, 'bien');
+    if (categoriaAbierta === c.id) categoriaAbierta = null;
+    seleccionado = null;
+    cargar();
+  }
+
+  async function eliminarProducto(p) {
+    if (!p) return;
+    if (!await confirmar({
+      titulo: `¿Eliminar ${p.nombre}?`,
+      texto: 'Se borra de verdad, no se puede recuperar. Si algún día hace falta, ' +
+             'se vuelve a dar de alta en dos segundos. Para lo de temporada, mejor ' +
+             'dale de baja.',
+      ok: 'Sí, eliminar', peligro: true
+    })) return;
+
+    try {
+      await api.borrar(`/catalogo/productos/${p.id}`, {});
+    } catch (e) {
+      if (!e.requiereContrasena) { avisar(e.message, 'error'); return; }
+
+      const clave = await pedirContrasena({
+        titulo: `Eliminar ${p.nombre}`,
+        texto: 'Borrar no se deshace, así que va con la contraseña del administrador.',
+        administradores: e.administradores || [],
+        ok: 'Eliminar'
+      });
+      if (!clave) return;
+
+      try {
+        await api.borrar(`/catalogo/productos/${p.id}`, { autorizacion: clave });
+      } catch (err) { avisar(err.message, 'error'); return; }
+    }
+
+    avisar(`${p.nombre} eliminado`, 'bien');
+    seleccionado = null;
+    cargar();
   }
 
   async function darDeAlta(p) {

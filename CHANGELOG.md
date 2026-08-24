@@ -11,6 +11,40 @@ solo para arreglos de algo que ya estaba, o para cambios de puro aspecto.
 
 ---
 
+## v1.8 — Historial, y borrar de verdad · 24 de agosto de 2026
+
+Sin migración. Dos cosas que se tocan entre sí.
+
+### Eliminar no es dar de baja
+
+La diferencia la puso Tony y es del negocio, no del programa:
+
+- Se da de **baja** lo de temporada, lo que va a volver. Sigue existiendo, deja de salir en la caja y se recupera cuando toca.
+- Se **elimina** lo que nunca debió estar: el producto de prueba, el que se dio de alta dos veces, el que ya no se va a vender jamás.
+
+- **clave** — **Solo se puede eliminar lo que NUNCA SE USÓ.** En cuanto algo se vendió, su nombre vive en tickets ya cobrados y en las cuentas del día; borrarlo dejaría el histórico mintiendo. El servidor lo comprueba (`vecesVendido`) y responde 409 con `sugerencia: 'baja'`, para que la pantalla no solo diga que no, sino qué hacer en su lugar.
+- **clave** — **Borrar pide la CONTRASEÑA del administrador**, no un PIN. El PIN se teclea veinte veces al día delante de quien sea: sirve para decir "yo estoy aquí", no para respaldar algo que no se deshace. Vive en `comprobarAdmin()` en `lib/autorizacion.js`, junto al `comprobar()` de siempre.
+- **nuevo** — `DELETE` de productos, categorías (solo vacías), clientes (solo sin movimientos) y movimientos del cajón.
+- **clave** — Un movimiento de un turno **ya cortado** sí se puede borrar, porque los totales del corte están congelados y no cambian. Pero la lista que se reimprima ya no coincidirá con el papel firmado, y la pantalla lo dice **antes** de preguntar la contraseña.
+- **clave** — Lo único que no se borra nunca es **la constancia de que alguien borró**: cada eliminación deja su renglón en la bitácora con quién autorizó y qué era.
+
+### El Historial
+
+`GET /historial`, solo con permiso `historial.ver` (hoy, solo el administrador).
+
+- **nuevo** — Ventas, gastos, entradas y abonos en una sola lista, del más nuevo al más viejo. Es lo único que un cajero puede hacer con el dinero, así que es lo único que hay que poder revisar.
+- **clave** — **Sale de las tablas de siempre, no de una copia.** No hay tabla `historial` que llenar: una copia se desincroniza el día que se cancele un ticket, y entonces el historial diría una cosa y la caja otra. Hay una prueba que cancela una venta y comprueba que el resumen baja solo.
+- **clave** — Se agrupa por `capturista_id`, no por `cajero_id`: la pregunta es *"¿qué hizo esta persona?"*, y quien tecleó el ticket es quien lo hizo, aunque el turno fuera de otro (regla 3.6, el relevo de las 2:30).
+- **nuevo** — Filtros por persona, por días, por horas y por tipo. `date()` y `time()` de SQLite, para poder preguntar "el jueves entre las 3 y las 8".
+- **clave** — Una fecha que no se entiende se **rechaza**, no se ignora: ignorarla daría una lista que parece filtrada y no lo está, que es la forma más fácil de sacar una conclusión equivocada.
+- **nuevo** — El resumen (cobrado, gastos, entradas, abonos) suma **todo lo que cae en el filtro**, no los 300 renglones que se enseñan. Si no, revisar un mes daría el total de la última página.
+
+### No es la bitácora
+
+La bitácora dice `venta.registrada` con un id y es para quien programa. El Historial dice *"Mari cobró el ticket #412 por $264 a las 3:15"* y es para Tony. Son dos preguntas distintas y por eso son dos pantallas distintas.
+
+---
+
 ## v1.7 — La caja obedece · 24 de agosto de 2026
 
 Sin migración. Todo esto sale de la primera prueba a fondo de Tony.

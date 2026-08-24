@@ -53,6 +53,7 @@ function crearApp() {
   app.use('/api/caja', require('./modulos/caja/rutas'));
   app.use('/api/ventas', require('./modulos/ventas/rutas'));
   app.use('/api/clientes', require('./modulos/clientes/rutas'));
+  app.use('/api/historial', require('./modulos/historial/rutas'));
   app.use('/api/ayuda', require('./modulos/ayuda/rutas'));
   app.use('/api/versiones', require('./modulos/versiones/rutas'));
   app.use('/api/sistema', require('./modulos/sistema/rutas'));

@@ -557,6 +557,89 @@ debería haber − contado = FALTA</pre>
 
   // ==========================================================
   {
+    id: 'historial',
+    titulo: 'Historial: revisar lo que se hizo',
+    busca: 'historial revisar auditar quién hizo qué cajero fecha hora filtro tickets gastos entradas abonos borrar eliminar dar de baja contraseña',
+    cuerpo: `
+      <p>La pantalla para contestar una pregunta: <em>"¿qué hizo Mari el jueves
+      entre las 3 y las 8?"</em>. Es <b>solo del administrador</b>: no porque
+      sea un secreto, sino porque es para revisar el trabajo de los demás.</p>
+
+      <h4>Qué se ve</h4>
+      <p>Todo lo que un cajero puede hacer con el dinero, que son cuatro cosas:</p>
+      <ul>
+        <li><b>🧾 Ventas</b> — lo que cobró</li>
+        <li><b>📤 Gastos</b> — lo que sacó del cajón</li>
+        <li><b>📥 Entradas</b> — lo que metió</li>
+        <li><b>💰 Abonos</b> — lo que le pagaron de una cuenta</li>
+      </ul>
+
+      <h4>Cómo se filtra</h4>
+      <p>Arriba: <b>desde y hasta qué día</b>, <b>desde y hasta qué hora</b>, y
+      <b>quién</b>. Los cuatro botones de colores prenden y apagan cada tipo.
+      <b>Hoy</b> pone las fechas de hoy de un toque, y <b>Quitar filtros</b>
+      deja todo como estaba.</p>
+
+      <h4>Los cuatro números de arriba</h4>
+      <p>Cuánto se cobró, cuánto salió, cuánto entró y cuánto abonaron.
+      <b>Suman todo lo que cae en el filtro</b>, no solo los renglones que
+      alcanzas a ver: si revisas un mes, el total es del mes.</p>
+
+      <p class="ayuda-tip">Cada renglón dice <b>quién lo capturó</b>, no de
+      quién era el turno. En el relevo de las 2:30 uno teclea y el turno es de
+      otro; aquí la pregunta es qué hizo la persona.</p>
+
+      <h4>Esto no es la bitácora</h4>
+      <p>La bitácora (en <b>Sistema</b>) dice cosas como
+      <code>venta.registrada</code> y es para el que programa. Esto está
+      escrito para leerse.</p>`
+  },
+
+  // ==========================================================
+  {
+    id: 'borrar',
+    titulo: 'Dar de baja o eliminar',
+    busca: 'borrar eliminar dar de baja recuperar producto categoría cliente gasto contraseña administrador temporada',
+    cuerpo: `
+      <p>Son <b>dos cosas distintas</b>, y elegir bien evita problemas:</p>
+
+      <h4>Dar de baja</h4>
+      <p>Para lo de <b>temporada</b>, lo que va a volver. Deja de salir en la
+      caja pero sigue existiendo, y se recupera cuando toca con <b>Ver dados
+      de baja</b>. Lo puede hacer un gerente con su PIN.</p>
+
+      <h4>Eliminar</h4>
+      <p>Para lo que <b>nunca debió estar</b>: el producto de prueba, el que se
+      dio de alta dos veces, el cliente que se escribió mal. Desaparece y
+      <b>no se recupera</b>; si algún día hace falta, se vuelve a dar de alta
+      en dos segundos.</p>
+
+      <p class="ayuda-tip"><b>Solo se puede eliminar lo que nunca se usó.</b>
+      En cuanto un producto se vendió, su nombre está en tickets ya cobrados;
+      borrarlo dejaría el histórico mintiendo. El sistema te lo dice y te
+      manda a darlo de baja. Lo mismo con un cliente que ya se llevó algo
+      fiado, y con una categoría que todavía tiene productos dentro.</p>
+
+      <h4>Pide la contraseña, no el PIN</h4>
+      <p>Y solo la del <b>administrador</b>. El PIN se teclea veinte veces al
+      día delante de quien sea: sirve para decir "yo estoy aquí". Borrar no se
+      deshace, así que va con algo que no ve nadie.</p>
+
+      <h4>Un gasto capturado por error</h4>
+      <p>Se puede <b>anular</b> —queda tachado con su motivo, y se ve qué
+      pasó— o <b>borrar</b> con la papelera 🗑, que lo quita de la lista. Lo
+      segundo es del administrador.</p>
+      <p>Si el gasto es de un turno <b>ya cortado</b>, el sistema avisa antes:
+      los totales de ese corte están congelados y no cambian, pero si vuelves
+      a imprimirlo la lista ya no va a coincidir con el papel firmado.</p>
+
+      <h4>Lo que nunca se borra</h4>
+      <p>La <b>constancia de que alguien borró</b>. Cada eliminación deja su
+      renglón en la bitácora, con quién la autorizó y qué era.</p>`
+  },
+
+  // ==========================================================
+  {
     id: 'permisos',
     titulo: 'Quién puede hacer qué',
     busca: 'permisos roles cajero gerente operario repartidor administrador quién puede',

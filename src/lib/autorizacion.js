@@ -35,6 +35,43 @@ function comprobar(autorizacion, permiso) {
   return { usuario: u };
 }
 
+/**
+ * BORRAR DE VERDAD PIDE LA CONTRASEÑA DEL ADMINISTRADOR.
+ *
+ * No el PIN, y es a propósito. El PIN se teclea veinte veces al día delante
+ * de quien sea: sirve para decir "yo estoy aquí", no para respaldar algo
+ * que no se puede deshacer. La contraseña se escribe pocas veces y no la
+ * ve nadie.
+ *
+ * Y solo el administrador: dar de baja lo puede hacer un gerente, porque
+ * se recupera; borrar no se recupera.
+ */
+function comprobarAdmin(autorizacion) {
+  if (!autorizacion?.usuarioId || !autorizacion?.contrasena) {
+    return { error: 'Para borrar hace falta la contraseña del administrador.' };
+  }
+
+  const u = bd.prepare('SELECT * FROM usuarios WHERE id = ? AND activo = 1')
+    .get(autorizacion.usuarioId);
+  if (!u) return { error: 'Ese usuario no existe.' };
+  if (u.rol !== 'admin') {
+    return { error: `${u.nombre} no es administrador. Borrar solo lo hace el administrador.` };
+  }
+  if (!u.contrasena_hash || !verificar(autorizacion.contrasena, u.contrasena_hash, u.contrasena_sal)) {
+    return { error: 'Contraseña incorrecta.' };
+  }
+  return { usuario: u };
+}
+
+/** Los administradores, para ofrecerlos en la lista de borrar. */
+function administradores() {
+  return bd.prepare(`
+    SELECT id, nombre, rol FROM usuarios
+     WHERE activo = 1 AND rol = 'admin' AND contrasena_hash IS NOT NULL
+     ORDER BY nombre
+  `).all().map((u) => ({ ...u, rolEtiqueta: ETIQUETAS_ROL[u.rol] }));
+}
+
 /** Quiénes pueden autorizar. La pantalla los ofrece en una lista. */
 function responsables() {
   return bd.prepare(`
@@ -44,4 +81,4 @@ function responsables() {
   `).all().map((u) => ({ ...u, rolEtiqueta: ETIQUETAS_ROL[u.rol] }));
 }
 
-module.exports = { comprobar, responsables };
+module.exports = { comprobar, comprobarAdmin, responsables, administradores };

@@ -220,6 +220,55 @@ export function pedirEntero({ titulo, texto = '', valor = '', marcador = '1',
   });
 }
 
+/**
+ * BORRAR PIDE LA CONTRASEÑA DEL ADMINISTRADOR.
+ *
+ * No el PIN, y es a propósito: el PIN se teclea veinte veces al día delante
+ * de quien sea, y sirve para decir "yo estoy aquí". Esto respalda algo que
+ * no se puede deshacer.
+ */
+export function pedirContrasena({ titulo, texto = '', administradores = [],
+                                  ok = 'Borrar', aviso = '' }) {
+  return new Promise((resolver) => {
+    const { caja, salir } = montar(`
+      <h3 class="dialogo-titulo">${titulo}</h3>
+      ${texto ? `<p class="dialogo-texto">${texto}</p>` : ''}
+      ${aviso ? `<div class="aviso-sin-caja" style="margin-bottom:12px">${aviso}</div>` : ''}
+
+      ${administradores.length > 1 ? `
+        <label for="quien">¿Quién?</label>
+        <select id="quien">
+          ${administradores.map((a) => `
+            <option value="${a.id}">${a.nombre}</option>`).join('')}
+        </select>` : `
+        <input type="hidden" id="quien" value="${administradores[0]?.id || ''}">
+        <p class="ayuda" style="margin:0 0 6px">
+          Contraseña de <strong>${administradores[0]?.nombre || 'el administrador'}</strong>
+        </p>`}
+
+      <label for="clave">Contraseña del administrador</label>
+      <input id="clave" type="password" autocomplete="off" placeholder="••••••••">
+
+      <div class="dialogo-botones">
+        <button class="secundario" data-no>Cancelar</button>
+        <button class="peligro" data-si>${ok}</button>
+      </div>`, resolver);
+
+    const clave = caja.querySelector('#clave');
+    setTimeout(() => clave.focus(), 220);
+
+    const enviar = () => {
+      const c = clave.value;
+      if (!c) { clave.focus(); return; }
+      salir({ usuarioId: caja.querySelector('#quien').value, contrasena: c });
+    };
+
+    clave.onkeydown = (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); enviar(); } };
+    caja.querySelector('[data-no]').onclick = () => salir(null);
+    caja.querySelector('[data-si]').onclick = enviar;
+  });
+}
+
 export function pedirImporte({ titulo, texto = '', valor = '', marcador = '0.00',
                                ok = 'Guardar', ayuda = '' }) {
   return new Promise((resolver) => {

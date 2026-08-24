@@ -14,7 +14,8 @@ const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
 const { categoriasActivas, productosActivos } = require('./catalogo');
 const { estadoProducto } = require('./inventario');
-const { comprobar: comprobarAutorizacion, responsables } = require('../../lib/autorizacion');
+const { comprobar: comprobarAutorizacion, responsables,
+        comprobarAdmin, administradores } = require('../../lib/autorizacion');
 const fotos = require('./fotos');
 
 const router = express.Router();
@@ -446,6 +447,98 @@ router.post('/productos/:id/baja', administrar, (req, res) => {
     ejecutorId: req.usuario.id, detalle: { nombre: p.nombre, quedaban: quedan }
   });
   return ok(res, { dadoDeBaja: true, quedaban: quedan });
+});
+
+// ============================================================
+// BORRAR DE VERDAD
+//
+// DAR DE BAJA y ELIMINAR no son lo mismo, y la diferencia la puso Tony:
+//
+//   · Se da de BAJA lo de temporada, lo que va a volver. Sigue existiendo,
+//     deja de salir en la caja y se recupera cuando toca.
+//   · Se ELIMINA lo que nunca debió estar: el producto de prueba, el que se
+//     dio de alta dos veces, el que ya no se va a vender jamás. Si algún día
+//     hace falta, se vuelve a dar de alta en dos segundos.
+//
+// PERO LOS TICKETS VIEJOS NO SE TOCAN. Por eso solo se puede eliminar lo
+// que NUNCA SE USÓ: en cuanto algo se vendió, su nombre vive en tickets y
+// en las cuentas del día, y borrarlo dejaría el histórico mintiendo. Eso se
+// da de baja, no se elimina.
+//
+// Y borrar pide la CONTRASEÑA del administrador, no un PIN: el PIN se
+// teclea veinte veces al día delante de quien sea.
+// ============================================================
+
+/** Cuántas veces se ha vendido algo. Es lo que decide si se puede borrar. */
+function vecesVendido(productoId) {
+  return bd.prepare(
+    'SELECT COUNT(*) n FROM venta_lineas WHERE producto_id = ?'
+  ).get(productoId).n;
+}
+
+router.delete('/productos/:id', administrar, (req, res) => {
+  const p = bd.prepare('SELECT * FROM productos WHERE id = ?').get(req.params.id);
+  if (!p) return error(res, 'Ese producto no existe.', 404);
+
+  const vendido = vecesVendido(p.id);
+  if (vendido > 0) {
+    return error(res,
+      `${p.nombre} ya se vendió ${vendido} ${vendido === 1 ? 'vez' : 'veces'}. ` +
+      'Eso no se borra, porque su nombre está en tickets ya cobrados. Dale de baja.',
+      409, { seVendio: vendido, sugerencia: 'baja' });
+  }
+
+  const auth = comprobarAdmin(req.body?.autorizacion);
+  if (auth.error) {
+    return error(res, auth.error, 403, {
+      requiereContrasena: true, administradores: administradores()
+    });
+  }
+
+  const borrar = bd.transaction(() => {
+    // Sus movimientos de inventario se van con él: son la cuenta de piezas
+    // de algo que ya no existe, y sin el producto no dicen nada.
+    bd.prepare('DELETE FROM movimientos_inventario WHERE producto_id = ?').run(p.id);
+    bd.prepare('DELETE FROM productos WHERE id = ?').run(p.id);
+  });
+  borrar();
+
+  bitacora.registrar({
+    accion: 'producto.eliminado', entidad: 'producto', entidadId: p.id,
+    ejecutorId: auth.usuario.id, capturistaId: req.usuario.id,
+    detalle: { nombre: p.nombre, codigo: p.codigo, categoriaId: p.categoria_id }
+  });
+
+  return ok(res, { eliminado: p.nombre });
+});
+
+router.delete('/categorias/:id', administrar, (req, res) => {
+  const c = bd.prepare('SELECT * FROM categorias WHERE id = ?').get(req.params.id);
+  if (!c) return error(res, 'Esa categoría no existe.', 404);
+
+  const dentro = bd.prepare('SELECT COUNT(*) n FROM productos WHERE categoria_id = ?')
+    .get(c.id).n;
+  if (dentro > 0) {
+    return error(res,
+      `${c.nombre} todavía tiene ${dentro} producto${dentro === 1 ? '' : 's'} dentro. ` +
+      'Saca o borra sus productos primero.', 409, { dentro });
+  }
+
+  const auth = comprobarAdmin(req.body?.autorizacion);
+  if (auth.error) {
+    return error(res, auth.error, 403, {
+      requiereContrasena: true, administradores: administradores()
+    });
+  }
+
+  bd.prepare('DELETE FROM categorias WHERE id = ?').run(c.id);
+  bitacora.registrar({
+    accion: 'categoria.eliminada', entidad: 'categoria', entidadId: c.id,
+    ejecutorId: auth.usuario.id, capturistaId: req.usuario.id,
+    detalle: { nombre: c.nombre }
+  });
+
+  return ok(res, { eliminada: c.nombre });
 });
 
 module.exports = router;

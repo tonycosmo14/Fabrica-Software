@@ -13,7 +13,7 @@
  */
 import { api } from '../api.js';
 import { esc, avisar, fecha as formatoFecha } from '../util.js';
-import { pedirTexto, pedirImporte, confirmar, menu } from '../dialogo.js';
+import { pedirTexto, pedirImporte, confirmar, menu, pedirContrasena } from '../dialogo.js';
 import { pesos, paraEditar } from '../fracciones.js';
 
 export async function vistaClientes(pantalla, estadoApp) {
@@ -21,6 +21,8 @@ export async function vistaClientes(pantalla, estadoApp) {
   const administra = puede('clientes.administrar');
   const cobra = puede('credito.cobrar');
   const corrige = puede('venta.cancelar');
+  // Borrar de verdad es solo del administrador.
+  const esAdmin = estadoApp.permisos.includes('*');
 
   let datos = { clientes: [], cartera: null };
   let ficha = null;             // { cliente, cuenta }
@@ -239,6 +241,7 @@ export async function vistaClientes(pantalla, estadoApp) {
       ${administra && c.activo ? `
         <div class="fila-botones" style="margin-top:18px">
           <button class="secundario chico peligro" id="baja">Dar de baja</button>
+          ${esAdmin ? '<button class="secundario chico peligro" id="borrar">Eliminar</button>' : ''}
         </div>` : ''}
       ${administra && !c.activo ? `
         <div class="fila-botones" style="margin-top:18px">
@@ -309,6 +312,8 @@ export async function vistaClientes(pantalla, estadoApp) {
 
     const baja = q('#baja');
     if (baja) baja.onclick = darDeBaja;
+    const borrar = q('#borrar');
+    if (borrar) borrar.onclick = eliminarCliente;
     const alta = q('#alta');
     if (alta) alta.onclick = darDeAlta;
 
@@ -412,6 +417,42 @@ export async function vistaClientes(pantalla, estadoApp) {
       seleccionado = null; ficha = null;
       await cargar();
     } catch (e) { avisar(e.message, 'error'); }
+  }
+
+  /**
+   * ELIMINAR UN CLIENTE.
+   *
+   * Solo al que nunca tuvo movimientos: el que se dio de alta dos veces, el
+   * que se escribió mal. En cuanto alguien se llevó algo fiado, su nombre
+   * está en tickets ya cobrados y eso no se borra.
+   */
+  async function eliminarCliente() {
+    const c = ficha.cliente;
+    if (!await confirmar({
+      titulo: `¿Eliminar a ${c.nombre}?`,
+      texto: 'Se borra de verdad, no se puede recuperar. Solo se puede si nunca ' +
+             'se llevó nada fiado ni dejó un abono.',
+      ok: 'Sí, eliminar', peligro: true
+    })) return;
+
+    try {
+      await api.borrar(`/clientes/${c.id}`, {});
+    } catch (e) {
+      if (!e.requiereContrasena) { avisar(e.message, 'error'); return; }
+      const clave = await pedirContrasena({
+        titulo: `Eliminar a ${c.nombre}`,
+        texto: 'Borrar no se deshace, así que va con la contraseña del administrador.',
+        administradores: e.administradores || [], ok: 'Eliminar'
+      });
+      if (!clave) return;
+      try {
+        await api.borrar(`/clientes/${c.id}`, { autorizacion: clave });
+      } catch (err) { avisar(err.message, 'error'); return; }
+    }
+
+    avisar(`${c.nombre} eliminado`, 'bien');
+    seleccionado = null; ficha = null;
+    await cargar();
   }
 
   async function darDeAlta() {

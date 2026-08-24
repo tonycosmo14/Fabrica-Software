@@ -21,6 +21,7 @@ const { ok, error } = require('../../lib/respuestas');
 const { leerPesos } = require('../../lib/dinero');
 const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
+const { comprobarAdmin, administradores } = require('../../lib/autorizacion');
 const {
   sesionAbierta, movimientos, estadoCaja, conteoVentas
 } = require('./calculo');
@@ -333,6 +334,57 @@ router.get('/cortes/:id', verCaja, (req, res) => {
   const corte = detalleCorte(req.params.id);
   if (!corte) return error(res, 'Ese corte no existe.', 404);
   return ok(res, { corte });
+});
+
+/**
+ * BORRAR UN MOVIMIENTO DEL CAJÓN.
+ *
+ * Anular deja el renglón tachado con su motivo, y para el día a día es lo
+ * correcto: se ve qué pasó. Pero un gasto capturado tres veces por un dedazo
+ * deja tres renglones tachados en una lista que ya es larga, y eso tampoco
+ * ayuda a nadie.
+ *
+ * Así que el administrador —solo él, y con su CONTRASEÑA— puede borrarlo.
+ * Queda en la bitácora: lo que no se puede borrar nunca es la constancia de
+ * que alguien lo borró.
+ *
+ * OJO CON LOS TURNOS YA CORTADOS. Los totales del corte están congelados,
+ * así que las cifras no cambian; pero la lista de movimientos que se
+ * reimprima ya no va a coincidir con el papel que se firmó. La pantalla lo
+ * dice antes de preguntar.
+ */
+router.delete('/movimientos/:id', verCaja, (req, res) => {
+  const m = bd.prepare('SELECT * FROM movimientos_caja WHERE id = ?').get(req.params.id ?? null);
+  if (!m) return error(res, 'Ese movimiento no existe.', 404);
+
+  const caja = bd.prepare('SELECT * FROM cajas WHERE id = ?').get(m.caja_id);
+
+  const auth = comprobarAdmin(req.body?.autorizacion);
+  if (auth.error) {
+    return error(res, auth.error, 403, {
+      requiereContrasena: true,
+      administradores: administradores(),
+      turnoCerrado: Boolean(caja?.cerrada_en),
+      folio: caja?.folio || null
+    });
+  }
+
+  // Un abono de crédito deja su renglón aquí. Si se borra el renglón hay que
+  // soltar el enlace, o el abono apuntaría a un movimiento que ya no existe.
+  const borrar = bd.transaction(() => {
+    bd.prepare('UPDATE abonos SET movimiento_id = NULL WHERE movimiento_id = ?').run(m.id);
+    bd.prepare('DELETE FROM movimientos_caja WHERE id = ?').run(m.id);
+  });
+  borrar();
+
+  bitacora.registrar({
+    accion: 'caja.movimiento-borrado', entidad: 'movimiento_caja', entidadId: m.id,
+    ejecutorId: auth.usuario.id, capturistaId: req.usuario.id,
+    detalle: { concepto: m.concepto, tipo: m.tipo, centavos: m.centavos,
+               cajaFolio: caja?.folio, turnoCerrado: Boolean(caja?.cerrada_en) }
+  });
+
+  return ok(res, { borrado: m.concepto });
 });
 
 module.exports = router;
