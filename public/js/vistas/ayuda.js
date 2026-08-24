@@ -123,7 +123,7 @@ debería quedar − contado = FALTA</pre>
   {
     id: 'venta',
     titulo: 'Punto de venta: cobrar',
-    busca: 'venta cobrar ticket precio fracción cambio devolución billete folio cancelar imprimir teclado enter f10 f2 f3 f4 código rápido categorías nueva venta espera pendiente',
+    busca: 'venta cobrar ticket precio fracción cambio devolución billete folio cancelar imprimir teclado enter f10 f2 f3 f4 código rápido categorías nueva venta espera pendiente aviso bolita se acabó agotado poco hielo inventario bajo atajos gastos historial reloj',
     cuerpo: `
       <p>Es la pantalla que se abre al entrar, porque es la que se usa casi
       todo el día. A la izquierda lo que lleva el cliente, a la derecha los
@@ -175,12 +175,59 @@ debería quedar − contado = FALTA</pre>
       <p>El ticket viejo queda cancelado y amarrado al nuevo, el hielo
       vuelve al cuarto frío solo y la caja cuadra sola. Todo queda anotado.</p>
 
-      <h4>Buscar un ticket viejo o sacar una copia</h4>
+      <h4>Buscar un ticket viejo, verlo o sacar una copia</h4>
       <p><em>F3</em>, o el botón 🧾. Se busca por número, por el importe o por
-      la hora. El botón <b>Copia</b> lo vuelve a imprimir marcado como
-      <b>COPIA</b>, para que no se confunda con el original.</p>
+      la hora.</p>
+      <ul>
+        <li><b>Ver</b> abre ahí mismo <b>qué traía</b> ese ticket, sin
+        imprimir nada. Es lo que se pregunta casi siempre.</li>
+        <li><b>Copia</b> lo vuelve a imprimir marcado como <b>COPIA</b>, para
+        que no se confunda con el original.</li>
+      </ul>
       <p>Sirve cuando el cliente vuelve porque perdió su ticket, o cuando te
       saliste de la pantalla sin querer.</p>
+
+      <h4>Cuando algo se está acabando</h4>
+      <p>Arriba a la derecha aparece un <b>⚠ con una bolita</b>. El número de
+      la bolita es cuántos productos están bajos o ya se acabaron. Al tocarlo
+      sale la lista, con cuántos quedan de cada uno.</p>
+      <p>Lo que ya se acabó <b>no se puede vender</b>: su botón se ve apagado
+      y dice <em>se acabó</em>, y teclear su código tampoco lo mete al ticket.
+      Si pides 5 y solo hay 4, te lo dice antes de armar el ticket. Lo que no
+      lleva inventario (el agua, los garrafones) no tiene tope.</p>
+
+      <h4>El aviso del hielo es distinto</h4>
+      <p>Cuando queda poco hielo sale un <b>🧊</b> aparte. Ese avisa, pero
+      <b>nunca impide vender</b>, y la razón importa:</p>
+      <p class="ayuda-tip">El número que ve el sistema es <b>lo que se ha
+      capturado</b>, no lo que hay en el cuarto frío. Los obreros sacan hielo
+      toda la mañana y reportan lo que sacaron hasta como las 3 de la tarde,
+      porque están atendiendo y sacando al mismo tiempo. Así que a media
+      mañana el sistema casi siempre va a marcar de menos. <b>Sigue
+      vendiendo normal.</b></p>
+      <p>Con cuántas marquetas avisa lo pones tú, en
+      <b>Productos y precios → Hielo</b>.</p>
+
+      <h4>Los atajos de arriba a la derecha</h4>
+      <p>Botoncitos discretos, para no ir al menú veinte veces al día:</p>
+      <ul>
+        <li><b>📋</b> la existencia del cuarto frío.</li>
+        <li><b>№</b> los números que siguen en los tanques (gerente o
+        administrador).</li>
+        <li><b>💵</b> los gastos y el dinero del cajón.</li>
+        <li><b>🔒</b> terminar el turno y contar.</li>
+      </ul>
+      <p>Si tenías un ticket a medias, <b>se aparta solo</b> antes de salir y
+      vuelve cuando regreses.</p>
+
+      <h4>Los gastos del cajón, desde aquí</h4>
+      <p>El botón <b>💵</b> abre los últimos movimientos <b>cruzando
+      turnos</b>: la gasolina de la mañana se ve aunque ese turno ya se haya
+      cerrado. Una raya parte la lista diciendo <em>"de aquí para abajo es
+      del turno de Fulano"</em>.</p>
+      <p>Los gastos van en rojo, con su botón para volver a sacar el
+      comprobante. Meter dinero se ve más discreto: nadie pide cuentas de lo
+      que se dejó.</p>
 
       <h4>Cantidades que no tienen botón</h4>
       <p>El botón de la calculadora 🧮, arriba a la derecha, abre el teclado
@@ -335,8 +382,22 @@ debería haber − contado = FALTA</pre>
       </ul>
 
       <p>Si pones un <b>mínimo</b>, arriba aparece cuántos productos ya hay que
-      pedir. Y con <b>Hoja para contar</b> sacas la lista impresa, con su
-      renglón en blanco para ir apuntando.</p>
+      pedir, y en la caja sale el ⚠ con la bolita. Y con <b>Hoja para
+      contar</b> sacas la lista impresa, con su renglón en blanco para ir
+      apuntando.</p>
+      <p class="ayuda-tip">Un producto en cero <b>ya no se puede vender</b>.
+      Si prefieres que se venda sin tope, quítale el inventario: entonces el
+      sistema deja de llevarle la cuenta.</p>
+
+      <h4>Con cuánto hielo avisar</h4>
+      <p>En la categoría <b>Hielo</b>, abajo del todo: <b>avisar con esto o
+      menos</b>, en marquetas. Cuando lo capturado baje de ahí, en la caja
+      aparece un 🧊.</p>
+      <p class="ayuda-tip">Ese aviso <b>nunca impide vender hielo</b>, y a
+      propósito. El número sale de <b>lo que se ha capturado</b>, y los
+      obreros reportan lo que sacaron hasta como las 3 de la tarde: a media
+      mañana el cuarto frío puede estar lleno y el sistema marcar cero. Si el
+      🧊 sale y tú sabes que sí hay, lo que falta es capturar producción.</p>
 
       <h4>Costo y ganancia</h4>
       <p>Si le pones el costo a un producto, el sistema te dice cuánto ganas

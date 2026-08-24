@@ -17,6 +17,7 @@ const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
 const { puede } = require('../../lib/roles');
 const { estadoProducto, movimientos, inventarioCompleto } = require('./inventario');
+const { avisos, minimoHielo, guardarMinimoHielo } = require('./avisos');
 
 const router = express.Router();
 
@@ -59,6 +60,36 @@ function sinCostos(producto) {
 function puedeVerCostos(req) {
   return Boolean(req.usuario) && puede(req.usuario.rol, 'costos.ver');
 }
+
+/**
+ * Lo que la caja necesita saber de un vistazo: qué se está acabando y cómo
+ * va el hielo. Se declara ANTES que /:productoId, o Express creería que
+ * "avisos" es el id de un producto.
+ */
+router.get('/avisos', verInventario, (req, res) => {
+  return ok(res, avisos());
+});
+
+/**
+ * Cuántas marquetas tienen que quedar para que salte el aviso del hielo.
+ * Lo pone quien administra los productos: es el mismo tipo de decisión que
+ * el "avisar cuando baje de" de cada refresco.
+ */
+router.put('/hielo-minimo', exigirPermiso('productos.administrar'), (req, res) => {
+  // Sin limpiar a la brava: si "muchas" se convirtiera en 0, el aviso
+  // quedaría apagado sin que nadie lo pidiera, y un -3 se leería como 3.
+  const crudo = String(req.body?.marquetas ?? '').trim();
+  const n = Number(crudo);
+  if (!/^\d+$/.test(crudo) || !Number.isInteger(n) || n > 100000) {
+    return error(res, 'Escribe con cuántas marquetas quieres que avise.');
+  }
+  guardarMinimoHielo(n, req.usuario.id);
+  bitacora.registrar({
+    accion: 'avisos.hielo', entidad: 'configuracion',
+    ejecutorId: req.usuario.id, detalle: { marquetas: n }
+  });
+  return ok(res, { minimoMarquetas: minimoHielo() });
+});
 
 /** Todo lo que lleva inventario, con lo que debería haber de cada cosa. */
 router.get('/', verInventario, (req, res) => {

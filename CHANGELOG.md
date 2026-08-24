@@ -11,6 +11,57 @@ solo para arreglos de algo que ya estaba, o para cambios de puro aspecto.
 
 ---
 
+## v1.5 — La caja avisa y la pantalla rinde · 24 de agosto de 2026
+
+Migración `014_avisos.sql`.
+
+### Dos avisos que se parecen y se comportan al revés
+
+Esta es la parte que hay que entender antes de tocar nada aquí.
+
+De un refresco el sistema sabe exactamente cuántos hay: entraron 24, se
+vendieron 20, quedan 4. Si dice cero, es cero, y venderlo solo genera un
+problema en el mostrador. **Se bloquea.**
+
+Del hielo no lo sabe. Los obreros sacan hielo toda la mañana y reportan lo
+que sacaron **hasta como las 3 de la tarde**, porque están atendiendo y
+sacando al mismo tiempo. Así que el número del sistema es *lo que se ha
+capturado*, no *lo que hay*: a media mañana el cuarto frío puede estar lleno
+y el sistema marcar cero. **Avisa y jamás bloquea.** Parar la venta de hielo
+por un dato que todavía no llega sería parar la fábrica.
+
+- **clave** — `alcanza(producto, cantidad)` en `src/modulos/catalogo/avisos.js` es el único punto donde se decide si algo se puede vender. Devuelve `null` si sí, o el motivo si no. Lo que no lleva inventario y el hielo pasan siempre.
+- **clave** — `prepararLineas()` lo llama y devuelve **409** con el motivo en claro: *"Ya no hay Sprite 600. Se acabó."* / *"Solo quedan 4 de Coca Cola 600."*
+- **nuevo** — `GET /inventario/avisos` trae lo que la caja necesita de un vistazo: los productos bajos, cuántos están agotados, cuántas piezas quedan de cada cosa (para negarse sin ir al servidor) y cómo va el hielo.
+- **nuevo** — `PUT /inventario/hielo-minimo` guarda con cuántas marquetas avisa. Lo pone quien administra productos: es la misma decisión que el *"avisar cuando baje de"* de cada refresco.
+- **arreglo** — Ese mínimo ya no se limpia a la brava. Antes `"muchas"` se convertía en `0` —o sea, apagaba el aviso sin que nadie lo pidiera— y un `−3` se leía como `3`.
+
+### Lo que ve el cajero
+
+- **nuevo** — Un triángulo con **bolita y número** arriba a la derecha. Tres productos bajos, un `3`. Al tocarlo, la lista completa: cuántos quedan de cada uno, y en rojo lo que ya se acabó.
+- **nuevo** — El botón de lo agotado se ve **apagado y no responde**, con la palabra *se acabó*. Es más claro que dejar tocarlo y contestar con un aviso cada vez. Lo que está bajo del mínimo dice *quedan 4* en su esquina.
+- **nuevo** — Símbolo 🧊 propio para el hielo, con su explicación de dónde sale el número y cuándo fue la última producción capturada.
+
+### Más pantalla para vender
+
+La franja azul de arriba costaba cien píxeles de alto en la pantalla que más
+se usa en la fábrica. Se quita solo en la caja (`sinBarra` en la ruta) y lo
+que traía se reparte donde ya había hueco.
+
+- **mejora** — El reloj, la fecha y el nombre del negocio bajaron al renglón de las teclas, que estaba medio vacío.
+- **mejora** — El menú y quién está en la caja se metieron en la fila de *Nueva venta*. El botón del menú es el de siempre: se le presta el clic.
+- **nuevo** — Atajos discretos: existencia del cuarto frío, los números que siguen en los tanques, los gastos del cajón y terminar el turno. Cada uno aparece solo si el permiso lo permite. Si había un ticket a medias, **se aparta solo** antes de salir.
+- **mejora** — En el celular, los tres botones grandes se reparten un renglón y los atajos bajan al siguiente; las teclas de función se esconden, porque en un teléfono no hay F2.
+
+### Historiales
+
+- **nuevo** — En **Tickets**, un botón **Ver** que abre lo que traía el ticket bajo su renglón. Antes había que imprimir una copia para contestar *"¿qué se llevó?"*: gastar papel para leer.
+- **nuevo** — `GET /caja/movimientos` cruza turnos. El de la pantalla de Caja solo trae el turno de ahora, y a media tarde el turno de la mañana ya se cerró.
+- **clave** — La lista se parte con una raya: *"de aquí para abajo, turno #3 de Mari (cerrado)"*. Sin eso, ver un gasto de otro turno mezclado con los de este es peor que no verlo.
+- **mejora** — Los gastos van en rojo y con su copia del comprobante. **Meter dinero se ve más discreto**: nadie pide cuentas de lo que se dejó.
+
+---
+
 ## v1.4 — Editar sin formularios · 23 de agosto de 2026
 
 Migración `013_categoria_foto.sql`.

@@ -195,6 +195,37 @@ router.post('/entregar', operarCaja, (req, res) => {
 // ============================================================
 
 /**
+ * EL HISTORIAL DEL CAJÓN, CRUZANDO TURNOS.
+ *
+ * El de la pantalla de Caja solo trae el turno de ahora, y eso deja fuera
+ * justo lo que se busca: "¿y la gasolina de la mañana quién la sacó?".
+ * Aquí vienen los últimos movimientos con el turno al que pertenece cada
+ * uno, para que la lista pueda partirse con la raya de "de aquí para abajo
+ * es del turno de Fulano".
+ */
+router.get('/movimientos', verCaja, (req, res) => {
+  const tipo = req.query.tipo === 'entrada' || req.query.tipo === 'salida'
+    ? req.query.tipo : null;
+  const limite = Math.min(Math.max(Number(req.query.limite) || 40, 1), 200);
+
+  const lista = bd.prepare(`
+    SELECT m.*, u.nombre AS ejecutor_nombre,
+           c.folio AS caja_folio, c.cerrada_en AS caja_cerrada_en,
+           cj.nombre AS caja_cajero
+      FROM movimientos_caja m
+      LEFT JOIN usuarios u  ON u.id = m.ejecutor_id
+      LEFT JOIN cajas c     ON c.id = m.caja_id
+      LEFT JOIN usuarios cj ON cj.id = c.cajero_id
+     WHERE m.anulado_en IS NULL
+       ${tipo ? 'AND m.tipo = ?' : ''}
+     ORDER BY m.fecha DESC
+     LIMIT ?
+  `).all(...(tipo ? [tipo, limite] : [limite]));
+
+  return ok(res, { movimientos: lista });
+});
+
+/**
  * Sacar o meter dinero que no es una venta.
  *
  * Salidas: la gasolina, el refresco de los muchachos, el retiro a la caja

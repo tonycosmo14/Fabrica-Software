@@ -17,9 +17,29 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '1.4';
+const VERSION_ACTUAL = '1.5';
 
 const VERSIONES = [
+  {
+    numero: '1.5',
+    nombre: 'La caja avisa y la pantalla rinde',
+    fecha: '2026-08-24',
+    resumen:
+      'La pantalla de vender ganó la franja de arriba entera, avisa de lo ' +
+      'que se está acabando y ya no deja vender lo que no hay.',
+    cambios: [
+      { tipo: 'importante', texto: 'AVISO DE LO QUE SE ACABA: arriba a la derecha sale un triángulo con una bolita y el número de productos bajos. Al tocarlo se abre la lista completa, con cuántos quedan de cada uno y cuáles ya se acabaron.' },
+      { tipo: 'importante', texto: 'LO QUE SE ACABÓ YA NO SE VENDE. El botón se ve apagado y dice "se acabó"; teclear su código tampoco lo mete. Y si pides 5 y solo hay 4, avisa antes de armar el ticket. Lo que no lleva inventario se sigue vendiendo sin tope.' },
+      { tipo: 'importante', texto: 'EL HIELO ES LA EXCEPCIÓN: tiene su propio símbolo 🧊 y AVISA, pero jamás bloquea. El número del sistema es lo que se ha capturado, no lo que hay en el cuarto frío: los obreros reportan hasta como las 3, y hasta entonces siempre va a marcar de menos. Parar la venta de hielo por un dato que todavía no llega sería parar la fábrica.' },
+      { tipo: 'nuevo', texto: 'Tú decides con cuántas marquetas avisa el hielo. Está en Productos y precios → Hielo, y ahí mismo se ve lo que hay capturado ahora.' },
+      { tipo: 'importante', texto: 'MÁS PANTALLA PARA VENDER: la franja azul de arriba desaparece en la caja. El reloj, la fecha y el nombre del negocio se fueron al renglón de abajo, junto a las teclas; el menú y quién está en la caja se metieron en la fila de los botones. Son cien píxeles de alto que ahora son botones.' },
+      { tipo: 'nuevo', texto: 'Atajos discretos arriba a la derecha: la existencia del cuarto frío, los números que siguen en los tanques, los gastos del cajón y terminar el turno. Si había un ticket a medias, se aparta solo antes de salir.' },
+      { tipo: 'nuevo', texto: 'EN TICKETS, un botón "Ver" que abre lo que traía cada ticket sin imprimirlo. Antes había que gastar papel para leer qué se llevó el cliente.' },
+      { tipo: 'nuevo', texto: 'HISTORIAL DEL CAJÓN desde la caja, cruzando turnos, con una raya que dice "de aquí para abajo es del turno de Fulano". Los gastos van en rojo y con su copia del comprobante; meter dinero se ve, pero discreto: nadie pide cuentas de lo que se dejó.' },
+      { tipo: 'arreglo', texto: 'Poner "muchas" en el mínimo del hielo lo dejaba en cero —o sea, apagaba el aviso— y un −3 se leía como 3. Ahora se rechaza.' }
+    ],
+    siguiente: 'v1.6 — Clientes y crédito: a quién se le fía y cuánto debe.'
+  },
   {
     numero: '1.4',
     nombre: 'Editar sin formularios',

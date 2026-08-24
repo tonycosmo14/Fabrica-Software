@@ -515,3 +515,69 @@ test('cada turno que existe tiene su renglón en la bitácora', () => {
 
   assert.equal(aperturas + entregas, cajas);
 });
+
+// ============================================================
+// EL HISTORIAL DEL CAJÓN, CRUZANDO TURNOS  (v1.5)
+//
+// La pregunta de la tarde es "¿y la gasolina de la mañana?", y la mañana
+// suele ser otro turno, ya cerrado. Por eso este historial no se queda en
+// el turno de ahora.
+// ============================================================
+
+test('el historial trae movimientos de turnos ya cerrados', async () => {
+  await entrarAdmin();
+  await cerrarSiHayAbierto();
+
+  // Turno A: un gasto, y se cierra.
+  await llamar('/api/caja/abrir', { method: 'POST', cuerpo: { fondo: 500 } });
+  await llamar('/api/caja/movimientos', {
+    method: 'POST', cuerpo: { tipo: 'salida', concepto: 'Gasolina de la mañana', monto: 200 }
+  });
+  await llamar('/api/caja/cerrar', { method: 'POST', cuerpo: { contado: 300 } });
+
+  // Turno B: otro movimiento, y sigue abierto.
+  await llamar('/api/caja/abrir', { method: 'POST', cuerpo: { fondo: 100 } });
+  await llamar('/api/caja/movimientos', {
+    method: 'POST', cuerpo: { tipo: 'entrada', concepto: 'Cambio de la tarde', monto: 400 }
+  });
+
+  const { movimientos } = (await llamar('/api/caja/movimientos')).json.datos;
+  const conceptos = movimientos.map((m) => m.concepto);
+  assert.ok(conceptos.includes('Gasolina de la mañana'), 'falta el gasto del turno cerrado');
+  assert.ok(conceptos.includes('Cambio de la tarde'));
+
+  // Lo más nuevo primero, y cada uno sabe de qué turno es: con eso la
+  // pantalla dibuja la raya de "de aquí para abajo es del turno de…".
+  assert.equal(movimientos[0].concepto, 'Cambio de la tarde');
+  const tarde = movimientos.find((m) => m.concepto === 'Cambio de la tarde');
+  const manana = movimientos.find((m) => m.concepto === 'Gasolina de la mañana');
+  assert.ok(tarde.caja_folio > manana.caja_folio, 'los folios no distinguen los turnos');
+  assert.ok(manana.caja_cerrada_en, 'el turno de la mañana debería venir marcado como cerrado');
+  assert.ok(tarde.caja_cajero, 'debería decir de quién es el turno');
+});
+
+test('el historial se puede pedir solo de gastos', async () => {
+  const { movimientos } = (await llamar('/api/caja/movimientos?tipo=salida')).json.datos;
+  assert.ok(movimientos.length > 0);
+  assert.ok(movimientos.every((m) => m.tipo === 'salida'));
+});
+
+test('un movimiento anulado desaparece del historial', async () => {
+  const antes = (await llamar('/api/caja/movimientos')).json.datos.movimientos;
+  const mov = antes.find((m) => m.concepto === 'Cambio de la tarde');
+
+  await llamar(`/api/caja/movimientos/${mov.id}/anular`, {
+    method: 'POST', cuerpo: { motivo: 'Mal capturado' }
+  });
+
+  const despues = (await llamar('/api/caja/movimientos')).json.datos.movimientos;
+  assert.ok(!despues.some((m) => m.id === mov.id));
+});
+
+test('el cajero ve el historial; el operario no', async () => {
+  await entrarPorNombre('Mari', '7777');
+  assert.equal((await llamar('/api/caja/movimientos')).estado, 200);
+
+  await entrarPorNombre('Chema', '5555');
+  assert.equal((await llamar('/api/caja/movimientos')).estado, 403);
+});

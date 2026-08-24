@@ -35,7 +35,7 @@ export async function vistaProductos(pantalla, estadoApp) {
   const mueve = puede('inventario.mover');
   const precios = puede('*');           // la lista de precios es del administrador
 
-  let catalogo, listas, impresion, inventario, existencia;
+  let catalogo, listas, impresion, inventario, existencia, alertas;
   let categoriaAbierta = ID_HIELO;
   let seleccionado = null;
   let verBajas = false;
@@ -43,13 +43,14 @@ export async function vistaProductos(pantalla, estadoApp) {
   await cargar();
 
   async function cargar() {
-    [catalogo, listas, impresion, inventario, existencia] = await Promise.all([
+    [catalogo, listas, impresion, inventario, existencia, alertas] = await Promise.all([
       api.obtener(`/catalogo${verBajas ? '?incluirBajas=1' : ''}`),
       api.obtener('/ventas/precios/listas').catch(() => ({ listas: [] })),
       administra ? api.obtener('/impresion/config').then((r) => r.impresion).catch(() => null)
                  : Promise.resolve(null),
       api.obtener('/inventario').catch(() => ({ inventario: [], bajos: 0 })),
-      api.obtener('/existencia').catch(() => ({ almacenes: [] }))
+      api.obtener('/existencia').catch(() => ({ almacenes: [] })),
+      api.obtener('/inventario/avisos').catch(() => ({ hielo: null }))
     ]);
 
     if (!catalogo.categorias.some((c) => c.id === categoriaAbierta)) {
@@ -460,7 +461,50 @@ export async function vistaProductos(pantalla, estadoApp) {
             <strong>Los tickets ya cobrados no cambian</strong> si subes un precio.
           </p>` : ''}` : ''}
 
-      ${panelExistenciaHielo()}`;
+      ${panelExistenciaHielo()}
+      ${panelAvisoHielo()}`;
+  }
+
+  /**
+   * CUÁNDO AVISAR DE QUE QUEDA POCO HIELO.
+   *
+   * Este aviso es distinto a todos los demás y hay que decirlo en la
+   * pantalla: el número del que sale no es lo que hay en el cuarto frío,
+   * es lo que se ha capturado. Los obreros sacan hielo toda la mañana y
+   * reportan hasta como las 3 de la tarde, así que a media mañana el
+   * sistema siempre va a creer que hay menos.
+   *
+   * Por eso el aviso solo pone un símbolo en la caja. Nunca impide vender.
+   */
+  function panelAvisoHielo() {
+    const h = alertas?.hielo;
+    if (!h) return '';
+
+    return `
+      <h4 class="cfg-subtitulo">Aviso de poco hielo</h4>
+      <p class="ayuda">
+        Cuando lo capturado baje de aquí, en la caja aparece un 🧊. Es solo
+        un aviso: <strong>el hielo nunca se deja de vender</strong>, porque
+        el número va atrasado hasta que los obreros reportan lo que sacaron.
+      </p>
+      <div class="cuadre">
+        <div class="cuadre-linea ${administra ? 'campo-vivo' : ''}">
+          <span>Avisar con esto o menos<small>en marquetas</small></span>
+          ${administra
+            ? `<input id="hielo-minimo" inputmode="numeric" autocomplete="off"
+                      value="${esc(String(h.minimoMarquetas))}">`
+            : `<strong>${esc(String(h.minimoMarquetas))}</strong>`}
+        </div>
+        <div class="cuadre-linea total">
+          <span>= Capturado ahora</span>
+          <strong class="${h.bajo ? 'malo' : ''}">${esc(h.texto)}</strong>
+        </div>
+      </div>
+      ${h.bajo ? `
+        <div class="aviso-sin-caja" style="margin-top:12px">
+          <strong>La caja ya está mostrando el aviso.</strong>
+          Si en el cuarto frío hay más, es que falta capturar producción.
+        </div>` : ''}`;
   }
 
   // ==========================================================
@@ -603,6 +647,31 @@ export async function vistaProductos(pantalla, estadoApp) {
     if (guardar) guardar.onclick = guardarPrecios;
     const sug = q('#sugerir');
     if (sug) sug.onclick = sugerir;
+
+    // El mínimo del hielo se guarda al salir del campo, como todo lo demás
+    // en esta pantalla: no hay botón de guardar que se pueda olvidar.
+    const min = q('#hielo-minimo');
+    if (min) {
+      min.onblur = () => guardarMinimoHielo(min);
+      min.onkeydown = (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); min.blur(); } };
+    }
+  }
+
+  async function guardarMinimoHielo(campoEl) {
+    const marquetas = campoEl.value.replace(/[^0-9]/g, '');
+    if (marquetas === '' || Number(marquetas) === alertas?.hielo?.minimoMarquetas) {
+      campoEl.value = String(alertas?.hielo?.minimoMarquetas ?? '');
+      return;
+    }
+    try {
+      await api.actualizar('/inventario/hielo-minimo', { marquetas });
+      alertas = await api.obtener('/inventario/avisos');
+      avisar(`Avisará con ${marquetas} marqueta${marquetas === '1' ? '' : 's'} o menos`, 'bien');
+      pintar();
+    } catch (e) {
+      avisar(e.message, 'error');
+      campoEl.value = String(alertas?.hielo?.minimoMarquetas ?? '');
+    }
   }
 
   function engancharImpresora() {

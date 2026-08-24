@@ -21,7 +21,7 @@
  * desde cero con sus propios precios.
  */
 import { api } from '../api.js';
-import { esc, avisar, soloHora, fecha as formatoFecha } from '../util.js';
+import { esc, avisar, soloHora, fecha as formatoFecha, ETIQUETAS_ROL } from '../util.js';
 import { pedirTexto, pedirImporte, pedirCantidad, confirmar } from '../dialogo.js';
 import { aTexto, descomponer, desglose, pesos } from '../fracciones.js';
 import { cargarMarca } from '../marca.js';
@@ -44,18 +44,37 @@ const FASES = {
   guardando: { enter: 'guardando…',               esc: 'espera' },
   historial: { enter: 'busca',                    esc: 'volver a vender' },
   espera:    { enter: 'nada',                     esc: 'volver a vender' },
+  avisos:    { enter: 'nada',                     esc: 'volver a vender' },
+  movimientos: { enter: 'nada',                   esc: 'volver a vender' },
   cobrada:   { enter: 'imprime el ticket',        esc: 'siguiente venta' }
 };
 
 export async function vistaVenta(pantalla, estadoApp) {
-  const puedeOperarCaja = estadoApp.permisos.includes('*') ||
-                          estadoApp.permisos.includes('caja.operar');
+  const tiene = (p) => estadoApp.permisos.includes('*') || estadoApp.permisos.includes(p);
+  const puedeOperarCaja = tiene('caja.operar');
+  const puedeVerCaja = tiene('caja.ver');
+  const puedeContarHielo = tiene('existencia.ver');
+  const puedeRepartirNumeros = tiene('produccion.autorizar');
 
   const marca = await cargarMarca();
   let ctx = await api.obtener('/ventas/contexto');
 
   // Precios del hielo por fracción, para cotizar sin ir al servidor.
   let tarifa = new Map(ctx.precios.map((p) => [p.dieciseisavos, p.centavos]));
+
+  /**
+   * LO QUE SE ESTÁ ACABANDO.
+   *
+   * Llega con el contexto y se vuelve a pedir después de cada venta, que es
+   * justo cuando cambia. Sirve para dos cosas distintas:
+   *
+   *  · la bolita roja de arriba, para que el cajero lo sepa sin buscarlo
+   *  · negarse en el acto cuando alguien captura algo que ya no hay
+   *
+   * El hielo va aparte y con su propio símbolo, porque su número no es lo
+   * que hay sino lo que se ha reportado. Avisa, nunca bloquea.
+   */
+  let alertas = ctx.avisos || { productos: [], bajos: 0, agotados: 0, existencias: {}, hielo: null };
 
   // ---- Lo que lleva el cliente ----
   let hielo = 0;                 // dieciseisavos, TODO en una sola línea
@@ -97,8 +116,10 @@ export async function vistaVenta(pantalla, estadoApp) {
   };
 
   document.addEventListener('keydown', alTeclado);
+  const relojito = setInterval(pintarHora, 10000);
   pantalla.addEventListener('vista-desmontada', () => {
     document.removeEventListener('keydown', alTeclado);
+    clearInterval(relojito);
     limpiarImpresion();
   }, { once: true });
 
@@ -121,6 +142,32 @@ export async function vistaVenta(pantalla, estadoApp) {
           <button class="pos-accion" id="historial">
             <span>🧾 Tickets</span><small>F3</small>
           </button>
+          <div class="pos-derecha">
+          <div class="pos-avisos" id="pos-avisos"></div>
+
+          <div class="pos-rapidos">
+            ${puedeContarHielo ? `
+              <button class="pos-chico" id="ir-existencia"
+                      title="Existencia del cuarto frío">📋</button>` : ''}
+            ${puedeRepartirNumeros ? `
+              <button class="pos-chico pos-chico-texto" id="ir-numeros"
+                      title="Los números que siguen en los tanques">№</button>` : ''}
+            ${puedeVerCaja ? `
+              <button class="pos-chico" id="ver-movimientos"
+                      title="Gastos y dinero metido">💵</button>` : ''}
+            ${puedeOperarCaja ? `
+              <button class="pos-chico" id="terminar-turno"
+                      title="Terminar turno y contar">🔒</button>` : ''}
+          </div>
+
+          <div class="pos-quien">
+            <span class="pos-quien-nombre">
+              <strong>${esc(estadoApp.usuario?.nombre || '')}</strong>
+              <small>${esc(ETIQUETAS_ROL[estadoApp.usuario?.rol] || '')}</small>
+            </span>
+            <button class="pos-chico" id="pos-menu" title="Menú">☰</button>
+          </div>
+          </div>
         </div>
 
         <section class="pos-ticket">
@@ -322,16 +369,46 @@ export async function vistaVenta(pantalla, estadoApp) {
   // ==========================================================
   // AGREGAR Y QUITAR
   // ==========================================================
-  function agregarProducto(p) {
+  /**
+   * Cuántas piezas quedan de algo. Infinito para lo que no lleva cuenta:
+   * el hielo y lo que se vende sin inventario nunca se acaban aquí.
+   */
+  function quedanDe(p) {
+    if (!p || !p.lleva_inventario) return Infinity;
+    const n = alertas.existencias?.[p.id];
+    return Number.isFinite(n) ? n : Infinity;
+  }
+
+  function seAcabo(p) { return quedanDe(p) <= 0; }
+
+  function agregarProducto(p, cuantos = 1) {
     if (fase !== 'venta') return;
 
     if (p.tipo === 'hielo') {
-      hielo += p.dieciseisavos;          // se SUMA, no se agrega otro renglón
-    } else {
-      const ya = articulos.find((a) => a.producto.id === p.id);
-      if (ya) ya.cantidad++;
-      else articulos.push({ producto: p, cantidad: 1 });
+      hielo += p.dieciseisavos * cuantos;  // se SUMA, no se agrega otro renglón
+      pintarTodo();
+      return;
     }
+
+    // No se vende lo que no hay. El servidor también lo revisa al cobrar,
+    // pero decirlo al capturar evita armar un ticket que se va a caer.
+    const quedan = quedanDe(p);
+    const ya = articulos.find((a) => a.producto.id === p.id);
+    const lleva = ya ? ya.cantidad : 0;
+
+    if (quedan <= 0) {
+      avisar(`Ya no hay ${p.nombre}. Se acabó.`, 'error');
+      return;
+    }
+    if (lleva + cuantos > quedan) {
+      avisar(quedan === 1
+        ? `Solo queda 1 de ${p.nombre}`
+        : `Solo quedan ${quedan} de ${p.nombre}`, 'error');
+      return;
+    }
+
+    if (ya) ya.cantidad += cuantos;
+    else articulos.push({ producto: p, cantidad: cuantos });
     pintarTodo();
   }
 
@@ -346,7 +423,223 @@ export async function vistaVenta(pantalla, estadoApp) {
   function pintarTodo() {
     pintarLineas();
     pintarRejilla();
+    pintarAvisos();
     pintarPista();
+  }
+
+  // ==========================================================
+  // LOS AVISOS DE ARRIBA
+  //
+  // Dos símbolos, y solo aparecen cuando hay algo que decir. Una pantalla
+  // llena de avisos permanentes se vuelve parte del fondo y deja de verse.
+  // ==========================================================
+  function pintarAvisos() {
+    const caja = pantalla.querySelector('#pos-avisos');
+    if (!caja) return;
+
+    const partes = [];
+
+    if (alertas.bajos > 0) {
+      const hayAgotados = alertas.agotados > 0;
+      partes.push(`
+        <button class="pos-aviso ${hayAgotados ? 'agotado' : ''}" id="aviso-inventario"
+                title="${hayAgotados
+                  ? `${alertas.agotados} producto${alertas.agotados === 1 ? '' : 's'} sin existencia`
+                  : 'Hay que pedir más'}">
+          <span class="pos-aviso-icono">⚠</span>
+          <span class="pos-burbuja">${alertas.bajos}</span>
+        </button>`);
+    }
+
+    if (alertas.hielo?.bajo) {
+      partes.push(`
+        <button class="pos-aviso pos-aviso-hielo" id="aviso-hielo"
+                title="Queda poco hielo de lo que se ha capturado">
+          <span class="pos-aviso-icono">🧊</span>
+        </button>`);
+    }
+
+    caja.innerHTML = partes.join('');
+    const bajos = caja.querySelector('#aviso-inventario');
+    if (bajos) bajos.onclick = verAvisosInventario;
+    const hie = caja.querySelector('#aviso-hielo');
+    if (hie) hie.onclick = verAvisoHielo;
+  }
+
+  /** La lista completa de lo que se está acabando. */
+  function verAvisosInventario() {
+    fase = 'avisos';
+    refs.cobro.hidden = false;
+    refs.cobro.innerHTML = `
+      <div class="pos-cobro-caja pos-lista-avisos">
+        <h3 style="margin:0 0 4px">Se está acabando</h3>
+        <p class="ayuda" style="margin:0 0 12px">
+          ${alertas.agotados
+            ? `${alertas.agotados} ya no se puede${alertas.agotados === 1 ? '' : 'n'} vender.`
+            : 'Todavía hay de todo, pero conviene pedir.'}
+        </p>
+        <div class="lista-tickets">
+          ${alertas.productos.map((p) => `
+            <div class="ticket-fila fila-agota ${p.agotado ? 'sin-nada' : ''}">
+              <div class="crece">
+                <strong>${esc(p.nombre)}</strong>
+                <small>${p.codigo ? 'código ' + esc(p.codigo) + ' · ' : ''}${
+                  p.minimo ? 'avisa en ' + p.minimo : 'sin mínimo'}</small>
+              </div>
+              <span class="aviso-quedan ${p.agotado ? 'agotado' : 'bajo'}">
+                ${p.agotado ? 'se acabó' : `quedan ${p.quedan}`}
+              </span>
+            </div>`).join('')
+            || '<p class="vacio" style="padding:20px 0">No falta nada.</p>'}
+        </div>
+        <button class="secundario" id="cerrar-avisos" style="margin-top:12px;width:100%">
+          Esc · volver a vender
+        </button>
+      </div>`;
+    refs.cobro.querySelector('#cerrar-avisos').onclick = cerrarAvisos;
+    pintarPista();
+  }
+
+  /**
+   * El aviso del hielo dice de dónde salió el número, porque el número
+   * miente a media mañana: los obreros sacan hielo desde temprano y no
+   * reportan hasta como las 3. Por eso avisa y no impide vender.
+   */
+  function verAvisoHielo() {
+    const h = alertas.hielo;
+    if (!h) return;
+    fase = 'avisos';
+    refs.cobro.hidden = false;
+    refs.cobro.innerHTML = `
+      <div class="pos-cobro-caja pos-aviso-caja">
+        <div class="pos-aviso-grande">🧊</div>
+        <h3 style="margin:0 0 4px">Queda poco hielo</h3>
+        <div class="pos-cobro-total">
+          <span>Capturado en ${esc(h.almacen)}</span>
+          <strong>${h.dieciseisavos > 0
+            ? esc(h.texto) + (h.dieciseisavos === 16 ? ' marqueta'
+                            : h.dieciseisavos > 16 ? ' marquetas' : '')
+            : 'nada'}</strong>
+        </div>
+        <p class="ayuda" style="margin:12px 0 0">
+          El aviso salta con ${h.minimoMarquetas} marqueta${h.minimoMarquetas === 1 ? '' : 's'}
+          o menos. Ese número es <strong>lo que se ha capturado</strong>, no
+          lo que hay en el cuarto frío: mientras los obreros no reporten lo
+          que sacaron, va a marcar de menos. Sigue vendiendo normal.
+        </p>
+        <p class="ayuda" style="margin:8px 0 0">
+          ${h.ultimaProduccion
+            ? `Última producción capturada: ${esc(formatoFecha(h.ultimaProduccion))}.`
+            : 'Todavía nadie ha capturado producción. Por eso marca en cero.'}
+        </p>
+        <button class="secundario" id="cerrar-avisos" style="margin-top:14px;width:100%">
+          Esc · volver a vender
+        </button>
+      </div>`;
+    refs.cobro.querySelector('#cerrar-avisos').onclick = cerrarAvisos;
+    pintarPista();
+  }
+
+  function cerrarAvisos() {
+    fase = 'venta';
+    refs.cobro.hidden = true;
+    pintarPista();
+    enfocar();
+  }
+
+  // ==========================================================
+  // EL HISTORIAL DEL CAJÓN
+  //
+  // "¿Y la gasolina de la mañana?" La pantalla de Caja solo enseña el turno
+  // de ahora, y a media tarde el turno de la mañana ya se cerró. Aquí se ven
+  // los últimos movimientos aunque sean de otro turno, con una raya que dice
+  // dónde empieza cada uno.
+  //
+  // Los gastos van primero y en grande porque son los que se buscan. Meter
+  // dinero se ve más discreto: nadie pide cuentas de lo que se dejó.
+  // ==========================================================
+  async function verMovimientos() {
+    fase = 'movimientos';
+    refs.cobro.hidden = false;
+    refs.cobro.innerHTML = `
+      <div class="pos-cobro-caja pos-movimientos">
+        <h3 style="margin:0 0 4px">Gastos y dinero del cajón</h3>
+        <p class="ayuda" style="margin:0 0 12px">Buscando…</p>
+      </div>`;
+    pintarPista();
+
+    let movs = [];
+    try {
+      movs = (await api.obtener('/caja/movimientos?limite=40')).movimientos || [];
+    } catch (e) {
+      refs.cobro.querySelector('.ayuda').textContent = e.message;
+      return;
+    }
+
+    // La raya se dibuja cuando cambia el turno. Como la lista viene de lo
+    // más nuevo a lo más viejo, la raya se pone ANTES del primer movimiento
+    // de cada turno: "de aquí para abajo es del turno de Fulano".
+    const filas = [];
+    let turnoAnterior = null;
+    for (const m of movs) {
+      if (m.caja_folio !== turnoAnterior) {
+        turnoAnterior = m.caja_folio;
+        filas.push(`
+          <div class="raya-turno">
+            <span>de aquí para abajo, turno #${m.caja_folio ?? '—'}${
+              m.caja_cajero ? ' de ' + esc(m.caja_cajero.split(' ')[0]) : ''}${
+              m.caja_cerrada_en ? ' (cerrado)' : ''}</span>
+          </div>`);
+      }
+      const esSalida = m.tipo === 'salida';
+      filas.push(`
+        <div class="ticket-fila mov-fila ${esSalida ? 'mov-salida' : 'mov-entrada'}">
+          <div class="crece">
+            <strong>${esc(m.concepto)}</strong>
+            <small>${esc(formatoFecha(m.fecha))} · ${esc(m.ejecutor_nombre || '—')}</small>
+          </div>
+          <span class="mov-importe">${esSalida ? '−' : '+'}${pesos(m.centavos)}</span>
+          ${esSalida ? `<button class="secundario chico" data-comprobante="${esc(m.id)}">Copia</button>` : ''}
+        </div>`);
+    }
+
+    const gastos = movs.filter((m) => m.tipo === 'salida')
+                       .reduce((t, m) => t + m.centavos, 0);
+
+    refs.cobro.innerHTML = `
+      <div class="pos-cobro-caja pos-movimientos">
+        <h3 style="margin:0 0 4px">Gastos y dinero del cajón</h3>
+        <p class="ayuda" style="margin:0 0 12px">
+          Los últimos ${movs.length}, cruzando turnos.
+          ${gastos ? `Salieron ${pesos(gastos)} en total.` : ''}
+        </p>
+        <div class="lista-tickets">
+          ${filas.join('') || '<p class="vacio" style="padding:20px 0">Todavía no hay movimientos.</p>'}
+        </div>
+        <button class="secundario" id="cerrar-avisos" style="margin-top:12px;width:100%">
+          Esc · volver a vender
+        </button>
+      </div>`;
+
+    refs.cobro.querySelector('#cerrar-avisos').onclick = cerrarAvisos;
+    // Una salida lleva papel firmado; si se traspapeló, aquí se saca otro.
+    refs.cobro.querySelectorAll('[data-comprobante]').forEach((b) => {
+      b.onclick = async () => {
+        b.disabled = true;
+        try { await api.enviar(`/impresion/movimiento/${b.dataset.comprobante}`, {}); avisar('Comprobante impreso', 'bien'); }
+        catch (e) { avisar(e.message, 'error'); }
+        b.disabled = false;
+      };
+    });
+  }
+
+  /** Después de cada venta cambia lo que queda. Si falla, no pasa nada. */
+  async function refrescarAvisos() {
+    try {
+      alertas = await api.obtener('/inventario/avisos');
+      pintarAvisos();
+      pintarRejilla();
+    } catch { /* el cajero no siempre puede ver inventario; sin aviso y ya */ }
   }
 
   function pintarLineas() {
@@ -449,8 +742,15 @@ export async function vistaVenta(pantalla, estadoApp) {
         <button class="miga" data-volver>‹ Categorías</button>
         <span class="miga-actual">${esc(cat?.nombre || '')}</span>`;
 
-      refs.rejilla.innerHTML = suyos.map((p) => `
-        <button class="pos-boton" data-producto="${esc(p.id)}"
+      refs.rejilla.innerHTML = suyos.map((p) => {
+        const quedan = quedanDe(p);
+        const vacio = quedan <= 0;
+        // Lo que ya no hay se ve muerto y no responde: es más claro que
+        // dejar tocarlo y contestar con un aviso cada vez.
+        const poco = !vacio && Number.isFinite(quedan) && p.minimo && quedan <= p.minimo;
+        return `
+        <button class="pos-boton ${vacio ? 'pos-boton-vacio' : ''}" data-producto="${esc(p.id)}"
+                ${vacio ? 'disabled' : ''}
                 style="${p.color || p.categoria_color
                   ? `--tono:${esc(p.color || p.categoria_color)}` : ''}">
           ${p.codigo ? `<span class="pos-boton-codigo">${esc(p.codigo)}</span>` : ''}
@@ -458,7 +758,10 @@ export async function vistaVenta(pantalla, estadoApp) {
           <span class="pos-boton-precio">${p.tipo === 'hielo'
             ? pesos(precioHielo(p.dieciseisavos))
             : pesos(p.precio_centavos)}</span>
-        </button>`).join('')
+          ${vacio ? '<span class="pos-boton-marca">se acabó</span>'
+            : poco ? `<span class="pos-boton-marca poco">quedan ${quedan}</span>` : ''}
+        </button>`;
+      }).join('')
         || '<p class="vacio">Esta categoría no tiene productos.</p>';
     }
 
@@ -475,17 +778,45 @@ export async function vistaVenta(pantalla, estadoApp) {
     if (volver) volver.onclick = () => { categoriaAbierta = null; pintarRejilla(); enfocar(); };
   }
 
-  /** El cartel que dice qué hace enter ahora mismo. */
+  /**
+   * El renglón de abajo: reloj y nombre del negocio a la izquierda, y a la
+   * derecha el cartel que dice qué hace enter ahora mismo.
+   *
+   * El reloj vivía en la franja azul de arriba. Aquí abajo ocupa un hueco
+   * que de todos modos estaba vacío, y esa franja entera —cien píxeles de
+   * alto— se le devuelve a los botones.
+   */
   function pintarPista() {
     const f = FASES[fase];
     refs.pista.innerHTML = `
-      <span><kbd>Enter</kbd> ${esc(f.enter)}</span>
-      <span><kbd>Esc</kbd> ${esc(f.esc)}</span>
-      ${fase === 'venta' ? `
-        <span><kbd>F10</kbd> cobrar</span>
-        <span><kbd>F2</kbd> nueva venta</span>
-        <span><kbd>F3</kbd> tickets</span>
-        <span><kbd>F4</kbd> cambio</span>` : ''}`;
+      <span class="pos-reloj">
+        <strong id="pos-hora">—</strong>
+        <small id="pos-fecha"></small>
+      </span>
+      ${marca.nombreNegocio
+        ? `<span class="pos-marca">${esc(marca.nombreNegocio)}</span>` : ''}
+      <span class="pos-teclas">
+        <span><kbd>Enter</kbd> ${esc(f.enter)}</span>
+        <span><kbd>Esc</kbd> ${esc(f.esc)}</span>
+        ${fase === 'venta' ? `
+          <span><kbd>F10</kbd> cobrar</span>
+          <span><kbd>F2</kbd> nueva venta</span>
+          <span><kbd>F3</kbd> tickets</span>
+          <span><kbd>F4</kbd> cambio</span>` : ''}
+      </span>`;
+    pintarHora();
+  }
+
+  function pintarHora() {
+    const ahora = new Date();
+    const hora = pantalla.querySelector('#pos-hora');
+    const dia = pantalla.querySelector('#pos-fecha');
+    if (!hora) return;
+    hora.textContent = ahora.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+    if (dia) {
+      dia.textContent = ahora.toLocaleDateString('es-MX',
+        { weekday: 'short', day: 'numeric', month: 'short' });
+    }
   }
 
   function enfocar() {
@@ -560,6 +891,8 @@ export async function vistaVenta(pantalla, estadoApp) {
   function avanzar() {
     if (fase === 'historial') return;      // el buscador se encarga solo
     if (fase === 'espera') return;
+    if (fase === 'avisos') return;
+    if (fase === 'movimientos') return;
     if (fase === 'venta')   return agregarPorCodigo();
     if (fase === 'cobro')   return calcularCambio();
     if (fase === 'cambio')  return registrar();
@@ -569,6 +902,8 @@ export async function vistaVenta(pantalla, estadoApp) {
   function retroceder() {
     if (fase === 'historial') { cerrarHistorial(); return; }
     if (fase === 'espera') { cerrarEspera(); return; }
+    if (fase === 'avisos') { cerrarAvisos(); return; }
+    if (fase === 'movimientos') { cerrarAvisos(); return; }
     if (fase === 'venta') {
       if (refs.codigo.value) { refs.codigo.value = ''; return; }
       if (cambiando) { cambiando = null; pintarTodo(); return; }
@@ -587,8 +922,10 @@ export async function vistaVenta(pantalla, estadoApp) {
     const p = porCodigo(codigo);
     if (!p) { avisar(`No hay ningún producto con el código ${codigo}`, 'error'); return; }
 
-    agregarProducto(p);
+    // Se limpia siempre, aunque no se pueda agregar: si el código se queda
+    // en el campo, el siguiente que teclee sale pegado al anterior.
     refs.codigo.value = '';
+    agregarProducto(p);
   }
 
   async function vaciar() {
@@ -760,6 +1097,9 @@ export async function vistaVenta(pantalla, estadoApp) {
       fase = 'cobrada';
       pintarCobrada();
       pintarPista();
+      // Lo que quedaba cambió con esta venta. Se vuelve a preguntar en
+      // segundo plano: nadie espera por la bolita.
+      refrescarAvisos();
       // NO se imprime solo: no todos los tickets se entregan, y cada uno
       // que sale sin que nadie lo pida es papel tirado. Enter imprime.
     } catch (e) {
@@ -988,6 +1328,9 @@ export async function vistaVenta(pantalla, estadoApp) {
       const { ventas } = await api.obtener(
         `/ventas?limite=25&busca=${encodeURIComponent(busca || '')}`);
 
+      // «Ver» abre lo que traía el ticket sin salir de la lista. Es la
+      // pregunta de verdad —"¿qué se llevó?"— y antes había que imprimir
+      // una copia para contestarla, o sea gastar papel para leer.
       caja.innerHTML = ventas.length ? ventas.map((v) => `
         <div class="ticket-fila ${v.cancelada_en ? 'anulada' : ''}">
           <div class="crece">
@@ -995,9 +1338,15 @@ export async function vistaVenta(pantalla, estadoApp) {
             <small>${esc(formatoFecha(v.fecha))} · ${esc(v.cajero_nombre || '—')}</small>
           </div>
           <span class="ticket-fila-total">${pesos(v.total_centavos)}</span>
+          <button class="secundario chico" data-ver="${esc(v.id)}">Ver</button>
           <button class="secundario chico" data-reimprimir="${esc(v.id)}">Copia</button>
-        </div>`).join('')
+        </div>
+        <div class="ticket-detalle" data-detalle="${esc(v.id)}" hidden></div>`).join('')
         : '<p class="vacio" style="padding:20px 0">No hay tickets que coincidan.</p>';
+
+      caja.querySelectorAll('[data-ver]').forEach((b) => {
+        b.onclick = () => verQueTraia(b);
+      });
 
       caja.querySelectorAll('[data-reimprimir]').forEach((b) => {
         b.onclick = async () => {
@@ -1009,6 +1358,51 @@ export async function vistaVenta(pantalla, estadoApp) {
       });
     } catch (e) {
       caja.innerHTML = `<p class="vacio">${esc(e.message)}</p>`;
+    }
+  }
+
+  /** Lo que traía un ticket, desplegado bajo su renglón. */
+  async function verQueTraia(boton) {
+    const id = boton.dataset.ver;
+    const caja = refs.cobro.querySelector(`[data-detalle="${CSS.escape(id)}"]`);
+    if (!caja) return;
+
+    if (!caja.hidden) { caja.hidden = true; boton.textContent = 'Ver'; return; }
+
+    caja.hidden = false;
+    boton.textContent = 'Cerrar';
+    caja.innerHTML = '<p class="ayuda" style="margin:0">Buscando…</p>';
+
+    try {
+      const { venta } = await api.obtener(`/ventas/${id}`);
+      caja.innerHTML = `
+        <table class="venta-lineas">
+          ${venta.lineas.map((l) => `
+            <tr>
+              <td class="detalle">
+                ${l.dieciseisavos
+                  ? `<strong>${esc(l.texto)}</strong> de ${esc(l.concepto.toLowerCase())}`
+                  : `${l.cantidad > 1 ? `<strong>${l.cantidad}</strong> × ` : ''}${esc(l.concepto)}`}
+              </td>
+              <td class="importe">${pesos(l.precio_centavos)}</td>
+            </tr>`).join('')}
+          <tr class="total">
+            <td class="detalle"><strong>Total</strong></td>
+            <td class="importe"><strong>${pesos(venta.total_centavos)}</strong></td>
+          </tr>
+        </table>
+        ${venta.pago_centavos ? `
+          <p class="ayuda" style="margin:6px 0 0">
+            Pagó ${pesos(venta.pago_centavos)}${venta.cambio_centavos
+              ? ` · cambio ${pesos(venta.cambio_centavos)}` : ' justo'}
+          </p>` : ''}
+        ${venta.cancelada_en ? `
+          <p class="ayuda" style="margin:6px 0 0">
+            <strong>Cancelado</strong>${venta.motivo_cancelacion
+              ? ': ' + esc(venta.motivo_cancelacion) : ''}
+          </p>` : ''}`;
+    } catch (e) {
+      caja.innerHTML = `<p class="ayuda" style="margin:0">${esc(e.message)}</p>`;
     }
   }
 
@@ -1031,6 +1425,37 @@ export async function vistaVenta(pantalla, estadoApp) {
     if (n) { hielo += n; pintarTodo(); }
     enfocar();
   };
+
+  // ==========================================================
+  // LOS BOTONES RÁPIDOS DE LA DERECHA
+  //
+  // El cajero pasa el día en esta pantalla. Ir al menú, buscar Existencia
+  // y volver son cuatro toques que se hacen veinte veces al día; desde
+  // aquí es uno. Antes de salir, lo que esté capturado se aparta solo:
+  // nunca se pierde un ticket a medias por tocar un botón de al lado.
+  // ==========================================================
+  function salirA(destino) {
+    if (hayAlgo() && !cambiando) apartarVenta();
+    if (cambiando) {
+      avisar('Termina el cambio antes de salir de la pantalla', 'error');
+      enfocar();
+      return;
+    }
+    location.hash = destino;
+  }
+
+  const irExistencia = pantalla.querySelector('#ir-existencia');
+  if (irExistencia) irExistencia.onclick = () => salirA('#/existencia');
+  const irNumeros = pantalla.querySelector('#ir-numeros');
+  if (irNumeros) irNumeros.onclick = () => salirA('#/tanques');
+  const irTurno = pantalla.querySelector('#terminar-turno');
+  if (irTurno) irTurno.onclick = () => salirA('#/caja');
+  const verMovs = pantalla.querySelector('#ver-movimientos');
+  if (verMovs) verMovs.onclick = () => verMovimientos();
+
+  // El menú es el de siempre; aquí solo se le presta un botón.
+  pantalla.querySelector('#pos-menu').onclick =
+    () => document.getElementById('btn-menu')?.click();
 
   pantalla.querySelector('#cobrar').onclick = irACobro;
   pantalla.querySelector('#historial').onclick = () => verHistorial();

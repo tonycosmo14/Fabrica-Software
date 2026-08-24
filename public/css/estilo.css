@@ -1705,10 +1705,23 @@ body.pantalla-fija main {
 
 /* El cartel que dice qué hace enter ahora. Es lo que hace que el
    teclado se aprenda sin manual. */
+/* El renglón de abajo: reloj y negocio a la izquierda, teclas a la
+   derecha. Aquí abajo el reloj no le quita sitio a nada. */
 .pos-pista {
-  display: flex; gap: 14px; flex-wrap: wrap;
+  display: flex; gap: 14px; flex-wrap: wrap; align-items: center;
   font-size: 12.5px; color: var(--suave);
 }
+.pos-reloj { display: flex; align-items: baseline; gap: 7px; }
+.pos-reloj strong {
+  font-size: 15px; font-weight: 800; color: var(--texto);
+  font-variant-numeric: tabular-nums;
+}
+.pos-reloj small { font-size: 11.5px; }
+.pos-marca {
+  font-weight: 800; letter-spacing: .3px; color: var(--primario);
+  padding-left: 12px; border-left: 1px solid var(--borde);
+}
+.pos-teclas { display: flex; gap: 14px; flex-wrap: wrap; margin-left: auto; }
 .pos-pista kbd {
   background: var(--superficie-alt); border: 1px solid var(--borde-fuerte);
   border-bottom-width: 2px; border-radius: 5px;
@@ -1890,6 +1903,156 @@ body.pantalla-fija main {
   border-radius: 5px; padding: 1px 6px; font-size: 11px; color: var(--suave);
 }
 .pos-accion-cambio { border-color: var(--acento); color: var(--primario); }
+
+/* ---------- Los avisos de la caja (v1.5) ----------
+
+   Van al final de la fila de acciones, pegados a la derecha, y SOLO
+   aparecen cuando hay algo que decir. Un aviso que está siempre deja de
+   verse a la semana. */
+/* Todo lo de la derecha va junto: avisos, atajos y quién está en la caja.
+   En PC se pega al borde derecho; en el celular baja a su propio renglón. */
+.pos-derecha {
+  margin-left: auto; display: flex; align-items: center; gap: 10px;
+}
+.pos-avisos { display: flex; gap: 8px; }
+
+/* Cuadrado, no un botón largo: en PC la regla general estira los botones
+   a 200 px y estos dos son símbolos, no botones de texto. */
+.pos-aviso {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  width: 56px; min-width: 56px; max-width: 56px; padding: 0; flex: 0 0 auto;
+  background: var(--superficie); border: 2px solid var(--borde-fuerte);
+}
+.pos-aviso-icono { font-size: 23px; line-height: 1; }
+.pos-aviso.agotado { border-color: var(--rojo); background: var(--et-baja-f); }
+.pos-aviso.agotado .pos-aviso-icono { color: var(--rojo); }
+.pos-aviso:not(.agotado) .pos-aviso-icono { color: var(--et-baja-t); }
+.pos-aviso-hielo { border-color: var(--primario); }
+
+/* La bolita con el número. Es lo que se ve de reojo desde el mostrador. */
+.pos-burbuja {
+  position: absolute; top: -7px; right: -7px;
+  min-width: 22px; height: 22px; padding: 0 5px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 999px; background: var(--rojo); color: #fff;
+  font-size: 12.5px; font-weight: 800; line-height: 1;
+  border: 2px solid var(--fondo);
+}
+
+/* Lo que ya no hay: el botón se ve muerto y no responde */
+.pos-boton-vacio {
+  opacity: .45; filter: grayscale(1); cursor: not-allowed;
+}
+.pos-boton-marca {
+  position: absolute; bottom: 4px; right: 6px;
+  font-size: 10px; font-weight: 800; letter-spacing: .3px;
+  text-transform: uppercase; color: var(--rojo);
+}
+.pos-boton-marca.poco { color: var(--suave); }
+
+.aviso-quedan {
+  font-size: 13px; font-weight: 800; white-space: nowrap;
+  padding: 4px 10px; border-radius: 999px;
+}
+.aviso-quedan.bajo { background: var(--et-operario-f); color: var(--et-operario-t); }
+.aviso-quedan.agotado {
+  background: var(--et-baja-f); color: var(--et-baja-t);
+  box-shadow: inset 0 0 0 1.5px var(--et-baja-t);
+}
+
+/* ---------- Los botones chicos de la fila de arriba (v1.5) ----------
+
+   Cuadrados de icono, sin texto: son los atajos, no los protagonistas.
+   La regla general estira los botones a 200 px en PC; aquí no. */
+.pos-rapidos { display: flex; gap: 6px; }
+.pos-chico {
+  display: flex; align-items: center; justify-content: center;
+  width: 46px; min-width: 46px; max-width: 46px; padding: 0; flex: 0 0 auto;
+  font-size: 19px; background: var(--superficie);
+  border: 1px solid var(--borde); color: var(--texto);
+}
+.pos-chico:hover { border-color: var(--borde-fuerte); }
+
+/* Quién está en la caja. Va aquí y no en una franja aparte. */
+.pos-quien { display: flex; align-items: center; gap: 8px; }
+.pos-quien-nombre {
+  display: flex; flex-direction: column; line-height: 1.15; text-align: right;
+}
+.pos-quien-nombre strong { font-size: 13.5px; font-weight: 800; }
+.pos-quien-nombre small { font-size: 11px; color: var(--suave); }
+#pos-menu { font-size: 21px; }
+/* «№» es texto, no emoji: sin él se vería la caja de "1234" que dibuja el
+   sistema cuando no tiene la fuente del emoji. */
+.pos-chico-texto { font-size: 19px; font-weight: 800; }
+
+/* En el celular la fila de arriba se aprieta: tres botones a lo ancho, sin
+   las teclas de función (en un teléfono no hay F2), y el nombre del cajero
+   fuera. Son cuatro renglones que se vuelven dos. */
+@media (max-width: 619px) {
+  .pos-accion {
+    flex: 1 1 0; width: auto; min-width: 0; justify-content: center;
+    padding: 10px 6px; font-size: 14px; gap: 4px;
+  }
+  .pos-accion small { display: none; }
+  .pos-quien-nombre { display: none; }
+  /* Los tres botones grandes se reparten el primer renglón; los atajos
+     bajan al segundo. Que no se aplasten unos con otros. */
+  .pos-derecha { flex-basis: 100%; margin-left: 0; gap: 8px; }
+  .pos-rapidos { margin-left: auto; }
+  .pos-aviso { width: 48px; min-width: 48px; max-width: 48px; }
+  .pos-chico { width: 42px; min-width: 42px; max-width: 42px; }
+  /* Sin teclado no hay teclas que recordar: tres renglones de pistas que
+     en un teléfono solo estorban. El reloj y el negocio sí se quedan. */
+  .pos-teclas { display: none; }
+}
+
+.pos-lista-avisos .lista-tickets { max-height: 46vh; overflow-y: auto; }
+
+/* ---------- El historial del cajón (v1.5) ----------
+
+   Más ancho que el cuadro de cobrar: aquí se leen conceptos ("Retiro a la
+   caja fuerte") que en 440 px se parten en tres renglones. */
+.pos-movimientos, .pos-historial { width: min(600px, 100%); }
+.pos-movimientos .lista-tickets { max-height: 52vh; overflow-y: auto; }
+.pos-movimientos .crece strong { line-height: 1.2; }
+
+/* La raya que parte la lista donde cambia el turno. */
+.raya-turno {
+  display: flex; align-items: center; gap: 10px;
+  margin: 14px 0 4px; font-size: 11.5px; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .5px; color: var(--suave);
+}
+.raya-turno::after {
+  content: ''; flex: 1; height: 2px; background: var(--borde-fuerte);
+}
+.raya-turno:first-child { margin-top: 0; }
+
+.mov-importe {
+  font-size: 15px; font-weight: 800; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  min-width: 108px; text-align: right;
+}
+/* Las entradas no llevan botón de comprobante; el hueco se deja igual para
+   que la columna de importes quede pareja. */
+.mov-entrada::after { content: ''; width: 84px; flex: 0 0 84px; }
+.mov-salida .mov-importe { color: var(--rojo); }
+/* Meter dinero no se le reclama a nadie: se ve, pero sin gritar. */
+.mov-entrada { opacity: .72; }
+.mov-entrada .mov-importe { color: var(--suave); font-weight: 700; }
+
+/* Lo que traía un ticket, desplegado bajo su renglón. */
+.ticket-detalle {
+  padding: 4px 0 12px 14px; margin-bottom: 6px;
+  border-left: 3px solid var(--borde-fuerte);
+}
+.ticket-detalle .venta-lineas { margin: 0; }
+/* Lo agotado se apaga, pero NO se tacha: tachado se lee como cancelado, y
+   el producto sigue existiendo; lo que no hay son piezas. */
+.fila-agota.sin-nada .crece strong { color: var(--suave); }
+
+.pos-aviso-caja { text-align: center; }
+.pos-aviso-grande { font-size: 48px; line-height: 1; margin-bottom: 6px; }
+.pos-aviso-caja .ayuda { text-align: left; }
 
 .etiqueta-espera {
   background: var(--et-repartidor-f); color: var(--et-repartidor-t);

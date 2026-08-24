@@ -3,7 +3,7 @@
 Sistema para la fábrica de hielo de Hunucmá, Yucatán.
 Se construye **por versiones**: cada versión es un pedazo terminado, probado y usable.
 
-**Versión actual: v1.4**
+**Versión actual: v1.5**
 
 ---
 
@@ -141,11 +141,22 @@ datos/                 Base de datos, respaldos, logo y fotos (no se sube a GitH
 
 ---
 
-## Cómo se cobra en la caja (v0.10)
+## Cómo se cobra en la caja (v0.10, ampliado en v1.5)
 
 La pantalla que se abre al entrar. Izquierda lo que lleva el cliente,
 derecha los botones, y **no se desplaza**: todo está siempre en el mismo
 sitio.
+
+Desde la v1.5 se queda con la pantalla **entera**: la franja azul de arriba
+no se dibuja aquí. El reloj, la fecha y el nombre del negocio se fueron al
+renglón de las teclas, que estaba medio vacío, y el menú y quién está en la
+caja se metieron en la fila de los botones. En la fábrica esos cien píxeles
+de alto valen más como botón que como adorno.
+
+Arriba a la derecha viven los avisos (⚠ con el número de productos bajos,
+🧊 si queda poco hielo) y los atajos discretos: existencia, números de los
+tanques, gastos del cajón y terminar el turno. Si había un ticket a medias,
+se aparta solo antes de salir.
 
 ### Sin soltar el teclado
 
@@ -291,6 +302,28 @@ Lo que cambia es el ritmo. El hielo se cuenta dos veces al día porque se
 derrite y es el 80% del negocio; un refresco se cuenta cuando toca. Meterlos
 en la misma pantalla obligaría a uno de los dos a fingir el ritmo del otro.
 
+### Y por eso avisan distinto (v1.5)
+
+De un refresco el sistema sabe **exactamente** cuántos hay: entraron 24, se
+vendieron 20, quedan 4. Si dice cero, es cero. Venderlo solo genera un
+problema en el mostrador, así que **se bloquea**: el botón se ve apagado y
+teclear su código tampoco lo mete al ticket.
+
+Del hielo **no lo sabe**. Los obreros sacan hielo toda la mañana y reportan
+lo que sacaron hasta como las **3 de la tarde**, porque están atendiendo y
+sacando al mismo tiempo. El número del sistema es *lo que se ha capturado*,
+no *lo que hay*: a media mañana el cuarto frío puede estar lleno y el
+sistema marcar cero.
+
+Por eso el hielo tiene su propio símbolo 🧊 y **avisa sin bloquear nunca**.
+Parar la venta de hielo por un dato que todavía no llega sería parar la
+fábrica.
+
+Todo esto pasa por un solo punto —`alcanza(producto, cantidad)` en
+`src/modulos/catalogo/avisos.js`—, y el servidor lo revisa otra vez al
+cobrar: el navegador solo se adelanta para no armar un ticket que se va a
+caer.
+
 ---
 
 ## El relevo de turno
@@ -414,8 +447,8 @@ versión nueva le aparece un punto rojo en el menú.
 | **v1.2** | Ventas en espera y cambios de ticket | ✅ listo |
 | **v1.3** | Productos con foto, costo e inventario | ✅ listo |
 | **v1.4** | Editar sin formularios, recuperar bajas, márgenes | ✅ listo |
-| v1.5 | Vender con más pantalla, historiales y accesos rápidos | siguiente |
-| v1.6 | Clientes registrados y crédito | |
+| **v1.5** | Avisos de inventario, no vender lo que no hay, más pantalla para vender | ✅ listo |
+| v1.6 | Clientes registrados y crédito | siguiente |
 | v1.7 | Reparto, pedidos y neveras en comodato | |
 | v1.8 | Planta de agua: garrafones, botellas y depósitos | |
 | v1.9 | Mantenimiento: compresores, ósmosis, membranas, horario punta | |

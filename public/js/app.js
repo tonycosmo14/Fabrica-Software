@@ -32,7 +32,10 @@ const estado = { usuario: null, permisos: [], configurado: true };
 const RUTAS = {
   '#/inicio':    { titulo: 'Inicio',            vista: vistaInicio },
   '#/tanques':   { titulo: 'Producción',        vista: vistaProduccion, permiso: 'produccion.ver' },
-  '#/venta':     { titulo: 'Punto de venta',    vista: vistaVenta,     permiso: 'venta.registrar', fija: true },
+  // El punto de venta se queda con TODA la pantalla: arma su propio
+  // encabezado adentro para no pagar dos veces por la misma franja.
+  '#/venta':     { titulo: 'Punto de venta',    vista: vistaVenta,     permiso: 'venta.registrar',
+                   fija: true, sinBarra: true },
   '#/caja':      { titulo: 'Caja',              vista: vistaCaja,      permiso: 'caja.ver' },
   '#/existencia': { titulo: 'Existencia',       vista: vistaExistencia, permiso: 'existencia.ver' },
   '#/config-tanques': { titulo: 'Configurar tanques', vista: vistaTanques, permiso: 'tanques.configurar' },
@@ -80,8 +83,11 @@ async function dibujar() {
     return vistaEntrar(pantalla, { alEntrar: entrar });
   }
 
-  barra.hidden = false;
   const ruta = RUTAS[location.hash] || RUTAS['#/inicio'];
+  // En el punto de venta la franja de arriba la pinta la vista, con el
+  // reloj y el menú metidos entre sus propios botones: son 100 px de alto
+  // que se ganan justo donde más falta hacen.
+  barra.hidden = Boolean(ruta.sinBarra);
 
   if (!puede(ruta.permiso)) {
     pantalla.innerHTML = '<p class="vacio">Tu rol no tiene acceso a esta pantalla.</p>';

@@ -23,6 +23,7 @@ const { listaActiva, preciosDe, precioDe, sugerencia } = require('./precios');
 const { sesionAbierta } = require('../caja/calculo');
 const { productoPorId, productoPorCodigo, cotizar,
         categoriasActivas, productosActivos } = require('../catalogo/catalogo');
+const { alcanza, avisos } = require('../catalogo/avisos');
 
 const router = express.Router();
 
@@ -60,7 +61,8 @@ router.get('/contexto', vender, (req, res) => {
     siguienteFolio: ultimoFolio + 1,
     caja: caja ? { folio: caja.folio, cajero: caja.cajero_nombre } : null,
     categorias: categoriasActivas(),
-    productos: productosActivos()
+    productos: productosActivos(),
+    avisos: avisos()
   });
 });
 
@@ -159,6 +161,12 @@ function prepararLineas(lineas, lista) {
       try { validar(sueltos); } catch { return { error: 'Cantidad inválida en una línea.' }; }
       if (sueltos <= 0) return { error: 'Cantidad fuera de rango.' };
     }
+
+    // No se vende lo que no hay. Solo aplica a lo que lleva cuenta de
+    // piezas: el hielo pasa siempre, porque su número depende de que los
+    // obreros hayan reportado, y eso no llega hasta la tarde.
+    const falta = alcanza(producto, cantidad);
+    if (falta) return { error: falta, codigo: 409 };
 
     const c = cotizar({ producto, dieciseisavos: sueltos, listaId: lista.id, cantidad });
 
