@@ -29,10 +29,17 @@ test('la fábrica arranca con el hielo dado de alta', async () => {
   const { json } = await llamar('/api/catalogo');
   assert.equal(json.datos.categorias.length, 1);
   assert.equal(json.datos.categorias[0].nombre, 'Hielo');
-  assert.equal(json.datos.productos.length, 5);
+  assert.equal(json.datos.productos.length, 7);
 
   const codigos = json.datos.productos.map((p) => p.codigo).sort();
-  assert.deepEqual(codigos, ['1', '116', '12', '14', '18']);
+  assert.deepEqual(codigos, ['1', '116', '12', '12M', '14', '18', '1M'],
+                   'las cinco fracciones de público, y las dos de mayoreo (v2.0)');
+
+  // Los de mayoreo NO tienen precio propio: su precio sale de la lista del
+  // cliente. Un precio propio aquí sería un segundo lugar donde cambiarlo.
+  const mayoreo = json.datos.productos.filter((p) => p.mayoreo);
+  assert.equal(mayoreo.length, 2);
+  assert.deepEqual(mayoreo.map((p) => p.dieciseisavos).sort((a, b) => a - b), [8, 16]);
 });
 
 /**

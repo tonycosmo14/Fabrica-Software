@@ -64,9 +64,15 @@ function pegar(donde) {
  */
 function historial(opciones = {}) {
   const limite = Math.min(Math.max(Number(opciones.limite) || 100, 1), 1000);
-  const tipos = Array.isArray(opciones.tipos) && opciones.tipos.length
+  let tipos = Array.isArray(opciones.tipos) && opciones.tipos.length
     ? opciones.tipos.filter((t) => TIPOS.includes(t))
     : TIPOS;
+
+  // BUSCAR POR NÚMERO DE TICKET. Es la pregunta más común del mundo —"a ver
+  // el #412"— y no tiene sentido en un gasto ni en un abono, que no llevan
+  // folio: buscando un número, solo hay ventas.
+  const folio = Number.isInteger(opciones.folio) ? opciones.folio : null;
+  if (folio !== null) tipos = ['venta'];
 
   const filas = [];
 
@@ -76,17 +82,32 @@ function historial(opciones = {}) {
   // (regla 3.6, el relevo de las 2:30).
   if (tipos.includes('venta')) {
     const { donde, valores } = filtros(opciones, 'v.fecha', 'v.capturista_id');
+    if (folio !== null) { donde.push('v.folio = ?'); valores.push(folio); }
     filas.push(...bd.prepare(`
       SELECT 'venta' AS tipo, v.id, v.fecha, v.folio,
              v.total_centavos AS centavos, v.forma_pago,
              v.cancelada_en, v.motivo_cancelacion,
              u.nombre AS quien, cj.nombre AS cajero,
-             cl.nombre AS cliente, c.folio AS turno
+             cl.nombre AS cliente, c.folio AS turno,
+             v.caja_id,
+             -- La pareja del cambio, para poder decir "#5 cambiado por #8"
+             -- en los dos renglones y no dejar ninguno huérfano.
+             viejo.folio AS cambio_de,
+             nuevo.folio AS cambiado_por,
+             lp.tipo AS lista_tipo, v.lista_nombre,
+             -- Qué se llevó, en corto: "5 marquetas, 2 Coca".
+             (SELECT group_concat(
+                       CASE WHEN vl.cantidad > 1 THEN vl.cantidad || ' × ' || vl.concepto
+                            ELSE vl.concepto END, ', ')
+                FROM venta_lineas vl WHERE vl.venta_id = v.id) AS detalle
         FROM ventas v
         LEFT JOIN usuarios u  ON u.id = v.capturista_id
         LEFT JOIN usuarios cj ON cj.id = v.cajero_id
         LEFT JOIN clientes cl ON cl.id = v.cliente_id
         LEFT JOIN cajas c     ON c.id = v.caja_id
+        LEFT JOIN ventas viejo ON viejo.id = v.cambio_de_venta_id
+        LEFT JOIN ventas nuevo ON nuevo.id = v.cambiada_por_venta_id
+        LEFT JOIN listas_precios lp ON lp.id = v.lista_id
        ${pegar(donde)}
        ORDER BY v.fecha DESC LIMIT ?
     `).all(...valores, limite));
@@ -107,7 +128,9 @@ function historial(opciones = {}) {
              m.id, m.fecha, NULL AS folio, m.centavos, NULL AS forma_pago,
              m.anulado_en AS cancelada_en, m.motivo_anulacion AS motivo_cancelacion,
              u.nombre AS quien, e.nombre AS cajero,
-             m.concepto AS cliente, c.folio AS turno
+             m.concepto AS cliente, c.folio AS turno, m.caja_id,
+             NULL AS cambio_de, NULL AS cambiado_por,
+             NULL AS lista_tipo, NULL AS lista_nombre, m.concepto AS detalle
         FROM movimientos_caja m
         LEFT JOIN usuarios u ON u.id = m.capturista_id
         LEFT JOIN usuarios e ON e.id = m.ejecutor_id
@@ -124,7 +147,10 @@ function historial(opciones = {}) {
       SELECT 'abono' AS tipo, a.id, a.fecha, NULL AS folio, a.centavos, a.forma_pago,
              a.anulado_en AS cancelada_en, a.motivo_anulacion AS motivo_cancelacion,
              u.nombre AS quien, e.nombre AS cajero,
-             cl.nombre AS cliente, c.folio AS turno
+             cl.nombre AS cliente, c.folio AS turno, a.caja_id,
+             NULL AS cambio_de, NULL AS cambiado_por,
+             NULL AS lista_tipo, NULL AS lista_nombre,
+             'Abono a su cuenta' AS detalle
         FROM abonos a
         LEFT JOIN usuarios u  ON u.id = a.capturista_id
         LEFT JOIN usuarios e  ON e.id = a.ejecutor_id

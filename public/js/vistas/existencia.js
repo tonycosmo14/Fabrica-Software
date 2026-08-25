@@ -19,7 +19,7 @@
  */
 import { api } from '../api.js';
 import { esc, avisar, fecha as formatoFecha } from '../util.js';
-import { pedirTexto, pedirCantidad } from '../dialogo.js';
+import { pedirTexto, pedirCantidad, menu } from '../dialogo.js';
 import { aTexto } from '../fracciones.js';
 
 /** "+3", "−1/2"... pero un cero se escribe "0" a secas, sin signo. */
@@ -62,6 +62,56 @@ export async function vistaExistencia(pantalla, estadoApp) {
     pantalla.querySelectorAll('[data-contar]').forEach((b) => {
       b.onclick = () => hacerConteo(almacenes.find((a) => a.almacen.id === b.dataset.contar));
     });
+    pantalla.querySelectorAll('[data-merma]').forEach((b) => {
+      b.onclick = () => anotarMerma(almacenes.find((a) => a.almacen.id === b.dataset.merma));
+    });
+  }
+
+  /**
+   * ANOTAR LO QUE SE PERDIÓ.
+   *
+   * Antes, el hielo que se derretía aparecía dentro del "faltante" a secas,
+   * mezclado con el que se fue sin pagar. Son dos cosas muy distintas: una
+   * es física y no tiene remedio, la otra es un problema. Anotarlo es lo
+   * que separa las dos.
+   */
+  async function anotarMerma(a) {
+    const dieciseisavos = await pedirCantidad({
+      titulo: `Merma en ${a.almacen.nombre}`,
+      texto: 'Hielo que salió del cuarto frío sin pasar por la caja.',
+      valor: 0, ok: 'Siguiente',
+      ayuda: 'Escríbelo como se dicta: "2 marquetas y 1/4".'
+    });
+    if (!dieciseisavos) return;
+
+    const motivo = await menu({
+      titulo: `${aTexto(dieciseisavos)} de hielo`,
+      texto: '¿Qué le pasó?',
+      opciones: [
+        { valor: 'derretida',   texto: '💧 Se derritió' },
+        { valor: 'rota',        texto: '🧊 Se rompió o se cayó' },
+        { valor: 'regalada',    texto: '🎁 Se regaló' },
+        { valor: 'autoconsumo', texto: '🏭 Se usó en la fábrica' },
+        { valor: 'otro',        texto: '· Otra cosa' }
+      ]
+    });
+    if (!motivo) return;
+
+    const notas = motivo === 'otro'
+      ? await pedirTexto({
+          titulo: '¿Qué pasó?', texto: 'Una línea basta.',
+          marcador: 'Se cayó la puerta del cuarto', ok: 'Anotar', largo: 200, unaLinea: true
+        })
+      : '';
+    if (motivo === 'otro' && !notas) return;
+
+    try {
+      await api.enviar('/existencia/mermas', {
+        almacenId: a.almacen.id, dieciseisavos, motivo, notas
+      });
+      avisar(`Anotadas ${aTexto(dieciseisavos)} de merma`, 'bien');
+      await pintar();
+    } catch (e) { avisar(e.message, 'error'); }
   }
 
   /** La tarjeta de un cuarto frío: cómo va y qué debería haber. */
@@ -92,11 +142,25 @@ export async function vistaExistencia(pantalla, estadoApp) {
             <span>+ Salió de los tanques desde entonces</span>
             <strong>${t.producido}</strong>
           </div>
-          ${a.vendido ? `
+          ${a.vendido || a.merma ? `
             <div class="cuadre-linea"><span>= Debería haber</span><strong>${t.teorico}</strong></div>` : ''}
+
+          <!-- EL DESGLOSE DE LA SALIDA. Público y mayoreo son dos negocios
+               distintos —el mostrador de a cuarto y el que se lleva veinte
+               marquetas—, y ver cuánto pesa cada uno es la mitad de saber
+               cómo va la fábrica. Lo derretido va aparte porque no es una
+               venta: es hielo que se perdió. -->
           <div class="cuadre-linea vendido">
-            <span>− Se vendió con ticket</span>
-            <strong>${t.vendido}</strong>
+            <span>− Se vendió al público</span>
+            <strong>${t.vendidoPublico}</strong>
+          </div>
+          <div class="cuadre-linea vendido">
+            <span>− Se vendió a mayoreo</span>
+            <strong>${t.vendidoMayoreo}</strong>
+          </div>
+          <div class="cuadre-linea vendido">
+            <span>− Derretidas, rotas o regaladas</span>
+            <strong>${t.merma}</strong>
           </div>
           <div class="cuadre-linea total">
             <span>= Debería haber ahora</span>
@@ -104,11 +168,18 @@ export async function vistaExistencia(pantalla, estadoApp) {
           </div>
         </div>
 
-        ${puedeContar
-          ? `<button data-contar="${esc(a.almacen.id)}" style="margin-top:14px">
-               📋 Contar el ${esc(a.almacen.nombre.toLowerCase())}
-             </button>`
-          : ''}
+        <div class="fila-botones" style="margin-top:14px;flex-wrap:wrap">
+          ${puedeContar
+            ? `<button class="crece" data-contar="${esc(a.almacen.id)}">
+                 📋 Contar el ${esc(a.almacen.nombre.toLowerCase())}
+               </button>`
+            : ''}
+          ${puedeContar
+            ? `<button class="secundario" data-merma="${esc(a.almacen.id)}">
+                 💧 Anotar merma
+               </button>`
+            : ''}
+        </div>
       </div>`;
   }
 
@@ -163,6 +234,8 @@ export async function vistaExistencia(pantalla, estadoApp) {
             ${r.vendido ? `
               <div class="cuadre-linea"><span>= Debería haber</span><strong>${aTexto(r.teorico)}</strong></div>` : ''}
             <div class="cuadre-linea vendido"><span>− Se vendió con ticket</span><strong>${aTexto(r.vendido)}</strong></div>
+            ${r.merma ? `
+              <div class="cuadre-linea vendido"><span>− Derretidas, rotas o regaladas</span><strong>${aTexto(r.merma)}</strong></div>` : ''}
             <div class="cuadre-linea total"><span>= Debería quedar</span><strong>${aTexto(r.esperado)}</strong></div>
             <div class="cuadre-linea contado"><span>− Contaste</span><strong>${aTexto(r.contado)}</strong></div>
           </div>

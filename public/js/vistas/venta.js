@@ -69,13 +69,13 @@ export async function vistaVenta(pantalla, estadoApp) {
   const preciosPublico = new Map(ctx.precios.map((p) => [p.dieciseisavos, p.centavos]));
 
   /**
-   * EL MAYOREO  (v1.9)
+   * EL MAYOREO  (v2.0)
    *
-   * Las listas de mayoreo llegan enteras con el contexto, con todos sus
-   * precios. No es por ahorrarse una llamada: es para que al decir de quién
-   * es el ticket el precio cambie EN LA PANTALLA, en el acto, con el cliente
-   * enfrente. Pedirle el precio al servidor sería medio segundo de espera en
-   * el peor momento.
+   * El mayoreo se teclea: "1m" y enter, y el renglón entra ya con precio de
+   * mayoreo. Las listas llegan enteras con el contexto —con todos sus
+   * precios— para que al decir de quién es el ticket el precio cambie EN LA
+   * PANTALLA, en el acto. Pedírselo al servidor sería medio segundo de
+   * espera con el cliente enfrente.
    *
    * El servidor vuelve a decidir el precio al cobrar, desde cero. Esto es
    * nada más lo que se ve.
@@ -85,7 +85,8 @@ export async function vistaVenta(pantalla, estadoApp) {
     nombre: l.nombre,
     precios: new Map(l.precios.map((p) => [p.dieciseisavos, p.centavos]))
   }]));
-  const MINIMO_MAYOREO = ctx.mayoreo?.minimo ?? 8;
+  // La que se cobra mientras no se sabe quién es el cliente.
+  const MAYOREO_POR_OMISION = ctx.mayoreo?.porOmision || null;
 
   /**
    * LO QUE SE ESTÁ ACABANDO.
@@ -144,6 +145,7 @@ export async function vistaVenta(pantalla, estadoApp) {
   let cliente = null;
   let fiar = false;
   let volverDeClientes = 'cobro';   // a dónde regresa Esc en la lista de clientes
+  let cobrarAlElegir = false;       // se abrió camino al cobro: al elegir, se sigue
 
   // ---- La fase del teclado ----
   let fase = 'venta';
@@ -427,42 +429,52 @@ export async function vistaVenta(pantalla, estadoApp) {
   // COTIZAR (el mismo reparto que hace el servidor)
   // ==========================================================
   /**
-   * CÓMO VA ESTE TICKET DE MAYOREO.
+   * CON QUÉ LISTA DE MAYOREO SE ESTÁ COBRANDO.
    *
-   * Devuelve null si no hay nada que decir —no hay cliente, o no tiene lista
-   * de mayoreo—. Si lo tiene, dice si ya alcanzó el mínimo y, si no, cuánto
-   * le falta: eso es lo que se le dice al cliente en la cara ("con un cuarto
-   * más te lo dejo a precio de mayoreo").
-   *
-   * Se mide sobre TODO el hielo del ticket, igual que en el servidor: quien
-   * pide un cuarto y un cuarto está pidiendo media marqueta.
+   * La del cliente si tiene una propia; si no, la de siempre. Un cliente sin
+   * lista propia no es un cliente sin mayoreo: es uno al que se le cobra el
+   * mayoreo normal. Igualito que en el servidor.
    */
-  function mayoreo() {
-    const lista = cliente?.listaId ? listasMayoreo.get(cliente.listaId) : null;
-    if (!lista) return null;
-    return {
-      lista,
-      aplica: hielo >= MINIMO_MAYOREO,
-      faltan: Math.max(MINIMO_MAYOREO - hielo, 0)
-    };
+  function listaMayoreo() {
+    if (cliente?.listaId && listasMayoreo.has(cliente.listaId)) {
+      return listasMayoreo.get(cliente.listaId);
+    }
+    return listasMayoreo.get(MAYOREO_POR_OMISION)
+        || [...listasMayoreo.values()][0]
+        || null;
   }
 
-  /** Los precios con los que se cotiza AHORA: los suyos o los de público. */
-  function tarifa() {
-    const m = mayoreo();
-    return m?.aplica ? m.lista.precios : preciosPublico;
+  /** ¿Este ticket lleva algo de mayoreo? Entonces necesita nombre. */
+  function llevaMayoreo() {
+    return articulos.some((a) => a.producto.mayoreo);
   }
 
   function precioHielo(dieciseisavos) {
-    const precios = tarifa();
+    return conLista(dieciseisavos, preciosPublico);
+  }
+
+  /** Lo que cuesta un producto de mayoreo, con la lista que toque. */
+  function precioMayoreo(dieciseisavos) {
+    const lista = listaMayoreo();
+    return lista ? conLista(dieciseisavos, lista.precios) : 0;
+  }
+
+  /** El mismo reparto que hace el servidor: 3/8 → 1/4 + 1/8. */
+  function conLista(dieciseisavos, precios) {
     let centavos = 0;
     for (const parte of descomponer(dieciseisavos)) centavos += precios.get(parte) ?? 0;
     return centavos;
   }
 
+  /** Lo que cuesta un renglón de artículos, sea de mayoreo o no. */
+  function precioArticulo(a) {
+    return a.producto.mayoreo
+      ? precioMayoreo(a.producto.dieciseisavos * a.cantidad)
+      : a.producto.precio_centavos * a.cantidad;
+  }
+
   function total() {
-    return precioHielo(hielo) +
-      articulos.reduce((t, a) => t + a.producto.precio_centavos * a.cantidad, 0);
+    return precioHielo(hielo) + articulos.reduce((t, a) => t + precioArticulo(a), 0);
   }
 
   function hayAlgo() { return hielo > 0 || articulos.length > 0; }
@@ -485,8 +497,11 @@ export async function vistaVenta(pantalla, estadoApp) {
   function agregarProducto(p, cuantos = 1) {
     if (fase !== 'venta') return;
 
-    if (p.tipo === 'hielo') {
-      hielo += p.dieciseisavos * cuantos;  // se SUMA, no se agrega otro renglón
+    // El hielo de público se acumula en un solo renglón: quien pide "5
+    // marquetas" pide una cosa, no cinco. El de MAYOREO no, porque se cobra
+    // con otra lista: mezclarlo con el de público sería cobrar mal.
+    if (p.tipo === 'hielo' && !p.mayoreo) {
+      hielo += p.dieciseisavos * cuantos;
       ultimoAgregado = p;
       pintarTodo();
       return;
@@ -744,15 +759,18 @@ export async function vistaVenta(pantalla, estadoApp) {
               m.caja_cerrada_en ? ' (cerrado)' : ''}</span>
           </div>`);
       }
+      // Un renglón, una línea, y las columnas siempre en el mismo sitio:
+      // concepto, cuándo, quién, importe. Lo que ENTRA va en verde, que es
+      // como se lee de reojo sin tener que buscar el signo.
       const esSalida = m.tipo === 'salida';
       filas.push(`
         <div class="ticket-fila mov-fila ${esSalida ? 'mov-salida' : 'mov-entrada'}">
-          <div class="crece">
-            <strong>${esc(m.concepto)}</strong>
-            <small>${esc(formatoFecha(m.fecha))} · ${esc(m.ejecutor_nombre || '—')}</small>
-          </div>
+          <span class="mov-concepto" title="${esc(m.concepto)}">${esc(m.concepto)}</span>
+          <span class="mov-cuando">${esc(cuandoCorto(m.fecha))}</span>
+          <span class="mov-quien">${esc((m.ejecutor_nombre || '—').split(' ')[0])}</span>
           <span class="mov-importe">${esSalida ? '−' : '+'}${pesos(m.centavos)}</span>
-          ${esSalida ? `<button class="secundario chico" data-comprobante="${esc(m.id)}">Copia</button>` : ''}
+          <span class="mov-accion">${esSalida
+            ? `<button class="secundario chico" data-comprobante="${esc(m.id)}">Copia</button>` : ''}</span>
         </div>`);
     }
 
@@ -811,21 +829,32 @@ export async function vistaVenta(pantalla, estadoApp) {
         </div>`);
     }
 
-    // DE QUIÉN ES EL TICKET. Va arriba de todo porque cambia los precios de
-    // abajo: verlo después de los importes sería verlo tarde.
+    // DE QUIÉN ES EL TICKET. Va arriba de todo porque puede cambiar los
+    // precios de abajo: verlo después de los importes sería verlo tarde.
+    const conMayoreo = llevaMayoreo();
     if (cliente) {
-      const m = mayoreo();
+      const lista = conMayoreo ? listaMayoreo() : null;
       filas.push(`
-        <div class="pos-linea pos-linea-cliente ${m?.aplica ? 'con-mayoreo' : ''}">
-          <div class="pos-cant">${m?.aplica ? '🏷️' : '👤'}</div>
+        <div class="pos-linea pos-linea-cliente ${lista ? 'con-mayoreo' : ''}">
+          <div class="pos-cant">${lista ? '🏷️' : '👤'}</div>
           <div class="pos-desc">
-            ${esc(cliente.nombre)}
-            <small>${
-              m?.aplica ? `precio de ${esc(m.lista.nombre)}`
-              : m ? `le falta ${esc(aTexto(m.faltan))} de hielo para su precio de ${esc(m.lista.nombre)}`
-              : fiar ? 'se le fía a él' : 'cliente'}</small>
+            <span class="cliente-num">#${cliente.numero ?? '—'}</span> ${esc(cliente.nombre)}
+            <small>${lista ? `precio de ${esc(lista.nombre)}`
+                    : fiar ? 'se le fía a él' : 'cliente'}</small>
           </div>
           <button class="tachita" data-quita-cliente aria-label="Quitar el cliente">×</button>
+        </div>`);
+    } else if (conMayoreo) {
+      // El ticket lleva mayoreo y todavía no se sabe de quién es. No se
+      // puede cobrar así, y más vale decirlo mientras se captura que
+      // descubrirlo al apretar F10.
+      filas.push(`
+        <div class="pos-linea pos-linea-cliente falta-cliente">
+          <div class="pos-cant">👤</div>
+          <div class="pos-desc">
+            ¿De quién es?
+            <small>al cobrar hay que decirlo · F6</small>
+          </div>
         </div>`);
     }
 
@@ -849,8 +878,12 @@ export async function vistaVenta(pantalla, estadoApp) {
         <div class="pos-linea">
           <button class="pos-cant pos-cant-tocable" data-cantidad="${i}"
                   title="Tocar para cambiar la cantidad">${a.cantidad}</button>
-          <div class="pos-desc">${esc(a.producto.nombre)}</div>
-          <div class="pos-importe">${pesos(a.producto.precio_centavos * a.cantidad)}</div>
+          <div class="pos-desc">
+            ${esc(a.producto.nombre)}
+            ${a.producto.mayoreo
+              ? `<small>${esc(listaMayoreo()?.nombre || 'sin lista de mayoreo')}</small>` : ''}
+          </div>
+          <div class="pos-importe">${pesos(precioArticulo(a))}</div>
           <button class="tachita" data-quita="${i}" aria-label="Quitar">×</button>
         </div>`);
     }
@@ -938,14 +971,15 @@ export async function vistaVenta(pantalla, estadoApp) {
         // dejar tocarlo y contestar con un aviso cada vez.
         const poco = !vacio && Number.isFinite(quedan) && p.minimo && quedan <= p.minimo;
         return `
-        <button class="pos-boton ${vacio ? 'pos-boton-vacio' : ''}" data-producto="${esc(p.id)}"
+        <button class="pos-boton ${vacio ? 'pos-boton-vacio' : ''}
+                       ${p.mayoreo ? 'pos-boton-mayoreo' : ''}" data-producto="${esc(p.id)}"
                 ${vacio ? 'disabled' : ''}
                 style="${p.color || p.categoria_color
                   ? `--tono:${esc(p.color || p.categoria_color)}` : ''}">
           ${p.codigo ? `<span class="pos-boton-codigo">${esc(p.codigo)}</span>` : ''}
           <span class="pos-boton-nombre">${esc(p.nombre)}</span>
           <span class="pos-boton-precio">${p.tipo === 'hielo'
-            ? pesos(precioHielo(p.dieciseisavos))
+            ? pesos(p.mayoreo ? precioMayoreo(p.dieciseisavos) : precioHielo(p.dieciseisavos))
             : pesos(p.precio_centavos)}</span>
           ${vacio ? '<span class="pos-boton-marca">se acabó</span>'
             : poco ? `<span class="pos-boton-marca poco">quedan ${quedan}</span>` : ''}
@@ -978,7 +1012,9 @@ export async function vistaVenta(pantalla, estadoApp) {
   function pintarPista() {
     // Fiando, enter no cobra: fía. El cartel de abajo es lo que hace que el
     // teclado se aprenda sin manual, así que tiene que decir la verdad.
-    const f = fase === 'cambio' && fiar
+    const f = fase === 'clientes'
+      ? { enter: 'elige al cliente', esc: volverDeClientes === 'venta' ? 'volver al ticket' : 'volver al cobro' }
+      : fase === 'cambio' && fiar
       ? { enter: 'fía y registra', esc: 'mejor cobrarle' }
       : FASES[fase];
     refs.pista.innerHTML = `
@@ -1097,7 +1133,13 @@ export async function vistaVenta(pantalla, estadoApp) {
     if (fase === 'espera') return;
     if (fase === 'avisos') return;
     if (fase === 'movimientos') return;
-    if (fase === 'clientes') return;
+    // En la lista de clientes, enter elige al primero de la lista. El campo
+    // de búsqueda se lo queda cuando tiene el foco; esto es para cuando no.
+    if (fase === 'clientes') {
+      const primero = refs.cobro.querySelector('[data-cliente]');
+      if (primero) elegirCliente(primero.dataset.cliente);
+      return;
+    }
     if (fase === 'venta')   return agregarPorCodigo();
     if (fase === 'cobro')   return calcularCambio();
     if (fase === 'cambio')  return registrar();
@@ -1168,6 +1210,16 @@ export async function vistaVenta(pantalla, estadoApp) {
   // ==========================================================
   function irACobro() {
     if (!hayAlgo()) return;
+
+    // UN TICKET CON MAYOREO NO SE COBRA SIN NOMBRE. En vez de dejar que el
+    // servidor lo rechace al final, la caja lo pide aquí, que es el momento
+    // en que el cajero ya está mirando al cliente. El servidor lo revisa
+    // igual: esto es comodidad, no seguridad.
+    if (llevaMayoreo() && !cliente) {
+      verClientes('', { volverA: 'venta', paraCobrar: true });
+      return;
+    }
+
     fase = 'cobro';
     pago = 0;
     pintarCobro();
@@ -1176,10 +1228,17 @@ export async function vistaVenta(pantalla, estadoApp) {
 
   function cerrarCobro() {
     fase = 'venta';
-    // El cliente se queda con el ticket: volver a capturar no cambia de
-    // persona. Lo que se cancela es el fiado, que se decide al cobrar.
+    // SALIRSE DEL COBRO SUELTA AL CLIENTE. Lo pidió Tony así: "si se sale
+    // antes de cobrar, el mayoreo se quita y se tiene que volver a
+    // seleccionar". Un cliente pegado al ticket es la forma de cobrarle a
+    // uno el precio del anterior.
+    cliente = null;
     fiar = false;
     refs.cobro.hidden = true;
+    // Se repinta el ticket: al soltar al cliente cambian los precios de
+    // mayoreo, y un renglón que dice $220 cuando ya vale $240 es peor que
+    // no decir nada.
+    pintarTodo();
     pintarPista();
     enfocar();
   }
@@ -1233,7 +1292,7 @@ export async function vistaVenta(pantalla, estadoApp) {
 
           ${puedeVerClientes && !cambiando ? `
             <button class="secundario pos-fiar" id="quien-es-cobro">
-              👤 ${cliente ? esc(cliente.nombre) : '¿Quién es? (precio de mayoreo)'}
+              👤 ${cliente ? `#${cliente.numero ?? '—'} ${esc(cliente.nombre)}` : '¿Quién es el cliente?'}
             </button>` : ''}
           ${puedeFiar && !cambiando ? `
             <button class="secundario pos-fiar" id="fiar">
@@ -1361,62 +1420,64 @@ export async function vistaVenta(pantalla, estadoApp) {
   /**
    * QUIÉN ES EL CLIENTE.
    *
+   * El cajero teclea el NÚMERO del cliente —"7" y enter— o las primeras
+   * letras de su nombre. Escribir "Pescadería Chuc" con gente esperando es
+   * lo que hacía lento el mayoreo en el software anterior.
+   *
+   * Con un solo candidato, enter lo elige. Y todo está a la vista en botones
+   * para quien prefiera el dedo: la caja no puede obligar a nadie a teclear.
+   *
    * La misma lista sirve para las dos cosas que se hacen con un nombre:
    * decir de quién es el ticket —para que le salga SU precio— y fiárselo.
    * Son botones distintos porque son decisiones distintas: la mayoría de
    * los mayoristas pagan en el momento.
-   *
-   * Solo los que están dados de alta: es la regla del negocio, y por eso la
-   * lista no tiene "cliente nuevo". Dar de alta a alguien se hace en su
-   * pantalla, con calma, no en medio del cobro con gente esperando.
    */
   function verClientes(busca = '', opciones = {}) {
-    // En un cambio de ticket no se cambia de cliente: lo que se está
-    // liquidando es un ticket que ya se cobró, con el precio que llevaba.
     if (cambiando) {
       avisar('Termina el cambio antes de ponerle cliente al ticket', '');
       enfocar();
       return;
     }
-    // Se puede llegar aquí desde el ticket (F6) o desde el cobro. Esc tiene
-    // que regresar a donde se estaba, no a un lugar cualquiera.
+    // Se puede llegar aquí desde el ticket (F6) o camino al cobro. Esc y la
+    // elección tienen que regresar a donde se estaba.
     if (opciones.volverA) volverDeClientes = opciones.volverA;
+    if (opciones.paraCobrar !== undefined) cobrarAlElegir = opciones.paraCobrar;
+
     fase = 'clientes';
     refs.cobro.hidden = false;
 
-    const filtro = busca.trim().toLowerCase();
-    const lista = (ctx.clientes || []).filter((c) =>
-      !filtro || `${c.nombre} ${c.negocio || ''}`.toLowerCase().includes(filtro));
+    const lista = filtrarClientes(busca);
 
     refs.cobro.innerHTML = `
       <div class="pos-cobro-caja pos-historial">
-        <h3 style="margin:0 0 4px">¿Quién es el cliente?</h3>
+        <h3 style="margin:0 0 4px">${cobrarAlElegir ? '¿De quién es el ticket?' : '¿Quién es el cliente?'}</h3>
         <p class="ayuda" style="margin:0 0 12px">
-          Al ponerle nombre al ticket, si tiene precio de mayoreo se le
-          aplica solo.${puedeFiar ? ' Fiar es aparte: ese botón es el otro.' : ''}
+          ${cobrarAlElegir
+            ? 'Lleva mayoreo: hay que decir a quién se le cobró ese precio.'
+            : 'Al ponerle nombre al ticket, si tiene precio de mayoreo se le aplica solo.'}
+          Teclea su <b>número</b> o su nombre y enter.
         </p>
         <input id="busca-cliente" class="buscador" autocomplete="off"
-               placeholder="Nombre o negocio" value="${esc(busca)}" style="margin:0">
-        <div class="lista-tickets">
+               placeholder="Número o nombre" value="${esc(busca)}" style="margin:0">
+        <div class="lista-tickets lista-clientes">
           ${lista.slice(0, 40).map((c) => {
             const suya = c.listaId ? listasMayoreo.get(c.listaId) : null;
             return `
-            <div class="ticket-fila">
-              <div class="crece">
+            <div class="ticket-fila fila-cliente" data-cliente="${esc(c.id)}" tabindex="0">
+              <span class="cliente-num">#${c.numero ?? '—'}</span>
+              <span class="crece">
                 <strong>${esc(c.nombre)}</strong>
                 <small>${c.negocio ? esc(c.negocio) + ' · ' : ''}${
-                  c.saldo > 0 ? 'debe ' + pesos(c.saldo) : 'no debe nada'}${
-                  c.limite !== null ? ' · límite ' + pesos(c.limite) : ''}</small>
-              </div>
+                  c.saldo > 0 ? 'debe ' + pesos(c.saldo) : 'no debe nada'}</small>
+              </span>
               ${suya ? `<span class="etiqueta-mayoreo">🏷️ ${esc(suya.nombre)}</span>` : ''}
               ${c.vencido ? '<span class="aviso-quedan agotado">vencido</span>' : ''}
-              <button class="secundario chico" data-cliente="${esc(c.id)}">Es él</button>
-              ${puedeFiar
+              ${puedeFiar && !cobrarAlElegir
                 ? `<button class="secundario chico" data-fiar="${esc(c.id)}">Fiarle</button>` : ''}
             </div>`; }).join('')
             || `<p class="vacio" style="padding:20px 0">${
                  (ctx.clientes || []).length
-                   ? 'Ningún cliente con ese nombre.'
+                   ? 'Nadie con ese número ni ese nombre.'
                    : 'Todavía no hay clientes dados de alta.'}</p>`}
         </div>
         <button class="secundario" id="cerrar-clientes" style="margin-top:12px;width:100%">
@@ -1433,20 +1494,24 @@ export async function vistaVenta(pantalla, estadoApp) {
       nuevo.focus();
       nuevo.setSelectionRange(donde, donde);
     };
-    campo.onkeydown = (ev) => { if (ev.key === 'Enter') ev.stopPropagation(); };
 
-    // "Es él": el ticket ya es suyo y el precio cambia a la vista. No se
-    // cobra ni se fía todavía; el cajero sigue su flujo normal.
+    // ENTER ELIGE. Con un solo candidato no hay ambigüedad; con varios se
+    // toma el primero, que es el de número más chico y el que se ve arriba.
+    campo.onkeydown = (ev) => {
+      if (ev.key !== 'Enter') return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      const candidatos = filtrarClientes(campo.value);
+      if (!candidatos.length) { avisar('Nadie con ese número ni ese nombre', 'error'); return; }
+      elegirCliente(candidatos[0].id);
+    };
+
     refs.cobro.querySelectorAll('[data-cliente]').forEach((b) => {
-      b.onclick = () => {
-        const elegido = (ctx.clientes || []).find((c) => c.id === b.dataset.cliente);
-        if (!elegido) return;
-        cliente = elegido; fiar = false;
-        const m = mayoreo();
-        if (m?.aplica) avisar(`Precio de ${m.lista.nombre} para ${elegido.nombre}`, 'bien');
-        else if (m) avisar(`Le falta ${aTexto(m.faltan)} de hielo para su precio de mayoreo`, '');
-        pintarTodo();
-        cerrarClientes();
+      b.onclick = (ev) => {
+        // El botón de fiar vive dentro del renglón: si no se para aquí, un
+        // toque en "Fiarle" haría las dos cosas.
+        if (ev.target.closest('[data-fiar]')) return;
+        elegirCliente(b.dataset.cliente);
       };
     });
 
@@ -1464,7 +1529,45 @@ export async function vistaVenta(pantalla, estadoApp) {
     pintarPista();
   }
 
+  /**
+   * Por número o por nombre, lo que se teclee.
+   *
+   * El número es exacto a propósito: "7" tiene que ser el cliente 7 y no
+   * los diecisiete que llevan un 7 en el número.
+   */
+  function filtrarClientes(busca) {
+    const t = String(busca || '').trim().toLowerCase();
+    const todos = ctx.clientes || [];
+    if (!t) return todos;
+
+    if (/^\d+$/.test(t)) {
+      const n = Number(t);
+      const exacto = todos.filter((c) => c.numero === n);
+      if (exacto.length) return exacto;
+    }
+    return todos.filter((c) => `${c.nombre} ${c.negocio || ''}`.toLowerCase().includes(t));
+  }
+
+  /** El ticket ya es suyo: el precio cambia a la vista. */
+  function elegirCliente(id) {
+    const elegido = (ctx.clientes || []).find((c) => c.id === id);
+    if (!elegido) return;
+
+    cliente = elegido;
+    fiar = false;
+    pintarTodo();
+
+    const lista = llevaMayoreo() ? listaMayoreo() : null;
+    if (lista) avisar(`Precio de ${lista.nombre} para ${elegido.nombre}`, 'bien');
+
+    // Si se vino aquí camino al cobro, se sigue de largo: el cajero apretó
+    // F10 para cobrar, no para elegir a alguien.
+    if (cobrarAlElegir) { cobrarAlElegir = false; irACobro(); return; }
+    cerrarClientes();
+  }
+
   function cerrarClientes() {
+    cobrarAlElegir = false;
     if (volverDeClientes === 'venta') {
       fase = 'venta';
       refs.cobro.hidden = true;
@@ -1820,6 +1923,26 @@ export async function vistaVenta(pantalla, estadoApp) {
     pintarPista();
   }
 
+  /** "25 ago · 07:33 a.m." Cabe en su columna sin recortarse. */
+  function cuandoCorto(iso) {
+    const d = new Date(iso);
+    return `${d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })} · ` +
+           `${d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}`;
+  }
+
+  /** Lo que traía el ticket, en corto y con lo que explica el precio. */
+  function detalleDe(v) {
+    const partes = [];
+    if (v.cancelada_en) partes.push('CANCELADO');
+    if (v.cambiado_por) partes.push(`cambiado por #${v.cambiado_por}`);
+    else if (v.cambio_de) partes.push(`cambio del #${v.cambio_de}`);
+    if (v.cliente_nombre) {
+      partes.push(v.forma_pago === 'credito' ? `fiado a ${v.cliente_nombre}` : v.cliente_nombre);
+    }
+    if (v.detalle) partes.push(v.detalle);
+    return partes.join(' · ') || '—';
+  }
+
   async function cargarTickets(busca) {
     const caja = refs.cobro.querySelector('#lista-tickets');
     if (!caja) return;
@@ -1829,27 +1952,21 @@ export async function vistaVenta(pantalla, estadoApp) {
       const { ventas } = await api.obtener(
         `/ventas?limite=50&hoy=1&busca=${encodeURIComponent(busca || '')}`);
 
-      // «Ver» abre lo que traía el ticket sin salir de la lista. Es la
-      // pregunta de verdad —"¿qué se llevó?"— y antes había que imprimir
-      // una copia para contestarla, o sea gastar papel para leer.
+      // UN TICKET, UN RENGLÓN, TODO EN LÍNEA. Lo que más se busca va
+      // primero y en grande —el número—, y lo que se llevó va en texto
+      // normal, recortado si no cabe. Antes había un botón "Ver" que abría
+      // el detalle: con el detalle a la vista ese botón sobraba.
       caja.innerHTML = ventas.length ? ventas.map((v) => `
-        <div class="ticket-fila ${v.cancelada_en ? 'anulada' : ''}">
-          <div class="crece">
-            <strong>#${v.folio}</strong>
-            <small>${esc(formatoFecha(v.fecha))} · ${esc(v.cajero_nombre || '—')}${
-              v.cliente_nombre ? ' · fiado a ' + esc(v.cliente_nombre) : ''}</small>
-          </div>
-          <span class="ticket-fila-total ${v.forma_pago === 'credito' ? 'fiado' : ''}">
+        <div class="ticket-fila fila-ticket ${v.cancelada_en ? 'anulada' : ''}">
+          <span class="tkl-folio">#${v.folio}</span>
+          <span class="tkl-cuando">${esc(cuandoCorto(v.fecha))}</span>
+          <span class="tkl-quien">${esc((v.cajero_nombre || '—').split(' ')[0])}</span>
+          <span class="tkl-detalle" title="${esc(detalleDe(v))}">${esc(detalleDe(v))}</span>
+          <span class="tkl-total ${v.forma_pago === 'credito' ? 'fiado' : ''}">
             ${pesos(v.total_centavos)}</span>
-          <button class="secundario chico" data-ver="${esc(v.id)}">Ver</button>
           <button class="secundario chico" data-reimprimir="${esc(v.id)}">Copia</button>
-        </div>
-        <div class="ticket-detalle" data-detalle="${esc(v.id)}" hidden></div>`).join('')
+        </div>`).join('')
         : '<p class="vacio" style="padding:20px 0">No hay tickets que coincidan.</p>';
-
-      caja.querySelectorAll('[data-ver]').forEach((b) => {
-        b.onclick = () => verQueTraia(b);
-      });
 
       caja.querySelectorAll('[data-reimprimir]').forEach((b) => {
         b.onclick = async () => {
@@ -1861,57 +1978,6 @@ export async function vistaVenta(pantalla, estadoApp) {
       });
     } catch (e) {
       caja.innerHTML = `<p class="vacio">${esc(e.message)}</p>`;
-    }
-  }
-
-  /** Lo que traía un ticket, desplegado bajo su renglón. */
-  async function verQueTraia(boton) {
-    const id = boton.dataset.ver;
-    const caja = refs.cobro.querySelector(`[data-detalle="${CSS.escape(id)}"]`);
-    if (!caja) return;
-
-    if (!caja.hidden) { caja.hidden = true; boton.textContent = 'Ver'; return; }
-
-    caja.hidden = false;
-    boton.textContent = 'Cerrar';
-    caja.innerHTML = '<p class="ayuda" style="margin:0">Buscando…</p>';
-
-    try {
-      const { venta } = await api.obtener(`/ventas/${id}`);
-      caja.innerHTML = `
-        <table class="venta-lineas">
-          ${venta.lineas.map((l) => `
-            <tr>
-              <td class="detalle">
-                ${l.dieciseisavos
-                  ? `<strong>${esc(l.texto)}</strong> de ${esc(l.concepto.toLowerCase())}`
-                  : `${l.cantidad > 1 ? `<strong>${l.cantidad}</strong> × ` : ''}${esc(l.concepto)}`}
-              </td>
-              <td class="importe">${pesos(l.precio_centavos)}</td>
-            </tr>`).join('')}
-          <tr class="total">
-            <td class="detalle"><strong>Total</strong></td>
-            <td class="importe"><strong>${pesos(venta.total_centavos)}</strong></td>
-          </tr>
-        </table>
-        ${venta.pago_centavos ? `
-          <p class="ayuda" style="margin:6px 0 0">
-            Pagó ${pesos(venta.pago_centavos)}${venta.cambio_centavos
-              ? ` · cambio ${pesos(venta.cambio_centavos)}` : ' justo'}
-          </p>` : ''}
-        ${venta.forma_pago === 'credito' ? `
-          <p class="ayuda" style="margin:6px 0 0">
-            <strong>Fiado</strong> a ${esc(venta.cliente_nombre || '—')}${
-              venta.credito_autorizado_nombre
-                ? ` · autorizó ${esc(venta.credito_autorizado_nombre)}` : ''}
-          </p>` : ''}
-        ${venta.cancelada_en ? `
-          <p class="ayuda" style="margin:6px 0 0">
-            <strong>Cancelado</strong>${venta.motivo_cancelacion
-              ? ': ' + esc(venta.motivo_cancelacion) : ''}
-          </p>` : ''}`;
-    } catch (e) {
-      caja.innerHTML = `<p class="ayuda" style="margin:0">${esc(e.message)}</p>`;
     }
   }
 

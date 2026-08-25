@@ -1,126 +1,92 @@
 /**
- * MAYOREO  (v1.9)
+ * MAYOREO  (v2.0)
  *
- * "Algunos clientes gozan de mayoreo, a partir de 1/2 marqueta."
+ * "Yo simplemente ponía 1m y se ponía el precio de mayoreo y listo."
  *
- * Dos ideas que conviene tener claras antes de tocar esto:
+ * Así lo trabajaba Tony antes, y así se hace ahora: el mayoreo SE TECLEA.
+ * Hay dos productos —"1m" y "12m"— que no tienen precio propio: su precio
+ * sale de una lista de mayoreo. Teclear un código es un toque; buscar al
+ * cliente en una lista antes de capturar son diez, y el cliente está
+ * enfrente.
  *
- * EL MAYOREO ES UNA LISTA, NO UN DESCUENTO. No es "a Doña Mary le bajas el
- * 10%": es la lista "Mayoreo 1", donde la marqueta vale $240 en vez de $264
- * y cada fracción tiene su propio precio. Varios clientes comparten la
- * misma lista, y subirle el precio a la lista se lo sube a todos de una
- * vez, que es como se maneja de verdad.
+ * TRES IDEAS QUE CONVIENE TENER CLARAS
  *
- * Y NO ES UN PORCENTAJE PAREJO. En la fábrica el 1/16 cuesta más de lo
- * proporcional porque cortar da trabajo, y ese trabajo no desaparece por
- * vender mucho. Por eso el mayoreo es su propia lista y no una regla de
- * tres sobre la de público (regla 7.2).
+ * EL MAYOREO ES UNA LISTA, NO UN DESCUENTO. "Mayoreo 1" es la lista donde
+ * la marqueta vale $240 en vez de $264 y cada fracción tiene su propio
+ * precio. Varios clientes comparten la misma lista, y subirle el precio a
+ * la lista se lo sube a todos de una vez, que es como se maneja de verdad.
  *
- * SE MIDE SOBRE EL HIELO DE TODO EL TICKET. En la caja el hielo se acumula
- * en una sola línea: quien pide "5 marquetas" está pidiendo una cosa, no
- * cinco. Medirlo renglón por renglón dejaría fuera al que pide 1/4 y 1/4.
+ * NO ES UN PORCENTAJE PAREJO. El 1/16 cuesta más de lo proporcional porque
+ * cortar da trabajo, y ese trabajo no desaparece por vender mucho. Por eso
+ * es su propia lista y no una regla de tres (regla 7.2).
+ *
+ * NO HAY MÍNIMO QUE VIGILAR. El mínimo lo dicen los productos que existen:
+ * si solo hay botón de marqueta y de media, no hay forma de pedir mayoreo
+ * por un cuarto. Un número configurable de más es un número que un día se
+ * queda mal puesto.
+ *
+ * Y UNA REGLA QUE NO SE NEGOCIA: un ticket con mayoreo NO SE COBRA SIN
+ * DECIR DE QUIÉN ES. El precio especial es de alguien; si no queda escrito
+ * de quién, al mes nadie puede explicar por qué esa marqueta salió a $240.
  */
 const { bd } = require('../../db/conexion');
 const { listaActiva } = require('./precios');
 
-const MINIMO_POR_OMISION = 8;   // media marqueta
-
-/** Desde cuánto hielo aplica el mayoreo, en dieciseisavos. */
-function minimoMayoreo() {
-  const valor = bd.prepare(
-    "SELECT valor FROM configuracion WHERE clave = 'mayoreo_minimo_dieciseisavos'"
-  ).get()?.valor;
-  const n = Number(valor);
-  return Number.isInteger(n) && n > 0 ? n : MINIMO_POR_OMISION;
+/**
+ * La lista de mayoreo que se le cobra a este cliente.
+ *
+ * La suya si tiene; si no, la lista de mayoreo activa, que es la de "precio
+ * de mayoreo normal". Un cliente sin lista propia no es un cliente sin
+ * mayoreo: es uno al que se le cobra el mayoreo de siempre.
+ *
+ * Puede devolver null si nadie ha creado todavía una lista de mayoreo. En
+ * ese caso no hay con qué cobrar esos productos, y eso se dice.
+ */
+function listaDeMayoreo(cliente) {
+  if (cliente?.lista_id && cliente.activo) {
+    const suya = bd.prepare(
+      "SELECT * FROM listas_precios WHERE id = ? AND activo = 1 AND tipo = 'mayoreo'"
+    ).get(cliente.lista_id);
+    // Su lista se dio de baja después de asignársela: se cae a la de
+    // siempre. Cobrar con precios que ya nadie mantiene sería peor.
+    if (suya) return suya;
+  }
+  return listaPorOmision();
 }
 
-function guardarMinimoMayoreo(dieciseisavos, usuarioId) {
-  bd.prepare(`
-    INSERT INTO configuracion (clave, valor, actualizado_en, actualizado_por)
-    VALUES ('mayoreo_minimo_dieciseisavos', ?, datetime('now'), ?)
-    ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor,
-      actualizado_en = excluded.actualizado_en, actualizado_por = excluded.actualizado_por
-  `).run(String(dieciseisavos), usuarioId || null);
+/** La lista de mayoreo "normal": la que se cobra cuando no hay una propia. */
+function listaPorOmision() {
+  return bd.prepare(`
+    SELECT * FROM listas_precios
+     WHERE tipo = 'mayoreo' AND activo = 1
+     ORDER BY activa DESC, nombre
+     LIMIT 1
+  `).get() || null;
 }
 
-/** Las listas de mayoreo que se pueden asignar a un cliente. */
+/** Todas las que se le pueden asignar a un cliente. */
 function listasDeMayoreo() {
   return bd.prepare(`
     SELECT * FROM listas_precios
      WHERE activo = 1 AND tipo = 'mayoreo'
-     ORDER BY nombre
+     ORDER BY activa DESC, nombre
   `).all();
 }
 
 /**
- * QUÉ LISTA SE LE COBRA A ESTE TICKET.
+ * ¿Este ticket lleva mayoreo?
  *
- * Devuelve { lista, esMayoreo, minimo, faltan } — `faltan` son los
- * dieciseisavos que le faltan al ticket para alcanzar el mayoreo, para
- * poder decírselo al cliente en la cara ("con media marqueta más te lo dejo
- * a precio de mayoreo").
- *
- * EL SERVIDOR MANDA. La pantalla calcula lo mismo para que el precio cambie
- * al instante, pero al cobrar se vuelve a decidir aquí desde cero: si no,
- * bastaría con mandar otro clienteId para llevarse el precio de mayoreo.
+ * Una línea llega de dos formas —por producto o por código tecleado— y las
+ * dos cuentan. El hielo suelto de la calculadora nunca es mayoreo: no salió
+ * de un botón de mayoreo.
  */
-function listaParaVenta(cliente, dieciseisavosDeHielo) {
-  const publico = listaActiva();
-  const minimo = minimoMayoreo();
-
-  // Sin cliente, o dado de baja, se cobra público. A un cliente de baja se
-  // le puede seguir cobrando de contado —llegó y pagó—, pero su precio de
-  // mayoreo se le quitó junto con la baja.
-  if (!cliente?.lista_id || !cliente.activo) {
-    return { lista: publico, esMayoreo: false, minimo, faltan: 0 };
-  }
-
-  const suya = bd.prepare(
-    'SELECT * FROM listas_precios WHERE id = ? AND activo = 1'
-  ).get(cliente.lista_id);
-
-  // La lista se dio de baja después de asignarla: se cobra público, que es
-  // lo seguro. Cobrar con una lista muerta sería cobrar con precios que ya
-  // nadie está manteniendo.
-  if (!suya) return { lista: publico, esMayoreo: false, minimo, faltan: 0 };
-
-  const alcanza = dieciseisavosDeHielo >= minimo;
-  return {
-    lista: alcanza ? suya : publico,
-    esMayoreo: alcanza,
-    listaDelCliente: suya,
-    minimo,
-    faltan: alcanza ? 0 : minimo - dieciseisavosDeHielo
-  };
-}
-
-/**
- * Cuánto hielo lleva un conjunto de líneas, para medir el mínimo.
- *
- * Una línea llega de tres formas —por producto, por código tecleado, o
- * suelta desde la calculadora de fracciones— y las tres cuentan igual.
- */
-function hieloDe(lineas, { porId, porCodigo }) {
-  let total = 0;
-  for (const l of lineas || []) {
-    const n = Number(l.cantidad);
-    const cantidad = Number.isInteger(n) && n > 0 ? n : 1;
-
+function llevaMayoreo(lineas, { porId, porCodigo }) {
+  return (lineas || []).some((l) => {
     const p = l.productoId ? porId(l.productoId)
             : l.codigo     ? porCodigo(l.codigo)
             : null;
-
-    if (p) {
-      if (p.tipo === 'hielo') total += p.dieciseisavos * cantidad;
-      continue;
-    }
-    // Sin producto es hielo suelto de la calculadora.
-    const sueltos = Number(l.dieciseisavos);
-    if (Number.isInteger(sueltos) && sueltos > 0) total += sueltos * cantidad;
-  }
-  return total;
+    return Boolean(p?.mayoreo);
+  });
 }
 
-module.exports = {
-  minimoMayoreo, guardarMinimoMayoreo, listasDeMayoreo, listaParaVenta, hieloDe
-};
+module.exports = { listaDeMayoreo, listaPorOmision, listasDeMayoreo, llevaMayoreo };

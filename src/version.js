@@ -17,9 +17,38 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '1.9';
+const VERSION_ACTUAL = '2.0';
 
 const VERSIONES = [
+  {
+    numero: '2.0',
+    nombre: 'La caja de diario',
+    fecha: '2026-08-25',
+    resumen:
+      'El mayoreo se teclea, el historial hace de verdad lo que se le pide, ' +
+      'y todas las listas se leen de un renglón.',
+    cambios: [
+      { tipo: 'importante', texto: 'EL MAYOREO SE TECLEA. Ahora hay dos botones nuevos: 1m es la marqueta de mayoreo y 12m la media. Tecleas 1m, enter, y el renglón entra ya con precio de mayoreo. Buscar al cliente ANTES de capturar era lo que hacía lento el mayoreo.' },
+      { tipo: 'nuevo', texto: 'Al apretar F10 en un ticket con mayoreo, la caja pide de quién es ANTES de cobrar. Tecleas el NÚMERO del cliente —"7" y enter— o las primeras letras de su nombre, y sigue el cobro de siempre.' },
+      { tipo: 'nuevo', texto: 'CADA CLIENTE TIENE SU NÚMERO, asignado solo y para siempre. Sale en su ficha y en la lista de la caja. Es lo que se teclea.' },
+      { tipo: 'importante', texto: 'Un ticket con mayoreo NO SE COBRA SIN NOMBRE. El precio especial es de alguien; sin saber de quién, al mes nadie puede explicar por qué esa marqueta salió a $240.' },
+      { tipo: 'importante', texto: 'Y si te sales del cobro antes de cobrar, el cliente se suelta y hay que volver a decir quién es. Un cliente pegado al ticket es la forma de cobrarle a uno el precio del anterior.' },
+      { tipo: 'mejora', texto: 'Ya no hay "mínimo de mayoreo" que configurar: el mínimo lo dicen los botones que existen. Si solo hay marqueta y media, no hay forma de pedir mayoreo por un cuarto.' },
+      { tipo: 'nuevo', texto: 'DESDE EL HISTORIAL se saca copia de cualquier ticket. Y el administrador puede cancelarlo o eliminarlo, detrás del botón "⋯". A los demás ni les sale.' },
+      { tipo: 'importante', texto: 'ELIMINAR UN TICKET solo se puede mientras su turno sigue ABIERTO. En cuanto se corta el turno hay un papel firmado con ese número: entonces se cancela, que deja el renglón tachado con su motivo y las cuentas cuadrando.' },
+      { tipo: 'nuevo', texto: 'LOS CAMBIOS SE VEN DE LOS DOS LADOS: los dos tickets salen marcados con ⇄ y cada uno dice cuál es su pareja (#5→#6). Cayendo en cualquiera se ve la historia completa.' },
+      { tipo: 'nuevo', texto: 'En el historial se busca POR NÚMERO DE TICKET. Escribes 412 y ahí está.' },
+      { tipo: 'mejora', texto: 'EL HISTORIAL, LOS TICKETS Y LOS GASTOS: un renglón es una línea. Nada se parte en dos, todo va centrado y las columnas siempre en el mismo sitio. Lo que no cabe se corta con puntos suspensivos y se ve completo al pasar el ratón.' },
+      { tipo: 'mejora', texto: 'En la lista de tickets se quitó el botón "Ver": ahora cada renglón ya dice qué se llevó el cliente.' },
+      { tipo: 'mejora', texto: 'El dinero que ENTRA al cajón se ve en verde, y el que sale en rojo.' },
+      { tipo: 'nuevo', texto: 'SE ANOTA LO QUE SE DERRITE. Botón "Anotar merma" en Existencia: cuánto, y si se derritió, se rompió, se regaló o se usó en la fábrica.' },
+      { tipo: 'importante', texto: 'Y la existencia ya trae el desglose completo: cuánto se vendió AL PÚBLICO, cuánto A MAYOREO y cuánto se perdió. Antes todo eso iba revuelto en un solo "faltante".' },
+      { tipo: 'mejora', texto: 'Productos y precios ya no trae el cuadre completo del cuarto frío: queda el dato de cuánto debería haber y un botón para ir a Existencia, que es donde eso se trabaja.' },
+      { tipo: 'arreglo', texto: 'ARREGLADO: los códigos de producto ya no distinguen mayúsculas. Teclear "1m" o "1M" es lo mismo, que es lo que espera cualquiera.' },
+      { tipo: 'arreglo', texto: 'ARREGLADO: la insignia del margen se alinea a la derecha, como el resto de los números.' }
+    ],
+    siguiente: 'v2.1 — Actualizar el sistema desde un archivo ZIP, sin perder datos.'
+  },
   {
     numero: '1.9',
     nombre: 'Mayoreo, papel y WhatsApp',

@@ -49,17 +49,57 @@ function producidoDesde(desde) {
 /**
  * Marquetas VENDIDAS con ticket desde una fecha, en un almacén.
  * Las ventas canceladas no cuentan: nunca salieron del cuarto frío.
+ *
+ * Se parte en público y mayoreo porque son dos negocios distintos: el
+ * mostrador de a cuarto y el mayorista que se lleva veinte marquetas. Ver
+ * cuánto pesa cada uno es la mitad de saber cómo va la fábrica.
  */
 function vendidoDesde(desde, almacenId) {
+  return partidoPorLista(desde, almacenId).total;
+}
+
+function partidoPorLista(desde, almacenId) {
   const fila = bd.prepare(`
-    SELECT COALESCE(SUM(vl.dieciseisavos), 0) n
+    SELECT
+      COALESCE(SUM(CASE WHEN lp.tipo = 'mayoreo' THEN vl.dieciseisavos ELSE 0 END), 0) mayoreo,
+      COALESCE(SUM(CASE WHEN lp.tipo = 'mayoreo' THEN 0 ELSE vl.dieciseisavos END), 0) publico
       FROM venta_lineas vl
       JOIN ventas v ON v.id = vl.venta_id
+      LEFT JOIN listas_precios lp ON lp.id = v.lista_id
      WHERE v.fecha > ?
        AND v.cancelada_en IS NULL
        AND v.almacen_id = ?
   `).get(desde || '', almacenId);
+  return { ...fila, total: fila.mayoreo + fila.publico };
+}
+
+/**
+ * LO QUE SE DERRITIÓ, SE ROMPIÓ O SE REGALÓ  (v2.0)
+ *
+ * Hasta la v1.9 esto aparecía dentro del "faltante" a secas, mezclado con
+ * el hielo que se fue sin pagar. Son dos cosas muy distintas: una es física
+ * y no tiene remedio, la otra es un problema que hay que atender. Anotarlo
+ * es lo que separa las dos.
+ */
+function mermaDesde(desde, almacenId) {
+  const fila = bd.prepare(`
+    SELECT COALESCE(SUM(dieciseisavos), 0) n
+      FROM mermas_hielo
+     WHERE fecha > ? AND almacen_id = ? AND anulada_en IS NULL
+  `).get(desde || '', almacenId);
   return fila.n;
+}
+
+/** Las mermas con su detalle, para enseñarlas y poder anular una. */
+function mermasDesde(desde, almacenId, limite = 50) {
+  return bd.prepare(`
+    SELECT m.*, u.nombre AS ejecutor_nombre, c.nombre AS capturista_nombre
+      FROM mermas_hielo m
+      LEFT JOIN usuarios u ON u.id = m.ejecutor_id
+      LEFT JOIN usuarios c ON c.id = m.capturista_id
+     WHERE m.fecha > ? AND m.almacen_id = ?
+     ORDER BY m.fecha DESC LIMIT ?
+  `).all(desde || '', almacenId, limite);
 }
 
 /**
@@ -75,7 +115,10 @@ function estadoAlmacen(almacen) {
   const anterior = ultimo?.contado ?? 0;
 
   // Lo que la caja ya explicó con tickets desde el último conteo.
-  const vendido = vendidoDesde(desde, almacen.id);
+  const ventas = partidoPorLista(desde, almacen.id);
+  const vendido = ventas.total;
+  // Y lo que se explicó sin ticket: lo derretido, lo roto, lo regalado.
+  const merma = mermaDesde(desde, almacen.id);
   const teorico = anterior + producido;
 
   return {
@@ -85,11 +128,14 @@ function estadoAlmacen(almacen) {
     existenciaAnterior: anterior,
     producido,
     vendido,
+    vendidoPublico: ventas.publico,
+    vendidoMayoreo: ventas.mayoreo,
+    merma,
     // Lo que debería haber si nada hubiera salido.
     teorico,
-    // Lo que debería haber ahora ya descontando lo vendido: este es el
-    // número contra el que se compara el conteo físico.
-    esperado: teorico - vendido
+    // Lo que debería haber ahora ya descontando todo lo que se explicó:
+    // este es el número contra el que se compara el conteo físico.
+    esperado: teorico - vendido - merma
   };
 }
 
@@ -104,6 +150,7 @@ function aMarquetas(dieciseisavos) {
 }
 
 module.exports = {
-  ultimoConteo, producidoDesde, vendidoDesde, estadoAlmacen,
+  ultimoConteo, producidoDesde, vendidoDesde, partidoPorLista,
+  mermaDesde, mermasDesde, estadoAlmacen,
   deMarquetas, aMarquetas, DIECISEISAVOS_POR_MARQUETA
 };

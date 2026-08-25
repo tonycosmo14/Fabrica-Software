@@ -40,7 +40,7 @@ export async function vistaProductos(pantalla, estadoApp) {
   const esAdmin = estadoApp.permisos.includes('*');
 
   let catalogo, listas, inventario, existencia, alertas;
-  let minimoMayoreo = 8;        // desde cuánto hielo aplica el precio de mayoreo
+  let mayoreoPorOmision = null;  // la lista de mayoreo que se cobra por omisión
   let categoriaAbierta = ID_HIELO;
   let seleccionado = null;
   let verBajas = false;
@@ -56,7 +56,7 @@ export async function vistaProductos(pantalla, estadoApp) {
       api.obtener('/inventario/avisos').catch(() => ({ hielo: null }))
     ]);
 
-    if (Number.isInteger(listas.minimoMayoreo)) minimoMayoreo = listas.minimoMayoreo;
+    mayoreoPorOmision = listas.mayoreoPorOmision || null;
 
     if (!catalogo.categorias.some((c) => c.id === categoriaAbierta)) {
       categoriaAbierta = catalogo.categorias[0]?.id || null;
@@ -72,16 +72,31 @@ export async function vistaProductos(pantalla, estadoApp) {
   function esHielo() { return categoriaAbierta === ID_HIELO; }
 
   function listaActiva() {
-    // Ojo con el respaldo: desde v1.9 hay listas de mayoreo en el mismo
-    // arreglo, y la primera del orden podría ser una de ellas. La de público
-    // es la que manda en esta pantalla.
-    return listas.listas.find((l) => l.activa)
+    // OJO: en este arreglo vienen también las listas de mayoreo, y una de
+    // ellas está marcada `activa` (es "el precio de mayoreo normal"). Sin
+    // pedir el tipo, la pantalla de público acabaría enseñando —y
+    // guardando— los precios de mayoreo.
+    return listas.listas.find((l) => l.activa && l.tipo === 'publico')
         || listas.listas.find((l) => l.tipo === 'publico')
-        || listas.listas[0];
+        || null;
   }
 
-  function precioDeHielo(dieciseisavos) {
-    const t = new Map((listaActiva()?.precios || []).map((p) => [p.dieciseisavos, p.centavos]));
+  /** La lista de mayoreo que se cobra cuando el cliente no tiene una propia. */
+  function listaMayoreoNormal() {
+    return listas.listas.find((l) => l.id === mayoreoPorOmision)
+        || listas.listas.find((l) => l.tipo === 'mayoreo')
+        || null;
+  }
+
+  /**
+   * Cuánto cuesta esa cantidad de hielo, con la lista que le toque.
+   *
+   * Un producto de mayoreo se cotiza con la lista de mayoreo, no con la de
+   * público: si no, la lista de la izquierda diría que "1m" vale $264.
+   */
+  function precioDeHielo(dieciseisavos, deMayoreo = false) {
+    const lista = deMayoreo ? listaMayoreoNormal() : listaActiva();
+    const t = new Map((lista?.precios || []).map((p) => [p.dieciseisavos, p.centavos]));
     let queda = dieciseisavos, centavos = 0;
     for (const paso of [16, 8, 4, 2, 1]) {
       while (queda >= paso) { centavos += t.get(paso) ?? 0; queda -= paso; }
@@ -180,7 +195,8 @@ export async function vistaProductos(pantalla, estadoApp) {
           <small>
             ${p.codigo ? `<b>${esc(p.codigo)}</b> · ` : ''}
             ${p.tipo === 'hielo'
-              ? pesos(precioDeHielo(p.dieciseisavos))
+              ? pesos(precioDeHielo(p.dieciseisavos, p.mayoreo)) +
+                (p.mayoreo ? ' · mayoreo' : '')
               : pesos(p.precio_centavos)}
             ${p.activo ? '' : ' · dado de baja'}
           </small>
@@ -321,22 +337,28 @@ export async function vistaProductos(pantalla, estadoApp) {
   }
 
   /** Para el hielo, el inventario ES la existencia del cuarto frío. */
+  /**
+   * LA EXISTENCIA, EN CORTO.
+   *
+   * Aquí se le ponen precios al hielo, no se cuenta el cuarto frío. El
+   * cuadre completo vivía también en esta pantalla y la dejaba saturada:
+   * ahora queda un solo dato —cuánto debería haber y de cuándo es— y un
+   * botón para ir al lugar donde eso sí se trabaja.
+   */
   function panelExistenciaHielo() {
     const a = existencia.almacenes?.[0];
     if (!a) return '';
     return `
-      <h4 class="cfg-subtitulo">Existencia del cuarto frío</h4>
-      <p class="ayuda">
-        El hielo no se cuenta por piezas: se mide en marquetas y se cuenta
-        dos veces al día. Esto es lo mismo que ves en <b>Existencia</b>.
-      </p>
-      <div class="cuadre">
-        <div class="cuadre-linea"><span>Había</span><strong>${esc(a.textos.anterior)}</strong></div>
-        <div class="cuadre-linea suma"><span>+ Se produjo</span><strong>${esc(a.textos.producido)}</strong></div>
-        <div class="cuadre-linea vendido"><span>− Se vendió</span><strong>${esc(a.textos.vendido)}</strong></div>
-        <div class="cuadre-linea total"><span>= Debería haber</span><strong>${esc(a.textos.esperado)}</strong></div>
-      </div>
-      <a class="boton secundario chico" href="#/existencia" style="margin-top:12px">Ir a Existencia</a>`;
+      <div class="hielo-resumen">
+        <div>
+          <small>Debería haber en el cuarto frío</small>
+          <strong>${esc(a.textos.esperado)}</strong>
+          <small>${a.ultimoConteo
+            ? `último conteo: ${esc(formatoFecha(a.ultimoConteo.fecha))}`
+            : 'todavía no se ha contado'}</small>
+        </div>
+        <a class="boton secundario chico" href="#/existencia">Ir a existencia del hielo</a>
+      </div>`;
   }
 
   function panelInventario(p, inv) {
@@ -492,21 +514,23 @@ export async function vistaProductos(pantalla, estadoApp) {
     return `
       <h4 class="cfg-subtitulo">🏷️ Precios de mayoreo</h4>
       <p class="ayuda">
-        A cada cliente se le apunta su lista en su ficha, en Clientes. En la
-        caja el precio cambia solo en cuanto el cajero dice quién es.
+        En la caja el mayoreo se teclea: <b>1m</b> es la marqueta y
+        <b>12m</b> la media. Al cobrar se pide de quién es el ticket, y si
+        ese cliente tiene su propia lista, se le cobra la suya.
+      </p>
+      <p class="ayuda">
+        La lista marcada como <b>normal</b> es la que se cobra a quien no
+        tiene una propia. A cada cliente se le apunta la suya en su ficha,
+        en <b>Clientes</b>.
       </p>
 
-      <div class="cuadre" style="margin-bottom:14px">
-        <div class="cuadre-linea campo-vivo">
-          <span>Desde cuánto hielo aplica<small>en dieciseisavos: 8 es media marqueta</small></span>
-          <input inputmode="numeric" id="mayoreo-minimo" value="${esc(String(minimoMayoreo))}">
-        </div>
-      </div>
-
       ${deMayoreo.map((l) => `
-        <div class="tarjeta-mayoreo">
+        <div class="tarjeta-mayoreo ${l.id === mayoreoPorOmision ? 'es-la-normal' : ''}">
           <div class="fila-botones" style="justify-content:space-between;align-items:center">
             <strong>${esc(l.nombre)}</strong>
+            ${l.id === mayoreoPorOmision
+              ? '<span class="etiqueta-mayoreo">el precio de mayoreo normal</span>'
+              : `<button class="secundario chico" data-normal="${esc(l.id)}">Hacerla la normal</button>`}
             <small class="ayuda" style="margin:0">${
               l.clientes ? `${l.clientes} cliente${l.clientes === 1 ? '' : 's'}` : 'sin clientes todavía'}</small>
           </div>
@@ -664,11 +688,9 @@ export async function vistaProductos(pantalla, estadoApp) {
     });
     const nuevaLista = q('#nueva-lista');
     if (nuevaLista) nuevaLista.onclick = crearListaMayoreo;
-    const minMay = q('#mayoreo-minimo');
-    if (minMay) {
-      minMay.onblur = () => guardarMinimoMayoreo(minMay);
-      minMay.onkeydown = (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); minMay.blur(); } };
-    }
+    pantalla.querySelectorAll('[data-normal]').forEach((b) => {
+      b.onclick = () => hacerlaNormal(b.dataset.normal);
+    });
     const sug = q('#sugerir');
     if (sug) sug.onclick = sugerir;
 
@@ -1199,18 +1221,12 @@ export async function vistaProductos(pantalla, estadoApp) {
     } catch (e) { avisar(e.message, 'error'); }
   }
 
-  async function guardarMinimoMayoreo(campoEl) {
-    const crudo = campoEl.value.trim();
+  async function hacerlaNormal(listaId) {
     try {
-      const r = await api.actualizar('/ventas/precios/mayoreo-minimo', { dieciseisavos: crudo });
-      minimoMayoreo = r.minimo;
-      campoEl.classList.add('guardado');
-      setTimeout(() => campoEl.classList.remove('guardado'), 900);
-      avisar(`El mayoreo aplica desde ${aTexto(r.minimo)} de hielo`, 'bien');
-    } catch (e) {
-      avisar(e.message, 'error');
-      campoEl.value = String(minimoMayoreo);
-    }
+      const r = await api.actualizar(`/ventas/precios/listas/${listaId}/predeterminada`, {});
+      avisar(`${r.lista.nombre} es ahora el precio de mayoreo normal`, 'bien');
+      await cargar();
+    } catch (e) { avisar(e.message, 'error'); }
   }
 
   async function sugerir() {

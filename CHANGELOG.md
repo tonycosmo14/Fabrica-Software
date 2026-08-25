@@ -11,6 +11,114 @@ solo para arreglos de algo que ya estaba, o para cambios de puro aspecto.
 
 ---
 
+## v2.0 — La caja de diario · 25 de agosto de 2026
+
+Migración `017_mayoreo_rapido.sql`: `productos.mayoreo`, `clientes.numero`,
+la tabla `mermas_hielo` y los dos productos de mayoreo del arranque.
+
+### El mayoreo se teclea
+
+La v1.9 resolvió el mayoreo bien pero por el camino largo: identificar al
+cliente y *entonces* capturar. Tony contó cómo lo trabajaba antes:
+
+> *"Creé un producto nuevo que llamé marquetas a mayoreo, solo eran dos:
+> media marqueta (12m) y una marqueta (1m). Yo simplemente ponía 1m y se
+> ponía el precio de mayoreo y listo."*
+
+Eso es un toque. Buscar a alguien en una lista con el cliente enfrente son
+diez. Así que la entrada ahora es el **código**:
+
+- `1m` y `12m` son productos de hielo con la marca `mayoreo`. **No tienen
+  precio propio**: su precio sale de una lista de mayoreo, la del cliente si
+  tiene una, o la marcada como *normal*.
+- Al apretar **F10** en un ticket con mayoreo, la caja pide de quién es
+  **antes** de cobrar. Se teclea el **número** del cliente o su nombre y
+  enter. Después, el cobro de siempre.
+- **Un ticket con mayoreo no se cobra sin nombre**, y la regla vive en el
+  servidor, no en la pantalla: es donde no se puede saltar.
+- Salirse del cobro **suelta al cliente**. Lo pidió Tony así, y tiene razón:
+  un cliente pegado al ticket es la forma de cobrarle a uno el precio del
+  anterior.
+
+Cada cliente nace con un **número** correlativo que no se reusa nunca, ni
+aunque se dé de baja: el número es del cliente, como el folio es del ticket
+(regla 3.3).
+
+Y desapareció el **mínimo de mayoreo** de la v1.9. No hacía falta: el mínimo
+lo dicen los botones que existen. Si solo hay marqueta y media marqueta, no
+hay forma de pedir mayoreo por un cuarto. Un número configurable de más es
+un número que un día se queda mal puesto.
+
+**Un ticket puede llevar los dos precios.** *"Dame una a mayoreo y un cuarto
+para la casa"* es un ticket con dos listas, y ahora cada línea se cotiza con
+la suya.
+
+### El historial hace lo que se le pide
+
+- **Copia** de cualquier ticket, para quien pueda vender.
+- **Cancelar** y **Eliminar** detrás de un `⋯`, y solo para el
+  administrador. Un botón rojo en cada renglón es un botón rojo que un día
+  se toca sin querer.
+- **Eliminar solo si el turno sigue abierto.** En cuanto se corta, hay un
+  papel firmado con ese número; borrarlo dejaría al papel diciendo una cosa
+  y al sistema otra. Entonces se cancela, que deja el renglón tachado y las
+  cuentas cuadrando. Pide la **contraseña** del administrador, no el PIN.
+- Un ticket que es parte de un **cambio** no se borra suelto: dejaría al
+  otro apuntando a un número que ya no existe.
+- **Los cambios se ven de los dos lados**: `⇄ #5→#6` en los dos renglones.
+  Cayendo en cualquiera se ve la historia completa sin buscar.
+- **Búsqueda por número de ticket.**
+
+### Un renglón es una línea
+
+El historial, la lista de tickets de la caja y los gastos del cajón se
+rehicieron con la misma regla: **una línea por renglón, columnas siempre en
+el mismo sitio, todo centrado a media altura**. Lo que no cabe se corta con
+puntos suspensivos y se ve completo al pasar el ratón.
+
+Una tabla donde cada renglón mide distinto no se puede recorrer con la
+vista, y recorrerla con la vista es exactamente para lo que sirve.
+
+De la lista de tickets se quitó el botón **Ver**: cada renglón ya dice qué
+se llevó el cliente, así que abrir un panel para leerlo era un paso de más.
+El dinero que **entra** al cajón va en verde y el que sale en rojo.
+
+### Lo que se derrite se anota
+
+Hasta hoy el hielo derretido caía dentro del *faltante* a secas, mezclado
+con el que se fue sin pagar. Son dos cosas muy distintas: una es física y no
+tiene remedio, la otra es un problema que hay que atender.
+
+Ahora hay un botón **Anotar merma** en Existencia —cuánto y por qué:
+derretida, rota, regalada, autoconsumo— y el cuadre quedó completo:
+
+```
+    Había en el último conteo
+  + Salió de los tanques
+  = Debería haber
+  − Se vendió al público
+  − Se vendió a mayoreo
+  − Derretidas, rotas o regaladas
+  = Debería haber ahora
+```
+
+Público y mayoreo son dos negocios distintos dentro de la misma fábrica —el
+mostrador de a cuarto y el que se lleva veinte marquetas—, y ver cuánto pesa
+cada uno es la mitad de saber cómo va.
+
+### Y dos arreglos
+
+- Los **códigos de producto** ya no distinguen mayúsculas: teclear `1m` o
+  `1M` es lo mismo. Nadie va a poner el bloqueo de mayúsculas con un cliente
+  enfrente, y un código que a veces funciona es peor que no tenerlo.
+- La **insignia del margen** se alinea a la derecha, como el resto de los
+  números.
+- **Productos y precios** ya no trae el cuadre completo del cuarto frío:
+  queda el dato de cuánto debería haber, de cuándo es, y un botón para ir a
+  Existencia, que es donde eso se trabaja.
+
+---
+
 ## v1.9 — Mayoreo, papel y WhatsApp · 24 de agosto de 2026
 
 Migración `016_mayoreo.sql`: una columna `lista_id` en `clientes` y el

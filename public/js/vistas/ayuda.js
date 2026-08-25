@@ -167,13 +167,13 @@ debería quedar − contado = FALTA</pre>
       hace falta acordarse.</p>
 
       <h4>Decir de quién es el ticket</h4>
-      <p><em>F6</em>, o el botón <b>👤 Cliente</b>. Sirve para dos cosas: para
-      que al cliente de mayoreo <b>le salga su precio</b>, y para fiarle. Son
-      dos botones distintos en la misma lista, porque son dos decisiones
-      distintas: la mayoría de los mayoristas pagan en el momento.</p>
-      <p>Se puede hacer en cualquier momento, antes o durante el cobro. El
-      precio cambia en la pantalla en el acto. Está explicado completo en
-      <b>Precios de mayoreo</b>.</p>
+      <p><em>F6</em>, o el botón <b>👤 Cliente</b>. Se teclea el <b>número</b>
+      del cliente o su nombre, y enter.</p>
+      <p>En un ticket de <b>mayoreo</b> no hace falta acordarse: al apretar
+      <em>F10</em> la caja lo pide sola antes de cobrar. Está explicado
+      completo en <b>Precios de mayoreo</b>.</p>
+      <p><b>Fiarle</b> es otra cosa y tiene su propio botón en esa misma
+      lista: la mayoría de los mayoristas pagan en el momento.</p>
 
       <h4>Dos clientes a la vez</h4>
       <p>Llega uno, pide 1/8 y se queda pensando. Detrás llega otro que ya
@@ -200,12 +200,9 @@ debería quedar − contado = FALTA</pre>
       <p><em>F3</em>, o el botón 🧾. Se busca por número, por el importe o por
       la hora, entre <b>los de hoy</b>: aquí se busca el ticket que el cliente
       acaba de perder, no el de hace tres semanas.</p>
-      <ul>
-        <li><b>Ver</b> abre ahí mismo <b>qué traía</b> ese ticket, sin
-        imprimir nada. Es lo que se pregunta casi siempre.</li>
-        <li><b>Copia</b> lo vuelve a imprimir marcado como <b>COPIA</b>, para
-        que no se confunda con el original.</li>
-      </ul>
+      <p>Cada renglón dice ya <b>qué se llevó</b> el cliente, así que casi
+      nunca hace falta abrir nada. <b>Copia</b> lo vuelve a imprimir marcado
+      como <b>COPIA</b>, para que no se confunda con el original.</p>
       <p>Sirve cuando el cliente vuelve porque perdió su ticket, o cuando te
       saliste de la pantalla sin querer.</p>
 
@@ -351,6 +348,15 @@ debería quedar − contado = FALTA</pre>
       entró por otro lado.</p>
       <p>Lo que sí entra al cajón son los <b>abonos en efectivo</b>: ese
       billete sí llegó ahí.</p>
+
+      <h4>Lo que se derrite también sale del cuarto frío</h4>
+      <p>En <b>Existencia</b>, botón <b>💧 Anotar merma</b>: cuánto hielo se
+      perdió y por qué (se derritió, se rompió, se regaló, se usó en la
+      fábrica). Eso baja lo que debería haber, igual que una venta, pero sin
+      dinero de por medio.</p>
+      <p class="ayuda-tip">Anotarlo es lo que separa <b>lo que se derritió</b>
+      —que no tiene remedio— de <b>lo que se fue sin pagar</b>, que sí es un
+      problema. Antes iban revueltos en el mismo "faltante".</p>
 
       <h4>Cerrar y contar</h4>
       <p>Cuentas <b>todo</b> el dinero del cajón, incluido el fondo, y lo
@@ -580,11 +586,50 @@ debería haber − contado = FALTA</pre>
   {
     id: 'mayoreo',
     titulo: 'Precios de mayoreo',
-    busca: 'mayoreo precio especial lista mayorista nevería descuento medio marqueta mínimo F6 cliente precio distinto',
+    busca: 'mayoreo precio especial lista mayorista nevería descuento 1m 12m media marqueta número de cliente F6 cliente precio distinto',
     cuerpo: `
       <p>Hay clientes que compran en cantidad y tienen <b>su propio precio</b>.
-      El sistema lo resuelve en un toque: capturas lo que te pidieron, dices
-      quién es, y el precio cambia solo en la pantalla.</p>
+      Se cobra tecleando, sin buscar a nadie primero.</p>
+
+      <h4>Los dos botones del mayoreo</h4>
+      <p>En el catálogo del hielo hay dos productos aparte:</p>
+      <ul>
+        <li><b>1m</b> — una marqueta a precio de mayoreo</li>
+        <li><b>12m</b> — media marqueta a precio de mayoreo</li>
+      </ul>
+      <p>No tienen precio propio: se cobran con la <b>lista de mayoreo</b> que
+      le toque al cliente. Da igual si tecleas <b>1m</b> o <b>1M</b>.</p>
+      <p class="ayuda-tip">No hay un "mínimo de mayoreo" que configurar: el
+      mínimo lo dicen los botones que existen. Si solo hay marqueta y media,
+      no hay forma de pedir mayoreo por un cuarto.</p>
+
+      <h4>Cobrar de mayoreo, paso a paso</h4>
+      <ol class="instrucciones">
+        <li>Tecleas <b>1m</b> y <em>Enter</em>, tantas veces como marquetas
+        te pidieron. (O tocas el número del renglón y escribes 5.)</li>
+        <li><em>F10</em>. En vez de ir al cobro, la caja pregunta
+        <b>¿de quién es el ticket?</b></li>
+        <li>Tecleas el <b>número del cliente</b> —"7"— o las primeras letras
+        de su nombre, y <em>Enter</em>.</li>
+        <li>Sigue el cobro de siempre.</li>
+      </ol>
+      <p>Todo con el teclado, sin soltarlo. Y todo está también en botones,
+      para quien prefiera el dedo.</p>
+
+      <h4>Dos reglas que conviene saber</h4>
+      <ul>
+        <li><b>Un ticket con mayoreo no se cobra sin nombre.</b> El precio
+        especial es de alguien; si no queda escrito de quién, al mes nadie
+        puede explicar por qué esa marqueta salió a $240.</li>
+        <li><b>Si te sales del cobro, el cliente se suelta</b> y hay que
+        volver a decir quién es. Un cliente pegado al ticket es la forma de
+        cobrarle a uno el precio del anterior.</li>
+      </ul>
+
+      <h4>El número del cliente</h4>
+      <p>Cada cliente tiene un número que le toca al darlo de alta y que
+      <b>no cambia nunca</b>, ni aunque se dé de baja. Sale en su ficha, en
+      la lista de <b>Clientes</b> y en la de la caja. Es lo que se teclea.</p>
 
       <h4>Es una LISTA, no un descuento</h4>
       <p><b>Mayoreo 1</b> es una lista de precios completa, donde la marqueta
@@ -593,65 +638,39 @@ debería haber − contado = FALTA</pre>
       vez</b>, que es como se maneja de verdad.</p>
       <p>Y cada fracción lleva <b>su propio precio</b>, igual que en la de
       público: el cuarto no sale de dividir la marqueta entre cuatro. Cortar
-      da trabajo, y ese trabajo no desaparece por vender mucho.</p>
-
-      <h4>Cobrarle en la caja</h4>
-      <ol class="instrucciones">
-        <li>Marcas lo que te pidieron, como en cualquier venta.</li>
-        <li><em>F6</em>, o el botón <b>👤 Cliente</b>.</li>
-        <li>Buscas su nombre y tocas <b>Es él</b>.</li>
-        <li>El precio cambia al instante: el total, los botones, todo. Sigues
-        tu flujo normal y cobras como siempre.</li>
-      </ol>
-      <p>Arriba del ticket queda su nombre en verde, diciendo con qué lista se
-      le está cobrando. La <b>✕</b> de ese renglón lo quita y devuelve los
-      precios de público, por si te confundiste de persona.</p>
-      <p class="ayuda-tip"><b>Es él</b> no es <b>Fiarle</b>. Decir quién es
-      sirve para el precio; fiarle es otra cosa y tiene su propio botón. Un
-      mayorista puede pagar en efectivo y llevarse su precio igual.</p>
-
-      <h4>Desde media marqueta</h4>
-      <p>El mayoreo <b>no aplica por cualquier cosa</b>: arranca desde media
-      marqueta. Al que lleva un cuarto se le cobra público aunque sea el
-      mayorista, y la pantalla te lo dice: <em>"le falta 1/4 de hielo para su
-      precio de Mayoreo 1"</em>. Eso es justo lo que se le dice al cliente:
-      <em>"con un cuarto más te lo dejo a precio de mayoreo"</em>.</p>
-      <p>Se mide sobre <b>todo el hielo del ticket</b>: quien pide un cuarto y
-      un cuarto está pidiendo media marqueta.</p>
-      <p>Alcanzar el mínimo no convierte dos cuartos en un medio: cada
-      fracción se sigue cobrando a su precio, el de mayoreo. Dos cuartos son
-      dos cortes.</p>
+      da trabajo, y ese trabajo no baja por vender más.</p>
 
       <h4>Crear una lista y ponerle precios</h4>
-      <p>En <b>Productos y precios</b>, en la categoría <b>Hielo</b>, hasta
-      abajo: <b>🏷️ Precios de mayoreo</b>.</p>
+      <p>En <b>Productos y precios</b>, categoría <b>Hielo</b>, hasta abajo:
+      <b>🏷️ Precios de mayoreo</b>.</p>
       <ul>
         <li><b>＋ Nueva lista de mayoreo</b> y le pones nombre. Nace copiando
-        los precios de público, para que nunca quede a medio llenar: le bajas
-        los que toque y <b>Guardar</b>.</li>
-        <li><b>Desde cuánto hielo aplica</b> se escribe en dieciseisavos: 8 es
-        media marqueta, 16 es una entera.</li>
+        los precios de público: le bajas los que toque y <b>Guardar</b>.</li>
+        <li>La lista marcada como <b>normal</b> es la que se cobra a quien no
+        tiene una propia. Con <b>Hacerla la normal</b> se cambia.</li>
         <li>Cada lista dice <b>cuántos clientes</b> la usan, para que sepas a
         cuántos les estás cambiando el precio.</li>
       </ul>
 
-      <h4>Apuntar a un cliente</h4>
+      <h4>Darle su lista a un cliente</h4>
       <p>En <b>Clientes</b>, en su ficha, el renglón <b>Precio de mayoreo</b>.
-      Se elige su lista y queda guardado en el acto. En la lista de la
-      izquierda, los que tienen mayoreo salen con 🏷️.</p>
-      <p>Dejarlo en <b>Precio de público</b> se lo quita.</p>
+      Dejarlo en "el normal" le cobra la lista de siempre. En la lista de la
+      izquierda, los que tienen lista propia salen con 🏷️.</p>
+
+      <h4>Un ticket puede llevar los dos precios</h4>
+      <p><em>"Dame una a mayoreo y un cuarto para la casa"</em>: tecleas
+      <b>1m</b> y <b>14</b>. Cada renglón se cobra con su lista.</p>
 
       <h4>Lo que no puede pasar</h4>
       <ul>
         <li><b>El precio lo decide el servidor.</b> La pantalla lo calcula
-        para que se vea al instante, pero al cobrar se vuelve a decidir desde
+        para que se vea al instante, pero al cobrar se decide otra vez desde
         cero.</li>
         <li><b>El precio queda copiado en el ticket.</b> Subirle mañana a la
         lista no cambia los tickets de hoy.</li>
-        <li>Un cliente <b>dado de baja</b> pierde su precio de mayoreo. Una
-        lista dada de baja se cobra a público.</li>
-        <li>El ticket impreso dice <b>de quién fue y con qué lista</b>: es lo
-        que explica por qué esa marqueta salió a $240.</li>
+        <li>Un cliente <b>dado de baja</b> pierde su lista propia. Una lista
+        dada de baja cae a la normal.</li>
+        <li>El ticket impreso dice <b>de quién fue y con qué lista</b>.</li>
       </ul>`
   },
 
@@ -689,6 +708,30 @@ debería haber − contado = FALTA</pre>
       quién era el turno. En el relevo de las 2:30 uno teclea y el turno es de
       otro; aquí la pregunta es qué hizo la persona.</p>
 
+      <h4>Buscar un ticket por su número</h4>
+      <p>Arriba del todo, <b>Ticket número</b>. Escribes <b>412</b> y ahí
+      está, sin acordarte de qué día fue. Mientras busques por número, los
+      demás filtros no aplican.</p>
+
+      <h4>Lo que puedes hacer con un ticket</h4>
+      <ul>
+        <li><b>Copia</b> — lo vuelve a imprimir marcado como COPIA. Lo puede
+        hacer cualquiera que pueda vender.</li>
+        <li><b>⋯</b> — solo el administrador. Ahí están cancelar y eliminar.
+        A los demás ni les sale el botón.</li>
+      </ul>
+      <p>Está explicado a fondo en <b>Dar de baja o eliminar</b>, pero en
+      corto: <b>cancelar</b> deja el ticket tachado con su motivo y las
+      cuentas cuadrando, y se puede siempre. <b>Eliminar</b> lo quita de
+      verdad, y <b>solo se puede mientras su turno siga abierto</b>: en
+      cuanto se corta, hay un papel firmado con ese número.</p>
+
+      <h4>Los cambios de ticket</h4>
+      <p>Cuando un ticket se cambió por otro, los <b>dos</b> renglones salen
+      marcados con <b>⇄</b> y cada uno dice cuál es su pareja
+      (<em>#5→#6</em>). Cayendo en cualquiera de los dos se ve la historia
+      completa sin buscar.</p>
+
       <h4>Esto no es la bitácora</h4>
       <p>La bitácora (en <b>Sistema</b>) dice cosas como
       <code>venta.registrada</code> y es para el que programa. Esto está
@@ -724,6 +767,25 @@ debería haber − contado = FALTA</pre>
       <p>Y solo la del <b>administrador</b>. El PIN se teclea veinte veces al
       día delante de quien sea: sirve para decir "yo estoy aquí". Borrar no se
       deshace, así que va con algo que no ve nadie.</p>
+
+      <h4>Un ticket: cancelar o eliminar</h4>
+      <p>Con los tickets la diferencia no es "temporada o no": es <b>el papel
+      firmado</b>.</p>
+      <ul>
+        <li><b>Cancelar</b> deja el ticket tachado con su motivo. El hielo
+        vuelve al cuarto frío, la caja se ajusta sola y el corte sigue
+        cuadrando. Se puede con tickets de <b>cualquier día</b>, y es lo que
+        se hace casi siempre.</li>
+        <li><b>Eliminar</b> lo quita como si nunca hubiera existido, y
+        <b>solo se puede mientras su turno siga abierto</b>. En cuanto se
+        corta el turno hay un papel firmado con ese número: borrarlo dejaría
+        al papel diciendo una cosa y al sistema otra, y ese papel es el que
+        se usa para reclamarle a alguien.</li>
+      </ul>
+      <p>Los dos están en el <b>Historial</b>, detrás del botón <b>⋯</b>, y
+      solo le salen al administrador. Un ticket que es parte de un
+      <b>cambio</b> tampoco se borra suelto: dejaría al otro apuntando a un
+      número que ya no existe.</p>
 
       <h4>Un gasto capturado por error</h4>
       <p>Se puede <b>anular</b> —queda tachado con su motivo, y se ve qué

@@ -64,10 +64,36 @@ segundo.
 - El mínimo (hoy 8 dieciseisavos) es **configurable**: es un número del
   negocio, y de esos no se hardcodea ninguno.
 
+### Cómo se cobra el mayoreo (v2.0)
+
+Tony lo trabajaba así en el software anterior, y así quedó:
+
+> *"Creé un producto nuevo que llamé marquetas a mayoreo, solo eran dos:
+> media marqueta (12m) y una marqueta (1m). Yo simplemente ponía 1m y se
+> ponía el precio de mayoreo y listo. Lo que no me gustaba es que no podía
+> asignárselo a un cliente."*
+
+- El mayoreo **se teclea**: `1m` y `12m`. Es un toque; buscar a alguien en
+  una lista antes de capturar son diez, y el cliente está enfrente.
+- Al cobrar (F10) el sistema **pide de quién es** antes de pasar al cobro.
+  Se teclea el **número del cliente** o su nombre.
+- Cada cliente tiene un **número** correlativo que no se reusa nunca.
+- **No hay mínimo configurable**: el mínimo lo dicen los productos que
+  existen. Si solo hay marqueta y media marqueta, no hay mayoreo por menos.
+- Salirse del cobro **suelta al cliente**: hay que volver a decir quién es.
+
 **Falta por definir todavía:** identificar al cliente **por huella** en la
-caja, para que el cajero no tenga que buscarlo en una lista. Tony lo pidió
-como fase propia: *"si esto es muy complicado, déjalo para una fase
-completamente sola"*.
+caja. Tony lo pidió como fase propia: *"si esto es muy complicado, déjalo
+para una fase completamente sola"*. El flujo ya está listo para recibirla:
+al apretar F10 en un ticket de mayoreo, en vez de pedir el número pediría la
+huella, y el resto sigue igual. Va con interruptor para apagarla.
+
+### Mermas del cuarto frío (v2.0)
+
+Hielo que sale del cuarto frío sin pasar por la caja: **derretido, roto,
+regalado o usado en la fábrica**. Se anota aparte de lo vendido, porque lo
+que se derrite no tiene remedio y lo que se va sin pagar sí es un problema.
+Antes iban revueltos en un solo "faltante".
 
 ---
 

@@ -26,9 +26,10 @@ const { productoPorId, productoPorCodigo, cotizar,
         categoriasActivas, productosActivos } = require('../catalogo/catalogo');
 const { alcanza, avisos } = require('../catalogo/avisos');
 const { cabeElCredito, estadoCliente, clientesConEstado } = require('../clientes/calculo');
-const { listaParaVenta, hieloDe, minimoMayoreo, guardarMinimoMayoreo,
-        listasDeMayoreo } = require('./mayoreo');
-const { comprobar: comprobarAutorizacion, responsables } = require('../../lib/autorizacion');
+const { listaDeMayoreo, listaPorOmision, listasDeMayoreo,
+        llevaMayoreo } = require('./mayoreo');
+const { comprobar: comprobarAutorizacion, comprobarAdmin,
+        responsables, administradores } = require('../../lib/autorizacion');
 
 const router = express.Router();
 
@@ -76,11 +77,12 @@ router.get('/contexto', vender, (req, res) => {
     categorias: categoriasActivas(),
     productos: productosActivos(),
     avisos: avisos(),
-    // Las listas de mayoreo, con sus precios: la caja tiene que poder
-    // recalcular al instante cuando el cajero dice de quién es el ticket.
-    // El servidor vuelve a decidir al cobrar; esto es solo para la pantalla.
+    // Las listas de mayoreo, con sus precios. La caja las necesita enteras
+    // para poder repintar el ticket en el acto cuando el cajero dice de
+    // quién es. El servidor vuelve a decidir al cobrar; esto es la pantalla.
     mayoreo: {
-      minimo: minimoMayoreo(),
+      // La que se cobra mientras no se sabe quién es el cliente.
+      porOmision: listaPorOmision()?.id || null,
       listas: listasDeMayoreo().map((l) => ({
         id: l.id, nombre: l.nombre,
         precios: [...preciosDe(l.id).entries()]
@@ -97,7 +99,9 @@ router.get('/contexto', vender, (req, res) => {
           id: c.id, nombre: c.nombre, negocio: c.negocio,
           saldo: c.estado.saldo, limite: c.estado.limite,
           disponible: c.estado.disponible, vencido: c.estado.vencido,
-          listaId: c.lista_id || null
+          listaId: c.lista_id || null,
+          // Para teclear "7" y enter en vez de escribir el nombre.
+          numero: c.numero || null
         }))
       : []
   });
@@ -135,19 +139,29 @@ router.post('/', vender, (req, res) => {
 
   // ---- QUIÉN ES, Y CON QUÉ LISTA SE LE COBRA ----
   //
-  // Esto va ANTES de cotizar, porque el mayoreo cambia el precio de cada
-  // fracción. Y se decide AQUÍ desde cero aunque la pantalla ya lo haya
-  // calculado: si no, bastaría con mandar el clienteId de un mayorista para
-  // llevarse su precio.
+  // Esto va ANTES de cotizar, porque las líneas de mayoreo se cobran con la
+  // lista del cliente. Y se decide AQUÍ desde cero aunque la pantalla ya lo
+  // haya calculado: si no, bastaría con mandar otro clienteId para llevarse
+  // el precio de alguien más.
   const clienteDelTicket = req.body?.clienteId
     ? bd.prepare('SELECT * FROM clientes WHERE id = ?').get(req.body.clienteId)
     : null;
 
-  const hielo = hieloDe(lineas, { porId: productoPorId, porCodigo: productoPorCodigo });
-  const cotizacion = listaParaVenta(clienteDelTicket, hielo);
-  const lista = cotizacion.lista;
+  const lista = listaActiva();
 
-  const preparadas = prepararLineas(lineas, lista);
+  // UN TICKET CON MAYOREO NO SE COBRA SIN NOMBRE. El precio especial es de
+  // alguien; sin saber de quién, al mes nadie puede explicar por qué esa
+  // marqueta salió a $240. La pantalla pide el cliente antes de cobrar,
+  // pero la regla vive aquí, que es donde no se puede saltar.
+  const conMayoreo = llevaMayoreo(lineas, { porId: productoPorId, porCodigo: productoPorCodigo });
+  if (conMayoreo && !clienteDelTicket) {
+    return error(res, 'Este ticket lleva mayoreo: falta decir de quién es.', 409,
+                 { faltaCliente: true });
+  }
+
+  const listaMayoreo = conMayoreo ? listaDeMayoreo(clienteDelTicket) : null;
+
+  const preparadas = prepararLineas(lineas, lista, listaMayoreo);
   if (preparadas.error) return error(res, preparadas.error, preparadas.codigo || 400);
 
   // --- Forma de pago ---
@@ -179,7 +193,10 @@ router.post('/', vender, (req, res) => {
     lineas: preparadas.lineas,
     total: preparadas.total,
     pago,
-    lista,
+    // Se guarda la lista que EXPLICA el precio: si hubo mayoreo, esa. Los
+    // precios ya van copiados renglón por renglón (regla 3.5); esto es para
+    // que el ticket y el historial puedan decir "salió a precio de Mayoreo 1".
+    lista: listaMayoreo || lista,
     almacenId: almacen?.id || null,
     cajeroId: req.body?.cajeroId || req.usuario.id,
     capturistaId: req.usuario.id,
@@ -198,7 +215,7 @@ router.post('/', vender, (req, res) => {
     detalle: { folio: venta.folio, total: preparadas.total,
                lineas: preparadas.lineas.length, cajaFolio: venta.cajaFolio,
                cliente: clienteDelTicket?.nombre,
-               mayoreo: cotizacion.esMayoreo ? lista.nombre : null,
+               mayoreo: listaMayoreo?.nombre || null,
                autorizo: credito.autorizadoPorNombre }
   });
 
@@ -208,7 +225,7 @@ router.post('/', vender, (req, res) => {
       ? { ...clienteDelTicket, estado: estadoCliente(clienteDelTicket) }
       : null,
     // Para que la caja pueda decir "salió a precio de Mayoreo 1".
-    mayoreo: cotizacion.esMayoreo ? { lista: lista.nombre, id: lista.id } : null
+    mayoreo: listaMayoreo ? { lista: listaMayoreo.nombre, id: listaMayoreo.id } : null
   }, 201);
 });
 
@@ -272,7 +289,7 @@ function revisarCredito(req, total, cliente) {
  * EL PRECIO SE CALCULA AQUÍ, en el servidor, no se cree lo que mande la
  * pantalla. Devuelve { lineas, total } o { error } — nunca a medias.
  */
-function prepararLineas(lineas, lista) {
+function prepararLineas(lineas, lista, listaMayoreo = null) {
   const preparadas = [];
   let total = 0;
 
@@ -305,18 +322,28 @@ function prepararLineas(lineas, lista) {
     const falta = alcanza(producto, cantidad);
     if (falta) return { error: falta, codigo: 409 };
 
-    const c = cotizar({ producto, dieciseisavos: sueltos, listaId: lista.id, cantidad });
+    // CADA LÍNEA CON SU LISTA. Un ticket puede llevar una marqueta de
+    // mayoreo y un cuarto de público en el mismo renglón de la vida real:
+    // "dame una a mayoreo y un cuarto para la casa". Cobrarlo todo con una
+    // sola lista sería regalar o cobrar de más.
+    const suLista = producto?.mayoreo ? listaMayoreo : lista;
+    if (!suLista) {
+      return { error: 'Todavía no hay ninguna lista de precios de mayoreo.', codigo: 409 };
+    }
+
+    const c = cotizar({ producto, dieciseisavos: sueltos, listaId: suLista.id, cantidad });
 
     if (c.dieciseisavos > MAX_DIECISEISAVOS) return { error: 'Cantidad fuera de rango.' };
     if (c.faltan.length) {
       return {
-        error: `Falta poner precio a ${c.faltan.map(aTexto).join(', ')} en la lista ${lista.nombre}.`,
+        error: `Falta poner precio a ${c.faltan.map(aTexto).join(', ')} en la lista ${suLista.nombre}.`,
         codigo: 409
       };
     }
 
     preparadas.push({
       productoId: producto?.id || null,
+      esMayoreo: Boolean(producto?.mayoreo),
       concepto: String(c.concepto).slice(0, 40),
       dieciseisavos: c.dieciseisavos,
       // Cuántas piezas: el inventario descuenta por esto, no por renglones.
@@ -433,9 +460,19 @@ router.get('/', verVentas, (req, res) => {
   }
 
   const filas = bd.prepare(`
-    SELECT v.*, u.nombre AS cajero_nombre, cl.nombre AS cliente_nombre FROM ventas v
+    SELECT v.*, u.nombre AS cajero_nombre, cl.nombre AS cliente_nombre,
+           viejo.folio AS cambio_de, nuevo.folio AS cambiado_por,
+           -- Qué se llevó, en corto. Va en la lista para no tener que abrir
+           -- el ticket —ni imprimirlo— para contestar "¿qué se llevó?".
+           (SELECT group_concat(
+                     CASE WHEN vl.cantidad > 1 THEN vl.cantidad || ' × ' || vl.concepto
+                          ELSE vl.concepto END, ', ')
+              FROM venta_lineas vl WHERE vl.venta_id = v.id) AS detalle
+      FROM ventas v
       LEFT JOIN usuarios u  ON u.id = v.cajero_id
       LEFT JOIN clientes cl ON cl.id = v.cliente_id
+      LEFT JOIN ventas viejo ON viejo.id = v.cambio_de_venta_id
+      LEFT JOIN ventas nuevo ON nuevo.id = v.cambiada_por_venta_id
      ${filtros.length ? 'WHERE ' + filtros.join(' AND ') : ''}
      ORDER BY v.fecha DESC LIMIT ?
   `).all(...valores, limite);
@@ -470,6 +507,73 @@ router.post('/:id/cancelar', exigirPermiso('venta.cancelar'), (req, res) => {
   });
 
   return ok(res, { cancelada: true });
+});
+
+/**
+ * BORRAR UN TICKET DE VERDAD.
+ *
+ * Cancelar y borrar no son lo mismo, y la diferencia es el papel firmado:
+ *
+ *  · CANCELAR deja el renglón tachado con su motivo. El hielo vuelve al
+ *    cuarto frío, la caja se ajusta sola y el corte sigue cuadrando. Es lo
+ *    que se hace el 99% de las veces, y funciona con tickets de cualquier
+ *    día.
+ *
+ *  · BORRAR lo quita como si nunca hubiera existido. Eso solo se puede
+ *    mientras el turno sigue ABIERTO —o sea, antes de que alguien firme un
+ *    papel con ese número—. Después, borrarlo dejaría el corte firmado
+ *    diciendo una cosa y el sistema otra, y ese papel es el que se usa para
+ *    reclamarle a alguien.
+ *
+ * Y solo el administrador, con su CONTRASEÑA, no con el PIN: el PIN se
+ * teclea veinte veces al día delante de quien sea, y esto no se deshace.
+ */
+router.delete('/:id', exigirPermiso('venta.cancelar'), (req, res) => {
+  const v = bd.prepare('SELECT * FROM ventas WHERE id = ?').get(req.params.id);
+  if (!v) return error(res, 'Ese ticket no existe.', 404);
+
+  const quien = comprobarAdmin(req.body?.autorizacion);
+  if (quien.error) {
+    return error(res, quien.error, 403, {
+      requiereContrasena: true, administradores: administradores()
+    });
+  }
+
+  // ¿Su turno sigue abierto? Un ticket sin turno (se cobró sin caja abierta)
+  // no entró en ningún corte, así que tampoco hay papel que contradecir.
+  if (v.caja_id) {
+    const caja = bd.prepare('SELECT * FROM cajas WHERE id = ?').get(v.caja_id);
+    if (caja?.cerrada_en) {
+      return error(res,
+        `El turno #${caja.folio} ya se cortó y ese papel lleva este ticket. ` +
+        'Cancélalo en vez de borrarlo: queda tachado con su motivo y las cuentas siguen cuadrando.',
+        409, { sugerencia: 'cancelar' });
+    }
+  }
+
+  // Un ticket amarrado a un cambio no se borra solo: dejaría al otro
+  // apuntando a un número que ya no existe.
+  if (v.cambio_de_venta_id || v.cambiada_por_venta_id) {
+    return error(res,
+      'Este ticket es parte de un cambio. Borrarlo dejaría al otro colgando; cancélalo.',
+      409, { sugerencia: 'cancelar' });
+  }
+
+  const borrar = bd.transaction(() => {
+    bd.prepare('DELETE FROM venta_lineas WHERE venta_id = ?').run(v.id);
+    bd.prepare('DELETE FROM ventas WHERE id = ?').run(v.id);
+  });
+  borrar();
+
+  // Lo único que no se borra nunca es la constancia de que alguien borró.
+  bitacora.registrar({
+    accion: 'venta.borrada', entidad: 'venta', entidadId: v.id,
+    ejecutorId: quien.usuario.id,
+    detalle: { folio: v.folio, total: v.total_centavos, fecha: v.fecha,
+               autorizo: quien.usuario.nombre }
+  });
+
+  return ok(res, { borrada: true, folio: v.folio });
 });
 
 // ============================================================
@@ -620,7 +724,7 @@ router.get('/precios/listas', verVentas, (req, res) => {
         .map(([dieciseisavos, centavos]) => ({ dieciseisavos, centavos, etiqueta: aTexto(dieciseisavos) }))
         .sort((a, b) => b.dieciseisavos - a.dieciseisavos)
     }));
-  return ok(res, { listas, minimoMayoreo: minimoMayoreo() });
+  return ok(res, { listas, mayoreoPorOmision: listaPorOmision()?.id || null });
 });
 
 /**
@@ -669,19 +773,30 @@ router.post('/precios/listas', configurarPrecios, (req, res) => {
   return ok(res, { lista }, 201);
 });
 
-/** Desde cuánto hielo aplica el mayoreo. */
-router.put('/precios/mayoreo-minimo', configurarPrecios, (req, res) => {
-  const crudo = String(req.body?.dieciseisavos ?? '').trim();
-  const n = Number(crudo);
-  if (!/^\d+$/.test(crudo) || !Number.isInteger(n) || n < 1 || n > 16 * 500) {
-    return error(res, 'Escribe desde cuánto hielo aplica el mayoreo.');
-  }
-  guardarMinimoMayoreo(n, req.usuario.id);
-  bitacora.registrar({
-    accion: 'precios.mayoreo-minimo', entidad: 'configuracion',
-    ejecutorId: req.usuario.id, detalle: { dieciseisavos: n }
+/**
+ * CUÁL ES "EL PRECIO DE MAYOREO NORMAL".
+ *
+ * Es la lista que se cobra cuando el cliente no tiene una propia, y la que
+ * la caja enseña mientras todavía no se sabe quién es. Solo puede haber
+ * una: dos listas "normales" sería no tener ninguna.
+ */
+router.put('/precios/listas/:id/predeterminada', configurarPrecios, (req, res) => {
+  const lista = bd.prepare(
+    "SELECT * FROM listas_precios WHERE id = ? AND activo = 1 AND tipo = 'mayoreo'"
+  ).get(req.params.id);
+  if (!lista) return error(res, 'Esa lista de mayoreo no existe.', 404);
+
+  const marcar = bd.transaction(() => {
+    bd.prepare("UPDATE listas_precios SET activa = 0 WHERE tipo = 'mayoreo'").run();
+    bd.prepare('UPDATE listas_precios SET activa = 1 WHERE id = ?').run(lista.id);
   });
-  return ok(res, { minimo: minimoMayoreo() });
+  marcar();
+
+  bitacora.registrar({
+    accion: 'precios.mayoreo-predeterminada', entidad: 'lista_precios', entidadId: lista.id,
+    ejecutorId: req.usuario.id, detalle: { nombre: lista.nombre }
+  });
+  return ok(res, { lista: listaPorOmision() });
 });
 
 router.put('/precios/:listaId', configurarPrecios, (req, res) => {

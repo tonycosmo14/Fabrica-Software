@@ -21,7 +21,7 @@ const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
 const { comprobarAdmin, administradores } = require('../../lib/autorizacion');
 const { sesionAbierta } = require('../caja/calculo');
-const { listasDeMayoreo, minimoMayoreo } = require('../ventas/mayoreo');
+const { listasDeMayoreo, listaPorOmision } = require('../ventas/mayoreo');
 const {
   estadoCliente, cuentaCorriente, clientesConEstado, resumenCartera
 } = require('./calculo');
@@ -86,7 +86,7 @@ router.get('/', verClientes, (req, res) => {
     clientes,
     cartera: resumenCartera(),
     listas: listasDeMayoreo().map((l) => ({ id: l.id, nombre: l.nombre })),
-    minimoMayoreo: minimoMayoreo()
+    mayoreoPorOmision: listaPorOmision()?.nombre || null
   });
 });
 
@@ -119,18 +119,28 @@ router.post('/', administrar, (req, res) => {
   if (plazo.error) return error(res, 'El plazo se escribe en días, con números.');
 
   const id = nuevoId();
-  bd.prepare(`
-    INSERT INTO clientes (id, nombre, negocio, telefono, direccion, notas,
-                          limite_centavos, dias_plazo, fecha_alta, creado_por)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, nombre.slice(0, 80),
-         (req.body?.negocio || '').trim().slice(0, 80) || null,
-         (req.body?.telefono || '').trim().slice(0, 30) || null,
-         (req.body?.direccion || '').trim().slice(0, 200) || null,
-         (req.body?.notas || '').trim().slice(0, 500) || null,
-         limiteCentavos,
-         plazo.omitido ? null : plazo.valor,
-         ahora(), req.usuario.id);
+
+  // EL NÚMERO DEL CLIENTE. Es para teclearlo en la caja: "7" y enter, en vez
+  // de escribir "Pescadería Chuc" con gente esperando. Se toma DENTRO de la
+  // transacción, igual que el folio de un ticket, y no se reusa nunca: el
+  // número es del cliente aunque se dé de baja (regla 3.3).
+  const alta = bd.transaction(() => {
+    const numero = bd.prepare('SELECT COALESCE(MAX(numero), 0) n FROM clientes').get().n + 1;
+    bd.prepare(`
+      INSERT INTO clientes (id, numero, nombre, negocio, telefono, direccion, notas,
+                            limite_centavos, dias_plazo, fecha_alta, creado_por)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, numero, nombre.slice(0, 80),
+           (req.body?.negocio || '').trim().slice(0, 80) || null,
+           (req.body?.telefono || '').trim().slice(0, 30) || null,
+           (req.body?.direccion || '').trim().slice(0, 200) || null,
+           (req.body?.notas || '').trim().slice(0, 500) || null,
+           limiteCentavos,
+           plazo.omitido ? null : plazo.valor,
+           ahora(), req.usuario.id);
+    return numero;
+  });
+  alta();
 
   bitacora.registrar({
     accion: 'cliente.alta', entidad: 'cliente', entidadId: id,

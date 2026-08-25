@@ -3,7 +3,7 @@
 Sistema para la fábrica de hielo de Hunucmá, Yucatán.
 Se construye **por versiones**: cada versión es un pedazo terminado, probado y usable.
 
-**Versión actual: v1.9**
+**Versión actual: v2.0**
 
 ---
 
@@ -374,47 +374,99 @@ Y lo único que no se borra nunca es **la constancia de que alguien borró**.
 
 ---
 
-## Precios de mayoreo (v1.9)
+## Precios de mayoreo (v1.9, rehecho en v2.0)
 
 *"Algunos clientes gozan de mayoreo, a partir de 1/2 marqueta."*
 
 **El mayoreo es una LISTA, no un descuento.** No es *"a Don Carlos le bajas
 el 10%"*: es la lista **Mayoreo 1**, donde la marqueta vale $240 en vez de
 $264 y cada fracción tiene su propio precio. Varios clientes comparten la
-misma lista, y subirle el precio a la lista se lo sube a todos de una vez,
-que es como se maneja de verdad.
+misma lista, y subirle el precio a la lista se lo sube a todos de una vez.
 
 Y no es un porcentaje parejo: el 1/16 cuesta más de lo proporcional porque
 cortar da trabajo, y ese trabajo no desaparece por vender mucho (regla 7.2).
-La tabla `listas_precios` ya traía `tipo IN ('publico','mayoreo')` desde la
-v0.8; esta versión no inventó el molde, lo usó.
 
-### El flujo
+### El mayoreo se teclea
 
-Capturar → **F6** → *"es él"* → el precio cambia en la pantalla → cobrar
-como siempre. Identificar al cliente **no es fiarle**: son dos botones en la
-misma lista, porque la mayoría de los mayoristas pagan en el momento.
+La v1.9 lo resolvió por el camino largo —identificar al cliente y *entonces*
+capturar—. La v2.0 lo invirtió, siguiendo cómo lo trabajaba Tony antes:
 
-### Cuándo aplica
+```
+   1m  ⏎   1m  ⏎   1m  ⏎        cinco marquetas a mayoreo
+   F10                          "¿de quién es?"
+   7   ⏎                        el cliente número 7
+   …                            el cobro de siempre
+```
 
-Desde el mínimo configurable (por omisión **8 dieciseisavos**, media
-marqueta), medido sobre **todo el hielo del ticket**: un cuarto y un cuarto
-son media marqueta. Por debajo se cobra público y la pantalla dice cuánto
-falta, que es lo que se le dice al cliente en la cara.
+- `1m` y `12m` son productos de hielo con la marca `mayoreo`. **No tienen
+  precio propio**: se cotizan con la lista del cliente si tiene una, y si no
+  con la marcada como *normal*.
+- **Un ticket con mayoreo no se cobra sin nombre.** La regla vive en el
+  servidor (`POST /ventas` responde 409 con `faltaCliente`), no solo en la
+  pantalla: es donde no se puede saltar.
+- **Salirse del cobro suelta al cliente.** Un cliente pegado al ticket es la
+  forma de cobrarle a uno el precio del anterior.
+- Cada cliente tiene un **número** correlativo que no se reusa nunca, para
+  poder teclearlo.
 
-Alcanzar el mínimo no convierte dos cuartos en un medio: cada fracción se
-sigue cobrando a su precio de mayoreo. Dos cuartos son dos cortes.
+No hay mínimo configurable: **el mínimo lo dicen los botones que existen**.
+Si solo hay marqueta y media, no hay forma de pedir mayoreo por un cuarto.
+
+### Un ticket, dos precios
+
+*"Dame una a mayoreo y un cuarto para la casa"* es un ticket con dos listas.
+`prepararLineas()` cotiza **cada línea con la suya**: la de mayoreo con la
+lista de mayoreo y el resto con la de público.
 
 ### Quién decide el precio
 
-**El servidor, siempre.** `listaParaVenta()` vuelve a resolver la lista al
-cobrar, desde cero: mandar el `clienteId` de un mayorista no alcanza para
-llevarse su precio. La pantalla calcula lo mismo solo para que se vea al
-instante — esperar medio segundo con el cliente enfrente es el peor momento
-para esperar.
+**El servidor, siempre.** La pantalla calcula lo mismo para que se vea al
+instante —esperar medio segundo con el cliente enfrente es el peor momento
+para esperar—, pero al cobrar se resuelve otra vez desde cero. El precio
+queda **copiado** en el ticket (regla 3.5).
 
-El precio queda **copiado** en el ticket (regla 3.5). Un cliente dado de
-baja pierde su mayoreo; una lista dada de baja se cobra a público.
+Un cliente dado de baja pierde su lista propia; una lista dada de baja cae a
+la normal.
+
+---
+
+## Mermas del cuarto frío (v2.0)
+
+Hasta la v1.9 el hielo derretido caía dentro del *faltante* a secas,
+mezclado con el que se fue sin pagar. Son dos cosas distintas: una es física
+y no tiene remedio, la otra es un problema.
+
+```
+    Había en el último conteo
+  + Salió de los tanques
+  = Debería haber
+  − Se vendió al público
+  − Se vendió a mayoreo
+  − Derretidas, rotas o regaladas
+  = Debería haber ahora
+```
+
+Las mermas se anotan con quién la vio y quién la capturó (regla 3.6), y
+nada se borra: un renglón mal capturado se anula y queda tachado con su
+motivo (regla 3.4).
+
+---
+
+## Borrar un ticket (v2.0)
+
+Cancelar y borrar no son lo mismo, y la diferencia es **el papel firmado**:
+
+| | Cancelar | Eliminar |
+|---|---|---|
+| Qué hace | Deja el renglón tachado con su motivo | Lo quita como si nunca hubiera existido |
+| Cuándo se puede | Siempre | Solo con el turno **abierto** |
+| Quién | Gerente o administrador | Solo el administrador, con su **contraseña** |
+| Las cuentas | Se ajustan solas | No había nada que ajustar |
+
+En cuanto se corta un turno hay un papel firmado con ese número. Borrar un
+renglón dejaría al papel diciendo una cosa y al sistema otra, y ese papel es
+el que se usa para reclamarle a alguien. Un ticket que es parte de un cambio
+tampoco se borra suelto: dejaría al otro apuntando a la nada.
 
 ---
 
@@ -626,7 +678,10 @@ versión nueva le aparece un punto rojo en el menú.
 | **v1.7** | Ajustes de la primera prueba a fondo: cantidades, F1, dinero sin decimales | ✅ listo |
 | **v1.8** | Historial con filtros, y borrar de verdad | ✅ listo |
 | **v1.9** | Precios de mayoreo, corte en dos columnas y compartir por WhatsApp | ✅ listo |
-| v2.0 | Reparto, pedidos y neveras en comodato | siguiente |
+| **v2.0** | Mayoreo tecleado, historial con acciones, mermas y listas de un renglón | ✅ listo |
+| v2.1 | Actualizar el sistema desde un ZIP, sin perder datos | siguiente |
+| v2.2 | Estadísticas, gráficas, recibos de CFE y gastos grandes de la empresa | |
+| v2.3 | Reparto, pedidos y neveras en comodato | |
 | v2.1 | Planta de agua: garrafones, botellas y depósitos | |
 | v2.2 | Mantenimiento: compresores, ósmosis, membranas, horario punta | |
 | v2.3 | Estadísticas y sistema completo en producción | |

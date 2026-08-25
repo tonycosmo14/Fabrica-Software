@@ -14,7 +14,7 @@
 import { api } from '../api.js';
 import { esc, avisar, fecha as formatoFecha } from '../util.js';
 import { pedirTexto, pedirImporte, confirmar, menu, pedirContrasena } from '../dialogo.js';
-import { pesos, paraEditar, aTexto } from '../fracciones.js';
+import { pesos, paraEditar } from '../fracciones.js';
 
 export async function vistaClientes(pantalla, estadoApp) {
   const puede = (p) => estadoApp.permisos.includes('*') || estadoApp.permisos.includes(p);
@@ -26,7 +26,7 @@ export async function vistaClientes(pantalla, estadoApp) {
 
   let datos = { clientes: [], cartera: null, listas: [] };
   let listas = [];              // las listas de mayoreo que se pueden asignar
-  let minimo = 0;               // desde cuánto hielo aplica el mayoreo
+  let laNormal = null;          // cómo se llama la lista de mayoreo de siempre
   let ficha = null;             // { cliente, cuenta }
   let seleccionado = null;      // id
   let soloDeben = false;
@@ -43,7 +43,7 @@ export async function vistaClientes(pantalla, estadoApp) {
 
     datos = await api.obtener(`/clientes?${query}`);
     listas = datos.listas || [];
-    minimo = datos.minimoMayoreo || 0;
+    laNormal = datos.mayoreoPorOmision || null;
 
     if (seleccionado && !datos.clientes.some((c) => c.id === seleccionado)) {
       // Sigue existiendo, solo que el filtro lo escondió: se deselecciona
@@ -118,6 +118,7 @@ export async function vistaClientes(pantalla, estadoApp) {
       <button class="cfg-item cfg-cliente ${seleccionado === c.id ? 'activo' : ''}
                      ${c.activo ? '' : 'de-baja'}"
               data-cliente="${esc(c.id)}">
+        <span class="cliente-num">#${c.numero ?? '—'}</span>
         <span class="crece">
           <strong>${esc(c.nombre)}</strong>
           <small>
@@ -175,7 +176,9 @@ export async function vistaClientes(pantalla, estadoApp) {
     return `
       <div class="cfg-detalle-cabeza">
         <div class="crece">
-          <h3 style="margin:0">${esc(c.nombre)}</h3>
+          <h3 style="margin:0">
+            <span class="cliente-num">#${c.numero ?? '—'}</span> ${esc(c.nombre)}
+          </h3>
           ${c.negocio ? `<p class="ayuda" style="margin:2px 0 0">${esc(c.negocio)}</p>` : ''}
           ${c.activo ? '' : '<span class="etiqueta baja">Dado de baja</span>'}
         </div>
@@ -271,15 +274,14 @@ export async function vistaClientes(pantalla, estadoApp) {
       return `
         <div class="cuadre-linea">
           <span>Precio de mayoreo</span>
-          <strong>${c.lista ? esc(c.lista.nombre) : 'precio de público'}</strong>
+          <strong>${c.lista ? esc(c.lista.nombre) : (laNormal || 'el de siempre')}</strong>
         </div>`;
     }
     return `
       <div class="cuadre-linea campo-vivo">
-        <span>Precio de mayoreo<small>desde ${
-          minimo ? esc(aTexto(minimo)) : 'media marqueta'} de hielo</small></span>
+        <span>Precio de mayoreo<small>cuál lista se le cobra al teclear 1m</small></span>
         <select data-lista>
-          <option value="">Precio de público</option>
+          <option value="">${laNormal ? `El normal (${esc(laNormal)})` : 'El de siempre'}</option>
           ${listas.map((l) => `
             <option value="${esc(l.id)}" ${suya === l.id ? 'selected' : ''}>
               ${esc(l.nombre)}
@@ -354,7 +356,7 @@ export async function vistaClientes(pantalla, estadoApp) {
         ficha.cliente = r.cliente;
         avisar(r.cliente.lista
           ? `${r.cliente.nombre} paga precio de ${r.cliente.lista.nombre}`
-          : `${r.cliente.nombre} paga precio de público`, 'bien');
+          : `${r.cliente.nombre} paga el precio de mayoreo normal`, 'bien');
         await cargar();
       } catch (e) { avisar(e.message, 'error'); await abrir(ficha.cliente.id); }
     };

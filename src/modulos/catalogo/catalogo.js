@@ -34,11 +34,20 @@ function productoPorId(id) {
   return bd.prepare('SELECT * FROM productos WHERE id = ? AND activo = 1').get(id || null) || null;
 }
 
-/** Lo que teclea el cajero: "18" y enter. */
+/**
+ * Lo que teclea el cajero: "18" y enter.
+ *
+ * Sin distinguir mayúsculas de minúsculas: los códigos se guardan en
+ * mayúsculas, pero nadie va a poner el bloqueo de mayúsculas para teclear
+ * "1M" con un cliente enfrente, y un código que a veces funciona y a veces
+ * no es peor que no tenerlo.
+ */
 function productoPorCodigo(codigo) {
   const limpio = String(codigo ?? '').trim();
   if (!limpio) return null;
-  return bd.prepare('SELECT * FROM productos WHERE codigo = ? AND activo = 1').get(limpio) || null;
+  return bd.prepare(
+    'SELECT * FROM productos WHERE upper(codigo) = upper(?) AND activo = 1'
+  ).get(limpio) || null;
 }
 
 /**

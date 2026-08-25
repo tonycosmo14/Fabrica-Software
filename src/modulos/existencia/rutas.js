@@ -19,7 +19,7 @@ const { nuevoId, ahora } = require('../../lib/ids');
 const { ok, error } = require('../../lib/respuestas');
 const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
-const { estadoAlmacen, ultimoConteo } = require('./calculo');
+const { estadoAlmacen, ultimoConteo, mermasDesde } = require('./calculo');
 const { aTexto, DIECISEISAVOS_POR_MARQUETA } = require('../../lib/fracciones');
 
 const router = express.Router();
@@ -105,12 +105,90 @@ router.get('/', verExistencia, (req, res) => {
         producido: aTexto(estado.producido),
         teorico: aTexto(estado.teorico),
         vendido: aTexto(estado.vendido),
+        vendidoPublico: aTexto(estado.vendidoPublico),
+        vendidoMayoreo: aTexto(estado.vendidoMayoreo),
+        merma: aTexto(estado.merma),
         esperado: aTexto(estado.esperado)
       }
     };
   });
 
   return ok(res, { almacenes, horarios: horariosConteo() });
+});
+
+/**
+ * LO QUE SE DERRITIÓ, SE ROMPIÓ O SE REGALÓ.
+ *
+ * Se anota igual que un gasto del cajón: quién lo vio, quién lo capturó y
+ * cuándo (regla 3.6). Y como todo lo demás, nada se borra: un renglón mal
+ * capturado se anula y queda tachado con su motivo (regla 3.4).
+ */
+const MOTIVOS_MERMA = ['derretida', 'rota', 'regalada', 'autoconsumo', 'otro'];
+
+router.get('/mermas', verExistencia, (req, res) => {
+  const almacen = bd.prepare('SELECT * FROM almacenes WHERE id = ?').get(req.query.almacenId ?? null)
+    || almacenesActivos()[0];
+  if (!almacen) return error(res, 'No hay ningún cuarto frío dado de alta.', 404);
+
+  const ultimo = ultimoConteo(almacen.id);
+  return ok(res, {
+    almacen: { id: almacen.id, nombre: almacen.nombre },
+    motivos: MOTIVOS_MERMA,
+    mermas: mermasDesde(ultimo?.fecha || null, almacen.id).map((m) => ({
+      ...m, texto: aTexto(m.dieciseisavos)
+    }))
+  });
+});
+
+router.post('/mermas', contar, (req, res) => {
+  const almacen = bd.prepare('SELECT * FROM almacenes WHERE id = ? AND activo = 1')
+    .get(req.body?.almacenId ?? null) || almacenesActivos()[0];
+  if (!almacen) return error(res, 'No hay ningún cuarto frío dado de alta.', 404);
+
+  const cantidad = Number(req.body?.dieciseisavos);
+  if (!Number.isInteger(cantidad) || cantidad <= 0 || cantidad > MAX_DIECISEISAVOS) {
+    return error(res, 'Escribe cuánto hielo se perdió.');
+  }
+
+  const motivo = String(req.body?.motivo || '').trim();
+  if (!MOTIVOS_MERMA.includes(motivo)) return error(res, 'Ese motivo no existe.');
+
+  const id = nuevoId();
+  bd.prepare(`
+    INSERT INTO mermas_hielo (id, fecha, almacen_id, dieciseisavos, motivo, notas,
+                              ejecutor_id, capturista_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, ahora(), almacen.id, cantidad, motivo,
+         String(req.body?.notas || '').trim().slice(0, 200) || null,
+         req.body?.ejecutorId || req.usuario.id, req.usuario.id);
+
+  bitacora.registrar({
+    accion: 'existencia.merma', entidad: 'merma', entidadId: id,
+    ejecutorId: req.body?.ejecutorId || req.usuario.id, capturistaId: req.usuario.id,
+    detalle: { almacen: almacen.nombre, dieciseisavos: cantidad, texto: aTexto(cantidad), motivo }
+  });
+
+  return ok(res, { merma: bd.prepare('SELECT * FROM mermas_hielo WHERE id = ?').get(id) }, 201);
+});
+
+router.post('/mermas/:id/anular', exigirPermiso('existencia.corregir'), (req, res) => {
+  const m = bd.prepare('SELECT * FROM mermas_hielo WHERE id = ?').get(req.params.id);
+  if (!m) return error(res, 'Esa merma no existe.', 404);
+  if (m.anulada_en) return error(res, 'Esa merma ya está anulada.');
+
+  const motivo = String(req.body?.motivo || '').trim();
+  if (!motivo) return error(res, 'Escribe por qué se anula.');
+
+  bd.prepare(`
+    UPDATE mermas_hielo SET anulada_en = ?, anulada_por = ?, motivo_anulacion = ? WHERE id = ?
+  `).run(ahora(), req.usuario.id, motivo, m.id);
+
+  bitacora.registrar({
+    accion: 'existencia.merma-anulada', entidad: 'merma', entidadId: m.id,
+    ejecutorId: req.usuario.id, detalle: { dieciseisavos: m.dieciseisavos, motivo }
+  });
+
+  return ok(res, { anulada: true });
 });
 
 /** Historial de conteos de un almacén. */
