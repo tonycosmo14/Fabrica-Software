@@ -300,7 +300,13 @@ export async function vistaExistencia(pantalla, estadoApp) {
   }
 
   // ==========================================================
-  // HISTORIAL
+  // HISTORIAL DE CONTEOS
+  //
+  // Antes bastaba tocar cualquier parte del renglón para que saltara la
+  // anulación. Un historial es para MIRAR: se abre a repasar los conteos de
+  // la semana y el dedo resbala. Tocar no hace nada; lo que se puede hacer
+  // son tres botones a la izquierda, con su dibujito, y cada uno dice qué
+  // hace: ver, imprimir, anular.
   // ==========================================================
   async function verHistorial() {
     const { conteos } = await api.obtener('/existencia/conteos?limite=40');
@@ -309,48 +315,180 @@ export async function vistaExistencia(pantalla, estadoApp) {
       <button class="secundario chico" id="volver">‹ Existencia</button>
       <h2 style="margin-top:14px">Historial de conteos</h2>
       <p class="ayuda">
-        Cada renglón es un corte. <strong>Falta</strong> es lo que salió del
+        Cada renglón es un conteo. <strong>Falta</strong> es lo que salió del
         cuarto frío sin que ningún ticket lo explique.
+        ${puedeCorregir
+          ? 'Con 🗑 se anula uno mal capturado: no se borra, se marca, y vuelve a valer el anterior.'
+          : ''}
       </p>
 
-      <div class="tarjeta plana">
-        <table class="tabla">
-          <tr><th>Cuándo</th><th>Contado</th><th>Vendido</th><th>Falta</th><th>Quién</th></tr>
-          ${conteos.map((c) => `
-            <tr class="${c.anulado_en ? 'anulada' : ''}"
-                ${puedeCorregir && !c.anulado_en ? `data-anular="${esc(c.id)}"` : ''}
-                style="${puedeCorregir && !c.anulado_en ? 'cursor:pointer' : ''}">
-              <td>${esc(formatoFecha(c.fecha))}</td>
-              <td><strong>${aTexto(c.contado)}</strong></td>
-              <td>${aTexto(c.vendido)}</td>
-              <td class="${c.salidas - c.vendido > 0 ? 'malo' : ''}">${aTexto(c.salidas - c.vendido)}</td>
-              <td>${esc(c.ejecutor_nombre || '—')}</td>
-            </tr>`).join('') || '<tr><td colspan="5">Todavía no hay conteos.</td></tr>'}
-        </table>
-      </div>
-
-      ${puedeCorregir
-        ? '<p class="ayuda" style="margin-top:12px">Toca un conteo para anularlo si se capturó mal.</p>'
-        : ''}`;
+      <div class="ancho-completo">
+        <div class="tarjeta plana">
+          <div class="hist-envoltura">
+            <table class="tabla hist-tabla conteo-tabla">
+              <tr>
+                <th class="conteo-c-acciones"></th>
+                <th class="conteo-c-cuando">Cuándo</th>
+                <th class="conteo-c-donde">Cuarto frío</th>
+                <th class="conteo-c-num der">Contado</th>
+                <th class="conteo-c-num der">Vendido</th>
+                <th class="conteo-c-num der">Falta</th>
+                <th class="conteo-c-quien">Quién contó</th>
+              </tr>
+              ${conteos.map(renglonDeConteo).join('')
+                || '<tr><td colspan="7">Todavía no hay conteos.</td></tr>'}
+            </table>
+          </div>
+        </div>
+      </div>`;
 
     pantalla.querySelector('#volver').onclick = pintar;
+    enlazarAcciones(conteos, verHistorial);
+  }
 
-    pantalla.querySelectorAll('[data-anular]').forEach((fila) => {
-      fila.onclick = async () => {
-        const motivo = await pedirTexto({
-          titulo: 'Anular este conteo',
-          texto: 'Se marca como anulado y vuelve a valer el conteo anterior. No se borra nada.',
-          marcador: 'Se contó mal, se capturó dos veces...',
-          ok: 'Anular'
-        });
-        if (!motivo) return;
-        try {
-          await api.enviar(`/existencia/conteos/${fila.dataset.anular}/anular`, { motivo });
-          avisar('Conteo anulado', 'bien');
-          verHistorial();
-        } catch (e) { avisar(e.message, 'error'); }
-      };
+  /** Un renglón del historial: primero lo que se puede hacer, luego los datos. */
+  function renglonDeConteo(c) {
+    // El primer conteo de un cuarto frío no cuadra nada: solo fija el punto
+    // de partida. Restarle lo vendido daba un "falta" de veinte marquetas
+    // negativas que no quería decir nada.
+    const primero = !c.desde;
+    const falta = c.salidas - c.vendido;
+    return `
+      <tr class="${c.anulado_en ? 'anulada' : ''}">
+        <td class="conteo-c-acciones">
+          <button class="secundario chico" data-ver="${esc(c.id)}"
+                  title="Ver este conteo con todas sus cuentas">👁</button>
+          <button class="secundario chico" data-imprimir="${esc(c.id)}"
+                  title="Volver a imprimir el papel">🖨</button>
+          ${puedeCorregir && !c.anulado_en
+            ? `<button class="secundario chico" data-anular="${esc(c.id)}"
+                       title="Anular este conteo">🗑</button>`
+            : ''}
+        </td>
+        <td class="conteo-c-cuando">${esc(formatoFecha(c.fecha))}</td>
+        <td class="conteo-c-donde">${esc(c.almacen || '—')}</td>
+        <td class="conteo-c-num der"><strong>${aTexto(c.contado)}</strong></td>
+        <td class="conteo-c-num der">${primero ? '—' : aTexto(c.vendido)}</td>
+        <td class="conteo-c-num der ${!primero && falta > 0 ? 'malo' : ''}">
+          ${primero ? '<small>primer conteo</small>' : aTexto(falta)}
+        </td>
+        <td class="conteo-c-quien">
+          ${esc(c.ejecutor_nombre || '—')}
+          ${c.anulado_en ? '<small>anulado</small>' : ''}
+        </td>
+      </tr>`;
+  }
+
+  /**
+   * Los tres botones, en el único sitio donde se sabe qué conteo es cada
+   * renglón. `volverA` es a qué pantalla se regresa después de anular: el
+   * historial completo, o el detalle de ese conteo.
+   */
+  function enlazarAcciones(conteos, volverA) {
+    const buscar = (id) => conteos.find((c) => c.id === id);
+
+    pantalla.querySelectorAll('[data-ver]').forEach((b) => {
+      b.onclick = () => verConteo(buscar(b.dataset.ver), conteos);
     });
+    pantalla.querySelectorAll('[data-imprimir]').forEach((b) => {
+      b.onclick = () => reimprimirConteo(b.dataset.imprimir, b);
+    });
+    pantalla.querySelectorAll('[data-anular]').forEach((b) => {
+      b.onclick = () => anularConteo(buscar(b.dataset.anular), volverA);
+    });
+  }
+
+  /** Volver a sacar el papel de un conteo, tal como salió aquel día. */
+  async function reimprimirConteo(id, boton) {
+    boton.disabled = true;
+    try {
+      const r = await api.enviar(`/impresion/conteo/${id}`, {});
+      if (r.impreso) avisar('Conteo impreso', 'bien');
+      else avisar('No hay impresora de tickets puesta. Ponla en Sistema.', 'error');
+    } catch (e) { avisar(e.message, 'error'); }
+    boton.disabled = false;
+  }
+
+  async function anularConteo(c, volverA) {
+    if (!c) return;
+    const motivo = await pedirTexto({
+      titulo: `Anular el conteo de ${formatoFecha(c.fecha)}`,
+      texto: 'Se marca como anulado y vuelve a valer el conteo anterior. No se borra nada.',
+      marcador: 'Se contó mal, se capturó dos veces...',
+      ok: 'Anular'
+    });
+    if (!motivo) return;
+    try {
+      await api.enviar(`/existencia/conteos/${c.id}/anular`, { motivo });
+      avisar('Conteo anulado', 'bien');
+      volverA();
+    } catch (e) { avisar(e.message, 'error'); }
+  }
+
+  /**
+   * VOLVER A VER UN CONTEO.
+   *
+   * Con los números CONGELADOS de aquel día (regla 3.2), no recalculados
+   * hoy: si después se canceló una venta, el papel que se firmó aquella
+   * tarde sigue diciendo lo mismo, y esta pantalla también.
+   */
+  function verConteo(c, conteos) {
+    if (!c) return;
+    const esperado = c.existencia_anterior + c.producido - c.vendido;
+    const faltante = esperado - c.contado;
+    const primero = !c.desde;
+    const sobra = faltante < 0;
+
+    pantalla.innerHTML = `
+      <button class="secundario chico" id="volver">‹ Historial de conteos</button>
+
+      <div class="tarjeta ${primero ? '' : (faltante === 0 ? 'cuadre-exacto' : 'cuadre-diferencia')}"
+           style="margin-top:14px">
+        <h2 style="margin:0 0 6px">${esc(c.almacen || 'Cuarto frío')}</h2>
+        <p class="ayuda" style="margin:0 0 14px">
+          ${esc(formatoFecha(c.fecha))} · contó ${esc(c.ejecutor_nombre || '—')}
+        </p>
+
+        ${c.anulado_en ? `
+          <div class="aviso-anulado">
+            <strong>Anulado</strong>
+            <span>${esc(formatoFecha(c.anulado_en))}
+              ${c.anulado_por_nombre ? `· ${esc(c.anulado_por_nombre)}` : ''}</span>
+            ${c.motivo_anulacion ? `<small>${esc(c.motivo_anulacion)}</small>` : ''}
+          </div>` : ''}
+
+        ${primero ? `
+          <div class="total-vivo">
+            <span>había en el cuarto frío</span>
+            <strong>${aTexto(c.contado)}</strong>
+            <small>primer conteo</small>
+          </div>` : `
+          <div class="cuadre">
+            <div class="cuadre-linea"><span>Había</span><strong>${aTexto(c.existencia_anterior)}</strong></div>
+            <div class="cuadre-linea suma"><span>+ Se produjo</span><strong>${aTexto(c.producido)}</strong></div>
+            <div class="cuadre-linea vendido"><span>− Se vendió con ticket</span><strong>${aTexto(c.vendido)}</strong></div>
+            <div class="cuadre-linea total"><span>= Debería quedar</span><strong>${aTexto(esperado)}</strong></div>
+            <div class="cuadre-linea contado"><span>− Se contó</span><strong>${aTexto(c.contado)}</strong></div>
+          </div>
+
+          <div class="salidas ${faltante === 0 ? 'exacto' : sobra ? 'sobra' : ''}">
+            <span>${sobra ? 'Sobró' : 'Faltó'}</span>
+            <strong>${aTexto(Math.abs(faltante))}</strong>
+            <small>${Math.abs(faltante) === 16 ? 'marqueta' : 'marquetas'}</small>
+          </div>`}
+
+        ${c.notas ? `<p class="ayuda" style="margin:14px 0 0">${esc(c.notas)}</p>` : ''}
+      </div>
+
+      <div class="fila-botones" style="margin-top:14px;flex-wrap:wrap">
+        <button class="secundario chico" data-imprimir="${esc(c.id)}">🖨 Volver a imprimir</button>
+        ${puedeCorregir && !c.anulado_en
+          ? `<button class="secundario chico peligro" data-anular="${esc(c.id)}">🗑 Anular este conteo</button>`
+          : ''}
+      </div>`;
+
+    pantalla.querySelector('#volver').onclick = verHistorial;
+    enlazarAcciones(conteos, verHistorial);
   }
 
   // ==========================================================

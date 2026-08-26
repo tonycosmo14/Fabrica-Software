@@ -245,3 +245,70 @@ test('un operario no ve la existencia', async () => {
   const r = await llamar('/api/existencia');
   assert.equal(r.estado, 403);
 });
+
+
+// ============================================================
+// EL HISTORIAL DE CONTEOS  (v2.3)
+//
+// Tocar un renglón ya no anula nada: hay tres botones a la izquierda —ver,
+// imprimir, anular—. Para que el ojito pueda volver a enseñar el cuadre sin
+// pedirle nada más al servidor, el historial tiene que traer ya todos los
+// números congelados de aquel día.
+// ============================================================
+
+test('cada renglón del historial trae el cuadre completo de aquel día', async () => {
+  await entrarAdmin();
+  const { conteos } = (await llamar('/api/existencia/conteos?limite=40')).json.datos;
+  assert.ok(conteos.length, 'hay conteos que mirar');
+
+  for (const c of conteos) {
+    for (const campo of ['id', 'fecha', 'contado', 'existencia_anterior',
+                         'producido', 'vendido', 'salidas', 'almacen']) {
+      assert.ok(c[campo] !== undefined, `falta ${campo}: el ojito no podría pintar el detalle`);
+    }
+  }
+
+  // Y la cuenta cierra con lo que se guardó, no con lo que haya hoy.
+  const c = conteos.find((x) => x.desde);
+  if (c) {
+    assert.equal(c.salidas, c.existencia_anterior + c.producido - c.contado,
+                 'las salidas son las de aquel momento');
+  }
+});
+
+test('el historial dice quién anuló un conteo y por qué', async () => {
+  await entrarAdmin();
+  const vivo = bd.prepare(
+    'SELECT id FROM conteos WHERE anulado_en IS NULL ORDER BY fecha DESC LIMIT 1'
+  ).get();
+  await llamar(`/api/existencia/conteos/${vivo.id}/anular`, {
+    method: 'POST', cuerpo: { motivo: 'Se capturó dos veces' }
+  });
+
+  const { conteos } = (await llamar('/api/existencia/conteos?limite=40')).json.datos;
+  const anulado = conteos.find((c) => c.id === vivo.id);
+  assert.ok(anulado.anulado_en, 'queda marcado, no borrado');
+  assert.equal(anulado.motivo_anulacion, 'Se capturó dos veces');
+  assert.ok(anulado.anulado_por_nombre, 'y con nombre y apellido');
+});
+
+test('un conteo se puede volver a imprimir tantas veces como haga falta', async () => {
+  await entrarAdmin();
+  const c = bd.prepare('SELECT id FROM conteos ORDER BY fecha DESC LIMIT 1').get();
+
+  // Sin impresora puesta contesta "no imprimí", que es lo que la pantalla
+  // necesita para avisar. Lo que no puede es fallar ni desaparecer.
+  const r = await llamar(`/api/impresion/conteo/${c.id}`, { method: 'POST', cuerpo: {} });
+  assert.equal(r.estado, 200);
+  assert.equal(r.json.datos.impreso, false);
+  assert.equal(r.json.datos.motivo, 'sin-destino');
+
+  const otra = await llamar(`/api/impresion/conteo/${c.id}`, { method: 'POST', cuerpo: {} });
+  assert.equal(otra.estado, 200, 'reimprimir no gasta el conteo');
+});
+
+test('un conteo que no existe no imprime nada', async () => {
+  await entrarAdmin();
+  const r = await llamar('/api/impresion/conteo/no-existe', { method: 'POST', cuerpo: {} });
+  assert.equal(r.estado, 404);
+});

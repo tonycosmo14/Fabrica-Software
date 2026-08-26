@@ -17,9 +17,31 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '2.2';
+const VERSION_ACTUAL = '2.3';
 
 const VERSIONES = [
+  {
+    numero: '2.3',
+    nombre: 'Como se construye un ticket',
+    fecha: '2026-08-26',
+    resumen:
+      'Todos los papeles del negocio se arman igual: qué es arriba a la ' +
+      'izquierda, quién y cuándo arriba a la derecha. Y los cuadros de ' +
+      'Vender ya se pueden hacer más grandes o más chicos.',
+    cambios: [
+      { tipo: 'importante', texto: 'EL TICKET SE REHIZO ENTERO, con la forma de la foto que mandaste. El número arriba a la izquierda, y a la derecha quién estaba en la caja y la fecha con el mes en letras: 26/Ago/2026 5:45pm. Abajo el nombre del negocio.' },
+      { tipo: 'mejora', texto: 'El hielo sigue en grande, pero ahora su desglose lleva el precio al final, con puntitos que llevan el ojo de un lado al otro del renglón. Igual cada artículo, con cuántos eran.' },
+      { tipo: 'mejora', texto: 'TOTAL, PAGO y CAMBIO van juntos abajo a la derecha y en columna: los pesos quedan uno debajo del otro y el cambio se comprueba de un vistazo.' },
+      { tipo: 'mejora', texto: 'LA MARCA DE COPIA se ve de lejos: dos rayas de asteriscos de lado a lado y la palabra en grande, hasta arriba de todo, antes que el número.' },
+      { tipo: 'nuevo', texto: 'Los tickets que son un cambio ahora lo dicen: "CAMBIO DEL #2026-152124" hasta abajo. Sin eso, un cambio se veía igual que una venta.' },
+      { tipo: 'importante', texto: 'EL COMPROBANTE DE GASTO ya no dice "lo tomó" ni "lo anotó". Dice quién estaba en el turno de caja —de ese cajón salió el dinero— y nada más. Los dos nombres siguen guardados en la bitácora, que es donde se buscan cuando hacen falta.' },
+      { tipo: 'nuevo', texto: 'EN EL HISTORIAL DE CONTEOS, tocar un renglón ya no lanza la anulación. Ahora hay tres botones a la izquierda: 👁 para volver a ver el cuadre de aquel día, 🖨 para reimprimirlo y 🗑 para anularlo. El bote de basura solo le sale al gerente y al administrador.' },
+      { tipo: 'nuevo', texto: 'EL TAMAÑO DE LOS CUADROS DE VENDER se elige en Personalizar: cuántas columnas y cuántas filas quieres ver de una vez, de 2 a 10 columnas y de 1 a 8 filas. Con su dibujito de cómo va a quedar mientras lo tecleas.' },
+      { tipo: 'arreglo', texto: 'El "×" de un desglose como "2 × 1/4" salía en la impresora como una cruz de rayitas. Ese y las comillas curvas ya se cambian por los de máquina de escribir antes de imprimir.' },
+      { tipo: 'arreglo', texto: 'En un ticket de mayoreo, el renglón del precio decía "undefined" en vez del nombre de la lista.' },
+      { tipo: 'arreglo', texto: 'Pagar justo ya sale en el ticket como "CAMBIO: $0". Antes se escondía el renglón y parecía que faltaba algo.' }
+    ]
+  },
   {
     numero: '2.2',
     nombre: 'El número del año, y actualizar solo',

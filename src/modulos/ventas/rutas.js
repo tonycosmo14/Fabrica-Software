@@ -30,6 +30,7 @@ const { cabeElCredito, estadoCliente, clientesConEstado } = require('../clientes
 const { listaDeMayoreo, listaPorOmision, listasDeMayoreo,
         llevaMayoreo } = require('./mayoreo');
 const { serieDeHoy, siguienteEnLaSerie, numeroDeTicket, leerNumero } = require('./folio');
+const { rejillaDeLaCaja } = require('../personalizacion/rejilla');
 const { comprobar: comprobarAutorizacion, comprobarAdmin,
         responsables, administradores } = require('../../lib/autorizacion');
 
@@ -92,6 +93,10 @@ router.get('/contexto', vender, (req, res) => {
     // efectivo. Sin esto tendría que preguntar por la configuración de
     // impresión en cada venta.
     abrirCajon: configuracionImpresion().abrirCajon,
+    // Cuántos cuadros de producto quiere ver de una vez el dueño. Se
+    // configura en Personalizar y viaja con el contexto para que la caja no
+    // tenga que preguntar por su cuenta cada vez que se repinta.
+    rejilla: rejillaDeLaCaja(),
     // sinDueno: el turno del relevo de las 2:30, que sigue cobrando
     // mientras el cajero que entra no llega. La caja tiene que decirlo.
     caja: caja

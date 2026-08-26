@@ -19,6 +19,7 @@ const { ticketVenta, ticketMovimiento, ticketPrueba, pulsoCajon,
         ticketCorte, ticketConteo } = require('./ticket');
 
 const { aTexto } = require('../../lib/fracciones');
+const { numeroDeTicket } = require('../ventas/folio');
 
 const router = express.Router();
 
@@ -40,15 +41,24 @@ function ventaCompleta(id) {
   const venta = bd.prepare(`
     SELECT v.*, u.nombre AS cajero_nombre,
            cl.nombre AS cliente_nombre, cl.negocio AS cliente_negocio,
-           lp.tipo AS lista_tipo
+           lp.tipo AS lista_tipo, lp.nombre AS lista_nombre,
+           viejo.serie  AS cambio_de_serie,
+           viejo.folio_anual AS cambio_de_anual,
+           viejo.folio  AS cambio_de_folio
       FROM ventas v
       LEFT JOIN usuarios u  ON u.id = v.cajero_id
       LEFT JOIN clientes cl ON cl.id = v.cliente_id
       LEFT JOIN listas_precios lp ON lp.id = v.lista_id
+      LEFT JOIN ventas viejo ON viejo.id = v.cambio_de_venta_id
      WHERE v.id = ?
   `).get(id);
   if (!venta) return null;
   venta.lineas = bd.prepare('SELECT * FROM venta_lineas WHERE venta_id = ?').all(id);
+  // De qué ticket sale este, ya escrito como se dice: "2026-152124".
+  venta.cambioDeNumero = venta.cambio_de_folio
+    ? numeroDeTicket({ serie: venta.cambio_de_serie, folio_anual: venta.cambio_de_anual,
+                       folio: venta.cambio_de_folio })
+    : null;
   return venta;
 }
 
@@ -292,10 +302,13 @@ router.post('/cajon', puedeImprimir, async (req, res) => {
  */
 router.post('/movimiento/:id', puedeImprimir, async (req, res) => {
   const mov = bd.prepare(`
-    SELECT m.*, u.nombre AS ejecutor_nombre, c.nombre AS capturista_nombre
+    SELECT m.*, u.nombre AS ejecutor_nombre, c.nombre AS capturista_nombre,
+           k.nombre AS cajero_nombre
       FROM movimientos_caja m
       LEFT JOIN usuarios u ON u.id = m.ejecutor_id
       LEFT JOIN usuarios c ON c.id = m.capturista_id
+      LEFT JOIN cajas   j ON j.id = m.caja_id
+      LEFT JOIN usuarios k ON k.id = j.cajero_id
      WHERE m.id = ?
   `).get(req.params.id);
   if (!mov) return error(res, 'Ese movimiento no existe.', 404);

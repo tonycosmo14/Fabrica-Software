@@ -111,9 +111,25 @@ debería quedar − contado = FALTA</pre>
       <p>Si <b>sobra</b>, revisa: puede faltar capturar producción, o el conteo
       anterior se quedó corto.</p>
 
+      <h4>El historial de conteos</h4>
+      <p>El botón <b>Historial de conteos</b> abre la lista de todos los
+      cuadres, del más nuevo al más viejo. <b>Tocar un renglón no hace
+      nada</b>: es una lista para mirar. Lo que se puede hacer está en los
+      tres botones de la izquierda de cada renglón:</p>
+      <ul>
+        <li><b>👁</b> — vuelve a enseñar el cuadre completo de aquel día, con
+        los números tal como se guardaron.</li>
+        <li><b>🖨</b> — vuelve a sacar el papel por la impresora de tickets,
+        las veces que haga falta.</li>
+        <li><b>🗑</b> — anula el conteo. Solo le sale al <b>gerente</b> y al
+        <b>administrador</b>; los demás ni lo ven.</li>
+      </ul>
+
       <h4>Si te equivocaste al capturar</h4>
       <p>El conteo <b>no se borra</b>: se anula, con motivo. Al anularlo vuelve
-      a valer el conteo anterior. Eso lo hace el gerente o el administrador.</p>
+      a valer el conteo anterior. Eso lo hace el gerente o el administrador.
+      El renglón se queda tachado en el historial, con quién lo anuló y por
+      qué.</p>
 
       <p class="ayuda-tip">Cada conteo guarda sus números <b>congelados</b>. Si
       mañana corriges una sacada vieja, el corte que ya hiciste no se mueve.</p>`
@@ -746,7 +762,8 @@ debería haber − contado = FALTA</pre>
 
       <h4>Lo que puedes hacer con un ticket</h4>
       <ul>
-        <li><b>Copia</b> — lo vuelve a imprimir marcado como COPIA. Lo puede
+        <li><b>Copia</b> — lo vuelve a imprimir con <b>** COPIA **</b> entre
+        asteriscos hasta arriba del papel. Lo puede
         hacer cualquiera que pueda vender.</li>
         <li><b>⋯</b> — solo el administrador. Ahí están cancelar y eliminar.
         A los demás ni les sale el botón.</li>
@@ -851,7 +868,101 @@ debería haber − contado = FALTA</pre>
       <p class="ayuda-tip">Se guarda <b>en cada aparato</b>, no en el
       negocio. La computadora de la caja tiene bocinas y el celular del
       reparto no tiene por qué ponerse a pitar en la calle, así que cada uno
-      se configura por su lado.</p>`
+      se configura por su lado.</p>
+
+      <h4>El tamaño de los cuadros de Vender</h4>
+      <p>En <b>Personalizar</b>, en <em>Los cuadros de Vender</em>, eliges
+      <b>cuántas columnas</b> y <b>cuántas filas</b> de productos quieres ver
+      de una vez en la caja. No se pone el tamaño en centímetros: se dice
+      cuántos cuadros caben y la caja reparte entre ellos el sitio que tenga
+      esa pantalla. Así la misma configuración vale para el monitor del
+      mostrador y para el de la oficina.</p>
+      <ul>
+        <li><b>Menos cuadros</b> = cuadros más grandes, que se tocan mejor con
+        el dedo y se leen de lejos.</li>
+        <li><b>Más cuadros</b> = se entra y se sale menos de las categorías.</li>
+        <li>De <b>2 a 10 columnas</b> y de <b>1 a 8 filas</b>. Menos de dos
+        columnas no es una rejilla, es una lista; más de diez deja cuadros
+        donde no cabe el nombre del producto.</li>
+      </ul>
+      <p>El dibujito de abajo enseña cómo va a quedar mientras tecleas. Si
+      sobran productos, la rejilla se desliza: las filas son cuántas se ven
+      sin desplazar, no cuántas caben en total.</p>
+
+      <p class="ayuda-tip">En el celular no se aplica: ahí entran los que
+      quepan por el ancho de la pantalla, porque diez columnas en una mano no
+      se leen.</p>`
+  },
+
+  // ==========================================================
+  {
+    id: 'tickets',
+    titulo: 'Cómo se lee un ticket',
+    busca: 'ticket papel comprobante copia cambio gasto firma atendio fecha total pago cambio impreso',
+    cuerpo: `
+      <p>Todos los papeles del negocio se arman igual, para que se reconozcan
+      sin leerlos: <b>arriba a la izquierda qué es</b> este papel, <b>arriba a
+      la derecha quién y cuándo</b>, en medio el contenido entre dos rayas, y
+      abajo el nombre del negocio.</p>
+
+      <pre class="ayuda-formula">#2026-152125          Atendio: Tony Castilla
+                          26/Ago/2026 5:45pm
+Cliente: Mario Cauich
+------------------------------------------------
+2 3/8
+(2 + 1/4 + 1/8) ......................... $610.00
+2 Coca 600 ............................... $50.00
+------------------------------------------------
+                                 TOTAL:   $660.00
+                                 PAGO:    $700.00
+                                 CAMBIO:   $40.00
+HIELO LOLHA</pre>
+
+      <h4>Qué es cada cosa</h4>
+      <ul>
+        <li><b>#2026-152125</b> — el número del ticket. El año y el
+        consecutivo, que vuelve a empezar cada 1 de enero.</li>
+        <li><b>Atendio</b> — quién tenía el turno de caja. Es de ese cajón de
+        donde salió o entró el dinero.</li>
+        <li><b>El número grande</b> — cuánto hielo se llevó. Es lo único que
+        el cliente comprueba de un vistazo, y por eso va en grande.</li>
+        <li><b>El paréntesis de abajo</b> — de qué pedazos salió esa cuenta,
+        y cuánto costó el hielo.</li>
+        <li><b>Los puntitos</b> — llevan el ojo del concepto a su precio sin
+        que se salte de renglón.</li>
+      </ul>
+
+      <h4>Los avisos que puede llevar</h4>
+      <ul>
+        <li><b>** COPIA **</b>, entre asteriscos y hasta arriba de todo — es
+        una reimpresión, no el original. Va antes que el número a propósito:
+        una marca de copia que hay que buscar no sirve de nada.</li>
+        <li><b>CANCELADO</b> — ese ticket ya no vale.</li>
+        <li><b>CAMBIO DEL #2026-152124</b>, hasta abajo — este hielo ya se
+        había pagado en otro papel; este es el cambio.</li>
+        <li><b>FIADO</b>, con la raya para firmar — el cliente se lo llevó a
+        crédito y este papel es el vale.</li>
+      </ul>
+
+      <h4>El comprobante de un gasto</h4>
+      <pre class="ayuda-formula">Gasto                     Atendio: Tony Castilla
+                              26/Ago/2026 5:45pm
+------------------------------------------------
+$6,250
+GASOLINA PARA LIMPIAR PIEZAS DE LA MAQUINA NUEVA
+EN REPARACION
+------------------------------------------------
+                  ______________
+                       FIRMA</pre>
+
+      <p>Mismo armazón: qué, quién, cuándo. Se firma porque alguien se llevó
+      dinero del cajón. <b>Meter</b> dinero también saca su papel, pero sin
+      raya para firmar: nadie firma por dejar.</p>
+
+      <p class="ayuda-tip">El papel no dice quién tomó el dinero ni quién lo
+      anotó, aunque el sistema lo guarde. Casi siempre es la misma persona y
+      llenaba el ticket de nombres. Cuando de verdad haga falta saberlo, está
+      en la <b>bitácora</b>, en Sistema.</p>`
   },
 
   // ==========================================================

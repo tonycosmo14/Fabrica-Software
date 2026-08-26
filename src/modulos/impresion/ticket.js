@@ -1,18 +1,28 @@
 /**
- * EL TICKET, EN BYTES  (v0.11)
+ * EL TICKET, EN BYTES  (v2.3)
  *
- * Mismo diseño que el de la pantalla, pero armado para la impresora:
+ * CÓMO SE CONSTRUYE UN TICKET, SIEMPRE
  *
- *      #12        23/08/26 05:23 p.m.        Tony
- *      ------------------------------------------
+ * Todos los papeles del negocio —venta, gasto, corte, conteo— se arman con
+ * la misma receta, para que quien los junta en una caja de zapatos los
+ * reconozca sin leerlos:
  *
- *                        3/4                       ← grande y centrado
- *                     1/2 + 1/4
+ *      #2026-152125          Atendio: Tony Castilla
+ *                                26/Ago/2026 5:45pm
+ *      Cliente: Mario Cauich
+ *      ------------------------------------------------
+ *      2 3/8                                            ← grande
+ *      (2 + 1/4 + 1/8) ......................... $610.00
+ *      2 Coca 600 ............................... $50.00
+ *      ------------------------------------------------
+ *                                       TOTAL:   $660.00
+ *                                       PAGO:    $700.00
+ *                                       CAMBIO:   $40.00
+ *      HIELO LOLHA
  *
- *      Coca 600                            $25.00
- *      ------------------------------------------
- *                      $230.00
- *          Pago $500.00 - cambio $270.00
+ * Arriba a la izquierda QUÉ es este papel: el número del ticket, o la
+ * palabra "Gasto". Arriba a la derecha QUIÉN estaba en la caja y CUÁNDO.
+ * En medio el contenido, entre dos rayas. Abajo el negocio.
  *
  * Se imprimen cientos al día: cada renglón de más son metros de papel al
  * mes. Va lo mínimo, y lo que importa —cuánto hielo se llevó— en grande.
@@ -23,7 +33,10 @@ const { aTexto, desglose } = require('../../lib/fracciones');
 const { formato } = require('../../lib/dinero');
 const { numeroDeTicket } = require('../ventas/folio');
 
-/** 23/08/26 05:23 p.m. */
+const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul',
+               'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+/** 23/08/26 05:23 p.m. — la de siempre, para donde ya se usaba. */
 function fechaCorta(iso) {
   const d = new Date(iso);
   const dia = String(d.getDate()).padStart(2, '0');
@@ -33,47 +46,107 @@ function fechaCorta(iso) {
   return `${dia}/${mes}/${anio} ${hora}`;
 }
 
+/**
+ * 26/Ago/2026 5:45pm — la fecha de la esquina del ticket.
+ *
+ * Con el mes en letras a propósito: en un papel que alguien va a leer
+ * dentro de seis meses, "26/08" y "08/26" se confunden, y "26/Ago" no.
+ */
+function fechaTicket(iso) {
+  const d = new Date(iso);
+  const h = d.getHours();
+  const minutos = String(d.getMinutes()).padStart(2, '0');
+  return `${d.getDate()}/${MESES[d.getMonth()]}/${d.getFullYear()} ` +
+         `${h % 12 || 12}:${minutos}${h < 12 ? 'am' : 'pm'}`;
+}
+
+/**
+ * LA ESQUINA DE ARRIBA, igual en todos los papeles.
+ *
+ * A la izquierda y en grande, qué es esto. A la derecha, chiquito, quién
+ * estaba en la caja y a qué hora. Van en renglones distintos porque una
+ * impresora térmica no sabe cambiar de tamaño a media línea.
+ */
+function encabezado(t, { titulo, atendio, fecha }) {
+  t.izquierda().negrita().tamano(2, 2).linea(titulo).normal();
+  t.derecha();
+  if (atendio) t.linea(`Atendio: ${atendio}`);
+  if (fecha) t.linea(fecha);
+  return t.izquierda();
+}
+
+/**
+ * LA MARCA DE COPIA.
+ *
+ * Va hasta arriba de todo y con asteriscos de lado a lado. Es lo único que
+ * separa un comprobante de su reimpresión, y de eso depende que nadie cobre
+ * dos veces el mismo ticket: si hay que entrecerrar los ojos para verlo, no
+ * sirve.
+ */
+function marcaCopia(t) {
+  t.centro().negrita();
+  t.linea('*'.repeat(t.ancho));
+  t.tamano(2, 2).linea('** COPIA **').tamano(1, 1);
+  t.linea('*'.repeat(t.ancho));
+  return t.normal().izquierda();
+}
+
+/** El pie: el nombre del negocio abajo a la izquierda, como en la foto. */
+function pie(t, negocio) {
+  const cfg = configuracion();
+  const nombre = String(negocio || '').trim();
+  if (!nombre && !cfg.pie) return t;
+  t.izquierda();
+  if (nombre) t.negrita().linea(nombre.toUpperCase()).negrita(false);
+  if (cfg.pie) t.linea(cfg.pie);
+  return t;
+}
+
 /** El ticket de una venta. `copia` marca las reimpresiones. */
 function ticketVenta(venta, { copia = false, negocio = '' } = {}) {
   const cfg = configuracion();
   const t = new Ticket(cfg.anchoMm, cfg.codigoPagina);
 
-  const hielo = venta.lineas
-    .filter((l) => l.dieciseisavos > 0)
-    .reduce((n, l) => n + l.dieciseisavos, 0);
+  const lineasHielo = venta.lineas.filter((l) => l.dieciseisavos > 0);
   const otras = venta.lineas.filter((l) => l.dieciseisavos === 0);
+  const hielo = lineasHielo.reduce((n, l) => n + l.dieciseisavos, 0);
+  const importeHielo = lineasHielo.reduce((n, l) => n + l.precio_centavos, 0);
 
-  t.izquierda().normal();
-  t.columnas3(numeroDeTicket(venta), fechaCorta(venta.fecha),
-              (venta.cajero_nombre || '').split(' ')[0]);
-  t.separador();
-
-  if (copia) {
-    t.centro().negrita().linea('*** COPIA ***').negrita(false).izquierda();
-  }
+  // Lo primero de todo, antes que el número: si es copia, que se vea desde
+  // el otro lado del mostrador.
+  if (copia) marcaCopia(t);
   if (venta.cancelada_en) {
     t.centro().negrita().tamano(2, 2).linea('CANCELADO').normal().izquierda();
   }
 
+  encabezado(t, {
+    titulo: `#${numeroDeTicket(venta)}`,
+    atendio: venta.cajero_nombre,
+    fecha: fechaTicket(venta.fecha)
+  });
+  if (venta.cliente_nombre) t.linea(`Cliente: ${venta.cliente_nombre}`);
+  t.separador();
+
+  // EL HIELO, EN GRANDE. Es lo único que el cliente comprueba de un
+  // vistazo: que dice lo que se llevó. Debajo, en chico, de qué piezas
+  // salió esa cuenta y cuánto costó.
   if (hielo) {
-    t.centro().negrita().tamano(3, 3).linea(aTexto(hielo)).normal();
+    t.izquierda().negrita().tamano(3, 3).linea(aTexto(hielo)).normal();
     const partes = desglose(hielo);
-    if (partes !== aTexto(hielo)) t.centro().linea(partes);
-    t.izquierda();
+    t.punteado(partes !== aTexto(hielo) ? `(${partes})` : 'Hielo', formato(importeHielo));
   }
 
-  if (otras.length) {
-    if (hielo) t.saltos(1);
-    for (const l of otras) t.columnas2(l.concepto, formato(l.precio_centavos));
+  for (const l of otras) {
+    const cuantas = Number(l.cantidad) > 1 ? `${l.cantidad} ` : '';
+    t.punteado(`${cuantas}${l.concepto}`, formato(l.precio_centavos));
   }
 
   t.separador();
-  t.centro().negrita().tamano(2, 2).linea(formato(venta.total_centavos)).normal();
-
-  if (venta.pago_centavos && venta.cambio_centavos) {
-    t.centro().linea(
-      `Pago ${formato(venta.pago_centavos)} - cambio ${formato(venta.cambio_centavos)}`);
-  }
+  t.bloqueDerecha([
+    ['TOTAL:', formato(venta.total_centavos)],
+    venta.pago_centavos != null ? ['PAGO:', formato(venta.pago_centavos)] : null,
+    venta.pago_centavos != null ? ['CAMBIO:', formato(venta.cambio_centavos || 0)] : null
+  ]);
 
   // FIADO. Va en grande y con el nombre porque este papel es el vale: el
   // cliente se lleva su copia y con eso los dos saben lo mismo. Y lleva la
@@ -81,56 +154,78 @@ function ticketVenta(venta, { copia = false, negocio = '' } = {}) {
   if (venta.forma_pago === 'credito') {
     t.separador();
     t.centro().negrita().tamano(2, 2).linea('FIADO').normal();
-    if (venta.cliente_nombre) t.centro().negrita().linea(venta.cliente_nombre).negrita(false);
     if (venta.cliente_negocio) t.centro().linea(venta.cliente_negocio);
-    t.izquierda().saltos(2);
-    t.centro().linea('_____________________');
-    t.linea('Firma de recibido');
-    t.izquierda();
+    t.izquierda().firma('FIRMA DE RECIBIDO');
   } else if (venta.forma_pago === 'transferencia') {
-    t.centro().linea('Pagado por transferencia');
+    t.centro().linea('Pagado por transferencia').izquierda();
   }
 
-  // MAYOREO. En un ticket pagado de contado el nombre del cliente no
-  // sobraría por gusto: es lo que explica por qué la marqueta salió a $240
-  // y no a $264. Un renglón, y solo cuando de verdad hubo mayoreo.
+  // MAYOREO. En un ticket pagado de contado, la lista es lo que explica por
+  // qué la marqueta salió a $240 y no a $264. Un renglón, y solo cuando de
+  // verdad hubo mayoreo.
   if (venta.forma_pago !== 'credito' && venta.lista_tipo === 'mayoreo') {
-    t.centro().linea(`${venta.cliente_nombre || 'Mayoreo'} - ${venta.lista_nombre}`);
-    t.izquierda();
+    t.izquierda().linea(`Precio de ${venta.lista_nombre || 'mayoreo'}`);
   }
 
-  if (negocio || cfg.pie) {
-    t.separador();
-    t.centro();
-    if (negocio) t.linea(negocio);
-    if (cfg.pie) t.linea(cfg.pie);
+  pie(t, negocio);
+
+  // DE QUÉ TICKET VIENE ESTE. Un cambio se ve igual que una venta, y sin
+  // este renglón nadie sabría que el hielo de este papel ya se había pagado
+  // en otro: el corte cuadraría y la existencia no.
+  if (venta.cambioDeNumero) {
+    t.negrita().linea(`CAMBIO DEL #${venta.cambioDeNumero}`).negrita(false);
   }
 
   t.izquierda().cortar();
   return t.bytes();
 }
 
-/** El comprobante de un gasto o retiro del cajón. */
+/**
+ * EL COMPROBANTE DE UN GASTO O RETIRO DEL CAJÓN.
+ *
+ *      Gasto                     Atendio: Tony Castilla
+ *                                    26/Ago/2026 5:45pm
+ *      ------------------------------------------------
+ *      $62.50
+ *      GASOLINA PARA LIMPIAR PIEZAS DE LA MAQUINA NUEVA
+ *      EN REPARACION
+ *      ------------------------------------------------
+ *                       ______________
+ *                            FIRMA
+ *
+ * "Atendio" es quien tiene el turno de caja: de ese cajón salió el dinero y
+ * es su corte el que va a salir corto. Antes decía además "lo tomó" y "lo
+ * anotó", que en la práctica son casi siempre la misma persona y llenaban
+ * el papel de nombres. Los dos siguen guardados en la bitácora (regla 3.6),
+ * que es donde se buscan cuando de verdad hacen falta.
+ */
 function ticketMovimiento(mov, { negocio = '' } = {}) {
   const cfg = configuracion();
   const t = new Ticket(cfg.anchoMm, cfg.codigoPagina);
+  const salida = mov.tipo === 'salida';
 
-  t.centro().negrita().linea(mov.tipo === 'salida' ? 'SALIDA DE CAJA' : 'ENTRADA A CAJA');
-  t.negrita(false).linea(fechaCorta(mov.fecha)).izquierda();
+  encabezado(t, {
+    titulo: salida ? 'Gasto' : 'Entrada',
+    atendio: mov.cajero_nombre || mov.ejecutor_nombre,
+    fecha: fechaTicket(mov.fecha)
+  });
   t.separador();
 
-  t.centro().linea(mov.concepto);
-  t.negrita().tamano(2, 2).linea(formato(mov.centavos)).normal();
+  t.izquierda().negrita().tamano(2, 2).linea(formato(mov.centavos)).normal();
+  t.parrafo(String(mov.concepto || '').toUpperCase());
+  if (mov.notas) t.parrafo(mov.notas);
+
+  if (mov.anulado_en) {
+    t.centro().negrita().tamano(2, 2).linea('ANULADO').normal().izquierda();
+  }
+
   t.separador();
 
-  t.izquierda();
-  t.linea(`Lo tomo: ${mov.ejecutor_nombre || '—'}`);
-  t.linea(`Lo anoto: ${mov.capturista_nombre || '—'}`);
-  t.saltos(2);
-  t.linea('Firma: ____________________');
+  // El gasto se firma; meter dinero al cajón no. Nadie firma por dejar.
+  if (salida) t.firma();
 
-  if (negocio) { t.separador().centro().linea(negocio).izquierda(); }
-  t.cortar();
+  pie(t, negocio);
+  t.izquierda().cortar();
   return t.bytes();
 }
 
@@ -290,5 +385,5 @@ function pulsoCajon(salida = 2) {
 
 module.exports = {
   ticketVenta, ticketMovimiento, ticketPrueba,
-  ticketCorte, ticketConteo, pulsoCajon, fechaCorta
+  ticketCorte, ticketConteo, pulsoCajon, fechaCorta, fechaTicket
 };

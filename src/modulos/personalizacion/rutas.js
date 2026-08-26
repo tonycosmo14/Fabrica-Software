@@ -15,6 +15,7 @@ const { ok, error } = require('../../lib/respuestas');
 const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
 const config = require('../../config');
+const { REJILLA, rejillaDeLaCaja } = require('./rejilla');
 
 const router = express.Router();
 
@@ -58,11 +59,12 @@ router.get('/', (req, res) => ok(res, {
   ciudad: leerConfig('ciudad') || '',
   logoClaro: leerConfig('logo_claro'),
   logoOscuro: leerConfig('logo_oscuro'),
-  version: leerConfig('logo_version') || '0'
+  version: leerConfig('logo_version') || '0',
+  rejilla: rejillaDeLaCaja()
 }));
 
 router.put('/', exigirPermiso('sistema.configurar'), (req, res) => {
-  const { nombreNegocio, ciudad } = req.body || {};
+  const { nombreNegocio, ciudad, posColumnas, posFilas } = req.body || {};
 
   if (nombreNegocio !== undefined) {
     const n = String(nombreNegocio).trim();
@@ -72,9 +74,25 @@ router.put('/', exigirPermiso('sistema.configurar'), (req, res) => {
   }
   if (ciudad !== undefined) guardarConfig('ciudad', String(ciudad).trim(), req.usuario.id);
 
+  // La rejilla de la caja. Se rechaza lo que se sale de los topes en vez de
+  // recortarlo en silencio: si alguien pide 40 columnas es que se equivocó,
+  // y guardarle 10 sin decir nada lo deja pensando que el sistema no le hizo
+  // caso.
+  for (const [valor, clave, topes, comoSeLlama] of [
+    [posColumnas, 'pos_columnas', REJILLA.columnas, 'columnas'],
+    [posFilas, 'pos_filas', REJILLA.filas, 'filas']
+  ]) {
+    if (valor === undefined) continue;
+    const n = Math.round(Number(valor));
+    if (!Number.isFinite(n) || n < topes.minimo || n > topes.maximo) {
+      return error(res, `Las ${comoSeLlama} de la caja van de ${topes.minimo} a ${topes.maximo}.`);
+    }
+    guardarConfig(clave, String(n), req.usuario.id);
+  }
+
   bitacora.registrar({
     accion: 'personalizacion.datos', entidad: 'configuracion',
-    ejecutorId: req.usuario.id, detalle: { nombreNegocio, ciudad }
+    ejecutorId: req.usuario.id, detalle: { nombreNegocio, ciudad, posColumnas, posFilas }
   });
 
   return ok(res, { guardado: true });

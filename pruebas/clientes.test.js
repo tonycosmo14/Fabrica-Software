@@ -442,7 +442,7 @@ test('el ticket fiado sale marcado y con el nombre del cliente', async () => {
   const papel = Buffer.from(ticketVenta(detalle, { negocio: 'Hielo LOLHA' })).toString('latin1');
   assert.match(papel, /FIADO/, 'el ticket es el vale: tiene que decirlo');
   assert.match(papel, /Mar/, 'y llevar el nombre de quien se lo llevó');
-  assert.match(papel, /Firma de recibido/, 'y la línea para firmar');
+  assert.match(papel, /FIRMA DE RECIBIDO/, 'y la línea para firmar');
 });
 
 test('cada venta a crédito deja su renglón en la bitácora', async () => {

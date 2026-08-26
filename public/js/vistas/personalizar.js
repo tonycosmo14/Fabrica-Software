@@ -19,6 +19,8 @@ export async function vistaPersonalizar(pantalla) {
   async function pintar() {
     const m = await cargarMarca({ recargar: true });
     const v = encodeURIComponent(m.version);
+    const r = m.rejilla || { columnas: 5, filas: 3 };
+    const t = r.topes || { columnas: { minimo: 2, maximo: 10 }, filas: { minimo: 1, maximo: 8 } };
 
     pantalla.innerHTML = `
       <h2>Personalizar</h2>
@@ -78,6 +80,43 @@ export async function vistaPersonalizar(pantalla) {
         </form>
       </div>
 
+      <h3>Los cuadros de Vender</h3>
+      <div class="tarjeta">
+        <p class="ayuda" style="margin:0 0 14px">
+          Cuántos cuadros de productos se ven de una vez en la caja. Menos
+          cuadros = cuadros más grandes, que se tocan mejor con el dedo y se
+          leen de lejos. Más cuadros = menos entrar y salir de categorías.
+          Si sobran productos, la rejilla se desliza.
+        </p>
+
+        <form id="f-rejilla">
+          <div class="rejilla-campos">
+            <div>
+              <label for="columnas">Columnas (de ${t.columnas.minimo} a ${t.columnas.maximo})</label>
+              <input id="columnas" type="number" inputmode="numeric"
+                     min="${t.columnas.minimo}" max="${t.columnas.maximo}"
+                     value="${r.columnas}" required>
+            </div>
+            <div>
+              <label for="filas">Filas (de ${t.filas.minimo} a ${t.filas.maximo})</label>
+              <input id="filas" type="number" inputmode="numeric"
+                     min="${t.filas.minimo}" max="${t.filas.maximo}"
+                     value="${r.filas}" required>
+            </div>
+          </div>
+
+          <div class="rejilla-previa" id="previa"></div>
+          <p class="ayuda" style="margin:10px 0 0;font-size:13.5px" id="previa-texto"></p>
+
+          <button type="submit" style="margin-top:18px">Guardar el tamaño</button>
+        </form>
+
+        <p class="ayuda" style="margin:14px 0 0;font-size:13.5px">
+          En el celular no se aplica: ahí entran los que quepan, porque
+          ${t.columnas.maximo} columnas en una pantalla de mano no se leen.
+        </p>
+      </div>
+
       <h3>Sonido</h3>
       <div class="tarjeta">
         <label class="interruptor">
@@ -113,6 +152,43 @@ export async function vistaPersonalizar(pantalla) {
     pantalla.querySelector('#probar-sonido').onclick = () => {
       tono('cobrado');
       avisar('Así suena una venta cobrada', 'bien');
+    };
+
+    // LA PREVIA. Un número no dice nada; el dibujito sí. Se repinta
+    // mientras se teclea, antes de guardar nada.
+    const campoColumnas = pantalla.querySelector('#columnas');
+    const campoFilas = pantalla.querySelector('#filas');
+    const previa = pantalla.querySelector('#previa');
+    const previaTexto = pantalla.querySelector('#previa-texto');
+
+    function entre(campo, topes) {
+      const n = Math.round(Number(campo.value));
+      if (!Number.isFinite(n)) return topes.minimo;
+      return Math.min(Math.max(n, topes.minimo), topes.maximo);
+    }
+
+    function pintarPrevia() {
+      const columnas = entre(campoColumnas, t.columnas);
+      const filas = entre(campoFilas, t.filas);
+      previa.style.gridTemplateColumns = `repeat(${columnas}, 1fr)`;
+      previa.innerHTML = '<span></span>'.repeat(columnas * filas);
+      previaTexto.textContent =
+        `${columnas * filas} cuadros a la vista: ${columnas} de ancho por ${filas} de alto.`;
+    }
+    campoColumnas.oninput = pintarPrevia;
+    campoFilas.oninput = pintarPrevia;
+    pintarPrevia();
+
+    pantalla.querySelector('#f-rejilla').onsubmit = async (ev) => {
+      ev.preventDefault();
+      try {
+        await api.actualizar('/personalizacion', {
+          posColumnas: entre(campoColumnas, t.columnas),
+          posFilas: entre(campoFilas, t.filas)
+        });
+        avisar('Guardado. Se ve al entrar a Vender.', 'bien');
+        await cargarMarca({ recargar: true });
+      } catch (e) { avisar(e.message, 'error'); }
     };
 
     pantalla.querySelector('#f').onsubmit = async (ev) => {

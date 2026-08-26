@@ -164,7 +164,13 @@ test('una reimpresión sale marcada como COPIA', async () => {
     method: 'POST', cuerpo: { copia: true }
   });
 
-  assert.match(loImpreso(), /\*\*\* COPIA \*\*\*/);
+  const papel = loImpreso();
+  assert.match(papel, /\*\* COPIA \*\*/, 'lo tiene que decir');
+  assert.match(papel, /\*{20}/, 'y con asteriscos de lado a lado, que se vea de lejos');
+  // Y hasta arriba de todo: una marca de copia debajo del número no la ve
+  // nadie con el cliente enfrente.
+  assert.ok(papel.indexOf('COPIA') < papel.indexOf('Atendio'),
+            'la marca va antes que nada');
 });
 
 test('se imprimen tantas copias como estén configuradas', async () => {
@@ -182,7 +188,7 @@ test('se imprimen tantas copias como estén configuradas', async () => {
   await llamar('/api/impresion/config', { method: 'PUT', cuerpo: { copias: 1 } });
 });
 
-test('un gasto imprime su comprobante con las dos firmas', async () => {
+test('el comprobante de un gasto dice quién estaba en la caja, y nada más', async () => {
   // Anotar un gasto necesita un turno abierto; entrar lo abre.
   await llamar('/api/auth/yo');
   await llamar('/api/caja/movimientos', {
@@ -195,10 +201,15 @@ test('un gasto imprime su comprobante con las dos firmas', async () => {
   assert.equal(r.estado, 200);
 
   const papel = loImpreso();
-  assert.match(papel, /SALIDA DE CAJA/);
-  assert.match(papel, /Gasolina/);
-  assert.match(papel, /Lo tomo/);
-  assert.match(papel, /Firma/);
+  assert.match(papel, /Gasto/, 'arriba a la izquierda, qué es este papel');
+  assert.match(papel, /Atendio:/, 'y a la derecha, de qué caja salió el dinero');
+  assert.match(papel, /GASOLINA/, 'el concepto, en mayúsculas como en la foto');
+  assert.match(papel, /FIRMA/, 'y la raya para firmar: alguien se llevó dinero');
+
+  // "Lo tomó" y "lo anotó" son casi siempre la misma persona y llenaban el
+  // papel de nombres. Siguen en la bitácora, que es donde se buscan.
+  assert.doesNotMatch(papel, /Lo tomo/, 'ese renglón ya no va');
+  assert.doesNotMatch(papel, /Lo anoto/, 'ni ese');
 });
 
 test('una venta que no existe no imprime nada', async () => {

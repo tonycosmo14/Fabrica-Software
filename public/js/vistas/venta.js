@@ -172,9 +172,18 @@ export async function vistaVenta(pantalla, estadoApp) {
 
   document.addEventListener('keydown', alTeclado);
   const relojito = setInterval(pintarHora, 10000);
+
+  // El alto de cada cuadro depende de lo que mida la rejilla, y eso cambia
+  // al agrandar la ventana o al girar la tablet. Se vuelve a medir sola.
+  const vigilante = typeof ResizeObserver === 'function'
+    ? new ResizeObserver(() => ajustarRejilla())
+    : null;
+  if (vigilante) vigilante.observe(refs.rejilla);
+
   pantalla.addEventListener('vista-desmontada', () => {
     document.removeEventListener('keydown', alTeclado);
     clearInterval(relojito);
+    if (vigilante) vigilante.disconnect();
     limpiarImpresion();
   }, { once: true });
 
@@ -1003,6 +1012,47 @@ export async function vistaVenta(pantalla, estadoApp) {
     });
     const volver = refs.migas.querySelector('[data-volver]');
     if (volver) volver.onclick = () => { categoriaAbierta = null; pintarRejilla(); enfocar(); };
+
+    ajustarRejilla();
+  }
+
+  /**
+   * CUÁNTOS CUADROS SE VEN DE UNA VEZ.
+   *
+   * El dueño elige en Personalizar cuántas columnas y cuántas filas quiere.
+   * Las columnas las reparte el CSS solo; el alto no puede, porque depende
+   * de lo que mida la rejilla en esta pantalla y eso no se sabe hasta que
+   * está dibujada. Así que se mide aquí y se deja escrito en --pos-alto.
+   *
+   * Si de todos modos hay más productos que huecos, la rejilla se desliza:
+   * "filas" es cuántas se ven sin desplazar, no cuántas caben en total.
+   */
+  function ajustarRejilla() {
+    const r = ctx.rejilla;
+    if (!r || !refs.rejilla) return;
+
+    // En el celular manda el ancho de la pantalla, no el gusto del dueño:
+    // cinco columnas en una mano son cinco cuadros ilegibles.
+    const enPc = window.matchMedia('(min-width: 860px)').matches;
+    refs.rejilla.classList.toggle('pos-a-medida', enPc);
+    if (!enPc) {
+      refs.rejilla.classList.remove('pos-apretada', 'pos-holgada');
+      return;
+    }
+
+    const HUECO = 8;                                   // el gap del CSS
+    const alto = refs.rejilla.clientHeight;
+    const cada = Math.max(56,
+      Math.floor((alto - HUECO * (r.filas - 1)) / r.filas));
+
+    refs.rejilla.style.setProperty('--pos-columnas', r.columnas);
+    refs.rejilla.style.setProperty('--pos-alto', `${cada}px`);
+
+    // La letra se encoge o crece con el cuadro. Un nombre de 16px dentro de
+    // un cuadro de 60 se sale; dentro de uno de 180 se ve perdido.
+    const ancho = refs.rejilla.clientWidth / r.columnas;
+    refs.rejilla.classList.toggle('pos-apretada', cada < 84 || ancho < 108);
+    refs.rejilla.classList.toggle('pos-holgada', cada >= 140 && ancho >= 170);
   }
 
   /**
