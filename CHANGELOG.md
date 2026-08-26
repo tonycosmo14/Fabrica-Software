@@ -11,6 +11,89 @@ solo para arreglos de algo que ya estaba, o para cambios de puro aspecto.
 
 ---
 
+## v2.0.2 — Tres que estorbaban · 26 de agosto de 2026
+
+Sin migración. Dos arreglos de los que se sienten todos los días, y la
+impresora por fin se elige en vez de escribirse.
+
+### Los tickets del día desaparecían a las 6 de la tarde
+
+El más grave, y llevaba ahí desde la v1.2 sin que nadie lo viera.
+
+Las fechas se guardan en **UTC** —un instante, no una hora de pared, que es
+lo correcto—. Pero la lista de "los tickets de hoy" comparaba así:
+
+```sql
+date(v.fecha) = date('now', 'localtime')   -- ✗ un lado en UTC, el otro local
+```
+
+Yucatán va seis horas detrás. Un ticket cobrado a las **6:29 p.m.** se
+guarda como las **00:29 del día siguiente**, así que `date(v.fecha)` decía
+*26 de agosto* mientras el reloj de la fábrica decía *25*. A partir de las 6
+de la tarde la lista salía vacía, todos los días. En una fábrica que cierra
+a las 8, eso es media tarde sin poder buscar un ticket.
+
+El mismo error estaba en el historial, y ahí además rompía el **filtro por
+horas**: pedir "de 3 a 8 de la tarde" traía lo de 9 de la mañana a 2 de la
+tarde.
+
+La cura es una palabra en los dos sitios: el modificador `'localtime'`
+sobre la columna guardada, que convierte el instante al reloj de esta
+computadora.
+
+```sql
+date(v.fecha, 'localtime') = date('now', 'localtime')   -- ✓
+time(m.fecha, 'localtime') >= time(?)                   -- ✓
+```
+
+Las pruebas nuevas corren con `TZ=America/Merida` puesto a propósito, y
+fallan las cuatro si se quita el `'localtime'`. Sin eso no probarían nada:
+en una computadora en UTC el error no existe.
+
+### Vaciar el ticket lo volvía a llenar
+
+Esc pregunta *"¿vaciar el ticket?"* y Enter confirma. Pero el ticket se
+vaciaba **y al mismo tiempo repetía lo último capturado**.
+
+El diálogo se cierra con el **keydown** del Enter. Para cuando el dedo
+suelta la tecla, el diálogo ya no está y el foco volvió al campo de códigos
+—que escuchaba el **keyup** y lo leía como "enter con el campo vacío", o
+sea *repite lo último*.
+
+Ahora el campo actúa en el keydown. Mientras el diálogo está abierto el
+campo no tiene el foco, así que no ve nada. El mismo golpe de tecla no puede
+hacer dos cosas.
+
+### La impresora se elige, no se escribe
+
+> *"Independientemente si está conectada o no, debe simplemente detectarla,
+> o a lo mucho configuro qué impresora usar y ya."*
+
+Al abrir **Sistema**, el programa le pregunta a Windows qué impresoras tiene
+y las pone en un selector. Se elige la de tickets y listo.
+
+Y para que cualquiera de la lista sirva —no solo las de red— se agregó un
+tercer camino: **por el nombre de Windows**.
+
+| Destino | Cómo se manda |
+|---|---|
+| `192.168.1.65` | socket al puerto 9100 |
+| `windows:ch-e80print en 192.168.1.65` | al motor de impresión, marcado RAW |
+| `\\localhost\TICKET` | `copy /b` (el camino viejo) |
+| `C:\tickets` | archivo, para probar sin impresora |
+
+El de Windows entrega el trabajo al spooler con `pDataType = "RAW"` —"esto
+ya son los bytes finales, no los conviertas"— vía PowerShell llamando a
+`winspool.drv`. Sirve para una USB **sin compartirla**, que era el paso donde
+la gente se rendía.
+
+Ese guion es C# dentro de PowerShell dentro de JavaScript, tres niveles de
+comillas. Tiene su propia prueba que revisa que no queden comillas sin
+pareja ni barras invertidas: una comilla mal escapada ahí no falla al
+guardar, falla la noche que alguien imprime.
+
+---
+
 ## v2.0.1 — La impresora de red · 26 de agosto de 2026
 
 Sin migración. Un arreglo, pero de los que desbloquean.

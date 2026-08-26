@@ -454,9 +454,18 @@ router.get('/', verVentas, (req, res) => {
                  `%${busca}%`);
   }
   if (soloHoy) {
-    // date('now','localtime'): el día del reloj de la fábrica, no el de UTC.
-    // Sin eso, a partir de las 6 de la tarde "hoy" ya sería mañana.
-    filtros.push("date(v.fecha) = date('now', 'localtime')");
+    // LOS DOS LADOS EN HORA LOCAL, y esto no es un detalle.
+    //
+    // Las fechas se guardan en UTC (regla de siempre: un instante, no una
+    // hora de pared). En Yucatán eso son seis horas de diferencia, así que
+    // un ticket de las 6:29 de la tarde se guarda como las 00:29 del día
+    // SIGUIENTE. Comparando date(v.fecha) —que da el día en UTC— contra el
+    // día del reloj de la fábrica, a partir de las 6 de la tarde los
+    // tickets de hoy desaparecían de la lista. Pasó de verdad.
+    //
+    // El modificador 'localtime' convierte el instante guardado al reloj de
+    // esta computadora, que es el de la fábrica.
+    filtros.push("date(v.fecha, 'localtime') = date('now', 'localtime')");
   }
 
   const filas = bd.prepare(`

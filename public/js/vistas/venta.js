@@ -2085,15 +2085,28 @@ export async function vistaVenta(pantalla, estadoApp) {
   pantalla.querySelector('#cambio').onclick = () => iniciarCambio();
   const btnQuienEs = pantalla.querySelector('#quien-es');
   if (btnQuienEs) btnQuienEs.onclick = () => verClientes('', { volverA: 'venta' });
-  // El campo del código se queda con el enter SOLO mientras se está
-  // capturando. En el cobro no hay nada que agregar, y si se lo tragara,
-  // el enter que confirma no llegaría a ningún lado.
+  /**
+   * EL ENTER DEL CAMPO DE CÓDIGOS.
+   *
+   * Va en el KEYDOWN, y eso importa. Antes iba en el keyup, y ahí había un
+   * agujero feo: al vaciar el ticket con Esc, el diálogo se cierra con el
+   * keydown del Enter y el foco vuelve al campo ANTES de que el dedo suelte
+   * la tecla. Ese keyup caía aquí y repetía lo último agregado, así que
+   * vaciar el ticket lo vaciaba y lo volvía a llenar en el mismo golpe.
+   *
+   * Con el keydown no puede pasar: mientras el diálogo está abierto, el
+   * campo no tiene el foco y no ve nada.
+   *
+   * El campo se queda con el enter SOLO mientras se captura. En el cobro no
+   * hay nada que agregar, y si se lo tragara, el enter que confirma el cobro
+   * no llegaría a ningún lado.
+   */
   refs.codigo.onkeydown = (ev) => {
-    if (ev.key === 'Enter' && fase === 'venta') ev.stopPropagation();
+    if (ev.key !== 'Enter' || fase !== 'venta') return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    agregarPorCodigo();
   };
-  refs.codigo.addEventListener('keyup', (ev) => {
-    if (ev.key === 'Enter') agregarPorCodigo();
-  });
 
   // ==========================================================
   // DINERO QUE ENTRA O SALE DEL CAJÓN

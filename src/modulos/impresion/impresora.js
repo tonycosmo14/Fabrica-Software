@@ -14,15 +14,24 @@
  *    que sea Windows: la impresora escucha en el 9100 y con eso basta. Es
  *    como hablan todas las térmicas de red desde hace treinta años.
  *
- * 2. POR NOMBRE COMPARTIDO DE WINDOWS, para las de USB:
+ * 2. POR SU NOMBRE DE WINDOWS, que sirve para cualquiera que esté
+ *    instalada, esté compartida o no:
+ *
+ *        windows:ch-e80print en 192.168.1.65
+ *
+ *    Se le entrega el trabajo al motor de impresión de Windows marcado como
+ *    RAW, o sea "esto ya viene listo, no lo toques". Es lo que permite que
+ *    el usuario solo ELIJA su impresora de una lista en vez de andar
+ *    averiguando direcciones.
+ *
+ * 3. POR NOMBRE COMPARTIDO DE WINDOWS, el camino viejo:
  *
  *        \\localhost\TICKET
  *
- *    Hay que compartir la impresora una vez. No es para que la usen otras
- *    PC: es para que Windows le dé un nombre al que se le puede escribir
- *    directo, saltándose el motor de impresión.
+ *    Hay que compartir la impresora una vez. Se conserva porque a quien ya
+ *    lo tenía funcionando no se le rompe nada.
  *
- * 3. A UN ARCHIVO O UNA CARPETA, para probar sin impresora: el ticket se
+ * 4. A UN ARCHIVO O UNA CARPETA, para probar sin impresora: el ticket se
  *    guarda en bytes y se puede abrir para ver qué habría salido.
  *
  * Si el destino no está configurado, no se imprime en el servidor y la
@@ -62,6 +71,15 @@ function guardarAjuste(clave, valor, usuarioId) {
 function tipoDeDestino(destino) {
   const t = String(destino || '').trim();
   if (!t) return { tipo: 'ninguno', texto: 'sin configurar' };
+
+  // windows:NOMBRE — la impresora tal como la llama Windows. Lleva prefijo
+  // porque un nombre suelto no se distingue de una carpeta.
+  if (/^windows:/i.test(t)) {
+    const nombre = t.slice(t.indexOf(':') + 1).trim();
+    return nombre
+      ? { tipo: 'windows', nombre, texto: `a la impresora "${nombre}" de Windows` }
+      : { tipo: 'ninguno', texto: 'sin configurar' };
+  }
 
   if (t.startsWith('\\\\')) {
     return { tipo: 'compartida', nombre: t, texto: `nombre compartido de Windows (${t})` };
@@ -130,10 +148,14 @@ async function imprimirCrudo(bytes) {
       return { impreso: true, motivo: 'archivo', como };
     }
 
-    // ---- POR NOMBRE COMPARTIDO O PUERTO DE WINDOWS ----
+    // ---- POR EL NOMBRE DE WINDOWS, O POR NOMBRE COMPARTIDO ----
     const temporal = path.join(os.tmpdir(), `lolha-${process.pid}-${Date.now()}.bin`);
     try {
       fs.writeFileSync(temporal, bytes);
+      if (como.tipo === 'windows') {
+        await mandarPorNombreDeWindows(temporal, como.nombre);
+        return { impreso: true, motivo: 'windows', como };
+      }
       await copiarCrudo(temporal, destino);
       return { impreso: true, motivo: 'impresora', como };
     } finally {
@@ -183,6 +205,121 @@ function mandarPorRed(bytes, host, puerto, milisegundos = 8000) {
       `${host}:${puerto} cortó la conexión antes de recibir el ticket.`)));
   });
 }
+
+/**
+ * MANDARLE EL TICKET A UNA IMPRESORA POR SU NOMBRE DE WINDOWS.
+ *
+ * Se le entrega el trabajo al motor de impresión marcado como RAW, que
+ * quiere decir "esto ya son los bytes finales, no los conviertas". Es lo
+ * mismo que hace `copy /b` a un nombre compartido, pero sin obligar a
+ * compartir nada: basta con que la impresora esté instalada.
+ *
+ * Se hace desde PowerShell porque Node no puede llamar a winspool.drv por
+ * su cuenta. El guion se escribe en un archivo temporal en vez de pasarlo
+ * por la línea de comandos: son cincuenta líneas de C# y meterlas en un
+ * argumento es pedir que un día una comilla lo rompa.
+ */
+function mandarPorNombreDeWindows(archivo, nombre, milisegundos = 15000) {
+  return new Promise((resolver, rechazar) => {
+    if (process.platform !== 'win32') {
+      return rechazar(new Error('Imprimir por el nombre de Windows solo funciona en Windows.'));
+    }
+
+    const guion = path.join(os.tmpdir(), `lolha-imp-${process.pid}-${Date.now()}.ps1`);
+    try { fs.writeFileSync(guion, GUION_RAW, 'utf8'); }
+    catch (e) { return rechazar(new Error(`No se pudo preparar la impresión: ${e.message}`)); }
+
+    const p = spawn('powershell', [
+      '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+      '-File', guion, nombre, archivo
+    ], { windowsHide: true });
+
+    let salida = '';
+    const limpiar = () => { try { fs.unlinkSync(guion); } catch { /* ya no está */ } };
+    const reloj = setTimeout(() => {
+      p.kill();
+      limpiar();
+      rechazar(new Error(`Windows no terminó de mandarle el ticket a "${nombre}".`));
+    }, milisegundos);
+
+    p.stdout.on('data', (d) => { salida += d.toString(); });
+    p.stderr.on('data', (d) => { salida += d.toString(); });
+    p.on('error', (e) => { clearTimeout(reloj); limpiar(); rechazar(e); });
+    p.on('close', (codigo) => {
+      clearTimeout(reloj);
+      limpiar();
+      if (codigo === 0) return resolver();
+      rechazar(new Error(
+        salida.trim().split('\n').pop() ||
+        `Windows no pudo mandarle el ticket a "${nombre}". ¿Sigue instalada?`));
+    });
+  });
+}
+
+/**
+ * El guion de PowerShell que entrega los bytes al motor de impresión.
+ *
+ * Es C# de toda la vida llamando a winspool.drv: abrir la impresora,
+ * empezar un documento RAW, escribir los bytes, cerrar. Está aquí como
+ * texto porque es lo único de este programa que no se puede escribir en
+ * JavaScript, y esconderlo en otro archivo sería esconderlo.
+ */
+const GUION_RAW = `
+param([string]$Impresora, [string]$Archivo)
+$ErrorActionPreference = 'Stop'
+Add-Type -TypeDefinition @"
+using System;
+using System.IO;
+using System.Runtime.InteropServices;
+public class LolhaRaw {
+  [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+  public class DOCINFO {
+    [MarshalAs(UnmanagedType.LPWStr)] public string pDocName;
+    [MarshalAs(UnmanagedType.LPWStr)] public string pOutputFile;
+    [MarshalAs(UnmanagedType.LPWStr)] public string pDataType;
+  }
+  [DllImport("winspool.Drv", EntryPoint = "OpenPrinterW", SetLastError = true, CharSet = CharSet.Unicode)]
+  static extern bool OpenPrinter(string src, out IntPtr hPrinter, IntPtr pd);
+  [DllImport("winspool.Drv", EntryPoint = "ClosePrinter")]
+  static extern bool ClosePrinter(IntPtr hPrinter);
+  [DllImport("winspool.Drv", EntryPoint = "StartDocPrinterW", SetLastError = true, CharSet = CharSet.Unicode)]
+  static extern bool StartDocPrinter(IntPtr hPrinter, int level, [In, MarshalAs(UnmanagedType.LPStruct)] DOCINFO di);
+  [DllImport("winspool.Drv", EntryPoint = "EndDocPrinter")]
+  static extern bool EndDocPrinter(IntPtr hPrinter);
+  [DllImport("winspool.Drv", EntryPoint = "StartPagePrinter")]
+  static extern bool StartPagePrinter(IntPtr hPrinter);
+  [DllImport("winspool.Drv", EntryPoint = "EndPagePrinter")]
+  static extern bool EndPagePrinter(IntPtr hPrinter);
+  [DllImport("winspool.Drv", EntryPoint = "WritePrinter", SetLastError = true)]
+  static extern bool WritePrinter(IntPtr hPrinter, IntPtr bytes, int count, out int written);
+
+  public static void Mandar(string impresora, string archivo) {
+    byte[] datos = File.ReadAllBytes(archivo);
+    IntPtr h;
+    if (!OpenPrinter(impresora, out h, IntPtr.Zero))
+      throw new Exception("Windows no pudo abrir esa impresora: " + impresora);
+    try {
+      DOCINFO di = new DOCINFO();
+      di.pDocName = "Ticket Hielo LOLHA";
+      di.pDataType = "RAW";
+      if (!StartDocPrinter(h, 1, di)) throw new Exception("Windows no aceptó el trabajo de impresion.");
+      try {
+        if (!StartPagePrinter(h)) throw new Exception("Windows no aceptó la pagina.");
+        IntPtr buffer = Marshal.AllocCoTaskMem(datos.Length);
+        try {
+          Marshal.Copy(datos, 0, buffer, datos.Length);
+          int escritos;
+          if (!WritePrinter(h, buffer, datos.Length, out escritos))
+            throw new Exception("Windows no pudo escribirle a la impresora.");
+        } finally { Marshal.FreeCoTaskMem(buffer); }
+        EndPagePrinter(h);
+      } finally { EndDocPrinter(h); }
+    } finally { ClosePrinter(h); }
+  }
+}
+"@
+[LolhaRaw]::Mandar($Impresora, $Archivo)
+`;
 
 /** El error de red, dicho como para arreglarlo, no como lo dice Node. */
 function explicarRed(e, host, puerto) {
@@ -250,11 +387,15 @@ function impresorasDeWindows(milisegundos = 6000) {
  * compartida, su nombre compartido.
  */
 function sugerirDestino(i) {
-  const puerto = String(i.PortName || '');
-  const ip = puerto.match(/(\d{1,3}(?:\.\d{1,3}){3})/);
+  // Si su puerto es una dirección de red, esa dirección: es el camino más
+  // corto y no depende ni del driver ni del motor de impresión.
+  const ip = String(i.PortName || '').match(/(\d{1,3}(?:\.\d{1,3}){3})/);
   if (ip) return ip[1];
-  if (i.ShareName) return `\\\\localhost\\${i.ShareName}`;
-  return null;
+
+  // Y si no, por su nombre de Windows. Sirve para cualquiera que esté
+  // instalada —USB incluida— sin tener que compartir nada, que era el paso
+  // que hacía que la gente se rindiera.
+  return i.Name ? `windows:${i.Name}` : null;
 }
 
 /** copy /b archivo destino — la forma de Windows de escribir bytes crudos. */

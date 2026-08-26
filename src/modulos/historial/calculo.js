@@ -38,14 +38,25 @@ function filtros({ desde, hasta, horaDesde, horaHasta, usuarioId }, campoFecha, 
   const donde = [];
   const valores = [];
 
-  // Las fechas se guardan como texto ISO en UTC; date() las recorta al día.
-  if (desde) { donde.push(`date(${campoFecha}) >= date(?)`); valores.push(desde); }
-  if (hasta) { donde.push(`date(${campoFecha}) <= date(?)`); valores.push(hasta); }
+  // TODO SE COMPARA EN HORA LOCAL, y esto no es un detalle.
+  //
+  // Las fechas se guardan en UTC: un instante, no una hora de pared. Pero
+  // quien filtra escribe la fecha y la hora de la fábrica. En Yucatán son
+  // seis horas de diferencia, así que sin convertir:
+  //
+  //   · un ticket de las 6:29 p.m. cae en el día SIGUIENTE, y buscando
+  //     "hoy" no aparecía
+  //   · "de 3 a 8 de la tarde" traía lo de 9 de la mañana a 2 de la tarde
+  //
+  // El modificador 'localtime' convierte el instante guardado al reloj de
+  // esta computadora, que es el de la fábrica.
+  if (desde) { donde.push(`date(${campoFecha}, 'localtime') >= date(?)`); valores.push(desde); }
+  if (hasta) { donde.push(`date(${campoFecha}, 'localtime') <= date(?)`); valores.push(hasta); }
 
   // Por horas: "de 3 a 8 de la noche", que es como se pregunta cuando algo
   // no cuadró en un turno.
-  if (horaDesde) { donde.push(`time(${campoFecha}) >= time(?)`); valores.push(horaDesde); }
-  if (horaHasta) { donde.push(`time(${campoFecha}) <= time(?)`); valores.push(horaHasta); }
+  if (horaDesde) { donde.push(`time(${campoFecha}, 'localtime') >= time(?)`); valores.push(horaDesde); }
+  if (horaHasta) { donde.push(`time(${campoFecha}, 'localtime') <= time(?)`); valores.push(horaHasta); }
 
   if (usuarioId) { donde.push(`${campoUsuario} = ?`); valores.push(usuarioId); }
 

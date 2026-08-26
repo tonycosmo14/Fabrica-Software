@@ -17,9 +17,27 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '2.0.1';
+const VERSION_ACTUAL = '2.0.2';
 
 const VERSIONES = [
+  {
+    numero: '2.0.2',
+    nombre: 'Tres que estorbaban',
+    fecha: '2026-08-26',
+    resumen:
+      'Los tickets del día ya no desaparecen después de las 6 de la tarde, ' +
+      'vaciar el ticket ya no repite lo último, y la impresora se elige de ' +
+      'una lista.',
+    cambios: [
+      { tipo: 'arreglo', texto: 'ARREGLADO Y GRAVE: los tickets de HOY desaparecían de la lista a partir de las 6 de la tarde. Las fechas se guardan en hora universal y se comparaban contra el reloj de la fábrica: a las 6:29 p.m. de aquí, para el sistema ya era mañana. En una fábrica que cierra a las 8, eso era media tarde sin poder buscar un ticket.' },
+      { tipo: 'arreglo', texto: 'Lo mismo pasaba en el HISTORIAL: buscar "hoy" no traía lo de la tarde, y el filtro por horas venía corrido seis horas —pedías de 3 a 8 de la tarde y salía lo de 9 de la mañana—. Ya está todo en el reloj de la fábrica.' },
+      { tipo: 'arreglo', texto: 'ARREGLADO: al vaciar el ticket con Esc y confirmar con Enter, se vaciaba y en el mismo golpe repetía lo último capturado. El diálogo se cerraba al APRETAR la tecla y el campo de códigos alcanzaba a ver cuando la SOLTABAS.' },
+      { tipo: 'importante', texto: 'LA IMPRESORA YA SE ELIGE DE UNA LISTA. Al abrir Sistema, el programa le pregunta a Windows qué impresoras tiene y las pone en un selector. Eliges la tuya y ya: no hay que averiguar direcciones ni compartir nada.' },
+      { tipo: 'nuevo', texto: 'Y funcionan las dos clases: si es de red se le habla directo por su dirección, y si es de USB por su nombre de Windows. Escribir la dirección a mano sigue estando, pero ya solo para casos raros.' },
+      { tipo: 'mejora', texto: 'Si dice "no se encuentra el nombre de red especificado", es que está apuntando a un nombre compartido que ya no existe. Se arregla eligiendo la impresora de la lista.' }
+    ],
+    siguiente: 'v2.1 — Actualizar el sistema desde un archivo ZIP, sin perder datos.'
+  },
   {
     numero: '2.0.1',
     nombre: 'La impresora de red',

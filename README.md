@@ -3,7 +3,7 @@
 Sistema para la fábrica de hielo de Hunucmá, Yucatán.
 Se construye **por versiones**: cada versión es un pedazo terminado, probado y usable.
 
-**Versión actual: v2.0.1**
+**Versión actual: v2.0.2**
 
 ---
 
@@ -490,6 +490,14 @@ puerto (`tickets`) se lee como archivo a propósito: leerlo como una máquina
 de la red convertiría una carpeta mal escrita en ocho segundos de espera por
 ticket.
 
+### Elegir en vez de escribir (v2.0.2)
+
+Al abrir Sistema se llena solo un selector con las impresoras que ve
+Windows. De cada una se resuelve el destino: si su puerto trae una IP, esa
+IP; si no, `windows:NOMBRE`, que entrega el trabajo al spooler marcado
+`RAW` vía `winspool.drv`. Eso hace que una USB funcione **sin compartirla**,
+que era donde la gente se rendía.
+
 `GET /impresion/impresoras` le pregunta a Windows con `Get-Printer` y
 devuelve nombre, puerto y nombre compartido con la sugerencia ya resuelta.
 `GET /impresion/entender?destino=…` dice qué entendió, sin guardar nada: es
@@ -649,6 +657,35 @@ ese tema tiene que aparecer en el buscador.
 
 ---
 
+## La trampa de la zona horaria
+
+Las fechas se guardan en **UTC** (`new Date().toISOString()`): un instante,
+no una hora de pared. Es lo correcto, pero abre una trampa que ya costó un
+bug de los caros.
+
+Yucatán va **seis horas detrás**. Un ticket de las 6:29 p.m. se guarda como
+las 00:29 del **día siguiente**. Así que cualquier consulta que compare la
+columna guardada contra un día o una hora **del reloj de la fábrica** tiene
+que convertirla primero:
+
+```sql
+date(v.fecha, 'localtime') = date('now', 'localtime')   -- ✓
+time(m.fecha, 'localtime') >= time(?)                   -- ✓
+
+date(v.fecha) = date('now', 'localtime')                -- ✗ media tarde perdida
+```
+
+**Regla:** si a un lado de la comparación hay una fecha escrita por una
+persona —un filtro, un día del calendario, una hora— el otro lado lleva
+`'localtime'`. Si los dos lados son columnas guardadas, no: los dos están
+en UTC y se comparan tal cual.
+
+`pruebas/zona-horaria.test.js` corre con `TZ=America/Merida` puesto: en una
+computadora en UTC este error no se puede reproducir, y una prueba que no
+puede fallar no prueba nada.
+
+---
+
 ## Las reglas de oro (del plan)
 
 Están escritas en el código, no solo en el documento:
@@ -712,6 +749,7 @@ versión nueva le aparece un punto rojo en el menú.
 | **v1.9** | Precios de mayoreo, corte en dos columnas y compartir por WhatsApp | ✅ listo |
 | **v2.0** | Mayoreo tecleado, historial con acciones, mermas y listas de un renglón | ✅ listo |
 | **v2.0.1** | La impresora de red: basta con su dirección IP | ✅ listo |
+| **v2.0.2** | Zona horaria, el enter de vaciar, y elegir la impresora de una lista | ✅ listo |
 | v2.1 | Actualizar el sistema desde un ZIP, sin perder datos | siguiente |
 | v2.2 | Estadísticas, gráficas, recibos de CFE y gastos grandes de la empresa | |
 | v2.3 | Reparto, pedidos y neveras en comodato | |

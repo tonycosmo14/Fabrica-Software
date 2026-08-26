@@ -174,6 +174,45 @@ test('la lista de impresoras contesta aunque no sea Windows', async () => {
             'fuera de Windows viene vacía, pero viene: la pantalla no se rompe');
 });
 
+test('la impresora se puede elegir por su nombre de Windows', () => {
+  const c = tipoDeDestino('windows:ch-e80print en 192.168.1.65');
+  assert.equal(c.tipo, 'windows');
+  assert.equal(c.nombre, 'ch-e80print en 192.168.1.65',
+               'el nombre lleva espacios y puntos: no se puede recortar');
+});
+
+test('el guion de Windows no lleva comillas sueltas ni barras invertidas', () => {
+  // Es C# dentro de PowerShell dentro de JavaScript. Una comilla mal
+  // escapada ahí no falla al guardar: falla la noche que alguien imprime.
+  const fuente = require('node:fs')
+    .readFileSync(require.resolve('../src/modulos/impresion/impresora'), 'utf8');
+  const guion = fuente.match(/const GUION_RAW = `([\s\S]*?)`;/)[1];
+
+  assert.ok(guion.includes('[LolhaRaw]::Mandar'), 'el guion está entero');
+  assert.ok(guion.includes('Add-Type -TypeDefinition @"'), 'abre el bloque de C#');
+  assert.ok(/\n"@\n/.test(guion), 'y lo cierra');
+
+  // Las dos líneas que abren y cierran el bloque llevan una comilla suelta a
+  // propósito: son el delimitador de PowerShell, no texto.
+  const cuerpo = guion.split('\n')
+    .filter((l) => !l.includes('Add-Type -TypeDefinition') && l.trim() !== '"@');
+
+  for (const linea of cuerpo) {
+    assert.equal((linea.match(/"/g) || []).length % 2, 0,
+                 `comillas sin pareja: ${linea}`);
+    assert.ok(!linea.includes('\\'),
+              `una barra invertida en el C# es una bomba de tiempo: ${linea}`);
+  }
+});
+
+test('fuera de Windows, mandar por nombre avisa en vez de reventar', async () => {
+  if (process.platform === 'win32') return;
+  guardarAjuste('impresora_destino', 'windows:La que sea');
+  const r = await imprimirCrudo(Buffer.from('x'));
+  assert.equal(r.impreso, false);
+  assert.match(r.motivo, /Windows/);
+});
+
 test('el cajero no configura la impresora', async () => {
   await llamar('/api/usuarios', {
     method: 'POST', cuerpo: { nombre: 'Mari', rol: 'cajero', pin: '7777' }

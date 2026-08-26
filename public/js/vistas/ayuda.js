@@ -833,21 +833,24 @@ debería haber − contado = FALTA</pre>
       destino puesto, el ticket sale <b>al instante</b>; sin él lo imprime el
       navegador y aparece la ventana de impresión.</p>
 
-      <p><b>Si la impresora es de red</b> —lo normal en las térmicas de
-      80 mm—, basta con escribir <b>su dirección IP</b>:</p>
-      <pre class="ayuda-formula">192.168.1.65</pre>
-      <p>El sistema le habla directo por el puerto <b>9100</b>. No hay que
-      compartir nada ni que Windows tenga el driver puesto.</p>
-      <p class="ayuda-tip">La IP suele estar en el nombre que le puso Windows:
-      si tu impresora se llama <em>"ch-e80print en 192.168.1.65"</em>, esa es.
-      El botón <b>Buscar las impresoras de esta PC</b> te la encuentra sola.</p>
+      <p><b>Se elige de una lista.</b> Al abrir Sistema, el programa le
+      pregunta a Windows qué impresoras tiene y las pone en un selector.
+      Eliges la de tickets y ya: no hay que averiguar direcciones ni
+      compartir nada.</p>
+      <p>Funciona con las dos clases:</p>
+      <ul>
+        <li><b>De red</b> (lo normal en las térmicas de 80 mm) — el sistema
+        le habla directo por su dirección, sin driver de por medio.</li>
+        <li><b>De USB</b> — va por su nombre de Windows, sin tener que
+        compartirla.</li>
+      </ul>
 
-      <p><b>Si es de USB</b>, hay que compartirla una vez en Windows y escribir
-      <code>\\\\localhost\\TICKET</code>. Los pasos están en la pantalla.</p>
-
-      <p>Debajo del campo, un renglón te dice <b>por dónde va a salir el
-      ticket</b> según lo que escribiste. Y el botón <b>Imprimir una prueba</b>
-      lo comprueba sin tener que hacer una venta.</p>
+      <p>Debajo del selector, un renglón te dice <b>por dónde va a salir el
+      ticket</b>. Y el botón <b>Imprimir una prueba</b> lo comprueba sin tener
+      que hacer una venta.</p>
+      <p class="ayuda-tip">Si tu impresora no sale en la lista, se puede
+      escribir a mano: su dirección IP (<code>192.168.1.65</code>), su nombre
+      compartido, o la ruta de una carpeta para probar sin papel.</p>
 
       <h4>Si hay que restaurar</h4>
       <p>Las instrucciones están en la propia pantalla de Sistema, paso por
@@ -895,14 +898,13 @@ debería haber − contado = FALTA</pre>
       por el navegador. Para eso hay que decirle una vez a dónde mandarlo, en
       <b>Sistema → Impresora de tickets</b>.</p>
       <ol class="instrucciones">
-        <li>Toca <b>Buscar las impresoras de esta PC</b> y luego
-        <b>Usar esta</b> en la térmica. Se llena solo.</li>
-        <li>Mira el renglón de abajo: tiene que decir
-        <em>"El ticket se manda por red a 192.168.1.65:9100"</em> o algo
-        parecido. Si dice <em>"a un archivo"</em>, lo que escribiste no es una
-        dirección.</li>
-        <li><b>Imprimir una prueba</b>. Si algo falla, el aviso dice qué
-        revisar, no un error en inglés.</li>
+        <li>En el selector <b>¿Cuál es la impresora de tickets?</b>, elige la
+        térmica.</li>
+        <li>Mira el renglón verde de abajo: tiene que decir
+        <em>"El ticket se manda por red a 192.168.1.65:9100"</em> o
+        <em>"a la impresora tal de Windows"</em>.</li>
+        <li><b>Guardar</b>, y luego <b>Imprimir una prueba</b>. Si algo falla,
+        el aviso dice qué revisar, no un error en inglés.</li>
       </ol>
       <p>Lo que suele pasar:</p>
       <ul>
@@ -913,6 +915,9 @@ debería haber − contado = FALTA</pre>
         <li><em>"no se llega a esa dirección"</em> — la PC y la impresora no
         se ven entre ellas. Casi siempre es que una está por WiFi y la otra
         por cable en otra red.</li>
+        <li><em>"no se encuentra el nombre de red especificado"</em> — está
+        apuntando a un nombre compartido que ya no existe. Elige la impresora
+        del selector y se arregla.</li>
       </ul>
       <p>Mientras no esté puesto el destino, imprime el navegador y aparece la
       ventana de siempre. Todo funciona igual, solo que más lento.</p>
