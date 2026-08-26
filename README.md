@@ -3,7 +3,7 @@
 Sistema para la fábrica de hielo de Hunucmá, Yucatán.
 Se construye **por versiones**: cada versión es un pedazo terminado, probado y usable.
 
-**Versión actual: v2.0.2**
+**Versión actual: v2.1**
 
 ---
 
@@ -657,6 +657,55 @@ ese tema tiene que aparecer en el buscador.
 
 ---
 
+## El cajón del dinero (v2.1)
+
+El cajón no tiene cerebro: es un solenoide con un cable RJ11 metido en la
+impresora. La impresora le manda un pulso y el resorte lo dispara. El
+comando es `ESC p m t1 t2` — salida (2 o 5), duración del pulso y espera.
+
+Dos decisiones:
+
+- **El pulso es su propio documento**, no va colgado del ticket. El ticket
+  solo sale si el cajero lo pide; el cajón tiene que abrirse siempre que
+  entre efectivo. Colgado del ticket, el día que nadie imprime el cajón no
+  abre.
+- **Se abre al cobrar**, desde la pantalla de venta, no desde el servidor al
+  registrar: así el cajero que cobra por el celular no abre el cajón de la
+  PC sin estar ahí.
+
+---
+
+## Los sonidos (v2.1)
+
+Se **sintetizan** con WebAudio, no son archivos: el programa vive sin
+internet, unos MP3 se pierden en una actualización, pesan cero y se ajustan
+cambiando un número. Onda triangular con rampa de subida y bajada — un tono
+que arranca de golpe hace "clic" en las bocinas baratas.
+
+El enganche está en `avisar()`, no en cada pantalla: todo lo que sale bien o
+mal pasa por ahí, así que a una pantalla nueva no se le puede olvidar.
+
+La preferencia vive en `localStorage`, **por aparato**: la PC de la caja
+tiene bocinas y el celular del reparto no tiene por qué pitar en la calle.
+
+---
+
+## Devoluciones completas (v2.1)
+
+Una devolución completa **es cancelar el ticket**. El hielo vuelve al cuarto
+frío solo y la caja se ajusta sola porque lo cobrado deja de contar; una
+tabla aparte sería otra cuenta que se puede desincronizar.
+
+Lo que añade `POST /ventas/:id/devolver` sobre cancelar:
+
+| | |
+|---|---|
+| Motivo de una lista cerrada | Veinte *"se cansó de esperar"* son un problema de la fila, y eso no se ve con texto libre |
+| Compensa el cajón | Si el ticket es de un turno cerrado, ese dinero entró otro día pero sale del cajón de hoy |
+| Distingue el fiado | No entró dinero: se cancela el cargo y el cliente deja de deberlo |
+
+---
+
 ## La trampa de la zona horaria
 
 Las fechas se guardan en **UTC** (`new Date().toISOString()`): un instante,
@@ -750,10 +799,10 @@ versión nueva le aparece un punto rojo en el menú.
 | **v2.0** | Mayoreo tecleado, historial con acciones, mermas y listas de un renglón | ✅ listo |
 | **v2.0.1** | La impresora de red: basta con su dirección IP | ✅ listo |
 | **v2.0.2** | Zona horaria, el enter de vaciar, y elegir la impresora de una lista | ✅ listo |
-| v2.1 | Actualizar el sistema desde un ZIP, sin perder datos | siguiente |
-| v2.2 | Estadísticas, gráficas, recibos de CFE y gastos grandes de la empresa | |
-| v2.3 | Reparto, pedidos y neveras en comodato | |
-| v2.1 | Planta de agua: garrafones, botellas y depósitos | |
-| v2.2 | Mantenimiento: compresores, ósmosis, membranas, horario punta | |
-| v2.3 | Estadísticas y sistema completo en producción | |
+| **v2.1** | El cajón del dinero, sonido, devoluciones completas e impresoras por apartado | ✅ listo |
+| v2.2 | Actualizar el sistema desde un ZIP, sin perder datos | siguiente |
+| v2.3 | Estadísticas, gráficas, recibos de CFE y gastos grandes de la empresa | |
+| v2.4 | Reparto, pedidos y neveras en comodato | |
+| v2.5 | Planta de agua: garrafones, botellas y depósitos | |
+| v2.6 | Mantenimiento: compresores, ósmosis, membranas, horario punta | |
 | — | Identificación por huella en la caja (fase propia) | |

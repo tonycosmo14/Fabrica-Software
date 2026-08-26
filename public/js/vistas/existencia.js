@@ -284,7 +284,19 @@ export async function vistaExistencia(pantalla, estadoApp) {
       <button class="no-imprimir" id="imprimir" style="margin-top:14px">🖨️ Imprimir el ticket</button>`;
 
     pantalla.querySelector('#volver').onclick = pintar;
-    pantalla.querySelector('#imprimir').onclick = () => window.print();
+
+    // Primero la impresora de tickets, que sale al instante. El navegador
+    // —con su ventana de "elegir impresora"— solo si no hay ninguna puesta.
+    pantalla.querySelector('#imprimir').onclick = async (ev) => {
+      const boton = ev.currentTarget;
+      boton.disabled = true;
+      try {
+        const r = await api.enviar(`/impresion/conteo/${conteo.id}`, {});
+        if (r.impreso) avisar('Conteo impreso', 'bien');
+        else window.print();
+      } catch (e) { avisar(e.message, 'error'); }
+      boton.disabled = false;
+    };
   }
 
   // ==========================================================

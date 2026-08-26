@@ -2318,7 +2318,8 @@ body.pantalla-fija main {
    cada renglón mide distinto no se puede recorrer con la vista. */
 .fila-ticket, .mov-fila {
   display: grid; align-items: center; gap: 10px;
-  grid-template-columns: 52px 132px 70px minmax(0, 1fr) 96px 76px;
+  /* folio · cuándo · quién · qué se llevó · importe · copia · devolver */
+  grid-template-columns: 52px 132px 70px minmax(0, 1fr) 96px 66px 42px;
 }
 .mov-fila { grid-template-columns: minmax(0, 1fr) 132px 70px 96px 76px; }
 
@@ -2337,6 +2338,9 @@ body.pantalla-fija main {
   font-weight: 800; font-variant-numeric: tabular-nums; text-align: right;
 }
 .tkl-total.fiado { color: var(--primario); }
+/* El botón de devolver es una flecha: cabe donde no cabría "Devolver", y
+   junto a "Copia" se entiende que es otra cosa que se le hace al ticket. */
+.fila-ticket [data-devolver] { padding-left: 10px; padding-right: 10px; }
 .mov-salida .mov-importe { color: var(--rojo); }
 /* El dinero que ENTRA, en verde: se distingue del que sale sin leer. */
 .mov-entrada .mov-importe { color: var(--verde); }
@@ -2366,6 +2370,22 @@ body.pantalla-fija main {
 }
 .lista-impresoras { border: 2px solid var(--borde); border-radius: 10px; padding: 4px 12px; }
 .lista-impresoras .ticket-fila:last-child { border-bottom: 0; }
+
+/* Un interruptor con su explicación al lado, para las preferencias que se
+   entienden mejor leyendo por qué existen. */
+/* Sistema en dos columnas: a la izquierda lo que se toca, a la derecha lo
+   que se consulta. En el celular se apilan solas. */
+.sistema-columnas { display: grid; gap: 0 28px; align-items: start; }
+@media (min-width: 1100px) {
+  .sistema-columnas { grid-template-columns: 1fr 1fr; }
+}
+.sistema-columna { min-width: 0; }
+.sistema-columna > h3:first-child { margin-top: 8px; }
+
+.interruptor { display: flex; align-items: flex-start; gap: 12px; cursor: pointer; }
+.interruptor input { width: 22px; height: 22px; margin: 2px 0 0; flex: none; }
+.interruptor span { display: flex; flex-direction: column; gap: 3px; }
+.interruptor small { color: var(--suave); font-size: 13px; line-height: 1.4; }
 
 .pos-boton-mayoreo { border-color: var(--verde); }
 .pos-boton-mayoreo .pos-boton-precio { color: var(--verde); }

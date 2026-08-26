@@ -11,6 +11,107 @@ solo para arreglos de algo que ya estaba, o para cambios de puro aspecto.
 
 ---
 
+## v2.1 — El cajón, el sonido y las devoluciones · 26 de agosto de 2026
+
+Sin migración.
+
+### El cajón nunca se abría
+
+El interruptor *"abrir el cajón"* llevaba meses en configuraciones. El
+comando ESC/POS estaba escrito en `escpos.js`. **Nunca se llamaba.** Un
+ajuste que se guarda y no hace nada es peor que no tenerlo: parece que el
+problema es el cajón.
+
+Ahora el pulso se manda, y **al cobrar, no al imprimir**. Es una diferencia
+que importa: el ticket solo sale si el cajero lo pide —no todos se
+entregan— y el cajón tiene que abrirse siempre que entre efectivo. Colgado
+del ticket, el día que nadie imprime el cajón no abre.
+
+Por eso el pulso es su propio "documento" (`pulsoCajon()`) y su propia ruta
+(`POST /impresion/cajon`): cinco bytes sin papel. También lo usa el botón de
+probar, y la devolución.
+
+La salida del conector se puede cambiar (la 2 o la 5). Casi todos los
+cajones van en la 2, pero hay quien usa la 5, y si no abre eso es lo primero
+que se prueba.
+
+### Devoluciones completas
+
+> *"A veces los clientes se cansan de esperar su hielo o la fila y regresan
+> a la caja y nos piden que les devolvamos su dinero."*
+
+**No es un tipo de venta nuevo.** Una devolución completa es exactamente
+cancelar el ticket: el hielo vuelve al cuarto frío solo y la caja se ajusta
+sola porque lo cobrado deja de contar. Inventarle una tabla aparte sería
+inventar otra cuenta que se puede desincronizar.
+
+Lo que sí hacía falta es lo que una cancelación a secas no dice:
+
+- **El motivo, de una lista cerrada** — se cansó de esperar, llevaba prisa,
+  el hielo no estaba bien, se capturó algo que no era. Veinte *"se cansó de
+  esperar"* en un mes son un problema de la fila, y eso no se ve si cada
+  quien lo escribe distinto.
+- **El dinero de un ticket viejo.** Si el ticket es de un turno cerrado, ese
+  dinero entró otro día: cancelarlo hoy no le quita nada a la caja de hoy,
+  pero del cajón de hoy sí salen los billetes. Se anota como salida, igual
+  que en un cambio.
+- **Un fiado no devuelve efectivo**: no entró dinero. Se cancela el cargo y
+  el cliente deja de deberlo, que es la devolución de verdad.
+
+Un ticket ya cambiado por otro no se devuelve: la respuesta dice cuál es el
+nuevo. Y es de gerente, no de cajero: sacar dinero del cajón por algo que ya
+se cobró se revisa.
+
+### Sonido
+
+Un tono corto cuando algo se acepta, otro cuando algo falla, y uno distinto
+al cobrar. En un mostrador con gente hablando el cajero no está mirando la
+pantalla cuando aprieta enter: está viendo al cliente y contando billetes.
+
+Los tonos **se sintetizan**, no son archivos: el programa vive sin internet,
+unos MP3 se pueden perder en una actualización, pesan cero y se ajustan
+cambiando un número. Onda triangular con subida y bajada suaves — un tono
+que arranca de golpe hace "clic" en las bocinas baratas, que son las que hay
+en una fábrica.
+
+El enganche está en `avisar()`, no en cada pantalla: todo lo que sale bien o
+mal pasa por ahí, así que suena en todos lados y a una pantalla nueva no se
+le puede olvidar.
+
+Se guarda **en el aparato**, no en el negocio: la computadora de la caja
+tiene bocinas y el celular del reparto no tiene por qué pitar en la calle.
+
+### Dos arreglos de la caja
+
+- **Repetir con enter una marqueta de mayoreo metía una normal.**
+  `repetirUltimo()` miraba `tipo === 'hielo'` y echaba la cantidad al montón
+  de hielo suelto, que se cobra con la lista de público. Ahora el mayoreo
+  repite mayoreo.
+- **En la lista de clientes solo se veía "Fiarle".** En la v2.0 el renglón
+  entero quedó clicable y el botón "Es él" desapareció, así que no parecía
+  posible ponerle nombre a una venta de contado. Volvió el botón.
+
+### Menos ventanas del navegador
+
+El **corte** y los **conteos** ya salen por la impresora de tickets, en
+ESC/POS, sin la ventana de "elegir impresora". Solo se cae al navegador si
+no hay impresora puesta.
+
+Y cada apartado puede ir a **su propia impresora** —tickets, corte, gastos,
+conteos—, con vacío queriendo decir "la de tickets".
+
+> Lo que **no** se puede: quitarle la ventana de impresión al navegador para
+> las hojas tamaño carta, ni elegirle la impresora desde el programa. Eso lo
+> decide el navegador y ninguna página puede tocarlo. Lo que sí se hizo fue
+> mover al papel térmico todo lo que tiene forma de ticket.
+
+### Y Sistema en dos columnas
+
+A la izquierda lo que se toca —respaldos e impresoras—, a la derecha lo que
+se consulta. En el celular se apilan solas.
+
+---
+
 ## v2.0.2 — Tres que estorbaban · 26 de agosto de 2026
 
 Sin migración. Dos arreglos de los que se sienten todos los días, y la

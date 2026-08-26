@@ -17,9 +17,30 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '2.0.2';
+const VERSION_ACTUAL = '2.1';
 
 const VERSIONES = [
+  {
+    numero: '2.1',
+    nombre: 'El cajón, el sonido y las devoluciones',
+    fecha: '2026-08-26',
+    resumen:
+      'El cajón se abre solo, la caja hace ruido cuando algo entra, y se ' +
+      'le puede devolver el dinero completo a un cliente.',
+    cambios: [
+      { tipo: 'arreglo', texto: 'ARREGLADO: el cajón del dinero no se abría. El interruptor estaba en configuraciones desde hace meses, pero el comando nunca se mandaba. Ahora sí, y se abre al COBRAR en efectivo, no al imprimir: el ticket solo sale si alguien lo pide y el cajón hace falta siempre.' },
+      { tipo: 'nuevo', texto: 'Si tu cajón no abre con eso, en Sistema se puede cambiar la SALIDA del conector (la 2 o la 5). Hay un botón para abrirlo ahí mismo y probar.' },
+      { tipo: 'nuevo', texto: 'DEVOLVER EL DINERO COMPLETO. En la lista de tickets, el botón ↩. Se escoge por qué —se cansó de esperar, llevaba prisa, el hielo no estaba bien— y el sistema cancela el ticket, regresa el hielo al cuarto frío, ajusta la caja y abre el cajón.' },
+      { tipo: 'importante', texto: 'Y el caso que se olvida: si el ticket es de un turno YA CERRADO, el dinero entró otro día pero sale del cajón de HOY. Queda anotado como salida para que el arqueo no salga corto.' },
+      { tipo: 'nuevo', texto: 'SONIDO. Un ruidito cuando algo se acepta y otro cuando algo falla, y uno especial al cobrar. En el mostrador el cajero no está mirando la pantalla cuando aprieta enter: está viendo al cliente. Se enciende y se apaga en Personalizar, y se guarda en cada aparato.' },
+      { tipo: 'arreglo', texto: 'ARREGLADO: con una marqueta de mayoreo (1m) en el ticket, apretar enter para repetir metía una marqueta NORMAL. Ahora repite lo mismo que agregaste.' },
+      { tipo: 'arreglo', texto: 'ARREGLADO: en la lista de clientes solo se veía el botón "Fiarle", así que no parecía posible ponerle nombre a una venta de contado. Volvió el botón "Es él".' },
+      { tipo: 'mejora', texto: 'EL CORTE Y LOS CONTEOS ya salen por la impresora de tickets, sin la ventana de impresión del navegador. Solo se cae al navegador si no hay impresora puesta.' },
+      { tipo: 'nuevo', texto: 'Y CADA COSA PUEDE IR A SU IMPRESORA: tickets de venta, corte de caja, comprobantes de gasto y conteos. Vacío quiere decir "la de tickets", que es lo que casi siempre se quiere.' },
+      { tipo: 'mejora', texto: 'La pantalla de Sistema se acomodó en dos columnas: a la izquierda lo que se toca, a la derecha lo que se consulta.' }
+    ],
+    siguiente: 'v2.2 — Actualizar el sistema desde un archivo ZIP, sin perder datos.'
+  },
   {
     numero: '2.0.2',
     nombre: 'Tres que estorbaban',

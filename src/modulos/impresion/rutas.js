@@ -14,8 +14,10 @@ const { ok, error } = require('../../lib/respuestas');
 const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
 const { configuracion, guardarAjuste, imprimirCrudo,
-        tipoDeDestino, impresorasDeWindows } = require('./impresora');
-const { ticketVenta, ticketMovimiento, ticketPrueba } = require('./ticket');
+        tipoDeDestino, impresorasDeWindows, APARTADOS } = require('./impresora');
+const { ticketVenta, ticketMovimiento, ticketPrueba, pulsoCajon,
+        ticketCorte, ticketConteo } = require('./ticket');
+
 const { aTexto } = require('../../lib/fracciones');
 
 const router = express.Router();
@@ -117,6 +119,22 @@ router.put('/config', configurar, (req, res) => {
     guardarAjuste('ticket_abrir_cajon', c.abrirCajon ? '1' : '0', req.usuario.id);
   }
 
+  // La impresora de cada apartado. Vacío = la de tickets, que es lo que
+  // casi siempre se quiere.
+  if (c.apartados && typeof c.apartados === 'object') {
+    for (const a of APARTADOS) {
+      if (c.apartados[a.id] === undefined) continue;
+      guardarAjuste(`impresora_destino_${a.id}`,
+                    String(c.apartados[a.id]).trim().slice(0, 200), req.usuario.id);
+    }
+  }
+
+  if (c.salidaCajon !== undefined) {
+    const n = Number(c.salidaCajon);
+    if (![2, 5].includes(n)) return error(res, 'El cajón va por la salida 2 o la 5.');
+    guardarAjuste('ticket_cajon_salida', n, req.usuario.id);
+  }
+
   bitacora.registrar({
     accion: 'impresion.config', entidad: 'configuracion',
     ejecutorId: req.usuario.id, detalle: configuracion()
@@ -155,7 +173,8 @@ router.post('/venta/:id', puedeImprimir, async (req, res) => {
 
   let ultimo = { impreso: false, motivo: 'nada' };
   for (let i = 0; i < cuantas; i++) {
-    ultimo = await imprimirCrudo(ticketVenta(venta, { copia, negocio: nombreNegocio() }));
+    ultimo = await imprimirCrudo(ticketVenta(venta, { copia, negocio: nombreNegocio() }),
+                                 { seccion: 'venta' });
     if (!ultimo.impreso) break;
   }
 
@@ -170,6 +189,100 @@ router.post('/venta/:id', puedeImprimir, async (req, res) => {
   }
 
   return ok(res, { impreso: true });
+});
+
+/**
+ * EL CORTE DE CAJA, en papel térmico y sin ventana de por medio.
+ *
+ * Sale dos o tres veces al día y siempre en la misma impresora: la ventana
+ * de "elegir impresora" del navegador ahí solo estorbaba.
+ */
+router.post('/corte/:id', exigirPermiso('caja.ver'), async (req, res) => {
+  const caja = bd.prepare(`
+    SELECT c.*, u.nombre AS cajero_nombre, v.nombre AS cerrada_por_nombre
+      FROM cajas c
+      LEFT JOIN usuarios u ON u.id = c.cajero_id
+      LEFT JOIN usuarios v ON v.id = c.cerrada_por
+     WHERE c.id = ?
+  `).get(req.params.id);
+  if (!caja) return error(res, 'Ese corte no existe.', 404);
+  if (!caja.cerrada_en) return error(res, 'Ese turno todavía no se ha cerrado.');
+
+  const corte = {
+    caja,
+    movimientos: bd.prepare(
+      'SELECT * FROM movimientos_caja WHERE caja_id = ? ORDER BY fecha').all(caja.id),
+    ventas: bd.prepare(`
+      SELECT COUNT(*) FILTER (WHERE cancelada_en IS NULL) AS cobradas,
+             COUNT(*) FILTER (WHERE cancelada_en IS NOT NULL) AS canceladas
+        FROM ventas WHERE caja_id = ?`).get(caja.id)
+  };
+
+  const cfg = configuracion();
+  if (!cfg.directa) return ok(res, { impreso: false, motivo: 'sin-destino' });
+
+  const r = await imprimirCrudo(ticketCorte(corte, { negocio: nombreNegocio() }),
+                                { seccion: 'corte' });
+  if (!r.impreso) return error(res, `No se pudo imprimir: ${r.motivo}`, 502);
+  return ok(res, { impreso: true });
+});
+
+/** El cuadre de un conteo del cuarto frío. */
+router.post('/conteo/:id', exigirPermiso('existencia.ver'), async (req, res) => {
+  const c = bd.prepare(`
+    SELECT c.*, a.nombre AS almacen_nombre, u.nombre AS ejecutor_nombre
+      FROM conteos c
+      LEFT JOIN almacenes a ON a.id = c.almacen_id
+      LEFT JOIN usuarios u  ON u.id = c.ejecutor_id
+     WHERE c.id = ?
+  `).get(req.params.id);
+  if (!c) return error(res, 'Ese conteo no existe.', 404);
+
+  const cfg = configuracion();
+  if (!cfg.directa) return ok(res, { impreso: false, motivo: 'sin-destino' });
+
+  // El conteo guarda sus números congelados en el momento (regla 3.2), así
+  // que el papel de hoy dice lo mismo que el de aquel día aunque después se
+  // haya cancelado una venta.
+  const esperado = c.existencia_anterior + c.producido - c.vendido;
+  const conteo = {
+    fecha: c.fecha,
+    almacen: c.almacen_nombre,
+    ejecutor: c.ejecutor_nombre,
+    resumen: {
+      primerConteo: !c.desde,
+      anterior: c.existencia_anterior, producido: c.producido,
+      vendido: c.vendido, merma: 0,
+      esperado, contado: c.contado,
+      faltante: esperado - c.contado
+    }
+  };
+
+  const r = await imprimirCrudo(ticketConteo(conteo, { negocio: nombreNegocio() }),
+                                { seccion: 'conteo' });
+  if (!r.impreso) return error(res, `No se pudo imprimir: ${r.motivo}`, 502);
+  return ok(res, { impreso: true });
+});
+
+/**
+ * ABRIR EL CAJÓN DEL DINERO.
+ *
+ * El cajón cuelga de la impresora por un cable: quien le manda el pulso es
+ * ella. Por eso abrirlo es "imprimir" cinco bytes sin papel.
+ *
+ * Va aparte del ticket y no colgado de él: el ticket solo sale si alguien
+ * lo pide, y el cajón tiene que abrirse siempre que entre dinero. También
+ * lo usa el botón de la caja, para cuando hay que dar cambio de algo que no
+ * fue una venta.
+ */
+router.post('/cajon', puedeImprimir, async (req, res) => {
+  const cfg = configuracion();
+  if (!cfg.directa) return ok(res, { abierto: false, motivo: 'sin-destino' });
+
+  const r = await imprimirCrudo(pulsoCajon(cfg.salidaCajon), { seccion: 'venta' });
+  if (!r.impreso) return error(res, `No se pudo abrir el cajón: ${r.motivo}`, 502);
+
+  return ok(res, { abierto: true });
 });
 
 /**
@@ -190,7 +303,8 @@ router.post('/movimiento/:id', puedeImprimir, async (req, res) => {
   const cfg = configuracion();
   if (!cfg.directa) return ok(res, { impreso: false, motivo: 'sin-destino' });
 
-  const r = await imprimirCrudo(ticketMovimiento(mov, { negocio: nombreNegocio() }));
+  const r = await imprimirCrudo(ticketMovimiento(mov, { negocio: nombreNegocio() }),
+                                { seccion: 'gasto' });
   if (!r.impreso) return error(res, `No se pudo imprimir: ${r.motivo}`, 502);
   return ok(res, { impreso: true });
 });

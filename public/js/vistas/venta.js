@@ -23,10 +23,11 @@
 import { api } from '../api.js';
 import { esc, avisar, soloHora, fecha as formatoFecha, ETIQUETAS_ROL } from '../util.js';
 import { pedirTexto, pedirImporte, pedirCantidad, pedirEntero, confirmar,
-         pedirAutorizacion } from '../dialogo.js';
+         pedirAutorizacion, menu } from '../dialogo.js';
 import { aTexto, descomponer, desglose, pesos, paraEditar } from '../fracciones.js';
 import { cargarMarca } from '../marca.js';
 import { imprimirTicket, limpiarImpresion } from '../imprimir.js';
+import { tono } from '../sonido.js';
 
 /** Billetes con los que de verdad paga la gente. */
 const BILLETES = [50, 100, 200, 500, 1000];
@@ -61,6 +62,9 @@ export async function vistaVenta(pantalla, estadoApp) {
   // no es fiar, es cobrarle lo suyo a quien lo tiene.
   const puedeVerClientes = tiene('clientes.ver');
   const puedeRepartirNumeros = tiene('produccion.numeros');
+  // Devolver saca dinero del cajón por algo que ya se cobró: eso lo revisa
+  // un gerente, no se hace solo desde el mostrador.
+  const puedeDevolver = tiene('venta.cancelar');
 
   const marca = await cargarMarca();
   let ctx = await api.obtener('/ventas/contexto');
@@ -1187,7 +1191,10 @@ export async function vistaVenta(pantalla, estadoApp) {
 
   function repetirUltimo() {
     if (!ultimoAgregado) return;
-    if (ultimoAgregado.tipo === 'hielo') {
+    // El hielo de público se suma al montón. El de MAYOREO no: tiene su
+    // propio renglón y su propia lista, y echarlo al montón le cambiaba el
+    // precio al de público sin avisar. Repetir "1m" tiene que repetir 1m.
+    if (ultimoAgregado.tipo === 'hielo' && !ultimoAgregado.mayoreo) {
       hielo += ultimoAgregado.dieciseisavos;
       pintarTodo();
       return;
@@ -1472,6 +1479,7 @@ export async function vistaVenta(pantalla, estadoApp) {
               </span>
               ${suya ? `<span class="etiqueta-mayoreo">🏷️ ${esc(suya.nombre)}</span>` : ''}
               ${c.vencido ? '<span class="aviso-quedan agotado">vencido</span>' : ''}
+              <button class="secundario chico" data-elegir="${esc(c.id)}">Es él</button>
               ${puedeFiar && !cobrarAlElegir
                 ? `<button class="secundario chico" data-fiar="${esc(c.id)}">Fiarle</button>` : ''}
             </div>`; }).join('')
@@ -1506,9 +1514,12 @@ export async function vistaVenta(pantalla, estadoApp) {
       elegirCliente(candidatos[0].id);
     };
 
+    // El renglón entero elige, y además hay un botón que lo dice. Tener
+    // solo el renglón clicable era un secreto: al lado de "Fiarle" parecía
+    // que fiar era lo único que se podía hacer con un cliente.
     refs.cobro.querySelectorAll('[data-cliente]').forEach((b) => {
       b.onclick = (ev) => {
-        // El botón de fiar vive dentro del renglón: si no se para aquí, un
+        // Los botones viven dentro del renglón: si no se para aquí, un
         // toque en "Fiarle" haría las dos cosas.
         if (ev.target.closest('[data-fiar]')) return;
         elegirCliente(b.dataset.cliente);
@@ -1639,9 +1650,15 @@ export async function vistaVenta(pantalla, estadoApp) {
       ultimoCambio = cambiando ? respuesta : null;
       cambiando = null;
       ventaCobrada = venta;
+      // El sonido de que la venta entró. Es distinto del "listo" de siempre
+      // porque es el que el cajero espera oír cien veces al día.
+      tono('cobrado');
       // Lo que quedó debiendo, para poder decírselo al cliente en la cara.
       fiadoCobrado = respuesta.cliente || null;
       ctx.siguienteFolio = venta.folio + 1;
+      // El cajón se abre al COBRAR, no al imprimir: el ticket solo sale si
+      // alguien lo pide, y el cajón hace falta siempre que entre efectivo.
+      if (ctx.abrirCajon && venta.forma_pago === 'efectivo') abrirCajon({ callado: true });
       if (cliente && respuesta.cliente) refrescarCliente(respuesta.cliente);
       cliente = null; fiar = false;
       fase = 'cobrada';
@@ -1965,8 +1982,15 @@ export async function vistaVenta(pantalla, estadoApp) {
           <span class="tkl-total ${v.forma_pago === 'credito' ? 'fiado' : ''}">
             ${pesos(v.total_centavos)}</span>
           <button class="secundario chico" data-reimprimir="${esc(v.id)}">Copia</button>
+          ${puedeDevolver && !v.cancelada_en && !v.cambiada_por_venta_id
+            ? `<button class="secundario chico" data-devolver="${esc(v.id)}"
+                       title="Devolverle su dinero al cliente">↩</button>` : ''}
         </div>`).join('')
         : '<p class="vacio" style="padding:20px 0">No hay tickets que coincidan.</p>';
+
+      caja.querySelectorAll('[data-devolver]').forEach((b) => {
+        b.onclick = () => devolverTicket(b.dataset.devolver);
+      });
 
       caja.querySelectorAll('[data-reimprimir]').forEach((b) => {
         b.onclick = async () => {
@@ -1978,6 +2002,67 @@ export async function vistaVenta(pantalla, estadoApp) {
       });
     } catch (e) {
       caja.innerHTML = `<p class="vacio">${esc(e.message)}</p>`;
+    }
+  }
+
+  /**
+   * DEVOLVERLE EL DINERO AL CLIENTE.
+   *
+   * "Se cansó de esperar la fila", "el hielo no estaba bien congelado".
+   * Pasa todos los días, y hasta hoy había que cancelar el ticket a mano y
+   * acordarse de sacar el dinero.
+   *
+   * El motivo sale de una lista corta a propósito: veinte "se cansó de
+   * esperar" en un mes son un problema de la fila, y eso no se ve si cada
+   * quien lo escribe distinto.
+   */
+  async function devolverTicket(id) {
+    let motivos = [];
+    try { motivos = (await api.obtener('/ventas/motivos-devolucion')).motivos; }
+    catch (e) { return avisar(e.message, 'error'); }
+
+    const cual = await menu({
+      titulo: 'Devolverle el dinero',
+      texto: '¿Por qué regresa el cliente?',
+      opciones: motivos.map((m) => ({ valor: m.id, texto: m.texto }))
+    });
+    if (!cual) return;
+
+    let nota = '';
+    if (cual === 'otro') {
+      nota = await pedirTexto({
+        titulo: '¿Qué pasó?', texto: 'Una línea basta.',
+        marcador: 'Se le rompió la bolsa aquí mismo',
+        ok: 'Devolver', largo: 200, unaLinea: true
+      });
+      if (!nota) return;
+    }
+
+    try {
+      const r = await api.enviar(`/ventas/${id}/devolver`, { motivo: cual, nota });
+      avisar(r.enEfectivo
+        ? `Sácale ${pesos(r.centavos)} del cajón al ticket #${r.folio}`
+        : `El ticket #${r.folio} dejó de deberse`, 'bien');
+      // El cajón se abre solo: hay que meter la mano de todas formas.
+      if (r.enEfectivo) abrirCajon({ callado: true });
+      cargarTickets('');
+      refrescarAvisos();
+    } catch (e) { avisar(e.message, 'error'); }
+  }
+
+  /**
+   * ABRE EL CAJÓN.
+   *
+   * El cajón cuelga de la impresora, así que abrirlo es mandarle cinco
+   * bytes. Se hace solo al cobrar en efectivo y al devolver, y hay botón
+   * para las veces que hay que dar cambio de algo que no fue una venta.
+   */
+  async function abrirCajon({ callado = false } = {}) {
+    try {
+      const r = await api.enviar('/impresion/cajon', {});
+      if (!callado && !r.abierto) avisar('No hay impresora configurada', '');
+    } catch (e) {
+      if (!callado) avisar(e.message, 'error');
     }
   }
 

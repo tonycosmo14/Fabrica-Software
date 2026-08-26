@@ -10,6 +10,11 @@ export async function vistaSistema(pantalla, estadoApp) {
   const puedeConfigurar = estadoApp?.permisos?.includes('*') ||
                           estadoApp?.permisos?.includes('sistema.configurar');
 
+  // Qué impresora tiene puesta cada apartado. Lo llena el panel al pintarse
+  // y lo lee la lista de impresoras, que es otra función: por eso vive aquí
+  // arriba, en el único sitio que las dos alcanzan.
+  let impresorasPorApartado = {};
+
   await pintar();
 
   async function pintar() {
@@ -22,7 +27,11 @@ export async function vistaSistema(pantalla, estadoApp) {
     api.obtener('/impresion/config').then((r) => r.impresion).catch(() => null)
   ]);
 
+  // DOS COLUMNAS EN LA PC. A la izquierda lo que se toca —respaldos e
+  // impresoras—, a la derecha lo que se consulta. En el celular se apilan
+  // solas, que es como se leen bien en una pantalla angosta.
   pantalla.innerHTML = `
+    <div class="ancho-completo">
     <h2>Sistema</h2>
 
     <div class="tarjeta">
@@ -33,6 +42,9 @@ export async function vistaSistema(pantalla, estadoApp) {
         <tr><th>Base de datos</th><td>${esc(estado.baseDeDatos.tamanoKb)} KB</td></tr>
       </table>
     </div>
+
+    <div class="sistema-columnas">
+    <div class="sistema-columna">
 
     <h3>Respaldos</h3>
     <div class="tarjeta respaldo-estado ${resp.sano ? 'sano' : 'alerta'}">
@@ -101,6 +113,9 @@ export async function vistaSistema(pantalla, estadoApp) {
 
     ${impresion ? panelImpresora(impresion) : ''}
 
+    </div>
+    <div class="sistema-columna">
+
     <h3>Dónde viven los datos</h3>
     <div class="tarjeta plana">
       <table class="tabla">
@@ -148,6 +163,10 @@ export async function vistaSistema(pantalla, estadoApp) {
             <td>${esc(e.ejecutor_nombre || '—')}</td>
           </tr>`).join('') || '<tr><td colspan="3">Sin eventos.</td></tr>'}
       </table>
+    </div>
+
+    </div>
+    </div>
     </div>`;
 
     if (!puedeConfigurar) return;
@@ -185,6 +204,18 @@ export async function vistaSistema(pantalla, estadoApp) {
       // La lista se llena sola al abrir la pantalla.
       llenarImpresoras();
 
+      pantalla.querySelector('#probar-cajon').onclick = async () => {
+        try {
+          await api.actualizar('/impresion/config', {
+            abrirCajon: pantalla.querySelector('#imp-cajon').checked,
+            salidaCajon: Number(pantalla.querySelector('#imp-cajon-salida').value)
+          });
+          const r = await api.enviar('/impresion/cajon', {});
+          avisar(r.abierto ? 'Se le mandó el pulso al cajón'
+                           : 'Primero elige la impresora', r.abierto ? 'bien' : '');
+        } catch (e) { avisar(e.message, 'error'); }
+      };
+
       // Y el cartel de "por dónde va a salir" se actualiza mientras se
       // teclea a mano: es lo que hace que este campo se pueda depurar solo.
       const destino = pantalla.querySelector('#imp-destino');
@@ -217,6 +248,8 @@ export async function vistaSistema(pantalla, estadoApp) {
   // ==========================================================
   function panelImpresora(i) {
     const como = i.comoSeManda || { tipo: 'ninguno', texto: 'sin configurar' };
+    impresorasPorApartado = Object.fromEntries(
+      (i.apartados || []).map((a) => [a.id, a.destino || '']));
     return `
       <h3>Impresora de tickets</h3>
       <div class="tarjeta">
@@ -268,6 +301,47 @@ export async function vistaSistema(pantalla, estadoApp) {
         <label class="etiqueta-chica" for="imp-pie">Renglón al pie (opcional)</label>
         <input id="imp-pie" autocomplete="off" placeholder="Tel. 999 000 0000"
                value="${esc(i.pie)}" ${puedeConfigurar ? '' : 'disabled'}>
+
+        <h4 class="cfg-subtitulo">El cajón del dinero</h4>
+        <label class="interruptor">
+          <input type="checkbox" id="imp-cajon" ${i.abrirCajon ? 'checked' : ''}
+                 ${puedeConfigurar ? '' : 'disabled'}>
+          <span>
+            <strong>Abrir el cajón al cobrar en efectivo</strong>
+            <small>
+              El cajón cuelga de la impresora por un cable: quien lo abre es
+              ella. Se abre al cobrar, no al imprimir, porque el ticket solo
+              sale si alguien lo pide.
+            </small>
+          </span>
+        </label>
+        <div class="rejilla-config" style="margin-top:10px">
+          <label>
+            <span class="etiqueta-chica">Salida del conector<small>si no abre, prueba la otra</small></span>
+            <select id="imp-cajon-salida" ${puedeConfigurar ? '' : 'disabled'}>
+              <option value="2" ${i.salidaCajon !== 5 ? 'selected' : ''}>Salida 2 (la normal)</option>
+              <option value="5" ${i.salidaCajon === 5 ? 'selected' : ''}>Salida 5</option>
+            </select>
+          </label>
+          ${puedeConfigurar ? `
+            <label>
+              <span class="etiqueta-chica">&nbsp;</span>
+              <button class="secundario" id="probar-cajon" type="button">Abrirlo ahora</button>
+            </label>` : ''}
+        </div>
+
+        <h4 class="cfg-subtitulo">Qué se imprime dónde</h4>
+        <p class="ayuda" style="margin:0 0 10px">
+          Cada cosa puede ir a una impresora distinta. Vacío quiere decir
+          <b>la de tickets</b>, que es lo que casi siempre se quiere.
+        </p>
+        ${(i.apartados || []).map((a) => `
+          <div class="cuadre-linea campo-vivo">
+            <span>${esc(a.nombre)}<small>${esc(a.ayuda)}</small></span>
+            <select data-apartado="${esc(a.id)}" ${puedeConfigurar ? '' : 'disabled'}>
+              <option value="">La de tickets</option>
+            </select>
+          </div>`).join('')}
 
         ${puedeConfigurar ? `
           <div class="fila-botones" style="margin-top:14px">
@@ -340,6 +414,20 @@ export async function vistaSistema(pantalla, estadoApp) {
       if (campo) campo.value = lista.value;
       entenderDestino();
     };
+
+    // Los selectores de cada apartado llevan las mismas impresoras, más la
+    // opción de dejarlo en "la de tickets".
+    const opciones = sueltas.map((p) => `
+      <option value="${esc(p.sugerencia)}">${esc(p.nombre)}</option>`).join('');
+    pantalla.querySelectorAll('[data-apartado]').forEach((sel) => {
+      const puesto = (impresorasPorApartado[sel.dataset.apartado] || '').trim();
+      const conocida = sueltas.some((p) => p.sugerencia === puesto);
+      sel.innerHTML = `
+        <option value="">La de tickets</option>
+        ${opciones}
+        ${puesto && !conocida ? `<option value="${esc(puesto)}">${esc(puesto)}</option>` : ''}`;
+      sel.value = puesto;
+    });
   }
 
   /** Va diciendo por dónde va a salir el ticket con lo que está elegido. */
@@ -358,11 +446,19 @@ export async function vistaSistema(pantalla, estadoApp) {
   }
 
   async function guardarImpresora({ probar = false } = {}) {
+    const apartados = {};
+    pantalla.querySelectorAll('[data-apartado]').forEach((sel) => {
+      apartados[sel.dataset.apartado] = sel.value;
+    });
+
     const datos = {
       destino: pantalla.querySelector('#imp-destino').value.trim(),
       anchoMm: Number(pantalla.querySelector('#imp-ancho').value),
       copias: Number(pantalla.querySelector('#imp-copias').value.replace(/[^0-9]/g, '')) || 1,
-      pie: pantalla.querySelector('#imp-pie').value.trim()
+      pie: pantalla.querySelector('#imp-pie').value.trim(),
+      abrirCajon: pantalla.querySelector('#imp-cajon').checked,
+      salidaCajon: Number(pantalla.querySelector('#imp-cajon-salida').value),
+      apartados
     };
     try {
       const r = await api.actualizar('/impresion/config', datos);

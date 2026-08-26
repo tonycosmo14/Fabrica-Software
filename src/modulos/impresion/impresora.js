@@ -101,6 +101,34 @@ function tipoDeDestino(destino) {
   return { tipo: 'archivo', ruta: t, texto: `a un archivo (${t})` };
 }
 
+/**
+ * LOS APARTADOS QUE IMPRIMEN.
+ *
+ * No todo lo que sale por papel es igual: el ticket de una venta y el corte
+ * del turno pueden ir a impresoras distintas —una en el mostrador y otra en
+ * la oficina—, y en una fábrica con dos cajas eso deja de ser un capricho.
+ *
+ * Cada apartado puede tener su propia impresora. Vacío quiere decir "la de
+ * tickets", que es lo que casi siempre se quiere y evita tener que
+ * configurar cuatro cosas para usar una sola.
+ */
+const APARTADOS = [
+  { id: 'venta', nombre: 'Tickets de venta',
+    ayuda: 'El ticket que se le da al cliente. También el pulso del cajón.' },
+  { id: 'corte', nombre: 'Corte de caja',
+    ayuda: 'El papel que se firma al cerrar el turno.' },
+  { id: 'gasto', nombre: 'Comprobantes de gasto',
+    ayuda: 'El papel que firma quien saca dinero del cajón.' },
+  { id: 'conteo', nombre: 'Conteos del cuarto frío',
+    ayuda: 'El cuadre de las marquetas, cada vez que se cuenta.' }
+];
+
+/** Dónde imprime un apartado. Vacío = donde imprimen los tickets. */
+function destinoDe(apartado) {
+  const propio = ajuste(`impresora_destino_${apartado}`, '').trim();
+  return propio || ajuste('impresora_destino', '').trim();
+}
+
 /** Cómo está configurada la impresión ahora mismo. */
 function configuracion() {
   const destino = ajuste('impresora_destino', '');
@@ -108,11 +136,25 @@ function configuracion() {
     destino,
     // Qué entendió el sistema de lo que está escrito.
     comoSeManda: tipoDeDestino(destino),
+    // Y qué tiene puesto cada apartado. `propia` distingue "tiene la suya"
+    // de "usa la de tickets", que en la pantalla se ve muy distinto.
+    apartados: APARTADOS.map((a) => {
+      const propio = ajuste(`impresora_destino_${a.id}`, '').trim();
+      return {
+        ...a,
+        destino: propio,
+        propia: Boolean(propio),
+        comoSeManda: tipoDeDestino(propio || destino)
+      };
+    }),
     anchoMm: Number(ajuste('ticket_ancho_mm', '80')),
     copias: Math.min(Math.max(Number(ajuste('ticket_copias', '1')) || 1, 1), 5),
     pie: ajuste('ticket_pie', ''),
     codigoPagina: Number(ajuste('ticket_codepage', '2')),
     abrirCajon: ajuste('ticket_abrir_cajon', '0') === '1',
+    // Por cuál de las dos salidas del conector se manda el pulso. Casi
+    // todos los cajones van en la 2; si no abre, se prueba la 5.
+    salidaCajon: Number(ajuste('ticket_cajon_salida', '2')) === 5 ? 5 : 2,
     // Sin destino, el servidor no imprime y la pantalla usa el navegador.
     directa: Boolean(ajuste('impresora_destino', ''))
   };
@@ -124,8 +166,8 @@ function configuracion() {
  * Devuelve { impreso, motivo }. NUNCA lanza: una impresora apagada no puede
  * tumbar una venta que ya se cobró.
  */
-async function imprimirCrudo(bytes) {
-  const destino = ajuste('impresora_destino', '').trim();
+async function imprimirCrudo(bytes, opciones = {}) {
+  const destino = destinoDe(opciones.seccion || 'venta');
   const como = tipoDeDestino(destino);
   if (como.tipo === 'ninguno') return { impreso: false, motivo: 'sin-destino' };
 
@@ -417,5 +459,5 @@ function copiarCrudo(archivo, destino) {
 
 module.exports = {
   configuracion, ajuste, guardarAjuste, imprimirCrudo,
-  tipoDeDestino, impresorasDeWindows
+  tipoDeDestino, impresorasDeWindows, destinoDe, APARTADOS
 };

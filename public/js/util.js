@@ -7,8 +7,18 @@ export function esc(texto) {
   ));
 }
 
+import { tono } from './sonido.js';
+
 /** Mensaje flotante abajo de la pantalla. */
 let temporizador;
+/**
+ * El cartelito de abajo, con su ruidito.
+ *
+ * El sonido va aquí y no en cada pantalla a propósito: todo lo que sale
+ * bien o mal en este programa pasa por este aviso, así que enchufándolo una
+ * vez suena en todos lados y no hay forma de que a una pantalla nueva se le
+ * olvide. Se apaga desde Personalizar.
+ */
 export function avisar(mensaje, tipo = '') {
   const caja = document.getElementById('aviso');
   caja.textContent = mensaje;
@@ -16,6 +26,8 @@ export function avisar(mensaje, tipo = '') {
   caja.hidden = false;
   clearTimeout(temporizador);
   temporizador = setTimeout(() => { caja.hidden = true; }, 3200);
+
+  tono(tipo === 'error' ? 'error' : tipo === 'bien' ? 'bien' : 'aviso');
 }
 
 export function fecha(iso) {

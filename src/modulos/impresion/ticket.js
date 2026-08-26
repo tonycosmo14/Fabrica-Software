@@ -158,4 +158,136 @@ function ticketPrueba({ negocio = 'Hielo LOLHA' } = {}) {
   return t.bytes();
 }
 
-module.exports = { ticketVenta, ticketMovimiento, ticketPrueba, fechaCorta };
+/**
+ * EL CORTE DE CAJA, EN PAPEL TÉRMICO.
+ *
+ * Hasta la v2.0 el corte lo imprimía el navegador, con su ventana de
+ * "elegir impresora" cada vez. Es el papel que se firma al cerrar el turno:
+ * sale dos o tres veces al día y siempre en la misma impresora, así que esa
+ * ventana era puro estorbo.
+ *
+ * Los movimientos van en dos columnas —gastos de un lado, entradas del
+ * otro— por lo mismo que en la pantalla: un día de gastos son quince
+ * renglones, y eso todos los días.
+ */
+function ticketCorte(corte, { negocio = '' } = {}) {
+  const cfg = configuracion();
+  const t = new Ticket(cfg.anchoMm, cfg.codigoPagina);
+  const c = corte.caja;
+  const dif = c.diferencia_centavos;
+
+  t.centro().negrita().linea((negocio || 'Hielo LOLHA').toUpperCase()).negrita(false);
+  t.linea(fechaCorta(c.cerrada_en));
+  t.izquierda().separador();
+  t.centro().negrita().tamano(2, 2).linea(`CORTE #${c.folio}`).normal().izquierda();
+  t.separador();
+
+  t.columnas2('Cajero', c.cajero_nombre || '-');
+  t.columnas2('Abierto', fechaCorta(c.abierta_en));
+  t.columnas2('Cerrado', fechaCorta(c.cerrada_en));
+  t.columnas2('Tickets', String(corte.ventas.cobradas));
+  if (corte.ventas.canceladas) t.columnas2('Cancelados', String(corte.ventas.canceladas));
+  t.separador();
+
+  t.columnas2('Fondo', formato(c.fondo_centavos));
+  t.columnas2('Cobrado', '+' + formato(c.vendido_centavos));
+  if (c.entradas_centavos) t.columnas2('Entradas', '+' + formato(c.entradas_centavos));
+  t.columnas2('Gastos y retiros', '-' + formato(c.salidas_centavos));
+  t.separador();
+  t.negrita().columnas2('Deberia haber', formato(c.esperado_centavos));
+  t.columnas2('Contado', formato(c.contado_centavos)).negrita(false);
+
+  t.centro().negrita().tamano(2, 2)
+   .linea(dif === 0 ? 'CUADRO' : dif > 0 ? `SOBRA ${formato(dif)}` : `FALTA ${formato(-dif)}`)
+   .normal().izquierda();
+
+  // Los movimientos, en dos columnas para ahorrar papel.
+  if (corte.movimientos.length) {
+    const gastos = corte.movimientos.filter((m) => m.tipo === 'salida');
+    const entradas = corte.movimientos.filter((m) => m.tipo !== 'salida');
+    t.separador();
+    if (gastos.length) columnaDeMovimientos(t, 'GASTOS', gastos, '-');
+    if (entradas.length) columnaDeMovimientos(t, 'ENTRADAS', entradas, '+');
+  }
+
+  t.separador();
+  t.linea(`Cerro: ${c.cerrada_por_nombre || '-'}`);
+  t.saltos(2).linea('Firma: _____________________');
+  t.izquierda().cortar();
+  return t.bytes();
+}
+
+/** Un bloque de movimientos con su suma, para el corte. */
+function columnaDeMovimientos(t, titulo, lista, signo) {
+  t.negrita().linea(`${titulo} (${lista.length})`).negrita(false);
+  let suma = 0;
+  for (const m of lista) {
+    if (!m.anulado_en) suma += m.centavos;
+    t.columnas2(m.anulado_en ? `(anulado) ${m.concepto}` : m.concepto,
+                m.anulado_en ? '-' : signo + formato(m.centavos));
+  }
+  t.negrita().columnas2('Suman', signo + formato(suma)).negrita(false);
+}
+
+/**
+ * EL CUADRE DEL CUARTO FRÍO, en papel térmico.
+ *
+ * Se cuenta dos veces al día y el papel se guarda. La misma cuenta que en
+ * la pantalla, en el orden en que se explica de viva voz.
+ */
+function ticketConteo(conteo, { negocio = '' } = {}) {
+  const cfg = configuracion();
+  const t = new Ticket(cfg.anchoMm, cfg.codigoPagina);
+  const r = conteo.resumen;
+
+  t.centro().negrita().linea((negocio || 'Hielo LOLHA').toUpperCase()).negrita(false);
+  t.linea(fechaCorta(conteo.fecha));
+  t.izquierda().separador();
+  t.centro().negrita().linea(`CONTEO - ${(conteo.almacen || '').toUpperCase()}`)
+   .negrita(false).izquierda();
+  t.separador();
+
+  t.columnas2('Conto', conteo.ejecutor || '-');
+  if (r.primerConteo) {
+    t.separador();
+    t.centro().negrita().tamano(2, 2).linea(aTexto(r.contado)).normal().izquierda();
+    t.centro().linea('primer conteo').izquierda();
+  } else {
+    t.columnas2('Habia', aTexto(r.anterior));
+    t.columnas2('+ Se produjo', aTexto(r.producido));
+    t.columnas2('- Se vendio', aTexto(r.vendido));
+    if (r.merma) t.columnas2('- Merma', aTexto(r.merma));
+    t.separador();
+    t.negrita().columnas2('Deberia quedar', aTexto(r.esperado));
+    t.columnas2('Contado', aTexto(r.contado)).negrita(false);
+    t.centro().negrita().tamano(2, 2)
+     .linea(r.faltante === 0 ? 'CUADRO'
+            : r.faltante < 0 ? `SOBRA ${aTexto(-r.faltante)}` : `FALTA ${aTexto(r.faltante)}`)
+     .normal().izquierda();
+  }
+
+  t.separador();
+  t.saltos(2).linea('Firma: _____________________');
+  t.izquierda().cortar();
+  return t.bytes();
+}
+
+/**
+ * SOLO EL PULSO DEL CAJÓN, sin papel de por medio.
+ *
+ * Va aparte del ticket a propósito. El ticket solo sale si el cajero lo
+ * pide —no todos se entregan, y cada uno que sale sin que nadie lo pida es
+ * papel tirado—, pero el cajón tiene que abrirse SIEMPRE que entre dinero.
+ * Colgado del ticket, el día que nadie imprime el cajón no abre.
+ */
+function pulsoCajon(salida = 2) {
+  const cfg = configuracion();
+  const t = new Ticket(cfg.anchoMm, cfg.codigoPagina);
+  t.abrirCajon(salida);
+  return t.bytes();
+}
+
+module.exports = {
+  ticketVenta, ticketMovimiento, ticketPrueba,
+  ticketCorte, ticketConteo, pulsoCajon, fechaCorta
+};

@@ -25,6 +25,7 @@ const { sesionAbierta } = require('../caja/calculo');
 const { productoPorId, productoPorCodigo, cotizar,
         categoriasActivas, productosActivos } = require('../catalogo/catalogo');
 const { alcanza, avisos } = require('../catalogo/avisos');
+const { configuracion: configuracionImpresion } = require('../impresion/impresora');
 const { cabeElCredito, estadoCliente, clientesConEstado } = require('../clientes/calculo');
 const { listaDeMayoreo, listaPorOmision, listasDeMayoreo,
         llevaMayoreo } = require('./mayoreo');
@@ -32,6 +33,21 @@ const { comprobar: comprobarAutorizacion, comprobarAdmin,
         responsables, administradores } = require('../../lib/autorizacion');
 
 const router = express.Router();
+
+/**
+ * POR QUÉ SE DEVUELVE EL DINERO.
+ *
+ * Una lista corta y cerrada, no texto libre. "Se cansó de esperar" veinte
+ * veces en un mes es un problema de la fila, y eso no se ve si cada quien
+ * lo escribe distinto.
+ */
+const MOTIVOS_DEVOLUCION = {
+  espera:     'El cliente se cansó de esperar',
+  prisa:      'El cliente llevaba prisa y se fue',
+  calidad:    'El hielo no estaba bien congelado',
+  equivocado: 'Se capturó algo que no era',
+  otro:       'Otro motivo'
+};
 
 const verVentas = exigirPermiso('caja.ver');
 const vender = exigirPermiso('venta.registrar');
@@ -69,6 +85,10 @@ router.get('/contexto', vender, (req, res) => {
   return ok(res, {
     lista, precios, almacenes,
     siguienteFolio: ultimoFolio + 1,
+    // Si el cajón está configurado, la caja lo abre sola al cobrar en
+    // efectivo. Sin esto tendría que preguntar por la configuración de
+    // impresión en cada venta.
+    abrirCajon: configuracionImpresion().abrirCajon,
     // sinDueno: el turno del relevo de las 2:30, que sigue cobrando
     // mientras el cajero que entra no llega. La caja tiene que decirlo.
     caja: caja
@@ -489,6 +509,18 @@ router.get('/', verVentas, (req, res) => {
   return ok(res, { ventas: filas });
 });
 
+/**
+ * Los motivos de devolución, para que la pantalla arme la lista.
+ *
+ * OJO CON EL ORDEN: esto va antes de /:id. Si se pone después, Express lee
+ * "motivos-devolucion" como el id de una venta y contesta que no existe.
+ */
+router.get('/motivos-devolucion', verVentas, (req, res) => {
+  return ok(res, {
+    motivos: Object.entries(MOTIVOS_DEVOLUCION).map(([id, texto]) => ({ id, texto }))
+  });
+});
+
 router.get('/:id', verVentas, (req, res) => {
   const venta = detalleVenta(req.params.id);
   if (!venta) return error(res, 'Esa venta no existe.', 404);
@@ -583,6 +615,93 @@ router.delete('/:id', exigirPermiso('venta.cancelar'), (req, res) => {
   });
 
   return ok(res, { borrada: true, folio: v.folio });
+});
+
+/**
+ * DEVOLVER EL DINERO COMPLETO.
+ *
+ * Pasa todos los días y por razones que no son culpa de nadie: el cliente
+ * se cansó de esperar la fila, tenía prisa, o el hielo no estaba bien
+ * congelado. Llega a la caja, entrega su ticket y se le regresa su dinero.
+ *
+ * NO ES UN TIPO DE VENTA NUEVO. Una devolución completa es exactamente
+ * cancelar el ticket: el hielo vuelve al cuarto frío solo y la caja se
+ * ajusta sola, porque lo cobrado deja de contar. Inventarle una tabla
+ * aparte sería inventar una cuenta más que se puede desincronizar.
+ *
+ * Lo que SÍ hace falta es lo que la cancelación a secas no dice:
+ *
+ *  · EL MOTIVO, de una lista corta. "Se cansó de esperar" veinte veces en
+ *    un mes es un problema de la fila, y eso no se ve si el motivo es texto
+ *    libre que cada quien escribe distinto.
+ *
+ *  · EL DINERO DE UN TICKET VIEJO. Si el ticket es de un turno ya cerrado,
+ *    ese dinero entró otro día: cancelarlo hoy no le quita nada a la caja
+ *    de hoy, pero del cajón de hoy SÍ salen los billetes. Se anota como
+ *    salida para que el arqueo no salga corto, igual que en un cambio.
+ */
+router.post('/:id/devolver', exigirPermiso('venta.cancelar'), (req, res) => {
+  const v = bd.prepare('SELECT * FROM ventas WHERE id = ?').get(req.params.id);
+  if (!v) return error(res, 'Ese ticket no existe.', 404);
+  // El del cambio va PRIMERO: un ticket cambiado ya está cancelado, y
+  // contestar "ya está cancelado" a quien trae ese papel en la mano no le
+  // dice qué hacer. Decirle "devuelve el nuevo" sí.
+  if (v.cambiada_por_venta_id) {
+    const nueva = bd.prepare('SELECT folio FROM ventas WHERE id = ?').get(v.cambiada_por_venta_id);
+    return error(res,
+      `Ese ticket se cambió por el #${nueva?.folio ?? '?'}. Devuelve el nuevo.`, 409);
+  }
+  if (v.cancelada_en) return error(res, 'Ese ticket ya está cancelado.');
+
+  const clave = String(req.body?.motivo || '').trim();
+  if (!MOTIVOS_DEVOLUCION[clave]) return error(res, 'Escoge por qué se devuelve.');
+
+  const nota = String(req.body?.nota || '').trim().slice(0, 200);
+  if (clave === 'otro' && !nota) return error(res, 'Si es otro motivo, escribe cuál.');
+  const motivo = nota ? `${MOTIVOS_DEVOLUCION[clave]}: ${nota}` : MOTIVOS_DEVOLUCION[clave];
+
+  // Fiado no se devuelve en efectivo: no entró dinero. Se cancela el cargo
+  // y con eso el cliente deja de deberlo, que es la devolución de verdad.
+  const fueEfectivo = v.forma_pago === 'efectivo';
+  const turno = sesionAbierta();
+  const fecha = ahora();
+
+  const hacer = bd.transaction(() => {
+    bd.prepare(`
+      UPDATE ventas SET cancelada_en = ?, cancelada_por = ?, motivo_cancelacion = ?
+       WHERE id = ?
+    `).run(fecha, req.usuario.id, `Devolución · ${motivo}`, v.id);
+
+    // Del turno de hoy salen los billetes aunque el ticket sea de ayer.
+    if (fueEfectivo && turno && v.caja_id !== turno.id) {
+      bd.prepare(`
+        INSERT INTO movimientos_caja
+          (id, caja_id, fecha, tipo, concepto, centavos, ejecutor_id, capturista_id, notas)
+        VALUES (?, ?, ?, 'salida', ?, ?, ?, ?, ?)
+      `).run(nuevoId(), turno.id, fecha,
+             `Devolución del ticket #${v.folio}`, v.total_centavos,
+             req.usuario.id, req.usuario.id,
+             'El ticket era de otro turno: el dinero sale del cajón de hoy');
+    }
+  });
+  hacer();
+
+  bitacora.registrar({
+    accion: 'venta.devuelta', entidad: 'venta', entidadId: v.id,
+    ejecutorId: req.usuario.id,
+    detalle: { folio: v.folio, total: v.total_centavos, motivo: clave, nota,
+               formaPago: v.forma_pago }
+  });
+
+  return ok(res, {
+    devuelta: true,
+    folio: v.folio,
+    // Cuánto hay que sacar del cajón. En un fiado, nada: no entró dinero.
+    centavos: fueEfectivo ? v.total_centavos : 0,
+    enEfectivo: fueEfectivo,
+    deOtroTurno: Boolean(turno && v.caja_id !== turno.id),
+    motivo
+  });
 });
 
 // ============================================================

@@ -9,6 +9,7 @@ import { api } from '../api.js';
 import { esc, avisar } from '../util.js';
 import { cargarMarca } from '../marca.js';
 import { confirmar } from '../dialogo.js';
+import { sonidoEncendido, cambiarSonido, tono } from '../sonido.js';
 
 const MAX_MB = 3;
 
@@ -75,12 +76,44 @@ export async function vistaPersonalizar(pantalla) {
 
           <button type="submit" style="margin-top:20px">Guardar</button>
         </form>
+      </div>
+
+      <h3>Sonido</h3>
+      <div class="tarjeta">
+        <label class="interruptor">
+          <input type="checkbox" id="sonido" ${sonidoEncendido() ? 'checked' : ''}>
+          <span>
+            <strong>Un ruidito cuando algo se acepta o falla</strong>
+            <small>
+              En el mostrador el cajero no está mirando la pantalla cuando
+              aprieta enter: está viendo al cliente. El oído le dice si el
+              ticket entró.
+            </small>
+          </span>
+        </label>
+        <p class="ayuda" style="margin:12px 0 0">
+          Se guarda <b>en este aparato</b>, no en el negocio: la computadora
+          de la caja tiene bocinas y el celular del reparto no tiene por qué
+          ponerse a pitar en la calle.
+        </p>
+        <button class="secundario chico" id="probar-sonido" style="margin-top:12px">
+          Oírlo
+        </button>
       </div>`;
 
     enlazarSubida('#archivo-claro', 'claro');
     enlazarSubida('#archivo-oscuro', 'oscuro');
     enlazarQuitar('#quitar-claro', 'claro');
     enlazarQuitar('#quitar-oscuro', 'oscuro');
+
+    pantalla.querySelector('#sonido').onchange = (ev) => {
+      cambiarSonido(ev.target.checked);
+      avisar(ev.target.checked ? 'Sonido encendido' : 'Sonido apagado', '');
+    };
+    pantalla.querySelector('#probar-sonido').onclick = () => {
+      tono('cobrado');
+      avisar('Así suena una venta cobrada', 'bien');
+    };
 
     pantalla.querySelector('#f').onsubmit = async (ev) => {
       ev.preventDefault();

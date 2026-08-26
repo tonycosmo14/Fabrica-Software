@@ -129,9 +129,24 @@ class Ticket {
     return this.saltos(4).crudo([GS, 0x56, 0x42, 0x00]);
   }
 
-  /** Abre el cajón del dinero (el pulso que espera la mayoría). */
-  abrirCajon() {
-    return this.crudo([ESC, 0x70, 0x00, 0x19, 0xfa]);
+  /**
+   * ABRE EL CAJÓN DEL DINERO.
+   *
+   * El cajón no tiene cerebro: es un solenoide con un cable RJ11 metido en
+   * la impresora. La impresora le manda un pulso de corriente y el resorte
+   * lo dispara. El comando es ESC p m t1 t2:
+   *
+   *   m   por cuál de las dos salidas: 0 es el pin 2, 1 es el pin 5.
+   *       Casi todos los cajones van en el 2, pero hay quien usa el 5, y
+   *       por eso se puede elegir: si no abre, es lo primero que se prueba.
+   *   t1  cuánto dura el pulso   (×2 ms)
+   *   t2  cuánto espera después  (×2 ms)
+   *
+   * 25 y 250 son los valores de siempre: 50 ms de pulso. Un pulso corto no
+   * alcanza a mover el resorte y uno largo calienta la bobina.
+   */
+  abrirCajon(salida = 0) {
+    return this.crudo([ESC, 0x70, salida === 5 || salida === 1 ? 0x01 : 0x00, 0x19, 0xfa]);
   }
 
   bytes() {

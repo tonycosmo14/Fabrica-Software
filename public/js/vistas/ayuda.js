@@ -196,6 +196,29 @@ debería quedar − contado = FALTA</pre>
       <p>El ticket viejo queda cancelado y amarrado al nuevo, el hielo
       vuelve al cuarto frío solo y la caja cuadra sola. Todo queda anotado.</p>
 
+      <h4>Devolverle el dinero a un cliente</h4>
+      <p>Pasa todos los días: se cansó de esperar la fila, llevaba prisa, o
+      el hielo no estaba bien congelado. Regresa a la caja con su ticket y
+      hay que regresarle su dinero.</p>
+      <ol class="instrucciones">
+        <li><em>F3</em> para ver los tickets de hoy y encuentra el suyo.</li>
+        <li>El botón <b>↩</b> de su renglón.</li>
+        <li>Escoge <b>por qué</b> regresa, de la lista.</li>
+      </ol>
+      <p>Con eso el sistema cancela el ticket, el hielo vuelve al cuarto
+      frío, la caja se ajusta sola y <b>el cajón se abre</b> para que saques
+      los billetes.</p>
+      <p class="ayuda-tip">El motivo es de una lista corta a propósito.
+      Veinte <em>"se cansó de esperar"</em> en un mes no son veinte clientes
+      raros: son un problema de la fila, y eso solo se ve si todos se
+      anotaron igual.</p>
+      <p>Si el ticket es de <b>otro turno</b>, el dinero entró otro día pero
+      sale del cajón de hoy: queda anotado como salida para que tu corte no
+      te salga corto. Y si era <b>fiado</b>, no sale dinero de ningún lado:
+      simplemente deja de deberlo.</p>
+      <p>Devolver es de <b>gerente</b>: sacar dinero del cajón por algo que
+      ya se cobró se revisa.</p>
+
       <h4>Buscar un ticket de hoy, verlo o sacar una copia</h4>
       <p><em>F3</em>, o el botón 🧾. Se busca por número, por el importe o por
       la hora, entre <b>los de hoy</b>: aquí se busca el ticket que el cliente
@@ -802,6 +825,29 @@ debería haber − contado = FALTA</pre>
 
   // ==========================================================
   {
+    id: 'sonido',
+    titulo: 'El sonido de la caja',
+    busca: 'sonido ruido pitido audio bocina apagar silencio beep',
+    cuerpo: `
+      <p>La caja hace un ruidito cuando algo se acepta, otro distinto cuando
+      algo falla, y uno especial al cobrar una venta.</p>
+      <p>No es un adorno: en el mostrador, con gente hablando, el cajero no
+      está mirando la pantalla cuando aprieta enter —está viendo al cliente y
+      contando billetes—. El oído le dice si el ticket entró sin tener que
+      voltear.</p>
+
+      <h4>Apagarlo o encenderlo</h4>
+      <p>En <b>Personalizar</b>, hasta abajo. El botón <b>Oírlo</b> toca el
+      de una venta cobrada.</p>
+
+      <p class="ayuda-tip">Se guarda <b>en cada aparato</b>, no en el
+      negocio. La computadora de la caja tiene bocinas y el celular del
+      reparto no tiene por qué ponerse a pitar en la calle, así que cada uno
+      se configura por su lado.</p>`
+  },
+
+  // ==========================================================
+  {
     id: 'permisos',
     titulo: 'Quién puede hacer qué',
     busca: 'permisos roles cajero gerente operario repartidor administrador quién puede',
@@ -851,6 +897,30 @@ debería haber − contado = FALTA</pre>
       <p class="ayuda-tip">Si tu impresora no sale en la lista, se puede
       escribir a mano: su dirección IP (<code>192.168.1.65</code>), su nombre
       compartido, o la ruta de una carpeta para probar sin papel.</p>
+
+      <h4>El cajón del dinero</h4>
+      <p>El cajón se abre solo. No tiene cerebro ni cable propio a la
+      computadora: es un resorte con un cable metido en la <b>impresora</b>,
+      y ella le manda el pulso que lo dispara. Por eso solo funciona con la
+      impresora configurada.</p>
+      <p>En <b>Sistema</b>, debajo de la impresora, prende
+      <b>Abrir el cajón al cobrar en efectivo</b>. Se abre <b>al cobrar</b>,
+      no al imprimir: el ticket solo sale si alguien lo pide y el cajón hace
+      falta siempre que entre dinero.</p>
+      <p class="ayuda-tip">¿No abre? Cambia la <b>salida del conector</b> de
+      la 2 a la 5 y dale a <b>Abrirlo ahora</b>. Casi todos los cajones van
+      en la 2, pero hay quien usa la otra, y es lo primero que se prueba.</p>
+      <p>También se abre solo cuando devuelves dinero, porque de todas formas
+      hay que meter la mano.</p>
+
+      <h4>Qué se imprime dónde</h4>
+      <p>Cada cosa puede ir a una impresora distinta: los tickets de venta,
+      el corte de caja, los comprobantes de gasto y los conteos. Dejarlo en
+      <b>La de tickets</b> es lo que casi siempre se quiere.</p>
+      <p class="ayuda-tip">Las hojas <b>tamaño carta</b> —como la hoja para
+      contar— las sigue imprimiendo el navegador con su ventana de elegir
+      impresora. Eso no lo puede quitar el programa: lo decide el navegador.
+      Todo lo que tiene forma de ticket sí sale directo.</p>
 
       <h4>Si hay que restaurar</h4>
       <p>Las instrucciones están en la propia pantalla de Sistema, paso por

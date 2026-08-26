@@ -454,7 +454,26 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
         </p>` : ''}`;
 
     pantalla.querySelector('#volver').onclick = pintar;
-    pantalla.querySelector('#imprimir').onclick = () => window.print();
+
+    /**
+     * IMPRIMIR EL CORTE.
+     *
+     * Primero por la impresora de tickets, que sale al instante y sin
+     * ventana de por medio. Solo si no hay impresora configurada se cae al
+     * navegador, que es el que abre el cuadro de "elegir impresora".
+     */
+    pantalla.querySelector('#imprimir').onclick = async (ev) => {
+      const boton = ev.currentTarget;
+      boton.disabled = true;
+      try {
+        const r = await api.enviar(`/impresion/corte/${corte.caja.id}`, {});
+        if (r.impreso) avisar('Corte impreso', 'bien');
+        else window.print();               // sin impresora puesta, el navegador
+      } catch (e) {
+        avisar(e.message, 'error');
+      }
+      boton.disabled = false;
+    };
 
     // La imagen del corte se arma en el momento, en el aparato: no se sube
     // a ningún lado ni pasa por el servidor.

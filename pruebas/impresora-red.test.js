@@ -213,6 +213,109 @@ test('fuera de Windows, mandar por nombre avisa en vez de reventar', async () =>
   assert.match(r.motivo, /Windows/);
 });
 
+// ============================================================
+// EL CAJÓN DEL DINERO
+// ============================================================
+
+test('el pulso del cajón lleva el comando de siempre', () => {
+  const { pulsoCajon } = require('../src/modulos/impresion/ticket');
+  const bytes = [...pulsoCajon(2)];
+
+  // ESC p 0 25 250: abrir por la salida 2, pulso de 50 ms.
+  const dondeEmpieza = bytes.findIndex((b, i) =>
+    b === 0x1b && bytes[i + 1] === 0x70);
+  assert.ok(dondeEmpieza >= 0, 'el comando está');
+  assert.deepEqual(bytes.slice(dondeEmpieza, dondeEmpieza + 5),
+                   [0x1b, 0x70, 0x00, 0x19, 0xfa]);
+});
+
+test('la otra salida del conector cambia un byte, no el resto', () => {
+  const { pulsoCajon } = require('../src/modulos/impresion/ticket');
+  const dos = [...pulsoCajon(2)];
+  const cinco = [...pulsoCajon(5)];
+
+  assert.equal(dos.length, cinco.length);
+  const distintos = dos.filter((b, i) => b !== cinco[i]).length;
+  assert.equal(distintos, 1, 'solo cambia por cuál salida se manda');
+});
+
+test('el cajón se abre mandándole los bytes a la impresora', async () => {
+  const imp = await impresoraDeMentiras();
+  guardarAjuste('impresora_destino', `127.0.0.1:${imp.puerto}`);
+  guardarAjuste('ticket_abrir_cajon', '1');
+
+  const r = await llamar('/api/impresion/cajon', { method: 'POST', cuerpo: {} });
+  await esperar();
+
+  assert.equal(r.estado, 200);
+  assert.equal(r.json.datos.abierto, true);
+  assert.equal(imp.recibido.length, 1, 'el cajón cuelga de la impresora: se le habla a ella');
+  assert.ok(imp.recibido[0].includes(Buffer.from([0x1b, 0x70])), 'y va el comando de abrir');
+
+  await imp.cerrar();
+});
+
+test('sin impresora configurada, abrir el cajón no revienta', async () => {
+  guardarAjuste('impresora_destino', '');
+  const r = await llamar('/api/impresion/cajon', { method: 'POST', cuerpo: {} });
+  assert.equal(r.estado, 200);
+  assert.equal(r.json.datos.abierto, false);
+  assert.equal(r.json.datos.motivo, 'sin-destino');
+});
+
+test('la salida del cajón solo puede ser la 2 o la 5', async () => {
+  const r = await llamar('/api/impresion/config', {
+    method: 'PUT', cuerpo: { salidaCajon: 7 }
+  });
+  assert.equal(r.estado, 400);
+});
+
+// ============================================================
+// CADA APARTADO A SU IMPRESORA
+// ============================================================
+
+test('un apartado sin impresora propia usa la de tickets', async () => {
+  const tickets = await impresoraDeMentiras();
+  guardarAjuste('impresora_destino', `127.0.0.1:${tickets.puerto}`);
+  guardarAjuste('impresora_destino_corte', '');
+
+  const { imprimirCrudo: mandar } = require('../src/modulos/impresion/impresora');
+  await mandar(Buffer.from('corte'), { seccion: 'corte' });
+  await esperar();
+
+  assert.equal(tickets.recibido.length, 1, 'cae en la de tickets, que es lo que se espera');
+  await tickets.cerrar();
+});
+
+test('un apartado con su propia impresora va a la suya', async () => {
+  const tickets = await impresoraDeMentiras();
+  const oficina = await impresoraDeMentiras();
+  guardarAjuste('impresora_destino', `127.0.0.1:${tickets.puerto}`);
+  guardarAjuste('impresora_destino_corte', `127.0.0.1:${oficina.puerto}`);
+
+  const { imprimirCrudo: mandar } = require('../src/modulos/impresion/impresora');
+  await mandar(Buffer.from('el corte'), { seccion: 'corte' });
+  await mandar(Buffer.from('un ticket'), { seccion: 'venta' });
+  await esperar();
+
+  assert.equal(oficina.recibido.length, 1);
+  assert.equal(oficina.recibido[0].toString(), 'el corte');
+  assert.equal(tickets.recibido.length, 1);
+  assert.equal(tickets.recibido[0].toString(), 'un ticket');
+
+  await tickets.cerrar(); await oficina.cerrar();
+  guardarAjuste('impresora_destino_corte', '');
+});
+
+test('la configuración dice qué tiene puesto cada apartado', async () => {
+  const r = await llamar('/api/impresion/config');
+  const apartados = r.json.datos.impresion.apartados;
+
+  assert.deepEqual(apartados.map((a) => a.id), ['venta', 'corte', 'gasto', 'conteo']);
+  assert.ok(apartados.every((a) => a.comoSeManda),
+            'cada uno dice por dónde va a salir, tenga impresora propia o no');
+});
+
 test('el cajero no configura la impresora', async () => {
   await llamar('/api/usuarios', {
     method: 'POST', cuerpo: { nombre: 'Mari', rol: 'cajero', pin: '7777' }
