@@ -452,7 +452,21 @@ export async function vistaProduccion(pantalla, estado) {
       <button id="imprimir" class="no-imprimir">🖨️ Imprimir</button>`;
 
     pantalla.querySelector('#volver').onclick = pintar;
-    pantalla.querySelector('#imprimir').onclick = () => window.print();
+
+    // PRIMERO LA TÉRMICA, que sale al instante y sin preguntar nada. La
+    // ventana de "elegir impresora" del navegador solo si no hay ninguna
+    // puesta: en un cuarto de máquinas nadie va a estar escogiendo bandeja
+    // ni tamaño de hoja con el obrero esperando.
+    pantalla.querySelector('#imprimir').onclick = async (ev) => {
+      const boton = ev.currentTarget;
+      boton.disabled = true;
+      try {
+        const r = await api.enviar('/impresion/produccion', {});
+        if (r.impreso) avisar('Números impresos', 'bien');
+        else window.print();
+      } catch (e) { avisar(e.message, 'error'); }
+      boton.disabled = false;
+    };
   }
 
   // ==========================================================

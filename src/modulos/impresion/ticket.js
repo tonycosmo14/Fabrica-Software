@@ -142,11 +142,32 @@ function ticketVenta(venta, { copia = false, negocio = '' } = {}) {
   }
 
   t.separador();
-  t.bloqueDerecha([
-    ['TOTAL:', formato(venta.total_centavos)],
-    venta.pago_centavos != null ? ['PAGO:', formato(venta.pago_centavos)] : null,
-    venta.pago_centavos != null ? ['CAMBIO:', formato(venta.cambio_centavos || 0)] : null
-  ]);
+
+  // EL CUADRE DE UN CAMBIO NO ES EL DE UNA VENTA.
+  //
+  // En un cambio el cliente no paga con billetes: paga con un ticket que ya
+  // tenía a favor. Por dentro la venta nueva se guarda como pagada completa
+  // —para que el arqueo del cajón cuadre—, y con eso el papel salía
+  // diciendo "TOTAL $132 · PAGO $132 · CAMBIO $0", que es verdad para la
+  // caja y mentira para el cliente: él trajo un vale de $314 y tiene que
+  // llevarse $182. Eso es lo que hay que imprimir.
+  const enCambio = venta.cambioDeNumero && venta.cambioDeTotal != null;
+  if (enCambio) {
+    const diferencia = venta.total_centavos - venta.cambioDeTotal;
+    t.bloqueDerecha([
+      ['TOTAL:', formato(venta.total_centavos)],
+      [`VALE #${venta.cambioDeNumero}:`, formato(venta.cambioDeTotal)],
+      diferencia < 0 ? ['SE LE DEVUELVE:', formato(-diferencia)]
+      : diferencia > 0 ? ['PAGO ADEMAS:', formato(diferencia)]
+      : ['QUEDA A MANO:', formato(0)]
+    ]);
+  } else {
+    t.bloqueDerecha([
+      ['TOTAL:', formato(venta.total_centavos)],
+      venta.pago_centavos != null ? ['PAGO:', formato(venta.pago_centavos)] : null,
+      venta.pago_centavos != null ? ['CAMBIO:', formato(venta.cambio_centavos || 0)] : null
+    ]);
+  }
 
   // FIADO. Va en grande y con el nombre porque este papel es el vale: el
   // cliente se lleva su copia y con eso los dos saben lo mismo. Y lleva la
@@ -223,6 +244,56 @@ function ticketMovimiento(mov, { negocio = '' } = {}) {
 
   // El gasto se firma; meter dinero al cajón no. Nadie firma por dejar.
   if (salida) t.firma();
+
+  pie(t, negocio);
+  t.izquierda().cortar();
+  return t.bytes();
+}
+
+/**
+ * LOS NÚMEROS A SACAR, para el obrero.
+ *
+ * Este papel se lo lleva en la mano al cuarto de tanques, y vuelve escrito
+ * con lo que sacó de verdad. Salía por la ventana de imprimir del navegador
+ * —hoja tamaño carta, elegir impresora, vista previa— y en un cuarto de
+ * máquinas eso no lo hace nadie: sale por la térmica como todo lo demás.
+ *
+ * Los números van GRANDES a propósito. El obrero lo lee con guantes, con la
+ * mano mojada y con poca luz.
+ */
+function ticketProduccion(datos, { negocio = '' } = {}) {
+  const cfg = configuracion();
+  const t = new Ticket(cfg.anchoMm, cfg.codigoPagina);
+
+  encabezado(t, {
+    titulo: 'A sacar',
+    atendio: datos.entregadoPor,
+    fecha: fechaTicket(datos.fecha)
+  });
+  t.separador();
+
+  for (const grupo of datos.lista || []) {
+    t.izquierda().negrita().linea(String(grupo.tanque || '').toUpperCase()).negrita(false);
+
+    if (!grupo.siguientes?.length) {
+      t.linea('  sin paños');
+    } else {
+      // El primero es el que toca AHORA; los demás son la fila para el
+      // resto de la jornada. Por eso el primero va más grande.
+      const [primero, ...luego] = grupo.siguientes;
+      t.negrita().tamano(3, 2).linea(`  ${primero}`).normal();
+      if (luego.length) t.linea(`  luego: ${luego.join(', ')}`);
+    }
+
+    if (grupo.enProceso?.length) {
+      t.linea(`  a medias: ${grupo.enProceso.join(', ')} - terminar primero`);
+    }
+    t.saltos(1);
+  }
+
+  t.separador();
+  t.linea('Saco de verdad:');
+  t.firma('FIRMA DEL OBRERO');
 
   pie(t, negocio);
   t.izquierda().cortar();
@@ -385,5 +456,5 @@ function pulsoCajon(salida = 2) {
 
 module.exports = {
   ticketVenta, ticketMovimiento, ticketPrueba,
-  ticketCorte, ticketConteo, pulsoCajon, fechaCorta, fechaTicket
+  ticketCorte, ticketConteo, ticketProduccion, pulsoCajon, fechaCorta, fechaTicket
 };

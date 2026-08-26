@@ -218,6 +218,24 @@ iniciarReloj();
 // --- Eventos de la barra y el menu ---
 document.getElementById('btn-menu').onclick = () => abrirMenu(true);
 menu.querySelector('.menu-fondo').onclick = () => abrirMenu(false);
+
+/**
+ * ESC CIERRA EL MENÚ.
+ *
+ * Todo lo demás que se abre encima en este programa se cierra con Esc —los
+ * diálogos, el cobro, la lista de tickets—, así que la mano ya va sola a
+ * esa tecla. Que el menú fuera lo único que no obedecía era una trampa.
+ *
+ * Va en captura y detiene el evento: si no, el Esc que cierra el menú
+ * también le llega a la pantalla de abajo y vacía el ticket que había a
+ * medias detrás.
+ */
+document.addEventListener('keydown', (ev) => {
+  if (ev.key !== 'Escape' || menu.hidden) return;
+  ev.preventDefault();
+  ev.stopPropagation();
+  abrirMenu(false);
+}, true);
 menu.querySelectorAll('a').forEach((a) => {
   a.onclick = () => {
     abrirMenu(false);

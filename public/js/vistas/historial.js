@@ -1,20 +1,26 @@
 /**
- * HISTORIAL  (v1.8)
+ * HISTORIAL  (v2.4)
  *
  * "¿Qué hizo Mari el jueves entre las 3 y las 8?"
  *
- * Esa es la pregunta, y la pantalla está armada para contestarla en cuatro
- * toques: los filtros arriba, el resumen debajo, y la lista completa abajo.
- *
  * NO ES LA BITÁCORA. La bitácora dice "venta.registrada" con un id, y es
- * para quien programa. Esto dice "Mari cobró el ticket #412 por $264 a las
- * 3:15", y es para Tony.
+ * para quien programa. Esto dice "Mari cobró el ticket #2026-412 por $264 a
+ * las 3:15", y es para Tony.
  *
- * Un cajero solo puede hacer cuatro cosas con el dinero —cobrar, sacar,
- * meter y recibir abonos—, así que eso es exactamente lo que se lista.
+ * ── SE ABRE CON LO DE HOY, NO CON TODO ──
+ *
+ * Dentro de tres años aquí va a haber cientos de miles de renglones.
+ * Abrir el historial no puede querer decir "tráemelos todos": se abre con
+ * el día de hoy —que es lo que se viene a ver casi siempre— y lo de más
+ * atrás se pide a propósito, con el botón de abajo o poniendo fechas.
+ *
+ * Y por eso ORDENAR ES COSA DE ESTA PANTALLA, no del servidor: ordena lo
+ * que YA está cargado. Si ordenara el servidor, poner "de lo más viejo a
+ * lo más nuevo" traería la primera venta de hace diez años en vez de la de
+ * las siete de la mañana de hoy, que es lo que se estaba buscando.
  */
 import { api } from '../api.js';
-import { esc, avisar, fecha as formatoFecha, soloHora } from '../util.js';
+import { esc, avisar, fecha as formatoFecha } from '../util.js';
 import { pedirTexto, confirmar, pedirContrasena, menu } from '../dialogo.js';
 import { pesos } from '../fracciones.js';
 
@@ -25,13 +31,38 @@ const TIPOS = [
   { id: 'abono',   texto: 'Abonos',   emoji: '💰' }
 ];
 
+/** Cuántos renglones trae cada tirón. */
+const POR_TIRON = 100;
+
+/**
+ * Las columnas por las que se puede ordenar, y de dónde sale el valor.
+ *
+ * Se ordena por el DATO, no por el texto que se ve: el importe por sus
+ * centavos y no por "$1,234" —que alfabéticamente va antes que "$9"— y la
+ * fecha por el instante guardado y no por "26 ago".
+ */
+const ORDENABLES = {
+  numero:  { texto: 'Ticket',  valor: (m) => m.folio ?? -1 },
+  que:     { texto: 'Qué',     valor: (m) => m.que?.texto || m.tipo },
+  fecha:   { texto: 'Cuándo',  valor: (m) => m.fecha },
+  quien:   { texto: 'Quién',   valor: (m) => (m.quien || '').toLowerCase() },
+  centavos:{ texto: 'Importe', valor: (m) => m.centavos ?? 0 }
+};
+
 export async function vistaHistorial(pantalla, estadoApp) {
   // Cancelar y eliminar son del administrador. A los demás ni les sale la
   // opción: un botón que siempre dice que no es peor que no tenerlo.
   const esAdmin = (estadoApp?.permisos || []).includes('*');
 
   let quienes = [];
-  let datos = { movimientos: [], resumen: null };
+  let movimientos = [];              // lo cargado hasta ahora, acumulado
+  let resumen = null;
+  let hayMas = false;
+  let cursor = null;
+  let ventana = 'hoy';
+  let cargando = false;
+
+  const orden = { columna: 'fecha', descendente: true };
 
   const filtro = {
     folio: '',
@@ -45,7 +76,8 @@ export async function vistaHistorial(pantalla, estadoApp) {
 
   await cargar();
 
-  async function cargar() {
+  /** Los filtros de la pantalla, como los espera el servidor. */
+  function consulta({ antesDe = null } = {}) {
     const q = new URLSearchParams();
     if (filtro.folio) q.set('folio', filtro.folio);
     if (filtro.desde) q.set('desde', filtro.desde);
@@ -54,35 +86,85 @@ export async function vistaHistorial(pantalla, estadoApp) {
     if (filtro.horaHasta) q.set('horaHasta', filtro.horaHasta);
     if (filtro.usuarioId) q.set('usuarioId', filtro.usuarioId);
     if (filtro.tipos.size !== TIPOS.length) q.set('tipos', [...filtro.tipos].join(','));
-    q.set('limite', '300');
+    if (antesDe) q.set('antesDe', antesDe);
+    q.set('limite', String(POR_TIRON));
+    return q;
+  }
 
+  /** Cambió un filtro: se empieza de cero. */
+  async function cargar() {
+    cargando = true;
     try {
-      datos = await api.obtener(`/historial?${q}`);
+      const d = await api.obtener(`/historial?${consulta()}`);
+      movimientos = d.movimientos;
+      resumen = d.resumen;
+      hayMas = d.hayMas;
+      cursor = d.cursor;
+      ventana = d.ventana;
     } catch (e) {
       avisar(e.message, 'error');
-      datos = { movimientos: [], resumen: null };
+      movimientos = []; resumen = null; hayMas = false; cursor = null;
     }
+    cargando = false;
     pintar();
+  }
+
+  /**
+   * CARGAR MÁS: se anexa, no se reemplaza.
+   *
+   * Se pide "lo anterior a este instante" y no "la página 2": entre un
+   * tirón y otro puede entrar una venta nueva, y con páginas numeradas eso
+   * hace que un renglón se vea dos veces o no se vea nunca.
+   */
+  async function cargarMas() {
+    if (!cursor || cargando) return;
+    cargando = true;
+    pintarBotonMas();
+    try {
+      const d = await api.obtener(`/historial?${consulta({ antesDe: cursor })}`);
+      // Por si acaso: dos tirones no pueden repetir un renglón.
+      const yaEstan = new Set(movimientos.map((m) => m.id));
+      movimientos = movimientos.concat(d.movimientos.filter((m) => !yaEstan.has(m.id)));
+      hayMas = d.hayMas;
+      cursor = d.cursor;
+      ventana = 'filtro';
+    } catch (e) { avisar(e.message, 'error'); }
+    cargando = false;
+    pintar();
+  }
+
+  /** Lo cargado, puesto en el orden que pidió la columna. */
+  function enOrden() {
+    const como = ORDENABLES[orden.columna] || ORDENABLES.fecha;
+    const signo = orden.descendente ? -1 : 1;
+    return [...movimientos].sort((a, b) => {
+      const x = como.valor(a);
+      const y = como.valor(b);
+      if (x === y) return a.fecha < b.fecha ? 1 : -1;   // desempate: lo más nuevo primero
+      return (x < y ? -1 : 1) * signo;
+    });
   }
 
   // ==========================================================
   // LA PANTALLA
   //
-  // Un renglón por movimiento, TODO en una sola línea y centrado. Lo que
-  // más se busca va primero y en grande —el número de ticket—, y lo que se
-  // lleva el cliente va en texto normal, recortado con puntos suspensivos
-  // si no cabe: una tabla en la que cada renglón mide distinto no se puede
-  // recorrer con la vista.
+  // Un renglón por movimiento, TODO en una sola línea y centrado a media
+  // altura. Lo que hay que ver sí o sí va primero y sin recortar: el
+  // NÚMERO de ticket, QUÉ fue, CUÁNDO y CUÁNTO. Lo que se llevó el cliente
+  // va al final, en texto normal y recortado si no cabe: es lo que menos
+  // se lee y lo que más ocupa, y con el ojito se ve entero.
   // ==========================================================
   function pintar() {
-    const r = datos.resumen;
+    const r = resumen;
+    const lista = enOrden();
 
     pantalla.innerHTML = `
       <div class="ancho-completo">
       <h2>Historial</h2>
       <p class="ayuda">
         Todo lo que ha pasado en la caja, de quien sea y de cuando sea.
-        Se lee de lo más nuevo a lo más viejo.
+        Se abre con <b>lo de hoy</b>; para ver más atrás, el botón de abajo
+        o las fechas.
       </p>
 
       <div class="tarjeta hist-filtros">
@@ -154,31 +236,72 @@ export async function vistaHistorial(pantalla, estadoApp) {
         </div>` : ''}
 
       <div class="tarjeta plana">
-        ${datos.movimientos.length ? `
+        <div class="hist-cuantos">
+          <span>
+            ${lista.length} renglón${lista.length === 1 ? '' : 'es'}
+            ${ventana === 'hoy' ? '<b>de hoy</b>' : 'cargados'}
+          </span>
+          <span class="ayuda">Los totales de arriba son de todo lo que cae en el filtro.</span>
+        </div>
+
+        ${lista.length ? `
           <div class="hist-envoltura">
           <table class="tabla hist-tabla">
             <tr>
-              <th class="hist-c-num">Ticket</th>
-              <th class="hist-c-que">Qué</th>
-              <th class="hist-c-cuando">Cuándo</th>
-              <th class="hist-c-quien">Quién</th>
+              ${cabecera('numero', 'hist-c-num')}
+              ${cabecera('que', 'hist-c-que')}
+              ${cabecera('fecha', 'hist-c-cuando')}
+              ${cabecera('quien', 'hist-c-quien')}
+              ${cabecera('centavos', 'hist-c-importe der')}
               <th class="hist-c-detalle">Se llevó</th>
-              <th class="hist-c-importe der">Importe</th>
               <th class="hist-c-acciones"></th>
             </tr>
-            ${datos.movimientos.map(renglon).join('')}
+            ${lista.map(renglon).join('')}
           </table>
-          </div>
-          ${datos.movimientos.length >= 300 ? `
-            <p class="ayuda" style="margin-top:12px">
-              Se enseñan los 300 más nuevos. Los totales de arriba sí son de
-              todo lo que cae en el filtro. Aprieta las fechas para ver el resto.
-            </p>` : ''}`
+          </div>`
         : '<p class="vacio" style="padding:30px 0">Nada que coincida con eso.</p>'}
+
+        <div id="zona-mas">${botonMas()}</div>
       </div>
       </div>`;
 
     enganchar();
+  }
+
+  /**
+   * Una cabecera que ordena al tocarla.
+   *
+   * La flechita solo sale en la columna por la que se está ordenando: tres
+   * flechas grises en una fila de cinco no dicen nada, y una sola dice
+   * exactamente por dónde va el orden.
+   */
+  function cabecera(clave, clases) {
+    const c = ORDENABLES[clave];
+    const activa = orden.columna === clave;
+    return `
+      <th class="${clases} ordenable ${activa ? 'ordenando' : ''}"
+          data-ordenar="${clave}"
+          title="Ordenar por ${c.texto.toLowerCase()}">
+        ${esc(c.texto)}<span class="flecha">${activa ? (orden.descendente ? '▼' : '▲') : ''}</span>
+      </th>`;
+  }
+
+  function botonMas() {
+    if (cargando) return '<p class="ayuda hist-mas">Buscando…</p>';
+    if (!hayMas) {
+      return movimientos.length
+        ? '<p class="ayuda hist-mas">Ya no hay nada más atrás con este filtro.</p>'
+        : '';
+    }
+    return `
+      <button class="secundario hist-mas-boton" id="cargar-mas">
+        Cargar ${POR_TIRON} más ${ventana === 'hoy' ? '(hacia atrás de hoy)' : 'hacia atrás'}
+      </button>`;
+  }
+
+  function pintarBotonMas() {
+    const zona = pantalla.querySelector('#zona-mas');
+    if (zona) zona.innerHTML = botonMas();
   }
 
   /**
@@ -190,10 +313,11 @@ export async function vistaHistorial(pantalla, estadoApp) {
    * en cualquiera de los dos, se sabe la historia completa sin buscar.
    */
   function renglon(m) {
-    const t = TIPOS.find((x) => x.id === m.tipo) || { emoji: '·', texto: m.tipo };
+    const q = m.que || { clave: m.tipo, texto: m.tipo, emoji: '·' };
     const cancelado = Boolean(m.cancelada_en);
     const esCambio = Boolean(m.cambio_de || m.cambiado_por);
     const esVenta = m.tipo === 'venta';
+    const detalle = detalleLargo(m);
 
     return `
       <tr class="${cancelado ? 'anulada' : ''} ${esCambio ? 'es-cambio' : ''}" data-fila="${esc(m.id)}">
@@ -201,34 +325,29 @@ export async function vistaHistorial(pantalla, estadoApp) {
           ${m.numero ? `<span class="hist-folio">${esc(m.numero)}</span>`
                      : '<span class="hist-folio vacio-folio">—</span>'}
         </td>
-        <td class="hist-c-que">
-          <span class="hist-tipo ${m.tipo}">${t.emoji} ${esc(t.texto)}</span>
-          ${esCambio ? `
-            <span class="hist-tipo cambio"
-                  title="${m.cambiado_por
-                    ? `Este ticket se cambió por el ${m.cambiadoPorNumero}`
-                    : `Este ticket viene del cambio del ${m.cambioDeNumero}`}">
-              ⇄ ${m.cambiado_por ? `${m.numero}→${m.cambiadoPorNumero}`
-                                 : `${m.cambioDeNumero}→${m.numero}`}
-            </span>` : ''}
-          ${m.lista_tipo === 'mayoreo'
-            ? `<span class="etiqueta-mayoreo">🏷️ ${esc(m.lista_nombre || 'mayoreo')}</span>` : ''}
-          ${m.forma_pago && m.forma_pago !== 'efectivo'
-            ? `<span class="hist-tipo pago">${m.forma_pago === 'credito' ? 'fiado' : esc(m.forma_pago)}</span>` : ''}
-          ${cancelado
-            ? `<span class="hist-tipo malo">${m.tipo === 'venta' ? 'cancelado' : 'anulado'}</span>` : ''}
+        <td class="hist-c-que"><span class="hist-que-caja"><span
+              class="hist-que que-${esc(q.clave)}">${q.emoji} ${esc(q.texto)}</span>${esCambio ? `<span
+              class="hist-que que-par"
+              title="${m.cambiado_por
+                ? `Este ticket se cambió por el ${m.cambiadoPorNumero}`
+                : `Este ticket viene del cambio del ${m.cambioDeNumero}`}"
+              >${m.cambiado_por ? `→ ${esc(m.cambiadoPorNumero)}`
+                                : `← ${esc(m.cambioDeNumero)}`}</span>` : ''}</span></td>
+        <td class="hist-c-cuando" title="${esc(formatoFecha(m.fecha))}">${esc(cuando(m.fecha))}</td>
+        <td class="hist-c-quien"
+            title="${esc(m.quien || '—')}${m.turno ? ` · turno #${m.turno}` : ''}">
+          ${esc(m.quien || '—')}
         </td>
-        <td class="hist-c-cuando">${esc(cuando(m.fecha))}</td>
-        <td class="hist-c-quien">
-          ${esc(m.quien || '—')}${m.turno ? ` <small>· turno #${m.turno}</small>` : ''}
-        </td>
-        <td class="hist-c-detalle" title="${esc(detalleLargo(m))}">${esc(detalleLargo(m))}</td>
         <td class="hist-c-importe der ${m.tipo === 'gasto' ? 'malo' : m.tipo === 'entrada' ? 'bueno' : ''}">
           ${m.tipo === 'gasto' ? '−' : m.tipo === 'entrada' ? '+' : ''}${pesos(m.centavos)}
         </td>
+        <td class="hist-c-detalle" title="${esc(detalle)}">${esc(detalle)}</td>
         <td class="hist-c-acciones">
+          <button class="secundario chico" data-ver="${esc(m.id)}"
+                  title="Ver este movimiento completo">👁</button>
           ${esVenta ? `
-            <button class="secundario chico" data-copia="${esc(m.id)}">Copia</button>
+            <button class="secundario chico" data-copia="${esc(m.id)}"
+                    title="Volver a imprimirlo marcado como copia">Copia</button>
             ${esAdmin && !cancelado
               ? `<button class="secundario chico" data-mas="${esc(m.id)}"
                          title="Cancelar o eliminar">⋯</button>` : ''}` : ''}
@@ -251,6 +370,44 @@ export async function vistaHistorial(pantalla, estadoApp) {
     if (m.detalle && m.detalle !== m.cliente) partes.push(m.detalle);
     if (m.cancelada_en && m.motivo_cancelacion) partes.push(`(${m.motivo_cancelacion})`);
     return partes.join(' · ') || '—';
+  }
+
+  // ==========================================================
+  // VER UN MOVIMIENTO COMPLETO
+  //
+  // La columna de "se llevó" está recortada a propósito —es la que más
+  // ocupa y la que menos se lee—, así que tiene que haber una forma de
+  // verlo entero sin salir de la lista. Eso es el ojito.
+  // ==========================================================
+  async function verMovimiento(id) {
+    const m = movimientos.find((x) => x.id === id);
+    if (!m) return;
+
+    // De una venta se piden sus renglones: es lo único que la lista no trae
+    // y es justo lo que se quiere ver.
+    let lineas = null;
+    if (m.tipo === 'venta') {
+      try { lineas = (await api.obtener(`/ventas/${m.id}`)).venta?.lineas || []; }
+      catch { lineas = null; }
+    }
+
+    const q = m.que || {};
+    await menu({
+      titulo: m.numero ? `Ticket ${m.numero}` : q.texto || 'Movimiento',
+      texto: [
+        `${q.emoji || ''} ${q.texto || ''}`.trim(),
+        formatoFecha(m.fecha),
+        m.quien ? `Lo hizo ${m.quien}` : '',
+        m.turno ? `Turno #${m.turno}` : '',
+        m.cliente ? `Cliente: ${m.cliente}` : '',
+        lineas?.length
+          ? lineas.map((l) => `· ${l.cantidad > 1 ? l.cantidad + ' × ' : ''}${l.concepto} — ${pesos(l.precio_centavos)}`).join('\n')
+          : (m.detalle || ''),
+        `Importe: ${pesos(m.centavos)}`,
+        m.cancelada_en ? `Cancelado: ${m.motivo_cancelacion || 'sin motivo'}` : ''
+      ].filter(Boolean).join('\n'),
+      opciones: [{ valor: 'cerrar', texto: 'Cerrar' }]
+    });
   }
 
   // ==========================================================
@@ -359,6 +516,8 @@ export async function vistaHistorial(pantalla, estadoApp) {
       };
     });
 
+    // "Hoy" vuelve a la ventana de arranque: se quitan las fechas y ya, que
+    // sin fechas el servidor enseña justo el día de hoy.
     q('#hoy').onclick = () => {
       const hoy = new Date();
       const dia = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${
@@ -373,6 +532,24 @@ export async function vistaHistorial(pantalla, estadoApp) {
     pantalla.querySelectorAll('[data-mas]').forEach((b) => {
       b.onclick = () => masOpciones(b.dataset.mas, folioDe(b));
     });
+    pantalla.querySelectorAll('[data-ver]').forEach((b) => {
+      b.onclick = () => verMovimiento(b.dataset.ver);
+    });
+
+    // ORDENAR. Tocar la misma columna otra vez le da la vuelta al orden;
+    // tocar otra empieza por lo más alto, que es lo que uno espera al
+    // preguntar "¿cuál fue el ticket más grande?".
+    pantalla.querySelectorAll('[data-ordenar]').forEach((th) => {
+      th.onclick = () => {
+        const clave = th.dataset.ordenar;
+        if (orden.columna === clave) orden.descendente = !orden.descendente;
+        else { orden.columna = clave; orden.descendente = true; }
+        pintar();
+      };
+    });
+
+    const mas = q('#cargar-mas');
+    if (mas) mas.onclick = cargarMas;
 
     q('#limpiar').onclick = () => {
       filtro.folio = '';

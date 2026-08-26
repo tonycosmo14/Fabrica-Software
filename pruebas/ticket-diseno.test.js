@@ -187,6 +187,34 @@ test('un cambio dice de qué ticket viene', () => {
                'lo último que se lee: este hielo ya se había pagado en otro papel');
 });
 
+test('el papel de un cambio dice cuánto se le devuelve al cliente', () => {
+  // El cliente trajo un vale de $314 y se llevó $132 de hielo: le tocan
+  // $182. Por dentro la venta nueva se guarda como pagada completa para
+  // que el cajón cuadre, y eso hacía que el papel dijera "PAGO $132 ·
+  // CAMBIO $0", que para el cliente no quiere decir nada.
+  const l = renglones(ticket.ticketVenta(
+    { ...venta, total_centavos: 13200, pago_centavos: 13200, cambio_centavos: 0,
+      cambioDeNumero: '2026-30', cambioDeTotal: 31400 },
+    { negocio: 'Hielo LOLHA' }));
+
+  assert.match(l[donde(l, 'TOTAL:')], /\$132/);
+  assert.match(l[donde(l, 'VALE #2026-30:')], /\$314/, 'con cuánto valía el que trajo');
+  assert.match(l[donde(l, 'SE LE DEVUELVE:')], /\$182/, 'y lo que se lleva en billetes');
+
+  assert.equal(donde(l, 'PAGO:'), -1, 'no pagó con billetes: pagó con un ticket');
+  assert.equal(donde(l, 'CAMBIO:'), -1);
+});
+
+test('si el cambio es por algo más caro, el papel dice cuánto puso de más', () => {
+  const l = renglones(ticket.ticketVenta(
+    { ...venta, total_centavos: 40000, pago_centavos: 40000, cambio_centavos: 0,
+      cambioDeNumero: '2026-30', cambioDeTotal: 31400 },
+    { negocio: 'Hielo LOLHA' }));
+
+  assert.match(l[donde(l, 'VALE #2026-30:')], /\$314/);
+  assert.match(l[donde(l, 'PAGO ADEMAS:')], /\$86/);
+});
+
 test('el cambio de un ticket se imprime con el renglón puesto', async () => {
   // El aviso no puede depender de que alguien se acuerde de pasarlo: sale
   // de la propia venta, mirando de cuál viene.

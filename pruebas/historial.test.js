@@ -331,3 +331,129 @@ test('el historial es solo del administrador', async () => {
   assert.equal((await llamar('/api/historial')).estado, 403);
   assert.equal((await llamar('/api/historial/quienes')).estado, 403);
 });
+
+
+// ============================================================
+// LA VENTANA DE HOY Y EL "CARGAR MÁS"  (v2.4)
+//
+// Dentro de tres años esta tabla va a tener cientos de miles de renglones.
+// Abrir el historial no puede querer decir "tráemelos todos": se abre con
+// lo de hoy y lo de más atrás se pide a propósito.
+// ============================================================
+
+test('el historial se abre con lo del día de hoy, no con todo', async () => {
+  await entrarAdmin();
+
+  // Una venta de hace tres años, metida directo: por la API no se puede
+  // cobrar en el pasado, y es justo lo que hay que dejar fuera.
+  const vieja = bd.prepare('SELECT id FROM ventas ORDER BY fecha DESC LIMIT 1').get();
+  bd.prepare("UPDATE ventas SET fecha = '2023-04-10T18:00:00.000Z' WHERE id = ?").run(vieja.id);
+
+  const r = (await llamar('/api/historial')).json.datos;
+  assert.equal(r.ventana, 'hoy');
+  assert.ok(!r.movimientos.some((m) => m.id === vieja.id),
+            'lo de hace tres años no se enseña de entrada');
+});
+
+test('con fechas puestas, la ventana de hoy se quita', async () => {
+  await entrarAdmin();
+  const r = (await llamar('/api/historial?desde=2023-01-01')).json.datos;
+  assert.equal(r.ventana, 'filtro');
+  assert.ok(r.movimientos.some((m) => String(m.fecha).startsWith('2023-')),
+            'quien pide 2023 es que sabe lo que pide');
+});
+
+test('buscar por número tampoco se queda encerrado en hoy', async () => {
+  await entrarAdmin();
+  const vieja = bd.prepare(
+    "SELECT * FROM ventas WHERE fecha LIKE '2023-%' LIMIT 1"
+  ).get();
+  const r = (await llamar(`/api/historial?folio=${vieja.folio_anual}`)).json.datos;
+  assert.equal(r.ventana, 'filtro');
+  assert.ok(r.movimientos.some((m) => m.id === vieja.id),
+            'el ticket que se busca aparece aunque sea viejo');
+});
+
+test('cargar más trae lo anterior al cursor, sin repetir ni saltarse nada', async () => {
+  await entrarAdmin();
+
+  const primera = (await llamar('/api/historial?desde=2020-01-01&limite=3')).json.datos;
+  assert.equal(primera.movimientos.length, 3);
+  assert.equal(primera.hayMas, true, 'hay más atrás');
+  assert.ok(primera.cursor, 'y viene el instante por donde seguir');
+
+  const segunda = (await llamar(
+    `/api/historial?desde=2020-01-01&limite=3&antesDe=${encodeURIComponent(primera.cursor)}`
+  )).json.datos;
+
+  const ids = new Set(primera.movimientos.map((m) => m.id));
+  for (const m of segunda.movimientos) {
+    assert.ok(!ids.has(m.id), `${m.id} salió dos veces`);
+    assert.ok(m.fecha < primera.cursor, 'todo lo del segundo tirón es más viejo que el corte');
+  }
+});
+
+test('el último tirón dice que ya no hay más', async () => {
+  await entrarAdmin();
+  const todo = (await llamar('/api/historial?desde=2020-01-01&limite=500')).json.datos;
+  assert.equal(todo.hayMas, false, 'cabe entero: el botón de cargar más sobra');
+});
+
+test('los totales no se paginan: son de todo el filtro, no del tirón', async () => {
+  await entrarAdmin();
+  const entero = (await llamar('/api/historial?desde=2020-01-01&limite=500')).json.datos;
+  const pedacito = (await llamar('/api/historial?desde=2020-01-01&limite=2')).json.datos;
+
+  assert.equal(pedacito.movimientos.length, 2);
+  assert.deepEqual(pedacito.resumen, entero.resumen,
+                   'cargar más no puede cambiar los totales de arriba');
+});
+
+test('un cursor con basura se rechaza en vez de traer cualquier cosa', async () => {
+  await entrarAdmin();
+  const r = await llamar('/api/historial?antesDe=el-jueves');
+  assert.equal(r.estado, 400);
+});
+
+
+// ============================================================
+// QUÉ PASÓ EN CADA RENGLÓN
+// ============================================================
+
+test('cada renglón dice qué clase de movimiento fue', async () => {
+  await entrarAdmin();
+  const { movimientos } = (await llamar('/api/historial?desde=2020-01-01&limite=500')).json.datos;
+
+  for (const m of movimientos) {
+    assert.ok(m.que && m.que.clave && m.que.texto,
+              `un renglón sin "qué": ${m.tipo} ${m.id}`);
+  }
+
+  const claves = new Set(movimientos.map((m) => m.que.clave));
+  assert.ok(claves.has('venta'), 'las ventas se llaman ventas');
+});
+
+test('una devolución no se ve igual que una cancelación', async () => {
+  await entrarAdmin();
+  const v = await llamar('/api/ventas', {
+    method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 4 }], pago: 100 }
+  });
+  const id = v.json.datos.venta.id;
+  await llamar(`/api/ventas/${id}/devolver`, {
+    method: 'POST', cuerpo: { motivo: 'espera' }
+  });
+
+  const { movimientos } = (await llamar('/api/historial?limite=200')).json.datos;
+  const fila = movimientos.find((m) => m.id === id);
+  assert.equal(fila.que.clave, 'devolucion',
+               'el dinero salió del cajón: eso no es una cancelación cualquiera');
+});
+
+test('un ticket de mayoreo se distingue de una venta de mostrador', async () => {
+  await entrarAdmin();
+  const { movimientos } = (await llamar('/api/historial?desde=2020-01-01&limite=500')).json.datos;
+  const mayoreo = movimientos.filter((m) => m.lista_tipo === 'mayoreo' && !m.cancelada_en
+                                            && !m.cambio_de && !m.cambiado_por
+                                            && m.forma_pago !== 'credito');
+  for (const m of mayoreo) assert.equal(m.que.clave, 'mayoreo');
+});

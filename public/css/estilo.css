@@ -2318,15 +2318,20 @@ body.pantalla-fija main {
    cada renglón mide distinto no se puede recorrer con la vista. */
 .fila-ticket, .mov-fila {
   display: grid; align-items: center; gap: 10px;
-  /* folio · cuándo · quién · qué se llevó · importe · copia · devolver */
-  grid-template-columns: 52px 132px 70px minmax(0, 1fr) 96px 66px 42px;
+  /* folio · qué · cuándo · quién · se llevó · importe · copia · devolver */
+  grid-template-columns: 100px 124px 112px 54px minmax(0, 1fr) 88px 62px 40px;
 }
 .mov-fila { grid-template-columns: minmax(0, 1fr) 132px 70px 96px 76px; }
 
 .fila-ticket > span, .mov-fila > span {
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.tkl-folio { font-weight: 800; font-size: 16px; font-variant-numeric: tabular-nums; }
+/* El número entero, sin recortar: es por lo que se busca. "2026-152125"
+   no cabía en 52 px y salía "202…", que no sirve para nada. */
+.tkl-folio {
+  font-weight: 800; font-size: 14px; letter-spacing: -.2px;
+  font-variant-numeric: tabular-nums;
+}
 /* El importe manda dentro de su columna, pero no crece hasta comerse al
    vecino: es un dato, no un cartel. */
 .tkl-total, .mov-importe { font-size: 15px; }
@@ -2710,3 +2715,105 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 .rejilla-campos { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; }
 .rejilla-campos input { width: 100%; }
 @media (max-width: 520px) { .rejilla-campos { grid-template-columns: 1fr; } }
+
+
+/* =====================================================================
+   EL HISTORIAL, v2.4
+
+   Lo que hay que ver sí o sí —número, qué fue, cuándo, cuánto— va primero
+   y NO se recorta nunca. Lo que se llevó el cliente va al final, es lo que
+   más ocupa y lo que menos se lee, y para eso está el ojito.
+   ===================================================================== */
+
+/* El número de ticket ahora es "2026-152125": doce letras. Con los 66 px
+   de antes se cortaba justo el dato por el que se busca. */
+.hist-c-num { width: 116px; }
+.hist-folio { font-size: 14px; letter-spacing: -.2px; }
+
+.hist-c-que      { width: 208px; }
+.hist-c-cuando   { width: 172px; }
+.hist-c-quien    { width: 146px; }
+.hist-c-importe  { width: 104px; }
+.hist-c-detalle  { width: auto; min-width: 120px; color: var(--suave); font-size: 14px; }
+.hist-c-acciones { width: 168px; }
+
+/* QUÉ PASÓ AQUÍ. Una etiqueta por renglón y de un color por clase: venta,
+   mayoreo, cambio, devolución, gasto... Antes había que deducirlo leyendo
+   la columna de al lado.
+
+   Las etiquetas van dentro de una caja flexible y no sueltas en la celda:
+   sueltas, el espacio en blanco del HTML les hacía de línea base y se
+   iban al fondo del renglón, que crecía. */
+.hist-que-caja { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.hist-que-caja .hist-que { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
+.hist-que {
+  display: inline-block; padding: 3px 9px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 800; letter-spacing: .3px;
+  white-space: nowrap; vertical-align: middle;
+}
+/* Un color por clase de movimiento. El emoji y la palabra dicen cuál es;
+   el color es lo que deja recorrer la columna sin leerla renglón a
+   renglón. Rojo = algo salió mal o salió dinero.
+
+   LAS CLASES VAN CON PREFIJO "que-" a propósito. Con el nombre pelado
+   —.entrada, .venta— chocaban con clases que ya existían en otras
+   pantallas: ".entrada" es la tarjeta de la pantalla de entrar, y su
+   "margin: 0 auto" centraba la etiqueta y le estiraba el renglón. Una
+   clase de una palabra en una hoja de estilos compartida es una bomba de
+   tiempo. */
+.hist-que.que-venta      { background: var(--et-cajero-f);     color: var(--et-cajero-t); }
+.hist-que.que-entrada    { background: var(--et-cajero-f);     color: var(--et-cajero-t); }
+.hist-que.que-mayoreo    { background: var(--et-admin-f);      color: var(--et-admin-t); }
+.hist-que.que-fiado      { background: var(--et-repartidor-f); color: var(--et-repartidor-t); }
+.hist-que.que-gasto      { background: var(--et-repartidor-f); color: var(--et-repartidor-t); }
+.hist-que.que-cambio,
+.hist-que.que-cambiado   { background: var(--et-operario-f);   color: var(--et-operario-t); }
+.hist-que.que-abono      { background: var(--et-operario-f);   color: var(--et-operario-t); }
+.hist-que.que-devolucion { background: var(--et-baja-f);       color: var(--et-baja-t); }
+.hist-que.que-cancelada  { background: var(--et-baja-f);       color: var(--et-baja-t); }
+.hist-que.que-par {
+  background: transparent; border: 1px dashed var(--borde); color: var(--suave);
+  font-weight: 700; margin-left: 4px;
+}
+
+/* Cabeceras que ordenan. La flecha solo sale en la columna activa: tres
+   flechas grises no dicen nada y una sola dice exactamente por dónde va. */
+.hist-tabla th.ordenable { cursor: pointer; user-select: none; }
+.hist-tabla th.ordenable:hover { color: var(--primario); }
+.hist-tabla th.ordenando { color: var(--primario); }
+.hist-tabla th .flecha { margin-left: 4px; font-size: 10px; }
+
+.hist-cuantos {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 12px; flex-wrap: wrap; padding: 0 2px 10px;
+  font-size: 13px; color: var(--texto);
+}
+.hist-cuantos .ayuda { margin: 0; font-size: 12.5px; }
+
+.hist-mas { text-align: center; margin: 14px 0 2px; }
+.hist-mas-boton { width: 100%; margin-top: 14px; }
+
+/* Un tirón nuevo se anexa debajo, así que el ancho de las columnas no
+   puede bailar entre uno y otro. */
+.hist-tabla { table-layout: fixed; }
+
+/* Cada apartado con su dibujito. En un menú de catorce renglones el icono
+   es lo que deja encontrar "Existencia" sin leer los catorce. */
+.menu-panel a { display: flex; align-items: center; gap: 10px; }
+.menu-icono {
+  flex: 0 0 auto; width: 22px; text-align: center;
+  font-size: 16px; line-height: 1;
+}
+
+/* Un renglón cancelado se tacha, pero ni su etiqueta ni sus botones: la
+   etiqueta ya DICE "Cancelada" y un botón tachado parece apagado. */
+.hist-tabla tr.anulada { text-decoration: none; opacity: .55; }
+.hist-tabla tr.anulada td:not(.hist-c-que):not(.hist-c-acciones) {
+  text-decoration: line-through;
+}
+
+/* Igual que en el historial: un ticket cancelado se tacha, pero su
+   etiqueta —que ya dice "Cancelado"— y sus botones, no. */
+.fila-ticket.anulada { text-decoration: none; opacity: .55; }
+.fila-ticket.anulada > span:not(.hist-que) { text-decoration: line-through; }
+.fila-ticket .hist-que { justify-self: start; }

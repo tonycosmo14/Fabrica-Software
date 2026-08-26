@@ -13,7 +13,7 @@ const path = require('node:path');
 const { fabricaDePrueba } = require('./ayudante');
 const { Ticket } = require('../src/modulos/impresion/escpos');
 
-const { llamar, carpeta, preparar } = fabricaDePrueba('imp');
+const { llamar, carpeta, preparar, entrarAdmin } = fabricaDePrueba('imp');
 
 const salida = path.join(carpeta, 'impresora.bin');
 
@@ -232,4 +232,145 @@ test('solo el administrador configura la impresora', async () => {
     { method: 'PUT', cuerpo: { copias: 2 } })).estado, 403);
   assert.equal((await llamar('/api/impresion/prueba',
     { method: 'POST', cuerpo: {} })).estado, 403);
+});
+
+
+// ============================================================
+// EL CAJÓN VA PEGADO AL TICKET  (v2.4)
+//
+// Antes el pulso se mandaba al cobrar, aparte del papel. Eso fallaba de
+// dos maneras que se notan en el mostrador: con la impresora apagada el
+// cajón no se abría igual —el pulso se lo manda ELLA— y nadie entendía por
+// qué; y al volver a imprimir el mismo ticket ya no se abría.
+// ============================================================
+
+/** ESC p, la orden de abrir el cajón: 1B 70 m t1 t2. */
+function abrePuertas(papel) {
+  return (papel.match(/\x1b\x70/g) || []).length;
+}
+
+test('con el cajón encendido, imprimir un ticket lo abre', async () => {
+  // La prueba de permisos de arriba deja la sesión en manos de un cajero.
+  await entrarAdmin();
+  await llamar('/api/impresion/config', { method: 'PUT', cuerpo: { abrirCajon: true } });
+  const v = await llamar('/api/ventas', {
+    method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 16 }], pago: 300 }
+  });
+
+  limpiarPapel();
+  const r = await llamar(`/api/impresion/venta/${v.json.datos.venta.id}`,
+                         { method: 'POST', cuerpo: {} });
+  assert.equal(r.estado, 200);
+  assert.equal(r.json.datos.cajon, true);
+  assert.equal(abrePuertas(loImpreso()), 1, 'el pulso viajó con el papel');
+});
+
+test('imprimir otra vez lo vuelve a abrir: no es solo la primera', async () => {
+  const v = await llamar('/api/ventas', {
+    method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 16 }], pago: 300 }
+  });
+  const id = v.json.datos.venta.id;
+
+  limpiarPapel();
+  await llamar(`/api/impresion/venta/${id}`, { method: 'POST', cuerpo: {} });
+  await llamar(`/api/impresion/venta/${id}`, { method: 'POST', cuerpo: { copia: true } });
+
+  assert.equal(abrePuertas(loImpreso()), 2, 'dos impresiones, dos veces abierto');
+});
+
+test('tres copias del mismo ticket son un cobro, no tres: un solo pulso', async () => {
+  await llamar('/api/impresion/config', { method: 'PUT', cuerpo: { copias: 3 } });
+  const v = await llamar('/api/ventas', {
+    method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 16 }], pago: 300 }
+  });
+
+  limpiarPapel();
+  await llamar(`/api/impresion/venta/${v.json.datos.venta.id}`, { method: 'POST', cuerpo: {} });
+
+  const papel = loImpreso();
+  assert.equal(papel.split('VB').length - 1, 3, 'salieron los tres papeles');
+  assert.equal(abrePuertas(papel), 1, 'y el cajón se abrió una vez');
+
+  await llamar('/api/impresion/config', { method: 'PUT', cuerpo: { copias: 1 } });
+});
+
+test('el comprobante de un gasto también abre el cajón: de ahí sale el dinero', async () => {
+  await llamar('/api/caja/movimientos', {
+    method: 'POST', cuerpo: { tipo: 'salida', concepto: 'Desayuno', monto: 120 }
+  });
+  const mov = (await llamar('/api/caja')).json.datos.movimientos[0];
+
+  limpiarPapel();
+  const r = await llamar(`/api/impresion/movimiento/${mov.id}`, { method: 'POST', cuerpo: {} });
+  assert.equal(r.estado, 200);
+  assert.equal(abrePuertas(loImpreso()), 1);
+});
+
+test('con el cajón apagado no se manda ningún pulso', async () => {
+  await llamar('/api/impresion/config', { method: 'PUT', cuerpo: { abrirCajon: false } });
+  const v = await llamar('/api/ventas', {
+    method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 16 }], pago: 300 }
+  });
+
+  limpiarPapel();
+  const r = await llamar(`/api/impresion/venta/${v.json.datos.venta.id}`,
+                         { method: 'POST', cuerpo: {} });
+  assert.equal(r.json.datos.cajon, false);
+  assert.equal(abrePuertas(loImpreso()), 0);
+});
+
+test('sin impresora puesta no se abre el cajón: el pulso se lo manda ella', async () => {
+  await llamar('/api/impresion/config', { method: 'PUT', cuerpo: { abrirCajon: true, destino: '' } });
+  const v = await llamar('/api/ventas', {
+    method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 16 }], pago: 300 }
+  });
+
+  const r = await llamar(`/api/impresion/venta/${v.json.datos.venta.id}`,
+                         { method: 'POST', cuerpo: {} });
+  assert.equal(r.estado, 200);
+  assert.equal(r.json.datos.impreso, false, 'no imprimió');
+  assert.ok(!r.json.datos.cajon, 'y por lo tanto tampoco abrió');
+
+  await llamar('/api/impresion/config', { method: 'PUT', cuerpo: { destino: salida } });
+});
+
+
+// ============================================================
+// LOS NÚMEROS A SACAR  (v2.4)
+//
+// Este papel se lo lleva el obrero al cuarto de tanques. Salía por la
+// ventana de imprimir del navegador —hoja carta, elegir impresora, vista
+// previa— y en un cuarto de máquinas eso no lo hace nadie.
+// ============================================================
+
+test('los números a sacar salen por la térmica, no por el navegador', async () => {
+  await entrarAdmin();
+  limpiarPapel();
+
+  const r = await llamar('/api/impresion/produccion', { method: 'POST', cuerpo: {} });
+  assert.equal(r.estado, 200);
+  assert.equal(r.json.datos.impreso, true);
+
+  const papel = loImpreso();
+  assert.match(papel, /A sacar/, 'qué es este papel, arriba a la izquierda');
+  assert.match(papel, /Atendio:/, 'y quién lo entregó');
+  assert.match(papel, /FIRMA DEL OBRERO/, 'vuelve firmado con lo que sacó de verdad');
+});
+
+test('los números a sacar tienen su propia impresora si hace falta', async () => {
+  await entrarAdmin();
+  const { impresion } = (await llamar('/api/impresion/config')).json.datos;
+  assert.ok(impresion.apartados.some((a) => a.id === 'produccion'),
+            'el cuarto de tanques puede tener su impresora, lejos del mostrador');
+});
+
+test('quien no puede ver los números tampoco los imprime', async () => {
+  await llamar('/api/usuarios', { method: 'POST', cuerpo: { nombre: 'Chuy', rol: 'operario', pin: '7777' } });
+  const lista = (await llamar('/api/auth/usuarios-disponibles')).json.datos.usuarios;
+  const chuy = lista.find((u) => u.nombre === 'Chuy');
+  await llamar('/api/auth/entrar-pin', { method: 'POST', cuerpo: { usuarioId: chuy.id, pin: '7777' } });
+
+  const r = await llamar('/api/impresion/produccion', { method: 'POST', cuerpo: {} });
+  assert.equal(r.estado, 403);
+  await entrarAdmin();
 });

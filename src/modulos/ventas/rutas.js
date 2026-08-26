@@ -524,6 +524,9 @@ router.get('/', verVentas, (req, res) => {
            viejo.serie AS cambio_de_serie, viejo.folio_anual AS cambio_de_anual,
            nuevo.serie AS cambiado_por_serie, nuevo.folio_anual AS cambiado_por_anual,
            viejo.folio AS cambio_de, nuevo.folio AS cambiado_por,
+           -- De qué lista salió el precio: es lo que deja marcar un ticket
+           -- como "Mayoreo" en la lista de la caja sin abrirlo.
+           lp.tipo AS lista_tipo,
            -- Qué se llevó, en corto. Va en la lista para no tener que abrir
            -- el ticket —ni imprimirlo— para contestar "¿qué se llevó?".
            (SELECT group_concat(
@@ -535,6 +538,7 @@ router.get('/', verVentas, (req, res) => {
       LEFT JOIN clientes cl ON cl.id = v.cliente_id
       LEFT JOIN ventas viejo ON viejo.id = v.cambio_de_venta_id
       LEFT JOIN ventas nuevo ON nuevo.id = v.cambiada_por_venta_id
+      LEFT JOIN listas_precios lp ON lp.id = v.lista_id
      ${filtros.length ? 'WHERE ' + filtros.join(' AND ') : ''}
      ORDER BY v.fecha DESC LIMIT ?
   `).all(...valores, limite);

@@ -517,6 +517,7 @@ export async function vistaVenta(pantalla, estadoApp) {
       hielo += p.dieciseisavos * cuantos;
       ultimoAgregado = p;
       pintarTodo();
+      tono('bien');
       return;
     }
 
@@ -541,6 +542,13 @@ export async function vistaVenta(pantalla, estadoApp) {
     else articulos.push({ producto: p, cantidad: cuantos });
     ultimoAgregado = p;
     pintarTodo();
+
+    // UN RUIDITO POR CADA COSA QUE ENTRA.
+    //
+    // El cajero no está mirando la pantalla mientras captura: está viendo
+    // al cliente y agarrando el hielo. El oído es lo que le dice que el
+    // renglón entró, y sin sonido no hay forma de saberlo sin voltear.
+    tono('bien');
   }
 
   /**
@@ -739,7 +747,7 @@ export async function vistaVenta(pantalla, estadoApp) {
   // Los gastos van primero y en grande porque son los que se buscan. Meter
   // dinero se ve más discreto: nadie pide cuentas de lo que se dejó.
   // ==========================================================
-  async function verMovimientos() {
+  async function verMovimientos({ todo = false } = {}) {
     fase = 'movimientos';
     refs.cobro.hidden = false;
     refs.cobro.innerHTML = `
@@ -751,7 +759,8 @@ export async function vistaVenta(pantalla, estadoApp) {
 
     let movs = [];
     try {
-      movs = (await api.obtener('/caja/movimientos?limite=40')).movimientos || [];
+      movs = (await api.obtener(
+        `/caja/movimientos?limite=${todo ? 60 : 40}${todo ? '&todo=1' : ''}`)).movimientos || [];
     } catch (e) {
       refs.cobro.querySelector('.ayuda').textContent = e.message;
       return;
@@ -778,9 +787,9 @@ export async function vistaVenta(pantalla, estadoApp) {
       const esSalida = m.tipo === 'salida';
       filas.push(`
         <div class="ticket-fila mov-fila ${esSalida ? 'mov-salida' : 'mov-entrada'}">
-          <span class="mov-concepto" title="${esc(m.concepto)}">${esc(m.concepto)}</span>
-          <span class="mov-cuando">${esc(cuandoCorto(m.fecha))}</span>
-          <span class="mov-quien">${esc((m.ejecutor_nombre || '—').split(' ')[0])}</span>
+          <span class="mov-concepto" title="${esc(m.concepto)}${m.notas ? ' · ' + esc(m.notas) : ''}">${esc(m.concepto)}</span>
+          <span class="mov-cuando" title="${esc(cuandoCorto(m.fecha))}">${esc(cuandoCorto(m.fecha))}</span>
+          <span class="mov-quien" title="${esc(m.ejecutor_nombre || '—')}">${esc((m.ejecutor_nombre || '—').split(' ')[0])}</span>
           <span class="mov-importe">${esSalida ? '−' : '+'}${pesos(m.centavos)}</span>
           <span class="mov-accion">${esSalida
             ? `<button class="secundario chico" data-comprobante="${esc(m.id)}">Copia</button>` : ''}</span>
@@ -794,18 +803,26 @@ export async function vistaVenta(pantalla, estadoApp) {
       <div class="pos-cobro-caja pos-movimientos">
         <h3 style="margin:0 0 4px">Gastos y dinero del cajón</h3>
         <p class="ayuda" style="margin:0 0 12px">
-          Los últimos ${movs.length}, cruzando turnos.
+          ${todo
+            ? `Los últimos ${movs.length}, cruzando días y turnos.`
+            : `<b>Los de hoy</b>${movs.length ? '' : ' — todavía ninguno'}.`}
           ${gastos ? `Salieron ${pesos(gastos)} en total.` : ''}
         </p>
         <div class="lista-tickets">
           ${filas.join('') || '<p class="vacio" style="padding:20px 0">Todavía no hay movimientos.</p>'}
         </div>
+        ${todo ? '' : `
+          <button class="secundario chico" id="ver-todo" style="margin-top:12px;width:100%">
+            Ver también los de días anteriores
+          </button>`}
         <button class="secundario" id="cerrar-avisos" style="margin-top:12px;width:100%">
           <span class="tecla-dice">Esc · </span>volver a vender
         </button>
       </div>`;
 
     refs.cobro.querySelector('#cerrar-avisos').onclick = cerrarAvisos;
+    const verTodo = refs.cobro.querySelector('#ver-todo');
+    if (verTodo) verTodo.onclick = () => verMovimientos({ todo: true });
     // Una salida lleva papel firmado; si se traspapeló, aquí se saca otro.
     refs.cobro.querySelectorAll('[data-comprobante]').forEach((b) => {
       b.onclick = async () => {
@@ -1247,6 +1264,7 @@ export async function vistaVenta(pantalla, estadoApp) {
     if (ultimoAgregado.tipo === 'hielo' && !ultimoAgregado.mayoreo) {
       hielo += ultimoAgregado.dieciseisavos;
       pintarTodo();
+      tono('bien');
       return;
     }
     agregarProducto(ultimoAgregado);
@@ -1709,9 +1727,11 @@ export async function vistaVenta(pantalla, estadoApp) {
       // mientras tanto se adelanta el de la serie para que la etiqueta no
       // se quede en el que ya se cobró.
       ctx.siguienteNumero = `${venta.serie}-${(venta.folio_anual || 0) + 1}`;
-      // El cajón se abre al COBRAR, no al imprimir: el ticket solo sale si
-      // alguien lo pide, y el cajón hace falta siempre que entre efectivo.
-      if (ctx.abrirCajon && venta.forma_pago === 'efectivo') abrirCajon({ callado: true });
+      // EL CAJÓN YA NO SE ABRE AQUÍ. Ahora el pulso viaja pegado a los
+      // bytes del ticket: si sale papel se abre, y si la impresora está
+      // apagada no se abre ni se finge que sí. Lo hace el servidor en
+      // /impresion/venta, que es el único sitio que sabe si de verdad
+      // imprimió.
       if (cliente && respuesta.cliente) refrescarCliente(respuesta.cliente);
       cliente = null; fiar = false;
       fase = 'cobrada';
@@ -2003,15 +2023,36 @@ export async function vistaVenta(pantalla, estadoApp) {
            `${d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}`;
   }
 
+  /**
+   * QUÉ CLASE DE TICKET ES ESTE.
+   *
+   * La misma escalera que usa el historial (queEs, en historial/calculo.js):
+   * de lo más específico a lo más general, gana el primero que acierte. Se
+   * repite aquí porque la caja pide las ventas por otra ruta, y lo que no
+   * puede pasar es que las dos pantallas le pongan nombres distintos al
+   * mismo ticket.
+   */
+  function queEs(v) {
+    if (v.cancelada_en && String(v.motivo_cancelacion || '').startsWith('Devolución')) {
+      return { clave: 'devolucion', texto: 'Devolución', emoji: '↩️' };
+    }
+    if (v.cambio_de)    return { clave: 'cambio',    texto: 'Cambio',    emoji: '⇄' };
+    if (v.cambiado_por) return { clave: 'cambiado',  texto: 'Cambiado',  emoji: '⇄' };
+    if (v.cancelada_en) return { clave: 'cancelada', texto: 'Cancelado', emoji: '✕' };
+    if (v.forma_pago === 'credito') return { clave: 'fiado', texto: 'Fiado', emoji: '🤝' };
+    if (v.lista_tipo === 'mayoreo') return { clave: 'mayoreo', texto: 'Mayoreo', emoji: '🏷️' };
+    return { clave: 'venta', texto: 'Venta', emoji: '🧾' };
+  }
+
   /** Lo que traía el ticket, en corto y con lo que explica el precio. */
   function detalleDe(v) {
+    // "CANCELADO", "cambio del #30" y "fiado" ya los dice la etiqueta de al
+    // lado. Aquí solo va lo que la etiqueta NO puede decir: de qué ticket
+    // viene el cambio, de quién es, y qué se llevó.
     const partes = [];
-    if (v.cancelada_en) partes.push('CANCELADO');
-    if (v.cambiado_por) partes.push(`cambiado por ${v.cambiadoPorNumero}`);
-    else if (v.cambio_de) partes.push(`cambio del ${v.cambioDeNumero}`);
-    if (v.cliente_nombre) {
-      partes.push(v.forma_pago === 'credito' ? `fiado a ${v.cliente_nombre}` : v.cliente_nombre);
-    }
+    if (v.cambiado_por) partes.push(`→ ${v.cambiadoPorNumero}`);
+    else if (v.cambio_de) partes.push(`← ${v.cambioDeNumero}`);
+    if (v.cliente_nombre) partes.push(v.cliente_nombre);
     if (v.detalle) partes.push(v.detalle);
     return partes.join(' · ') || '—';
   }
@@ -2029,19 +2070,25 @@ export async function vistaVenta(pantalla, estadoApp) {
       // primero y en grande —el número—, y lo que se llevó va en texto
       // normal, recortado si no cabe. Antes había un botón "Ver" que abría
       // el detalle: con el detalle a la vista ese botón sobraba.
-      caja.innerHTML = ventas.length ? ventas.map((v) => `
+      caja.innerHTML = ventas.length ? ventas.map((v) => {
+        const q = queEs(v);
+        const detalle = detalleDe(v);
+        return `
         <div class="ticket-fila fila-ticket ${v.cancelada_en ? 'anulada' : ''}">
-          <span class="tkl-folio">${esc(v.numero || v.folio)}</span>
-          <span class="tkl-cuando">${esc(cuandoCorto(v.fecha))}</span>
-          <span class="tkl-quien">${esc((v.cajero_nombre || '—').split(' ')[0])}</span>
-          <span class="tkl-detalle" title="${esc(detalleDe(v))}">${esc(detalleDe(v))}</span>
-          <span class="tkl-total ${v.forma_pago === 'credito' ? 'fiado' : ''}">
+          <span class="tkl-folio" title="Ticket ${esc(v.numero || v.folio)}">${esc(v.numero || v.folio)}</span>
+          <span class="hist-que que-${esc(q.clave)}" title="${esc(q.texto)}">${q.emoji} ${esc(q.texto)}</span>
+          <span class="tkl-cuando" title="${esc(cuandoCorto(v.fecha))}">${esc(cuandoCorto(v.fecha))}</span>
+          <span class="tkl-quien" title="${esc(v.cajero_nombre || '—')}">${esc((v.cajero_nombre || '—').split(' ')[0])}</span>
+          <span class="tkl-detalle" title="${esc(detalle)}">${esc(detalle)}</span>
+          <span class="tkl-total ${v.forma_pago === 'credito' ? 'fiado' : ''}"
+                title="${esc(pesos(v.total_centavos))}">
             ${pesos(v.total_centavos)}</span>
-          <button class="secundario chico" data-reimprimir="${esc(v.id)}">Copia</button>
+          <button class="secundario chico" data-reimprimir="${esc(v.id)}"
+                  title="Volver a imprimirlo marcado como copia">Copia</button>
           ${puedeDevolver && !v.cancelada_en && !v.cambiada_por_venta_id
             ? `<button class="secundario chico" data-devolver="${esc(v.id)}"
                        title="Devolverle su dinero al cliente">↩</button>` : ''}
-        </div>`).join('')
+        </div>`; }).join('')
         : '<p class="vacio" style="padding:20px 0">No hay tickets que coincidan.</p>';
 
       caja.querySelectorAll('[data-devolver]').forEach((b) => {
@@ -2138,7 +2185,7 @@ export async function vistaVenta(pantalla, estadoApp) {
       texto: 'Para las cantidades que no tienen botón. Se suma a lo que ya lleva el ticket.',
       valor: 0, ok: 'Agregar al ticket'
     });
-    if (n) { hielo += n; pintarTodo(); }
+    if (n) { hielo += n; pintarTodo(); tono('bien'); }
     enfocar();
   };
 

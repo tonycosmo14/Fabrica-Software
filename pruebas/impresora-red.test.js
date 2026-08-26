@@ -311,7 +311,8 @@ test('la configuración dice qué tiene puesto cada apartado', async () => {
   const r = await llamar('/api/impresion/config');
   const apartados = r.json.datos.impresion.apartados;
 
-  assert.deepEqual(apartados.map((a) => a.id), ['venta', 'corte', 'gasto', 'conteo']);
+  assert.deepEqual(apartados.map((a) => a.id),
+                   ['venta', 'corte', 'gasto', 'conteo', 'produccion']);
   assert.ok(apartados.every((a) => a.comoSeManda),
             'cada uno dice por dónde va a salir, tenga impresora propia o no');
 });

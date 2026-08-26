@@ -205,6 +205,24 @@ router.get('/movimientos', verCaja, (req, res) => {
     ? req.query.tipo : null;
   const limite = Math.min(Math.max(Number(req.query.limite) || 40, 1), 200);
 
+  // DE ENTRADA, SOLO LOS DE HOY.
+  //
+  // La caja pregunta "¿qué ha salido del cajón?", y eso es una pregunta de
+  // hoy: lo de la semana pasada ya se cortó y vive en el historial. Sin
+  // esto la lista traía los últimos cuarenta pasara el tiempo que pasara, y
+  // en un día flojo salían gastos de hace tres días como si fueran de este
+  // turno.
+  //
+  // 'localtime' en el campo guardado, no en el reloj: las fechas se guardan
+  // en UTC y en Yucatán un gasto de las 6:30 de la tarde cae en el día
+  // siguiente. Comparar sin convertir escondía los de la tarde.
+  const soloHoy = req.query.todo !== '1';
+
+  const filtros = ['m.anulado_en IS NULL'];
+  const valores = [];
+  if (tipo) { filtros.push('m.tipo = ?'); valores.push(tipo); }
+  if (soloHoy) filtros.push("date(m.fecha, 'localtime') = date('now', 'localtime')");
+
   const lista = bd.prepare(`
     SELECT m.*, u.nombre AS ejecutor_nombre,
            c.folio AS caja_folio, c.cerrada_en AS caja_cerrada_en,
@@ -213,13 +231,12 @@ router.get('/movimientos', verCaja, (req, res) => {
       LEFT JOIN usuarios u  ON u.id = m.ejecutor_id
       LEFT JOIN cajas c     ON c.id = m.caja_id
       LEFT JOIN usuarios cj ON cj.id = c.cajero_id
-     WHERE m.anulado_en IS NULL
-       ${tipo ? 'AND m.tipo = ?' : ''}
+     WHERE ${filtros.join(' AND ')}
      ORDER BY m.fecha DESC
      LIMIT ?
-  `).all(...(tipo ? [tipo, limite] : [limite]));
+  `).all(...valores, limite);
 
-  return ok(res, { movimientos: lista });
+  return ok(res, { movimientos: lista, soloHoy });
 });
 
 /**

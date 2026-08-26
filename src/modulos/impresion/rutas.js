@@ -15,11 +15,12 @@ const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
 const { configuracion, guardarAjuste, imprimirCrudo,
         tipoDeDestino, impresorasDeWindows, APARTADOS } = require('./impresora');
-const { ticketVenta, ticketMovimiento, ticketPrueba, pulsoCajon,
+const { ticketVenta, ticketMovimiento, ticketPrueba, pulsoCajon, ticketProduccion,
         ticketCorte, ticketConteo } = require('./ticket');
 
 const { aTexto } = require('../../lib/fracciones');
 const { numeroDeTicket } = require('../ventas/folio');
+const { numerosASacar } = require('../produccion/siguientes');
 
 const router = express.Router();
 
@@ -44,7 +45,10 @@ function ventaCompleta(id) {
            lp.tipo AS lista_tipo, lp.nombre AS lista_nombre,
            viejo.serie  AS cambio_de_serie,
            viejo.folio_anual AS cambio_de_anual,
-           viejo.folio  AS cambio_de_folio
+           viejo.folio  AS cambio_de_folio,
+           -- Cuánto valía el ticket que trajo el cliente. Sin esto el
+           -- papel del cambio no puede decir cuánto se le devolvió.
+           viejo.total_centavos AS cambio_de_total
       FROM ventas v
       LEFT JOIN usuarios u  ON u.id = v.cajero_id
       LEFT JOIN clientes cl ON cl.id = v.cliente_id
@@ -59,6 +63,7 @@ function ventaCompleta(id) {
     ? numeroDeTicket({ serie: venta.cambio_de_serie, folio_anual: venta.cambio_de_anual,
                        folio: venta.cambio_de_folio })
     : null;
+  venta.cambioDeTotal = venta.cambio_de_folio ? venta.cambio_de_total : null;
   return venta;
 }
 
@@ -181,10 +186,24 @@ router.post('/venta/:id', puedeImprimir, async (req, res) => {
   const copia = req.body?.copia === true;
   const cuantas = copia ? 1 : cfg.copias;
 
+  // EL CAJÓN VA PEGADO AL TICKET, no aparte.
+  //
+  // Antes el pulso se mandaba al cobrar. Eso tenía dos problemas de los que
+  // se notan en el mostrador: si la impresora estaba apagada el cajón no se
+  // abría igual —el pulso se lo manda ELLA— y nadie entendía por qué; y si
+  // el cajero volvía a imprimir, el cajón ya no se abría.
+  //
+  // Ahora el pulso viaja con los bytes del primer ticket, en el mismo
+  // viaje: si sale papel, se abre; si no sale papel, no se abre. Y sale
+  // cada vez que se imprime, no solo la primera. Va solo en el primero
+  // porque tres copias del mismo ticket son un cobro, no tres.
+  const pulso = cfg.abrirCajon ? pulsoCajon(cfg.salidaCajon) : null;
+
   let ultimo = { impreso: false, motivo: 'nada' };
   for (let i = 0; i < cuantas; i++) {
-    ultimo = await imprimirCrudo(ticketVenta(venta, { copia, negocio: nombreNegocio() }),
-                                 { seccion: 'venta' });
+    const papel = ticketVenta(venta, { copia, negocio: nombreNegocio() });
+    const bytes = i === 0 && pulso ? Buffer.concat([pulso, papel]) : papel;
+    ultimo = await imprimirCrudo(bytes, { seccion: 'venta' });
     if (!ultimo.impreso) break;
   }
 
@@ -198,7 +217,7 @@ router.post('/venta/:id', puedeImprimir, async (req, res) => {
     });
   }
 
-  return ok(res, { impreso: true });
+  return ok(res, { impreso: true, cajon: Boolean(pulso) });
 });
 
 /**
@@ -275,6 +294,24 @@ router.post('/conteo/:id', exigirPermiso('existencia.ver'), async (req, res) => 
 });
 
 /**
+ * LOS NÚMEROS A SACAR, por la térmica.
+ *
+ * Los datos se vuelven a pedir aquí y no llegan del navegador: un papel que
+ * dice qué paño le toca al obrero no puede salir de lo que alguien mande en
+ * el cuerpo de la petición.
+ */
+router.post('/produccion', exigirPermiso('produccion.numeros'), async (req, res) => {
+  const cfg = configuracion();
+  if (!cfg.directa) return ok(res, { impreso: false, motivo: 'sin-destino' });
+
+  const datos = numerosASacar(req.usuario.nombre);
+  const r = await imprimirCrudo(ticketProduccion(datos, { negocio: nombreNegocio() }),
+                                { seccion: 'produccion' });
+  if (!r.impreso) return error(res, `No se pudo imprimir: ${r.motivo}`, 502);
+  return ok(res, { impreso: true });
+});
+
+/**
  * ABRIR EL CAJÓN DEL DINERO.
  *
  * El cajón cuelga de la impresora por un cable: quien le manda el pulso es
@@ -316,10 +353,16 @@ router.post('/movimiento/:id', puedeImprimir, async (req, res) => {
   const cfg = configuracion();
   if (!cfg.directa) return ok(res, { impreso: false, motivo: 'sin-destino' });
 
-  const r = await imprimirCrudo(ticketMovimiento(mov, { negocio: nombreNegocio() }),
+  // El cajón también, y por la razón más obvia de todas: de ahí hay que
+  // sacar los billetes del gasto, o meter los que entran. Va con el papel
+  // en el mismo viaje, igual que en la venta.
+  const pulso = cfg.abrirCajon ? pulsoCajon(cfg.salidaCajon) : null;
+  const papel = ticketMovimiento(mov, { negocio: nombreNegocio() });
+
+  const r = await imprimirCrudo(pulso ? Buffer.concat([pulso, papel]) : papel,
                                 { seccion: 'gasto' });
   if (!r.impreso) return error(res, `No se pudo imprimir: ${r.motivo}`, 502);
-  return ok(res, { impreso: true });
+  return ok(res, { impreso: true, cajon: Boolean(pulso) });
 });
 
 module.exports = router;

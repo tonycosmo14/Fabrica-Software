@@ -28,6 +28,7 @@ const { ok, error } = require('../../lib/respuestas');
 const { puede, ETIQUETAS_ROL } = require('../../lib/roles');
 const autorizar = require('../../lib/autorizacion');
 const { verificar } = require('../../lib/seguridad');
+const { numerosASacar } = require('./siguientes');
 const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
 const { tanqueConEstado, canastasFuera, horasDesde } = require('./estado');
@@ -137,39 +138,7 @@ router.post('/autorizar', registrar, (req, res) => {
  * Decidir que se saque uno FUERA de orden sigue siendo del gerente.
  */
 router.get('/siguientes', exigirPermiso('produccion.numeros'), (req, res) => {
-  const tanques = bd.prepare(
-    'SELECT id, nombre FROM tanques WHERE activo = 1 ORDER BY orden, nombre'
-  ).all();
-
-  const lista = tanques.map((t) => {
-    const estado = tanqueConEstado(t.id);
-    const orden = [];
-    let ultimo = estado.ultimo_pano_sacado;
-
-    // Los siguientes de la rotación, no solo el primero: el obrero se lleva
-    // una lista para toda su jornada.
-    const numeros = estado.panos.map((p) => p.numero);
-    const enProceso = estado.panos.filter((p) => p.enProceso).map((p) => p.numero);
-    const { siguientePano } = require('./rotacion');
-
-    for (let i = 0; i < Math.min(6, numeros.length); i++) {
-      const n = siguientePano(numeros, ultimo, i === 0 ? enProceso : []);
-      if (n == null || orden.includes(n)) break;
-      const pano = estado.panos.find((p) => p.numero === n);
-      orden.push(n);
-      if (!(i === 0 && enProceso.length)) ultimo = n;
-      if (!pano) break;
-    }
-
-    return {
-      tanque: t.nombre,
-      siguientes: orden,
-      enProceso,
-      horasConfiguradas: estado.horas_congelacion
-    };
-  });
-
-  return ok(res, { fecha: ahora(), lista, entregadoPor: req.usuario.nombre });
+  return ok(res, numerosASacar(req.usuario.nombre));
 });
 
 /** Obreros a los que se les puede atribuir el trabajo. */

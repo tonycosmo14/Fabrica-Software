@@ -725,65 +725,65 @@ debería haber − contado = FALTA</pre>
   {
     id: 'historial',
     titulo: 'Historial: revisar lo que se hizo',
-    busca: 'historial revisar auditar quién hizo qué cajero fecha hora filtro tickets gastos entradas abonos borrar eliminar dar de baja contraseña',
+    busca: 'historial revisar auditar quién hizo qué cajero fecha hora filtro tickets gastos entradas abonos borrar eliminar dar de baja contraseña ordenar columna cargar más hoy devolución cambio mayoreo',
     cuerpo: `
-      <p>La pantalla para contestar una pregunta: <em>"¿qué hizo Mari el jueves
-      entre las 3 y las 8?"</em>. Es <b>solo del administrador</b>: no porque
-      sea un secreto, sino porque es para revisar el trabajo de los demás.</p>
+      <p>Todo lo que ha pasado en la caja, de quien sea y de cuando sea:
+      ventas, gastos, entradas de dinero y abonos, mezclados y en orden.</p>
 
-      <h4>Qué se ve</h4>
-      <p>Todo lo que un cajero puede hacer con el dinero, que son cuatro cosas:</p>
+      <h4>Se abre con lo de hoy</h4>
+      <p>Dentro de tres años aquí va a haber cientos de miles de renglones,
+      así que <b>al entrar solo se enseña el día de hoy</b>. Para ver más
+      atrás hay dos caminos:</p>
       <ul>
-        <li><b>🧾 Ventas</b> — lo que cobró</li>
-        <li><b>📤 Gastos</b> — lo que sacó del cajón</li>
-        <li><b>📥 Entradas</b> — lo que metió</li>
-        <li><b>💰 Abonos</b> — lo que le pagaron de una cuenta</li>
+        <li>El botón <b>Cargar 100 más</b> de abajo, que va anexando hacia
+        atrás sin borrar lo que ya estaba.</li>
+        <li>Poner <b>fechas</b>, un <b>número de ticket</b> o cualquier otro
+        filtro: con eso la ventana de hoy se quita sola.</li>
       </ul>
 
-      <h4>Cómo se filtra</h4>
-      <p>Arriba: <b>desde y hasta qué día</b>, <b>desde y hasta qué hora</b>, y
-      <b>quién</b>. Los cuatro botones de colores prenden y apagan cada tipo.
-      <b>Hoy</b> pone las fechas de hoy de un toque, y <b>Quitar filtros</b>
-      deja todo como estaba.</p>
+      <h4>Ordenar</h4>
+      <p>Se toca el título de una columna y se ordena por ella; se toca otra
+      vez y se da la vuelta. Se puede por número, por qué fue, por fecha,
+      por quién o por importe.</p>
+      <p class="ayuda-tip">Ordena <b>lo que ya está cargado</b>, no toda la
+      base. Es a propósito: si ordenara todo, poner "de lo más viejo a lo
+      más nuevo" traería la primera venta de hace diez años en vez de la de
+      las siete de la mañana de hoy, que es lo que se estaba buscando.</p>
 
-      <h4>Los cuatro números de arriba</h4>
-      <p>Cuánto se cobró, cuánto salió, cuánto entró y cuánto abonaron.
-      <b>Suman todo lo que cae en el filtro</b>, no solo los renglones que
-      alcanzas a ver: si revisas un mes, el total es del mes.</p>
-
-      <p class="ayuda-tip">Cada renglón dice <b>quién lo capturó</b>, no de
-      quién era el turno. En el relevo de las 2:30 uno teclea y el turno es de
-      otro; aquí la pregunta es qué hizo la persona.</p>
-
-      <h4>Buscar un ticket por su número</h4>
-      <p>Arriba del todo, <b>Ticket número</b>. Escribes <b>412</b> y ahí
-      está, sin acordarte de qué día fue. Mientras busques por número, los
-      demás filtros no aplican.</p>
-
-      <h4>Lo que puedes hacer con un ticket</h4>
+      <h4>La columna QUÉ</h4>
+      <p>Cada renglón dice de un vistazo qué clase de movimiento fue:</p>
       <ul>
-        <li><b>Copia</b> — lo vuelve a imprimir con <b>** COPIA **</b> entre
-        asteriscos hasta arriba del papel. Lo puede
-        hacer cualquiera que pueda vender.</li>
-        <li><b>⋯</b> — solo el administrador. Ahí están cancelar y eliminar.
-        A los demás ni les sale el botón.</li>
+        <li><b>Venta</b> — una venta de mostrador.</li>
+        <li><b>Mayoreo</b> — salió con precio de una lista de mayoreo.</li>
+        <li><b>Fiado</b> — se lo llevó a crédito.</li>
+        <li><b>Cambio</b> / <b>Cambiado</b> — el ticket nuevo y el viejo de
+        un cambio. Cada uno nombra a su pareja, así que cayendo en
+        cualquiera de los dos se ve la historia completa.</li>
+        <li><b>Devolución</b> — se le devolvió el dinero al cliente.</li>
+        <li><b>Cancelada</b> — el ticket no vale.</li>
+        <li><b>Gasto</b>, <b>Entrada</b>, <b>Abono</b> — dinero del cajón
+        que no fue una venta.</li>
       </ul>
-      <p>Está explicado a fondo en <b>Dar de baja o eliminar</b>, pero en
-      corto: <b>cancelar</b> deja el ticket tachado con su motivo y las
-      cuentas cuadrando, y se puede siempre. <b>Eliminar</b> lo quita de
-      verdad, y <b>solo se puede mientras su turno siga abierto</b>: en
-      cuanto se corta, hay un papel firmado con ese número.</p>
 
-      <h4>Los cambios de ticket</h4>
-      <p>Cuando un ticket se cambió por otro, los <b>dos</b> renglones salen
-      marcados con <b>⇄</b> y cada uno dice cuál es su pareja
-      (<em>#5→#6</em>). Cayendo en cualquiera de los dos se ve la historia
-      completa sin buscar.</p>
+      <h4>Los botones de cada renglón</h4>
+      <ul>
+        <li><b>👁</b> — enseña el movimiento entero: sus renglones, su
+        cliente, su motivo. La columna de "se llevó" va recortada porque es
+        la que más ocupa y la que menos se lee.</li>
+        <li><b>Copia</b> — vuelve a imprimir el ticket con <b>** COPIA **</b>
+        hasta arriba. Lo puede cualquiera.</li>
+        <li><b>⋯</b> — cancelar o eliminar. Solo el administrador; a los
+        demás ni les sale.</li>
+      </ul>
 
-      <h4>Esto no es la bitácora</h4>
-      <p>La bitácora (en <b>Sistema</b>) dice cosas como
-      <code>venta.registrada</code> y es para el que programa. Esto está
-      escrito para leerse.</p>`
+      <p class="ayuda-tip">Lo que salga recortado con puntos suspensivos se
+      ve completo dejando el ratón encima un momento. Vale en todas las
+      listas del programa.</p>
+
+      <h4>Los totales de arriba</h4>
+      <p>Son de <b>todo lo que cae en el filtro</b>, no de los renglones que
+      se están viendo. Por eso cargar más no los cambia: si cambiaran, no
+      se sabría a cuál creerle.</p>`
   },
 
   // ==========================================================
@@ -1022,6 +1022,13 @@ EN REPARACION
       computadora: es un resorte con un cable metido en la <b>impresora</b>,
       y ella le manda el pulso que lo dispara. Por eso solo funciona con la
       impresora configurada.</p>
+      <p><b>El cajón se abre con el ticket.</b> El pulso viaja pegado a los
+      bytes del papel: si sale ticket, se abre; si la impresora está apagada,
+      no se abre ni se finge que sí. Y se abre <b>cada vez</b> que se
+      imprime, no solo la primera. Tres copias del mismo ticket son un
+      cobro, así que ahí se abre una sola vez.</p>
+      <p>El comprobante de un gasto también lo abre: de ahí hay que sacar
+      los billetes.</p>
       <p>En <b>Sistema</b>, debajo de la impresora, prende
       <b>Abrir el cajón al cobrar en efectivo</b>. Se abre <b>al cobrar</b>,
       no al imprimir: el ticket solo sale si alguien lo pide y el cajón hace
@@ -1034,7 +1041,9 @@ EN REPARACION
 
       <h4>Qué se imprime dónde</h4>
       <p>Cada cosa puede ir a una impresora distinta: los tickets de venta,
-      el corte de caja, los comprobantes de gasto y los conteos. Dejarlo en
+      el corte de caja, los comprobantes de gasto, los conteos y los
+      <b>números a sacar</b> —que bien pueden salir en el cuarto de tanques
+      y no en el mostrador—. Dejarlo en
       <b>La de tickets</b> es lo que casi siempre se quiere.</p>
       <p class="ayuda-tip">Las hojas <b>tamaño carta</b> —como la hoja para
       contar— las sigue imprimiendo el navegador con su ventana de elegir

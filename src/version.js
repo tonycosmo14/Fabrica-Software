@@ -17,9 +17,33 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '2.3';
+const VERSION_ACTUAL = '2.4';
 
 const VERSIONES = [
+  {
+    numero: '2.4',
+    nombre: 'Listas que se pueden leer',
+    fecha: '2026-08-26',
+    resumen:
+      'El historial se abre con lo de hoy y no con diez años de golpe, se ' +
+      'ordena tocando la columna y cada renglón dice qué pasó. Y el cajón ' +
+      'ya se abre con el ticket, no por su cuenta.',
+    cambios: [
+      { tipo: 'importante', texto: 'EL HISTORIAL SE ABRE CON LO DE HOY. Dentro de tres años va a haber cientos de miles de renglones y abrirlo no puede querer decir "tráemelos todos". Lo de más atrás se pide con el botón de abajo, que va anexando de cien en cien, o poniendo fechas.' },
+      { tipo: 'nuevo', texto: 'SE ORDENA TOCANDO LA COLUMNA: por número, por qué fue, por fecha, por quién o por importe. Ordena lo que ya está cargado, así que "de lo más viejo a lo más nuevo" te enseña las siete de la mañana de hoy y no la primera venta de hace diez años.' },
+      { tipo: 'importante', texto: 'CADA RENGLÓN DICE QUÉ PASÓ: Venta, Mayoreo, Fiado, Cambio, Devolución, Cancelada, Gasto, Entrada o Abono, con su color. Antes había que deducirlo leyendo la columna de al lado.' },
+      { tipo: 'arreglo', texto: 'El número de ticket ya se ve completo. Con "2026-152125" salía "202…", que es justo el dato por el que se busca.' },
+      { tipo: 'nuevo', texto: 'El ojito de cada renglón abre el movimiento entero, con sus renglones y su motivo. Y todo lo que se recorta con puntos suspensivos enseña el texto completo al pasarle el ratón encima.' },
+      { tipo: 'nuevo', texto: 'SUENA CADA COSA QUE ENTRA AL TICKET, no solo el cobro. El cajero no está mirando la pantalla mientras captura: está viendo al cliente.' },
+      { tipo: 'importante', texto: 'EL CAJÓN VA PEGADO AL TICKET. Antes el pulso se mandaba al cobrar, aparte: con la impresora apagada el cajón no se abría igual —el pulso se lo manda ella— y al reimprimir ya no se abría. Ahora viaja con los bytes del papel: si sale ticket, se abre. Y cada vez que se imprime, no solo la primera.' },
+      { tipo: 'nuevo', texto: 'El comprobante de un gasto también abre el cajón: de ahí hay que sacar los billetes.' },
+      { tipo: 'arreglo', texto: 'EL TICKET DE UN CAMBIO ya dice cuánto se le devuelve al cliente. Antes salía "TOTAL $132 · PAGO $132 · CAMBIO $0", que es verdad para la caja y mentira para el cliente, que trajo un vale de $314 y se lleva $182.' },
+      { tipo: 'nuevo', texto: 'LOS NÚMEROS A SACAR salen por la impresora térmica, con el paño que toca en grande y su raya para firmar. Ya no sale la ventana de imprimir del navegador. Y pueden tener su propia impresora, en el cuarto de tanques.' },
+      { tipo: 'mejora', texto: 'Los gastos y el dinero del cajón enseñan los del día, no los últimos cuarenta cruzando días. Hay un botón para ver los anteriores.' },
+      { tipo: 'arreglo', texto: 'ESC cierra el menú de la derecha, como todo lo demás que se abre encima. Y cada apartado del menú lleva su dibujito.' },
+      { tipo: 'arreglo', texto: 'En la lista de tickets de la caja, cada uno lleva su etiqueta de qué es y el número completo.' }
+    ]
+  },
   {
     numero: '2.3',
     nombre: 'Como se construye un ticket',

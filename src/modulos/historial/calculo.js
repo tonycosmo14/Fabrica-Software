@@ -35,7 +35,8 @@ const TIPOS = ['venta', 'gasto', 'entrada', 'abono'];
  * `campoFecha` y `campoUsuario` cambian según la tabla, pero las preguntas
  * son las mismas.
  */
-function filtros({ desde, hasta, horaDesde, horaHasta, usuarioId }, campoFecha, campoUsuario) {
+function filtros({ desde, hasta, horaDesde, horaHasta, usuarioId, antesDe },
+                 campoFecha, campoUsuario) {
   const donde = [];
   const valores = [];
 
@@ -61,6 +62,15 @@ function filtros({ desde, hasta, horaDesde, horaHasta, usuarioId }, campoFecha, 
 
   if (usuarioId) { donde.push(`${campoUsuario} = ?`); valores.push(usuarioId); }
 
+  // EL CURSOR DE "CARGAR MÁS".
+  //
+  // No se pagina por número de página —"dame la página 3"— porque entre
+  // una página y otra puede entrar una venta nueva y entonces un renglón
+  // se ve dos veces o no se ve nunca. Se pagina por INSTANTE: "dame lo
+  // anterior a este momento exacto". Lo que entre después no estorba,
+  // porque es más nuevo que el corte.
+  if (antesDe) { donde.push(`${campoFecha} < ?`); valores.push(antesDe); }
+
   return { donde, valores };
 }
 
@@ -76,6 +86,11 @@ function pegar(donde) {
  */
 function historial(opciones = {}) {
   const limite = Math.min(Math.max(Number(opciones.limite) || 100, 1), 1000);
+  // Se pide UNO DE MÁS de lo que se va a enseñar. Si viene, es que hay más
+  // atrás y el botón de "cargar más" tiene sentido; si no viene, se llegó
+  // al principio de los tiempos y el botón sobra. Cuesta una fila y evita
+  // un botón que no hace nada, que es lo que hace desconfiar de un botón.
+  const conUnoMas = limite + 1;
   let tipos = Array.isArray(opciones.tipos) && opciones.tipos.length
     ? opciones.tipos.filter((t) => TIPOS.includes(t))
     : TIPOS;
@@ -133,7 +148,7 @@ function historial(opciones = {}) {
         LEFT JOIN listas_precios lp ON lp.id = v.lista_id
        ${pegar(donde)}
        ORDER BY v.fecha DESC LIMIT ?
-    `).all(...valores, limite));
+    `).all(...valores, conUnoMas));
   }
 
   // ---- GASTOS Y ENTRADAS ----
@@ -163,7 +178,7 @@ function historial(opciones = {}) {
         LEFT JOIN cajas c    ON c.id = m.caja_id
        ${pegar(conTipo)}
        ORDER BY m.fecha DESC LIMIT ?
-    `).all(...susValores, limite));
+    `).all(...susValores, conUnoMas));
   }
 
   // ---- ABONOS ----
@@ -187,22 +202,65 @@ function historial(opciones = {}) {
         LEFT JOIN cajas c     ON c.id = a.caja_id
        ${pegar(donde)}
        ORDER BY a.fecha DESC LIMIT ?
-    `).all(...valores, limite));
+    `).all(...valores, conUnoMas));
   }
 
   filas.sort((a, b) => (a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0));
 
-  // El número ya escrito, para que la pantalla no tenga que armarlo.
-  return filas.slice(0, limite).map((f) => ({
-    ...f,
-    numero: f.folio ? numeroDeTicket(f) : null,
-    cambioDeNumero: f.cambio_de
-      ? numeroDeTicket({ serie: f.cambio_de_serie, folio_anual: f.cambio_de_anual,
-                         folio: f.cambio_de }) : null,
-    cambiadoPorNumero: f.cambiado_por
-      ? numeroDeTicket({ serie: f.cambiado_por_serie, folio_anual: f.cambiado_por_anual,
-                         folio: f.cambiado_por }) : null
-  }));
+  const seEnsenan = filas.slice(0, limite);
+
+  return {
+    // El número y el "qué" ya escritos, para que la pantalla no tenga que
+    // armarlos: son los dos datos que se leen primero y no pueden depender
+    // de que cada pantalla los deduzca igual.
+    movimientos: seEnsenan.map((f) => ({
+      ...f,
+      numero: f.folio ? numeroDeTicket(f) : null,
+      cambioDeNumero: f.cambio_de
+        ? numeroDeTicket({ serie: f.cambio_de_serie, folio_anual: f.cambio_de_anual,
+                           folio: f.cambio_de }) : null,
+      cambiadoPorNumero: f.cambiado_por
+        ? numeroDeTicket({ serie: f.cambiado_por_serie, folio_anual: f.cambiado_por_anual,
+                           folio: f.cambiado_por }) : null,
+      que: queEs(f)
+    })),
+    hayMas: filas.length > limite,
+    // El instante del último renglón enseñado. Es lo que hay que mandar
+    // como `antesDe` para pedir el siguiente pedazo.
+    cursor: seEnsenan.length ? seEnsenan[seEnsenan.length - 1].fecha : null
+  };
+}
+
+/**
+ * QUÉ PASÓ AQUÍ, en dos palabras.
+ *
+ * "Venta" no basta: una devolución, un cambio y una venta de mayoreo son
+ * tres cosas distintas y en la lista se veían las tres iguales, con la
+ * diferencia escondida en la columna de "se llevó". Quien revisa el día
+ * quiere saber de un vistazo qué clase de movimiento fue cada renglón, y
+ * eso es un dato, no una interpretación de la pantalla.
+ *
+ * El orden importa: se va de lo más específico a lo más general, y gana el
+ * primero que acierte. Una devolución de un ticket de mayoreo es una
+ * DEVOLUCIÓN: lo que se está mirando es el dinero que salió.
+ */
+function queEs(f) {
+  if (f.tipo === 'gasto')   return { clave: 'gasto',   texto: 'Gasto',    emoji: '📤' };
+  if (f.tipo === 'entrada') return { clave: 'entrada', texto: 'Entrada',  emoji: '📥' };
+  if (f.tipo === 'abono')   return { clave: 'abono',   texto: 'Abono',    emoji: '💰' };
+
+  // El motivo de cancelación es lo que separa una devolución —el cliente
+  // se llevó su dinero— de una cancelación a secas, que es un ticket que
+  // nunca debió existir. Lo escribe el sistema, no una persona.
+  if (f.cancelada_en && String(f.motivo_cancelacion || '').startsWith('Devolución')) {
+    return { clave: 'devolucion', texto: 'Devolución', emoji: '↩️' };
+  }
+  if (f.cambio_de)     return { clave: 'cambio',   texto: 'Cambio',   emoji: '⇄' };
+  if (f.cambiado_por)  return { clave: 'cambiado', texto: 'Cambiado',  emoji: '⇄' };
+  if (f.cancelada_en)  return { clave: 'cancelada', texto: 'Cancelada', emoji: '✕' };
+  if (f.forma_pago === 'credito') return { clave: 'fiado', texto: 'Fiado', emoji: '🤝' };
+  if (f.lista_tipo === 'mayoreo') return { clave: 'mayoreo', texto: 'Mayoreo', emoji: '🏷️' };
+  return { clave: 'venta', texto: 'Venta', emoji: '🧾' };
 }
 
 /**
@@ -258,4 +316,4 @@ function quienes() {
   `).all();
 }
 
-module.exports = { historial, resumen, quienes, TIPOS };
+module.exports = { historial, resumen, quienes, queEs, TIPOS };

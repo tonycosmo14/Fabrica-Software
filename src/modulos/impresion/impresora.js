@@ -120,7 +120,9 @@ const APARTADOS = [
   { id: 'gasto', nombre: 'Comprobantes de gasto',
     ayuda: 'El papel que firma quien saca dinero del cajón.' },
   { id: 'conteo', nombre: 'Conteos del cuarto frío',
-    ayuda: 'El cuadre de las marquetas, cada vez que se cuenta.' }
+    ayuda: 'El cuadre de las marquetas, cada vez que se cuenta.' },
+  { id: 'produccion', nombre: 'Números a sacar',
+    ayuda: 'El papel que se le da al obrero con los paños que le tocan.' }
 ];
 
 /** Dónde imprime un apartado. Vacío = donde imprimen los tickets. */
