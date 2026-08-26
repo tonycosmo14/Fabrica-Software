@@ -16,7 +16,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const { fabricaDePrueba } = require('./ayudante');
 
-const { llamar, entrarAdmin, entrarPorNombre, bd, preparar } = fabricaDePrueba('caja');
+const { llamar, entrarAdmin, entrarPorNombre, crearUsuario, bd, preparar } = fabricaDePrueba('caja');
 
 
 /** Vende una marqueta ($264) en efectivo. */
@@ -562,4 +562,215 @@ test('teclear el PIN sí lo adopta, y la caja lo dice', async () => {
   const despues = (await llamar('/api/ventas/contexto')).json.datos.caja;
   assert.equal(despues.sinDueno, false);
   assert.equal(despues.cajero, 'Mari');
+});
+
+
+// ============================================================
+// LOS GASTOS QUE SE REPITEN  (v2.5)
+//
+// El desayuno de los muchachos es todos los días y nunca es igual.
+// Escrito a mano, a fin de mes hay "Desayuno", "desayunos" y "DESAYUNO":
+// tres conceptos y ninguna estadística. Ese es el problema que resuelve.
+// ============================================================
+
+test('el sistema arranca con unos conceptos de los de siempre', async () => {
+  await entrarAdmin();
+  const { conceptos } = (await llamar('/api/caja/conceptos')).json.datos;
+  assert.ok(conceptos.length >= 4, 'hay algo que tocar desde el primer día');
+  assert.ok(conceptos.some((c) => /desayuno/i.test(c.nombre)));
+  assert.ok(conceptos.every((c) => c.tipo === 'salida' || c.tipo === 'entrada'));
+});
+
+test('el concepto de un gasto lo pone el catálogo, no quien llama', async () => {
+  await entrarAdmin();
+  const { conceptos } = (await llamar('/api/caja/conceptos')).json.datos;
+  const desayuno = conceptos.find((c) => /desayuno/i.test(c.nombre));
+
+  // Se manda un texto distinto a propósito: tiene que ganar el catálogo.
+  const r = await llamar('/api/caja/movimientos', {
+    method: 'POST',
+    cuerpo: { tipo: 'salida', conceptoId: desayuno.id, concepto: 'lo que sea', monto: 85 }
+  });
+  assert.equal(r.estado, 201);
+
+  const m = bd.prepare('SELECT * FROM movimientos_caja WHERE id = ?')
+    .get(r.json.datos.movimientoId);
+  assert.equal(m.concepto, desayuno.nombre, 'el texto sale del catálogo');
+  assert.equal(m.concepto_id, desayuno.id, 'y queda amarrado por su id');
+});
+
+test('un gasto escrito a mano sigue valiendo: no todo se repite', async () => {
+  const r = await llamar('/api/caja/movimientos', {
+    method: 'POST', cuerpo: { tipo: 'salida', concepto: 'Le pagué al plomero', monto: 400 }
+  });
+  assert.equal(r.estado, 201);
+  const m = bd.prepare('SELECT * FROM movimientos_caja WHERE id = ?')
+    .get(r.json.datos.movimientoId);
+  assert.equal(m.concepto, 'Le pagué al plomero');
+  assert.equal(m.concepto_id, null);
+});
+
+test('un concepto de salidas no se puede usar para meter dinero', async () => {
+  const { conceptos } = (await llamar('/api/caja/conceptos')).json.datos;
+  const gasto = conceptos.find((c) => c.tipo === 'salida');
+  const r = await llamar('/api/caja/movimientos', {
+    method: 'POST', cuerpo: { tipo: 'entrada', conceptoId: gasto.id, monto: 50 }
+  });
+  assert.equal(r.estado, 400);
+  assert.match(r.json.error, /salidas/);
+});
+
+test('un concepto que no existe se rechaza en vez de inventarlo', async () => {
+  const r = await llamar('/api/caja/movimientos', {
+    method: 'POST', cuerpo: { tipo: 'salida', conceptoId: 'no-existe', monto: 50 }
+  });
+  assert.equal(r.estado, 409);
+});
+
+test('el resumen del mes suma por concepto, no por lo que se escribió', async () => {
+  await entrarAdmin();
+  const { conceptos } = (await llamar('/api/caja/conceptos')).json.datos;
+  const desayuno = conceptos.find((c) => /desayuno/i.test(c.nombre));
+
+  // Tres desayunos de importes distintos, que es como pasa de verdad.
+  for (const monto of [50, 100, 75]) {
+    await llamar('/api/caja/movimientos', {
+      method: 'POST', cuerpo: { tipo: 'salida', conceptoId: desayuno.id, monto } });
+  }
+
+  const { porConcepto, sueltos } = (await llamar('/api/caja/conceptos/resumen')).json.datos;
+  const fila = porConcepto.find((r) => r.id === desayuno.id);
+  assert.ok(fila, 'el desayuno tiene su renglón');
+  assert.equal(fila.veces, 4, 'los tres de ahora más el de la prueba de antes');
+  assert.equal(fila.centavos, 8500 + 5000 + 10000 + 7500);
+
+  // Los escritos a mano van aparte: no hay forma honesta de agruparlos.
+  assert.ok(sueltos.some((s) => s.tipo === 'salida'),
+            'los de texto libre se cuentan, pero por separado');
+});
+
+test('renombrar un concepto no parte su historia en dos', async () => {
+  await entrarAdmin();
+  const { conceptos } = (await llamar('/api/caja/conceptos')).json.datos;
+  const desayuno = conceptos.find((c) => /desayuno/i.test(c.nombre));
+
+  const antes = (await llamar('/api/caja/conceptos/resumen')).json.datos
+    .porConcepto.find((r) => r.id === desayuno.id);
+
+  const r = await llamar(`/api/caja/conceptos/${desayuno.id}`, {
+    method: 'PUT', cuerpo: { nombre: 'Comida de los muchachos' }
+  });
+  assert.equal(r.estado, 200);
+
+  const despues = (await llamar('/api/caja/conceptos/resumen')).json.datos
+    .porConcepto.find((x) => x.id === desayuno.id);
+  assert.equal(despues.centavos, antes.centavos, 'sigue sumando lo mismo');
+  assert.equal(despues.nombre, 'Comida de los muchachos');
+
+  // Y el comprobante que se firmó ayer no cambió (regla 3.5).
+  const viejo = bd.prepare(
+    "SELECT concepto FROM movimientos_caja WHERE concepto_id = ? ORDER BY fecha LIMIT 1"
+  ).get(desayuno.id);
+  assert.equal(viejo.concepto, 'Desayuno', 'el papel dice lo que decía ese día');
+});
+
+test('dar de baja un concepto no borra lo que ya se anotó con él', async () => {
+  await entrarAdmin();
+  const { conceptos } = (await llamar('/api/caja/conceptos')).json.datos;
+  const desayuno = conceptos.find((c) => c.id === 'gasto-desayuno');
+
+  const antes = (await llamar('/api/caja/conceptos/resumen')).json.datos
+    .porConcepto.find((r) => r.id === desayuno.id);
+
+  await llamar(`/api/caja/conceptos/${desayuno.id}`, { method: 'PUT', cuerpo: { activo: false } });
+
+  const activos = (await llamar('/api/caja/conceptos')).json.datos.conceptos;
+  assert.ok(!activos.some((c) => c.id === desayuno.id), 'ya no sale en la caja');
+
+  const despues = (await llamar('/api/caja/conceptos/resumen')).json.datos
+    .porConcepto.find((r) => r.id === desayuno.id);
+  assert.equal(despues.centavos, antes.centavos, 'un gasto de marzo no desaparece en agosto');
+
+  // Y no se puede usar por accidente estando de baja.
+  const r = await llamar('/api/caja/movimientos', {
+    method: 'POST', cuerpo: { tipo: 'salida', conceptoId: desayuno.id, monto: 50 } });
+  assert.equal(r.estado, 409);
+
+  await llamar(`/api/caja/conceptos/${desayuno.id}`, { method: 'PUT', cuerpo: { activo: true } });
+});
+
+test('no se pueden dar de alta dos conceptos con el mismo nombre', async () => {
+  await entrarAdmin();
+  const r1 = await llamar('/api/caja/conceptos', { method: 'POST', cuerpo: { nombre: 'Hielo seco' } });
+  assert.equal(r1.estado, 201);
+  const r2 = await llamar('/api/caja/conceptos', { method: 'POST', cuerpo: { nombre: 'hielo SECO' } });
+  assert.equal(r2.estado, 409, 'dos que se llaman igual son el problema que esto resuelve');
+});
+
+test('un cajero usa los conceptos pero no los da de alta', async () => {
+  await crearUsuario('Lupe', 'cajero', '3131');
+  await entrarPorNombre('Lupe', '3131');
+
+  assert.equal((await llamar('/api/caja/conceptos')).estado, 200, 'los ve para tocarlos');
+  const r = await llamar('/api/caja/conceptos', { method: 'POST', cuerpo: { nombre: 'Lo que sea' } });
+  assert.equal(r.estado, 403, 'el catálogo es del gerente para arriba');
+  await entrarAdmin();
+});
+
+
+// ============================================================
+// EL TURNO QUE SE RELEVÓ  (v2.5)
+//
+// EL CASO: son las diez de la noche, se va la luz y el turno no se puede
+// cortar. A la mañana llega otro cajero, pone su PIN y sigue vendiendo
+// sobre el turno abierto. Cuando por fin se corta, el papel salía a
+// nombre del primero y el segundo no aparecía por ningún lado.
+// ============================================================
+
+test('el corte dice quién metió qué cuando estuvieron dos en la caja', async () => {
+  await entrarAdmin();
+
+  // El turno arranca con el administrador.
+  const abierta = (await llamar('/api/caja')).json.datos.abierta;
+  assert.ok(abierta, 'hay un turno abierto');
+
+  await llamar('/api/ventas', { method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 16 }], pago: 300 } });
+  await llamar('/api/ventas', { method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 8 }], pago: 200 } });
+
+  // Llega el relevo y sigue sobre el MISMO turno, sin cortar.
+  await crearUsuario('Beto', 'cajero', '2121');
+  await entrarPorNombre('Beto', '2121');
+  await llamar('/api/ventas', { method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 4 }], pago: 100 } });
+  await llamar('/api/caja/movimientos', {
+    method: 'POST', cuerpo: { tipo: 'salida', concepto: 'Refrescos', monto: 60 } });
+
+  await entrarAdmin();
+  const cerrar = await llamar('/api/caja/cerrar', { method: 'POST', cuerpo: { contado: 1 } });
+  assert.equal(cerrar.estado, 200);
+
+  const { porPersona } = cerrar.json.datos.corte;
+  assert.equal(porPersona.length, 2, 'los dos aparecen');
+
+  const beto = porPersona.find((p) => p.nombre === 'Beto');
+  assert.ok(beto, 'el que llegó al relevo tiene su renglón');
+  assert.equal(beto.cobradas, 1);
+  assert.equal(beto.salidas, 6000, 'y sus gastos');
+
+  const tony = porPersona.find((p) => p.nombre !== 'Beto');
+  assert.equal(tony.cobradas, 2);
+
+  // El arqueo NO se parte: el dinero del cajón es uno solo.
+  const c = cerrar.json.datos.corte.caja;
+  assert.equal(c.vendido_centavos,
+               porPersona.reduce((n, p) => n + p.efectivo, 0),
+               'lo de todos junto es lo del turno');
+});
+
+test('con una sola persona el corte no trae desglose: repetiría lo mismo', async () => {
+  await entrarAdmin();
+  await llamar('/api/caja/abrir', { method: 'POST', cuerpo: { fondo: 500 } });
+  await llamar('/api/ventas', { method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 16 }], pago: 300 } });
+
+  const cerrar = await llamar('/api/caja/cerrar', { method: 'POST', cuerpo: { contado: 764 } });
+  assert.deepEqual(cerrar.json.datos.corte.porPersona, []);
 });

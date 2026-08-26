@@ -72,7 +72,9 @@ test('un concepto larguísimo se recorta en vez de romper el renglón', () => {
 
 test('los acentos se mandan en la tabla de la impresora', () => {
   const b = new Ticket(80).linea('año cañón').bytes();
-  assert.ok(b.toString('latin1').includes('año'), 'la ñ va como un solo byte');
+  // Un byte por letra, no dos: la ñ no se parte en n + tilde.
+  assert.ok(b.includes(0xa4), 'la ñ va como un solo byte, el suyo en CP850');
+  assert.ok(b.includes(0xa2), 'y la ó también');
   // Y se pidió la tabla de acentos: ESC t
   assert.equal(b[2], 0x1b);
   assert.equal(b[3], 0x74);
@@ -373,4 +375,99 @@ test('quien no puede ver los números tampoco los imprime', async () => {
   const r = await llamar('/api/impresion/produccion', { method: 'POST', cuerpo: {} });
   assert.equal(r.estado, 403);
   await entrarAdmin();
+});
+
+
+// ============================================================
+// EL CIERRE IMPRIME TRES COSAS  (v2.5)
+//
+// "Cuando hago el corte de turno me tiene que salir impreso: el ticket del
+//  corte, cuánto hielo queda, y qué paños se sacaron en el día."
+//
+// Juntos, porque juntos es como se leen: si el cajón cuadra pero falta
+// hielo, el problema no está en la caja.
+// ============================================================
+
+test('al imprimir el corte sale también el hielo que queda y los paños del día', async () => {
+  await entrarAdmin();
+  await llamar('/api/caja/abrir', { method: 'POST', cuerpo: { fondo: 500 } });
+  await llamar('/api/ventas', { method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 16 }], pago: 300 } });
+  const cerrar = await llamar('/api/caja/cerrar', { method: 'POST', cuerpo: { contado: 764 } });
+  const cajaId = cerrar.json.datos.corte.caja.id;
+
+  limpiarPapel();
+  const r = await llamar(`/api/impresion/corte/${cajaId}`, { method: 'POST', cuerpo: {} });
+  assert.equal(r.estado, 200);
+  assert.equal(r.json.datos.papeles, 2, 'el corte y el día');
+
+  const papel = loImpreso();
+  assert.match(papel, /Corte #/, 'el papel que se firma');
+  assert.match(papel, /HIELO EN EL CUARTO FRIO/, 'cuánto queda');
+  assert.match(papel, /PANOS SACADOS HOY/, 'y qué se sacó');
+  assert.equal(papel.split('VB').length - 1, 2, 'dos papeles, dos cortes de papel');
+});
+
+test('si el turno se relevó, sale un papel por cada quien', async () => {
+  await entrarAdmin();
+  await llamar('/api/caja/abrir', { method: 'POST', cuerpo: { fondo: 500 } });
+  await llamar('/api/ventas', { method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 16 }], pago: 300 } });
+
+  await llamar('/api/usuarios', { method: 'POST', cuerpo: { nombre: 'Nico', rol: 'cajero', pin: '8181' } });
+  const lista = (await llamar('/api/auth/usuarios-disponibles')).json.datos.usuarios;
+  const nico = lista.find((u) => u.nombre === 'Nico');
+  await llamar('/api/auth/entrar-pin', { method: 'POST', cuerpo: { usuarioId: nico.id, pin: '8181' } });
+  await llamar('/api/ventas', { method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 8 }], pago: 200 } });
+
+  await entrarAdmin();
+  const cerrar = await llamar('/api/caja/cerrar', { method: 'POST', cuerpo: { contado: 1 } });
+  const cajaId = cerrar.json.datos.corte.caja.id;
+
+  limpiarPapel();
+  const r = await llamar(`/api/impresion/corte/${cajaId}`, { method: 'POST', cuerpo: {} });
+  assert.equal(r.json.datos.papeles, 4, 'el corte, uno por cada quien, y el día');
+
+  const papel = loImpreso();
+  assert.match(papel, /Su parte del turno/, 'cada uno firma lo suyo');
+  assert.match(papel, /Nico/, 'el que llegó al relevo tiene su papel');
+  assert.match(papel, /CADA QUIEN/, 'y el corte del turno los lista a los dos');
+  assert.match(papel, /El arqueo completo va en el corte del turno/,
+               'porque el dinero del cajón es uno solo y no se parte');
+});
+
+
+// ============================================================
+// LOS ACENTOS  (v2.5)
+//
+// Un error viejo y silencioso: el texto se mandaba en latin1 y a la
+// impresora se le decía "usa la tabla 2", que es la CP850. No son la
+// misma. "Cuarto frío" salía impreso "Cuarto frÝo".
+// ============================================================
+
+test('los acentos salen en la tabla que de verdad usa la impresora', () => {
+  const bytes = new Ticket(80).linea('Cuarto frío').bytes();
+  // í en CP850 es 0xA1. En latin1 es 0xED, que en CP850 es una Ý.
+  assert.ok(bytes.includes(0xa1), 'la í va como í');
+  assert.ok(!bytes.includes(0xed), 'y no como el byte de latin1');
+});
+
+test('la ñ y los signos de apertura también', () => {
+  const bytes = [...new Ticket(80).linea('Año ¿Ñandú?').bytes()];
+  assert.ok(bytes.includes(0xa4), 'ñ');
+  assert.ok(bytes.includes(0xa5), 'Ñ');
+  assert.ok(bytes.includes(0xa8), '¿');
+  assert.ok(bytes.includes(0xa3), 'ú');
+});
+
+test('lo que no está en la tabla se queda sin acento, no en cuadrito', () => {
+  // La ā con raya encima no existe en CP850: se prefiere "Baltico" a un
+  // cuadro negro. (La ó sí existe, así que esa sí sale con su acento.)
+  const papel = new Ticket(80).linea('Bāltico').bytes().toString('latin1');
+  assert.match(papel, /Baltico/);
+});
+
+test('la impresora sigue arrancando con la tabla 2 (CP850)', () => {
+  const bytes = new Ticket(80).bytes();
+  assert.equal(bytes[2], 0x1b);
+  assert.equal(bytes[3], 0x74);
+  assert.equal(bytes[4], 2, 'si esto cambia, la tabla de acentos deja de valer');
 });

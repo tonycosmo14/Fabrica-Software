@@ -17,9 +17,28 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '2.4';
+const VERSION_ACTUAL = '2.5';
 
 const VERSIONES = [
+  {
+    numero: '2.5',
+    nombre: 'Los gastos de siempre y el turno relevado',
+    fecha: '2026-08-26',
+    resumen:
+      'Los gastos que se repiten se tocan en vez de escribirse, y a fin de ' +
+      'mes se pueden sumar. El corte sale con el hielo y los paños del día, ' +
+      'y con un papel por cada quien si el turno se relevó.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'GASTOS QUE SE REPITEN. El desayuno de los muchachos es todos los días y nunca es igual. Se da de alta una vez y el cajero lo toca: pone la cantidad y listo. En Caja › Gastos que se repiten se administran.' },
+      { tipo: 'importante', texto: 'Lo que se gana no es escribir menos: es que los cien desayunos del mes se llamen IGUAL. Escrito a mano quedaban "Desayuno", "desayunos" y "DESAYUNO", que son tres conceptos y ninguna estadística. Ahí ya se ve cuánto lleva cada uno este mes.' },
+      { tipo: 'mejora', texto: 'Renombrar un concepto no parte su historia en dos: los gastos viejos siguen sumando ahí, y sus comprobantes siguen diciendo lo que decían el día que se firmaron. Darlo de baja tampoco borra nada.' },
+      { tipo: 'nuevo', texto: 'EL GASTO RARO SE SIGUE ESCRIBIENDO. "Otro" está ahí para el plomero de una vez: obligar a dar de alta un concepto para eso sería peor que el problema.' },
+      { tipo: 'importante', texto: 'EL TURNO QUE SE RELEVA. Si se va la luz y el turno queda abierto, y a la mañana otro cajero pone su PIN y sigue vendiendo, el corte ya no sale solo a nombre del primero: sale un papel POR CADA QUIEN con lo suyo, además del corte del turno. El arqueo no se parte, porque el dinero del cajón es uno solo.' },
+      { tipo: 'nuevo', texto: 'AL CERRAR EL TURNO SALE TODO SOLO: el corte que se firma, el papel de cada cajero si hubo relevo, y el resumen del día con cuánto hielo queda y qué paños se sacaron. Juntos, porque juntos es como se leen: si el cajón cuadra pero falta hielo, el problema no está en la caja.' },
+      { tipo: 'mejora', texto: 'El corte se apretó: mismo contenido, menos renglones. De estos salen dos o tres al día.' },
+      { tipo: 'arreglo', texto: 'LOS ACENTOS EN LA IMPRESORA. Error viejo y silencioso: el texto se mandaba en una tabla de letras y a la impresora se le pedía otra. "Cuarto frío" salía "Cuarto frÝo". Ya salen bien la í, la ñ, la é, los signos de apertura y todo lo demás.' }
+    ]
+  },
   {
     numero: '2.4',
     nombre: 'Listas que se pueden leer',

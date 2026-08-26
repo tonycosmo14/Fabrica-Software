@@ -2304,18 +2304,65 @@ export async function vistaVenta(pantalla, estadoApp) {
     pantalla.querySelector('#gasto').onclick = () => movimiento('salida');
   }
 
+  /**
+   * ANOTAR UN GASTO O UNA ENTRADA.
+   *
+   * Primero se ELIGE de los que se repiten, no se escribe. El desayuno de
+   * los muchachos es todos los días y nunca es igual: escrito a mano, al
+   * final del mes hay "Desayuno", "desayunos" y "DESAYUNO", que son tres
+   * conceptos y ninguna estadística. Tocándolo es siempre el mismo.
+   *
+   * "Otro" sigue ahí para el gasto raro que no se va a repetir: obligar a
+   * dar de alta un concepto para pagarle una vez a un plomero sería peor
+   * que el problema.
+   */
   async function movimiento(tipo) {
     const esSalida = tipo === 'salida';
 
-    const concepto = await pedirTexto({
-      titulo: esSalida ? 'Gasto o retiro' : 'Meter dinero al cajón',
-      texto: esSalida
-        ? '¿En qué se usó? La gasolina, un refresco, el retiro a la caja fuerte…'
-        : '¿De dónde viene? El fondo con el que arranca el cajón, cambio del banco…',
-      marcador: esSalida ? 'Gasolina' : 'Fondo para cambio',
-      ok: 'Siguiente', largo: 60
-    });
-    if (!concepto) { enfocar(); return; }
+    let conceptos = [];
+    try {
+      conceptos = ((await api.obtener('/caja/conceptos')).conceptos || [])
+        .filter((c) => c.tipo === tipo);
+    } catch { /* sin catálogo se escribe a mano, que es como era antes */ }
+
+    let conceptoId = null;
+    let concepto = '';
+
+    if (conceptos.length) {
+      const elegido = await menu({
+        titulo: esSalida ? 'Gasto o retiro' : 'Meter dinero al cajón',
+        texto: esSalida
+          ? '¿En qué se usó? Toca el de siempre, o escribe uno.'
+          : '¿De dónde viene? Toca el de siempre, o escribe uno.',
+        opciones: [
+          ...conceptos.map((c) => ({
+            valor: c.id,
+            texto: c.nombre,
+            detalle: c.ayuda || ''
+          })),
+          { valor: '__otro', texto: '✎ Otro — escribirlo',
+            detalle: 'Para el gasto que no se repite' }
+        ]
+      });
+      if (!elegido) { enfocar(); return; }
+
+      if (elegido !== '__otro') {
+        conceptoId = elegido;
+        concepto = conceptos.find((c) => c.id === elegido)?.nombre || '';
+      }
+    }
+
+    if (!conceptoId) {
+      concepto = await pedirTexto({
+        titulo: esSalida ? 'Gasto o retiro' : 'Meter dinero al cajón',
+        texto: esSalida
+          ? '¿En qué se usó? La gasolina, un refresco, el retiro a la caja fuerte…'
+          : '¿De dónde viene? El fondo con el que arranca el cajón, cambio del banco…',
+        marcador: esSalida ? 'Gasolina' : 'Fondo para cambio',
+        ok: 'Siguiente', largo: 60
+      });
+      if (!concepto) { enfocar(); return; }
+    }
 
     const monto = await pedirImporte({
       titulo: concepto, texto: '¿De cuánto es?',
@@ -2324,7 +2371,8 @@ export async function vistaVenta(pantalla, estadoApp) {
     if (!monto) { enfocar(); return; }
 
     try {
-      const r = await api.enviar('/caja/movimientos', { tipo, concepto, monto });
+      const r = await api.enviar('/caja/movimientos',
+        conceptoId ? { tipo, conceptoId, monto } : { tipo, concepto, monto });
       avisar(esSalida ? 'Salida anotada' : 'Dinero anotado', 'bien');
 
       // Una salida SÍ lleva papel: alguien se llevó dinero del cajón y

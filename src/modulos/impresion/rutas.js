@@ -16,11 +16,15 @@ const { exigirPermiso } = require('../../middleware/sesion');
 const { configuracion, guardarAjuste, imprimirCrudo,
         tipoDeDestino, impresorasDeWindows, APARTADOS } = require('./impresora');
 const { ticketVenta, ticketMovimiento, ticketPrueba, pulsoCajon, ticketProduccion,
-        ticketCorte, ticketConteo } = require('./ticket');
+        ticketCorte, ticketCortePersona, ticketConteo,
+        ticketResumenDia } = require('./ticket');
 
 const { aTexto } = require('../../lib/fracciones');
 const { numeroDeTicket } = require('../ventas/folio');
 const { numerosASacar } = require('../produccion/siguientes');
+const { resumenDelDia } = require('../produccion/dia');
+const { estadoAlmacen } = require('../existencia/calculo');
+const { desglosePorPersona } = require('../caja/calculo');
 
 const router = express.Router();
 
@@ -244,17 +248,72 @@ router.post('/corte/:id', exigirPermiso('caja.ver'), async (req, res) => {
     ventas: bd.prepare(`
       SELECT COUNT(*) FILTER (WHERE cancelada_en IS NULL) AS cobradas,
              COUNT(*) FILTER (WHERE cancelada_en IS NOT NULL) AS canceladas
-        FROM ventas WHERE caja_id = ?`).get(caja.id)
+        FROM ventas WHERE caja_id = ?`).get(caja.id),
+    porPersona: desglosePorPersona(caja.id)
   };
 
   const cfg = configuracion();
   if (!cfg.directa) return ok(res, { impreso: false, motivo: 'sin-destino' });
 
-  const r = await imprimirCrudo(ticketCorte(corte, { negocio: nombreNegocio() }),
-                                { seccion: 'corte' });
-  if (!r.impreso) return error(res, `No se pudo imprimir: ${r.motivo}`, 502);
-  return ok(res, { impreso: true });
+  const negocio = nombreNegocio();
+
+  // LOS TRES PAPELES DEL CIERRE, en un solo tirón:
+  //
+  //   1. el corte del turno, que es el que se firma
+  //   2. uno por cajero, si el turno se relevó a media noche
+  //   3. el resumen del día: cuánto hielo queda y qué paños salieron
+  //
+  // Van juntos porque juntos es como se leen: si el cajón cuadra pero
+  // falta hielo, el problema no está en la caja. En papeles separados
+  // nadie los junta.
+  const papeles = [ticketCorte(corte, { negocio })];
+
+  if (corte.porPersona.length > 1) {
+    for (const p of corte.porPersona) {
+      papeles.push(ticketCortePersona(corte, p, { negocio }));
+    }
+  }
+
+  papeles.push(ticketResumenDia({
+    fecha: caja.cerrada_en,
+    quien: caja.cerrada_por_nombre || caja.cajero_nombre,
+    almacenes: existenciaParaElCorte(),
+    produccion: resumenDelDia()
+  }, { negocio }));
+
+  let ultimo = { impreso: false, motivo: 'nada' };
+  for (const papel of papeles) {
+    ultimo = await imprimirCrudo(papel, { seccion: 'corte' });
+    if (!ultimo.impreso) break;
+  }
+
+  if (!ultimo.impreso) return error(res, `No se pudo imprimir: ${ultimo.motivo}`, 502);
+  return ok(res, { impreso: true, papeles: papeles.length });
 });
+
+/**
+ * Cuánto hielo debería haber en cada cuarto frío, para el papel del cierre.
+ *
+ * Es el mismo cálculo de la pantalla de Existencia —no hay un número
+ * guardado que se pueda desincronizar (regla 3.2)— y por eso dice también
+ * cuándo fue el último conteo: "deberían quedar 18" vale muy poco si el
+ * último conteo fue hace tres días.
+ */
+function existenciaParaElCorte() {
+  const almacenes = bd.prepare(
+    'SELECT * FROM almacenes WHERE activo = 1 ORDER BY orden, nombre'
+  ).all();
+
+  return almacenes.map((a) => {
+    const e = estadoAlmacen(a);
+    return {
+      nombre: a.nombre,
+      esperado: e.esperado,
+      contado: e.existenciaAnterior,
+      ultimoConteo: e.ultimoConteo?.fecha || null
+    };
+  });
+}
 
 /** El cuadre de un conteo del cuarto frío. */
 router.post('/conteo/:id', exigirPermiso('existencia.ver'), async (req, res) => {

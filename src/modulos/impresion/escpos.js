@@ -27,6 +27,38 @@ const ESC = 0x1b;
 const GS = 0x1d;
 
 /**
+ * LOS ACENTOS, en la tabla que de verdad usa la impresora.
+ *
+ * Aquí había un error viejo y silencioso: el texto se mandaba en latin1 y a
+ * la impresora se le decía "usa la tabla 2", que es la CP850. No son la
+ * misma. En latin1 la í es el byte 0xED; en CP850 ese byte es una Ý. Así
+ * que "Cuarto frío" salía impreso "Cuarto frÝo" y nadie sabía por qué.
+ *
+ * Esta tabla dice, para cada letra que lleva acento en español, qué byte le
+ * corresponde en CP850. Lo que no esté aquí y no quepa en un byte se sigue
+ * quedando sin acento, que es mejor que un cuadrito negro.
+ */
+const CP850 = {
+  'Ç': 0x80, 'ü': 0x81, 'é': 0x82, 'â': 0x83, 'ä': 0x84, 'à': 0x85,
+  'ç': 0x87, 'ê': 0x88, 'ë': 0x89, 'è': 0x8a, 'ï': 0x8b, 'î': 0x8c,
+  'ì': 0x8d, 'Ä': 0x8e, 'Å': 0x8f, 'É': 0x90, 'ô': 0x93, 'ö': 0x94,
+  'ò': 0x95, 'û': 0x96, 'ù': 0x97, 'ÿ': 0x98, 'Ö': 0x99, 'Ü': 0x9a,
+  'ø': 0x9b, '£': 0x9c, 'Ø': 0x9d, '×': 0x9e,
+  'á': 0xa0, 'í': 0xa1, 'ó': 0xa2, 'ú': 0xa3, 'ñ': 0xa4, 'Ñ': 0xa5,
+  'ª': 0xa6, 'º': 0xa7, '¿': 0xa8, '¬': 0xaa, '½': 0xab, '¼': 0xac,
+  '¡': 0xad, '«': 0xae, '»': 0xaf,
+  'Á': 0xb5, 'Â': 0xb6, 'À': 0xb7, '©': 0xb8,
+  'ã': 0xc6, 'Ã': 0xc7,
+  'ð': 0xd0, 'Ð': 0xd1, 'Ê': 0xd2, 'Ë': 0xd3, 'È': 0xd4, 'Í': 0xd6,
+  'Î': 0xd7, 'Ï': 0xd8,
+  'Ó': 0xe0, 'ß': 0xe1, 'Ô': 0xe2, 'Ò': 0xe3, 'õ': 0xe4, 'Õ': 0xe5,
+  'µ': 0xe6, 'þ': 0xe7, 'Þ': 0xe8, 'Ú': 0xe9, 'Û': 0xea, 'Ù': 0xeb,
+  'ý': 0xec, 'Ý': 0xed, '¯': 0xee, '´': 0xef,
+  '±': 0xf1, '¾': 0xf3, '¶': 0xf4, '§': 0xf5, '÷': 0xf6, '°': 0xf8,
+  '¨': 0xf9, '·': 0xfa, '¹': 0xfb, '³': 0xfc, '²': 0xfd
+};
+
+/**
  * Signos de imprenta que la impresora dibuja mal, y con qué se cambian.
  * Son los que se cuelan al copiar de un documento o los que pone el propio
  * sistema al armar un desglose: "2 × 1/4".
@@ -77,11 +109,30 @@ class Ticket {
   texto(cadena = '') {
     const limpio = String(cadena)
       .normalize('NFC')
-      .replace(/[×÷‐-―‘’“”…−]/g,
-               (c) => EQUIVALENTES[c] || c)
-      .replace(/[^\x00-\xFF]/g, (c) =>
-        c.normalize('NFD').replace(/[̀-ͯ]/g, '') || '?');
-    this.partes.push(Buffer.from(limpio, 'latin1'));
+      .replace(/[×÷‐-―‘’“”…−]/g, (c) => EQUIVALENTES[c] || c);
+
+    const bytes = [];
+    for (const letra of limpio) {
+      const codigo = letra.codePointAt(0);
+
+      // Lo de siempre —letras, números, signos— es igual en todas las
+      // tablas y va tal cual.
+      if (codigo < 0x80) { bytes.push(codigo); continue; }
+
+      // Los acentos, por su byte de CP850, que es la tabla que se le pidió
+      // a la impresora en el arranque (ESC t 2).
+      if (CP850[letra] !== undefined) { bytes.push(CP850[letra]); continue; }
+
+      // Lo que no está en la tabla se queda sin acento: más vale
+      // "Panaderia" que un cuadrito negro.
+      const pelado = letra.normalize('NFD').replace(/[̀-ͯ]/g, '');
+      for (const l of pelado) {
+        const c = l.codePointAt(0);
+        bytes.push(c < 0x80 ? c : (CP850[l] ?? 0x3f));   // 0x3f = '?'
+      }
+    }
+
+    this.partes.push(Buffer.from(bytes));
     return this;
   }
 

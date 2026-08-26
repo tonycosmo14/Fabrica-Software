@@ -2817,3 +2817,17 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 .fila-ticket.anulada { text-decoration: none; opacity: .55; }
 .fila-ticket.anulada > span:not(.hist-que) { text-decoration: line-through; }
 .fila-ticket .hist-que { justify-self: start; }
+
+/* Los gastos que se repiten: el catálogo del que salen los botones de la
+   caja. Cuánto lleva cada uno este mes es lo que dice si el concepto está
+   sirviendo de algo o sobra. */
+.concepto-tabla { min-width: 640px; }
+.cp-c-nombre   { width: auto; }
+.cp-c-nombre small { display: block; font-size: 11.5px; color: var(--suave); }
+.cp-c-tipo     { width: 168px; }
+.cp-c-mes      { width: 116px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.cp-c-usos     { width: 78px; font-variant-numeric: tabular-nums; color: var(--suave); }
+.cp-c-acciones { width: 182px; white-space: nowrap; }
+.cp-c-acciones .chico { margin-left: 4px; }
+.concepto-tabla tr.anulada { text-decoration: none; opacity: .55; }
+.concepto-tabla td { height: auto; white-space: normal; }

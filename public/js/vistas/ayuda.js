@@ -437,7 +437,51 @@ debería haber − contado = DIFERENCIA</pre>
         de hoy, el corte firmado se queda como está.</li>
         <li>Al cerrar el turno, el siguiente se abre solo cuando alguien
         vuelva a entrar con su PIN.</li>
-      </ul>`
+      </ul>
+
+      <h4>Los gastos que se repiten</h4>
+      <p>El desayuno de los muchachos es todos los días y nunca es igual: a
+      veces $50, a veces $100. Escrito a mano, a fin de mes hay "Desayuno",
+      "desayunos" y "DESAYUNO" —tres conceptos y ninguna cuenta—, porque
+      nadie escribe igual dos veces.</p>
+      <p>Los que se repiten se dan de alta una vez en
+      <b>Caja › Gastos que se repiten</b>, y el cajero los <b>toca</b>: pone
+      la cantidad y sale el comprobante. A fin de mes se puede ver cuánto se
+      fue en cada cosa.</p>
+      <ul>
+        <li><b>Renombrarlo no parte su historia.</b> Si "Desayuno" pasa a
+        llamarse "Comida de los muchachos", los gastos viejos siguen sumando
+        ahí, y los comprobantes que ya se firmaron siguen diciendo
+        "Desayuno": el papel dice lo que decía ese día.</li>
+        <li><b>Darlo de baja no borra nada.</b> Deja de salir en la caja, y
+        lo que ya se anotó con él sigue contando: un gasto de marzo no
+        desaparece porque en agosto se deje de usar.</li>
+        <li><b>Otro</b> sigue ahí para el gasto que no se repite. Obligar a
+        dar de alta un concepto para pagarle una vez a un plomero sería peor
+        que el problema.</li>
+      </ul>
+
+      <h4>Cuando el turno se releva</h4>
+      <p>Se va la luz a las diez de la noche y el turno no se puede cortar. A
+      la mañana llega otro cajero, pone su PIN y sigue vendiendo sobre el
+      mismo turno. Antes el corte salía a nombre del primero y el segundo no
+      aparecía por ningún lado.</p>
+      <p>Ahora, al cortar, sale <b>un papel por cada quien</b> con lo suyo,
+      además del corte del turno. <b>El arqueo no se parte</b>: el dinero del
+      cajón es uno solo y los billetes no saben de quién son. Lo que dice
+      cada papel es cuánto metió esa persona.</p>
+
+      <h4>Qué se imprime al cerrar</h4>
+      <p>Al terminar el turno salen solos, en un tirón:</p>
+      <ol>
+        <li>El <b>corte del turno</b>, que es el que se firma.</li>
+        <li>Un <b>papel por cajero</b>, si hubo relevo.</li>
+        <li>El <b>resumen del día</b>: cuánto hielo queda en el cuarto frío y
+        qué paños se sacaron, con cuántas marquetas dio cada uno.</li>
+      </ol>
+      <p class="ayuda-tip">Van juntos porque juntos es como se leen. Si el
+      cajón cuadra pero falta hielo, el problema no está en la caja. Y al
+      revés. En papeles separados nadie los junta.</p>`
   },
 
   // ==========================================================

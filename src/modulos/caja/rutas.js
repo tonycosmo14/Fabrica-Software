@@ -23,7 +23,7 @@ const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
 const { comprobarAdmin, administradores } = require('../../lib/autorizacion');
 const {
-  sesionAbierta, movimientos, estadoCaja, conteoVentas
+  sesionAbierta, movimientos, estadoCaja, conteoVentas, desglosePorPersona
 } = require('./calculo');
 
 const router = express.Router();
@@ -239,6 +239,171 @@ router.get('/movimientos', verCaja, (req, res) => {
   return ok(res, { movimientos: lista, soloHoy });
 });
 
+// ============================================================
+// LOS GASTOS QUE SE REPITEN
+//
+// El desayuno de los muchachos es todos los días y nunca es igual. Escrito
+// a mano, al final del mes hay "Desayuno", "desayunos", "Desayuno de los
+// muchachos" y "DESAYUNO": cuatro conceptos y ninguna estadística. Dados
+// de alta una vez y tocados, es un solo renglón que se puede sumar.
+// ============================================================
+
+/** Los conceptos que se pueden tocar. Los usa la caja al anotar un gasto. */
+router.get('/conceptos', verCaja, (req, res) => {
+  const todos = req.query.todos === '1';
+  const lista = bd.prepare(`
+    SELECT c.*,
+           -- Cuántas veces se ha usado. Es lo que deja saber si un concepto
+           -- se puede dar de baja sin que nadie lo extrañe.
+           (SELECT COUNT(*) FROM movimientos_caja m WHERE m.concepto_id = c.id) AS usos
+      FROM conceptos_gasto c
+     ${todos ? '' : 'WHERE c.activo = 1'}
+     ORDER BY c.activo DESC, c.orden, c.nombre
+  `).all();
+  return ok(res, { conceptos: lista });
+});
+
+/**
+ * CUÁNTO SE HA GASTADO EN CADA COSA.
+ *
+ * "Al final del mes quiero ver cuánto gasté en desayunos." Esto es esa
+ * pregunta: un renglón por concepto, con su total y cuántas veces.
+ *
+ * Se suma por CONCEPTO_ID, no por el texto: los gastos escritos a mano se
+ * juntan todos en un renglón aparte —"escritos a mano"— porque no hay
+ * forma honesta de agruparlos, y decir que sí la hay sería inventar
+ * números.
+ */
+router.get('/conceptos/resumen', verCaja, (req, res) => {
+  const desde = leerDia(req.query.desde);
+  const hasta = leerDia(req.query.hasta);
+  if (req.query.desde && !desde) return error(res, 'Esa fecha no se entiende.');
+  if (req.query.hasta && !hasta) return error(res, 'Esa fecha no se entiende.');
+
+  const donde = ['m.anulado_en IS NULL'];
+  const valores = [];
+  // En hora local: un gasto de las 6:30 de la tarde se guarda con la fecha
+  // del día siguiente, y sin convertir caería en el mes que no es.
+  if (desde) { donde.push("date(m.fecha, 'localtime') >= date(?)"); valores.push(desde); }
+  if (hasta) { donde.push("date(m.fecha, 'localtime') <= date(?)"); valores.push(hasta); }
+
+  const porConcepto = bd.prepare(`
+    SELECT c.id, c.nombre, c.tipo, c.activo,
+           COUNT(*) AS veces,
+           SUM(m.centavos) AS centavos,
+           MIN(m.fecha) AS primero,
+           MAX(m.fecha) AS ultimo
+      FROM movimientos_caja m
+      JOIN conceptos_gasto c ON c.id = m.concepto_id
+     WHERE ${donde.join(' AND ')}
+     GROUP BY c.id
+     ORDER BY SUM(m.centavos) DESC
+  `).all(...valores);
+
+  const sueltos = bd.prepare(`
+    SELECT m.tipo, COUNT(*) AS veces, SUM(m.centavos) AS centavos
+      FROM movimientos_caja m
+     WHERE m.concepto_id IS NULL AND ${donde.join(' AND ')}
+     GROUP BY m.tipo
+  `).all(...valores);
+
+  return ok(res, { desde, hasta, porConcepto, sueltos });
+});
+
+/** Un día del calendario: 2026-08-26. Nada más. */
+function leerDia(valor) {
+  const t = String(valor || '').trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(t) ? t : null;
+}
+
+/** Dar de alta uno nuevo. Del gerente para arriba: es catálogo, no caja. */
+router.post('/conceptos', corregir, (req, res) => {
+  const nombre = String(req.body?.nombre || '').trim();
+  if (!nombre) return error(res, 'Escribe cómo se llama el gasto.');
+  if (nombre.length > 40) return error(res, 'El nombre es demasiado largo.');
+
+  const tipo = req.body?.tipo === 'entrada' ? 'entrada' : 'salida';
+
+  const repetido = bd.prepare(
+    'SELECT id FROM conceptos_gasto WHERE lower(nombre) = lower(?) AND activo = 1'
+  ).get(nombre);
+  if (repetido) return error(res, `Ya hay un concepto que se llama "${nombre}".`, 409);
+
+  const id = nuevoId();
+  const siguiente = bd.prepare(
+    'SELECT COALESCE(MAX(orden), 0) n FROM conceptos_gasto'
+  ).get().n + 1;
+
+  bd.prepare(`
+    INSERT INTO conceptos_gasto (id, nombre, tipo, orden, ayuda, fecha_alta)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(id, nombre, tipo, siguiente,
+         String(req.body?.ayuda || '').trim().slice(0, 120) || null, ahora());
+
+  bitacora.registrar({
+    accion: 'caja.concepto_alta', entidad: 'concepto_gasto', entidadId: id,
+    ejecutorId: req.usuario.id, detalle: { nombre, tipo }
+  });
+
+  return ok(res, { concepto: bd.prepare('SELECT * FROM conceptos_gasto WHERE id = ?').get(id) }, 201);
+});
+
+/**
+ * Editar uno: el nombre, la nota, el orden, o darlo de baja.
+ *
+ * EL ID NO CAMBIA NUNCA (regla 3.3). Renombrar "Desayuno" a "Comida de los
+ * muchachos" no parte la estadística en dos: los gastos viejos siguen
+ * colgando del mismo id, y sus comprobantes siguen diciendo "Desayuno"
+ * porque el texto se copió al movimiento (regla 3.5).
+ */
+router.put('/conceptos/:id', corregir, (req, res) => {
+  const c = bd.prepare('SELECT * FROM conceptos_gasto WHERE id = ?').get(req.params.id);
+  if (!c) return error(res, 'Ese concepto no existe.', 404);
+
+  const cambios = {};
+
+  if (req.body?.nombre !== undefined) {
+    const nombre = String(req.body.nombre).trim();
+    if (!nombre) return error(res, 'El nombre no puede quedar vacío.');
+    if (nombre.length > 40) return error(res, 'El nombre es demasiado largo.');
+    const otro = bd.prepare(
+      'SELECT id FROM conceptos_gasto WHERE lower(nombre) = lower(?) AND activo = 1 AND id <> ?'
+    ).get(nombre, c.id);
+    if (otro) return error(res, `Ya hay un concepto que se llama "${nombre}".`, 409);
+    cambios.nombre = nombre;
+  }
+
+  if (req.body?.ayuda !== undefined) {
+    cambios.ayuda = String(req.body.ayuda).trim().slice(0, 120) || null;
+  }
+  if (req.body?.orden !== undefined) {
+    const n = Number(req.body.orden);
+    if (!Number.isFinite(n)) return error(res, 'Ese orden no se entiende.');
+    cambios.orden = Math.round(n);
+  }
+
+  // DAR DE BAJA NO ES BORRAR (regla 3.4). Deja de salir en la caja, y los
+  // gastos que ya se anotaron con él siguen sumando en la estadística: un
+  // gasto de marzo no desaparece porque en agosto se deje de usar.
+  if (req.body?.activo !== undefined) {
+    cambios.activo = req.body.activo ? 1 : 0;
+    cambios.fecha_baja = req.body.activo ? null : ahora();
+  }
+
+  if (!Object.keys(cambios).length) return error(res, 'No mandaste nada que cambiar.');
+
+  const campos = Object.keys(cambios).map((k) => `${k} = ?`).join(', ');
+  bd.prepare(`UPDATE conceptos_gasto SET ${campos} WHERE id = ?`)
+    .run(...Object.values(cambios), c.id);
+
+  bitacora.registrar({
+    accion: 'caja.concepto_editado', entidad: 'concepto_gasto', entidadId: c.id,
+    ejecutorId: req.usuario.id, detalle: { antes: c.nombre, ...cambios }
+  });
+
+  return ok(res, { concepto: bd.prepare('SELECT * FROM conceptos_gasto WHERE id = ?').get(c.id) });
+});
+
 /**
  * Sacar o meter dinero que no es una venta.
  *
@@ -258,7 +423,26 @@ router.post('/movimientos', operarCaja, (req, res) => {
   const centavos = leerImporte(req.body?.monto, { permitirCero: false });
   if (centavos === null) return error(res, 'Escribe de cuánto es el movimiento.');
 
-  const concepto = String(req.body?.concepto || '').trim();
+  // DE DÓNDE SALE EL CONCEPTO.
+  //
+  // Si viene un conceptoId, el texto lo pone el catálogo y NO el que llama:
+  // es lo único que garantiza que los cien desayunos del mes se llamen
+  // igual. Si no viene, se escribe a mano, que es lo de siempre y sigue
+  // valiendo para el gasto raro que no se va a repetir.
+  let conceptoId = null;
+  let concepto = String(req.body?.concepto || '').trim();
+
+  if (req.body?.conceptoId) {
+    const c = bd.prepare('SELECT * FROM conceptos_gasto WHERE id = ? AND activo = 1')
+      .get(req.body.conceptoId);
+    if (!c) return error(res, 'Ese concepto no existe o se dio de baja.', 409);
+    if (c.tipo !== tipo) {
+      return error(res, `"${c.nombre}" es de ${c.tipo === 'salida' ? 'salidas' : 'entradas'}.`);
+    }
+    conceptoId = c.id;
+    concepto = c.nombre;
+  }
+
   if (!concepto) return error(res, 'Escribe en qué se usó el dinero.');
 
   const id = nuevoId();
@@ -266,15 +450,16 @@ router.post('/movimientos', operarCaja, (req, res) => {
 
   bd.prepare(`
     INSERT INTO movimientos_caja
-      (id, caja_id, fecha, tipo, concepto, centavos, ejecutor_id, capturista_id, notas)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, caja_id, fecha, tipo, concepto, centavos, ejecutor_id, capturista_id,
+       notas, concepto_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(id, caja.id, ahora(), tipo, concepto.slice(0, 80), centavos,
-         ejecutorId, req.usuario.id, req.body?.notas || null);
+         ejecutorId, req.usuario.id, req.body?.notas || null, conceptoId);
 
   bitacora.registrar({
     accion: `caja.${tipo}`, entidad: 'movimiento_caja', entidadId: id,
     ejecutorId, capturistaId: req.usuario.id,
-    detalle: { concepto, centavos, cajaFolio: caja.folio }
+    detalle: { concepto, conceptoId, centavos, cajaFolio: caja.folio }
   });
 
   return ok(res, {
@@ -328,10 +513,16 @@ function detalleCorte(id) {
   `).get(id);
   if (!caja) return null;
 
+  const porPersona = desglosePorPersona(id);
+
   return {
     caja,
     movimientos: movimientos(id, { incluirAnulados: true }),
-    ventas: conteoVentas(id)
+    ventas: conteoVentas(id),
+    // Quién metió qué dentro del turno. Con una sola persona no dice nada
+    // que el corte no diga ya, y por eso viene vacío: así ni la pantalla ni
+    // la impresora tienen que decidir cuándo enseñarlo.
+    porPersona: porPersona.length > 1 ? porPersona : []
   };
 }
 

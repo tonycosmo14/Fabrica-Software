@@ -129,7 +129,82 @@ function estadoCaja(caja) {
   };
 }
 
+/**
+ * QUIÉN HIZO QUÉ DENTRO DE UN MISMO TURNO.
+ *
+ * EL CASO: son las diez de la noche, se va la luz y el turno no se puede
+ * cortar. A la mañana siguiente llega otro cajero, pone su PIN y sigue
+ * vendiendo sobre el turno que quedó abierto. Cuando por fin se corta, el
+ * papel sale a nombre del primero y el segundo aparece por ningún lado.
+ *
+ * El dinero del cajón es UNO SOLO y el arqueo sigue siendo del turno: eso
+ * no se parte, porque los billetes no saben de quién son. Lo que sí se
+ * puede decir es CUÁNTO METIÓ CADA UNO, y eso sale de un dato que ya se
+ * guarda desde el principio: cada venta y cada movimiento llevan su
+ * capturista, que es quien lo tecleó (regla 3.6).
+ *
+ * Devuelve un renglón por persona, del que más cobró al que menos. Si solo
+ * hubo una, devuelve un solo renglón: quien llama decide si vale la pena
+ * imprimirlo aparte.
+ */
+function desglosePorPersona(cajaId) {
+  const ventas = bd.prepare(`
+    SELECT v.capturista_id AS id, u.nombre,
+           COALESCE(SUM(CASE WHEN v.cancelada_en IS NULL AND v.forma_pago = 'efectivo'
+                             THEN v.total_centavos END), 0) AS efectivo,
+           COALESCE(SUM(CASE WHEN v.cancelada_en IS NULL AND v.forma_pago = 'credito'
+                             THEN v.total_centavos END), 0) AS fiado,
+           COALESCE(SUM(CASE WHEN v.cancelada_en IS NULL AND v.forma_pago = 'transferencia'
+                             THEN v.total_centavos END), 0) AS transferencia,
+           COUNT(*) FILTER (WHERE v.cancelada_en IS NULL) AS cobradas,
+           COUNT(*) FILTER (WHERE v.cancelada_en IS NOT NULL) AS canceladas,
+           MIN(v.fecha) AS primera, MAX(v.fecha) AS ultima
+      FROM ventas v
+      LEFT JOIN usuarios u ON u.id = v.capturista_id
+     WHERE v.caja_id = ?
+     GROUP BY v.capturista_id
+  `).all(cajaId);
+
+  const movs = bd.prepare(`
+    SELECT m.capturista_id AS id, u.nombre,
+           COALESCE(SUM(CASE WHEN m.tipo = 'entrada' THEN m.centavos END), 0) AS entradas,
+           COALESCE(SUM(CASE WHEN m.tipo = 'salida'  THEN m.centavos END), 0) AS salidas
+      FROM movimientos_caja m
+      LEFT JOIN usuarios u ON u.id = m.capturista_id
+     WHERE m.caja_id = ? AND m.anulado_en IS NULL
+     GROUP BY m.capturista_id
+  `).all(cajaId);
+
+  const porId = new Map();
+  const vacio = (id, nombre) => ({
+    usuarioId: id, nombre: nombre || 'Sin nombre',
+    efectivo: 0, fiado: 0, transferencia: 0,
+    cobradas: 0, canceladas: 0, entradas: 0, salidas: 0,
+    primera: null, ultima: null
+  });
+
+  for (const v of ventas) {
+    const fila = porId.get(v.id) || vacio(v.id, v.nombre);
+    Object.assign(fila, {
+      efectivo: v.efectivo, fiado: v.fiado, transferencia: v.transferencia,
+      cobradas: v.cobradas, canceladas: v.canceladas,
+      primera: v.primera, ultima: v.ultima
+    });
+    porId.set(v.id, fila);
+  }
+  for (const m of movs) {
+    const fila = porId.get(m.id) || vacio(m.id, m.nombre);
+    fila.entradas = m.entradas;
+    fila.salidas = m.salidas;
+    porId.set(m.id, fila);
+  }
+
+  return [...porId.values()]
+    .map((f) => ({ ...f, aportado: f.efectivo + f.entradas - f.salidas }))
+    .sort((a, b) => b.efectivo - a.efectivo);
+}
+
 module.exports = {
   sesionAbierta, vendidoEnEfectivo, vendidoSinEfectivo, vendidoAlCredito,
-  movimientos, sumaPorTipo, conteoVentas, estadoCaja
+  movimientos, sumaPorTipo, conteoVentas, estadoCaja, desglosePorPersona
 };

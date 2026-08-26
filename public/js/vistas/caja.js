@@ -115,6 +115,9 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
         <h2>Caja</h2>
         <div class="venta-cabeza-datos">
           <span class="etiqueta-folio">turno #${c.folio}</span>
+          ${puedeCorregir
+            ? '<button class="secundario chico" id="conceptos">Gastos que se repiten</button>'
+            : ''}
           <button class="secundario chico" id="historial">Cortes</button>
         </div>
       </div>
@@ -216,6 +219,9 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
 
     pantalla.querySelector('#historial').onclick = () => verHistorial();
 
+    const btnConceptos = pantalla.querySelector('#conceptos');
+    if (btnConceptos) btnConceptos.onclick = verConceptos;
+
     if (puedeOperar) {
       pantalla.querySelector('#salida').onclick = () => nuevoMovimiento('salida');
       pantalla.querySelector('#entrada').onclick = () => nuevoMovimiento('entrada');
@@ -286,18 +292,51 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
     pintar();
   }
 
+  /**
+   * Igual que en el punto de venta: primero se ELIGE de los que se repiten
+   * y solo si no está se escribe. Es lo que hace que los cien desayunos del
+   * mes se llamen todos igual y se puedan sumar.
+   */
   async function nuevoMovimiento(tipo) {
     const esSalida = tipo === 'salida';
 
-    const concepto = await pedirTexto({
-      titulo: esSalida ? 'Gasto o retiro' : 'Meter dinero al cajón',
-      texto: esSalida
-        ? '¿En qué se usó el dinero? La gasolina, un refresco, el retiro a la caja fuerte...'
-        : '¿De dónde viene el dinero? Cambio del banco, dinero que se repuso...',
-      marcador: esSalida ? 'Gasolina de la camioneta' : 'Cambio del banco',
-      ok: 'Siguiente'
-    });
-    if (!concepto) return;
+    let conceptos = [];
+    try {
+      conceptos = ((await api.obtener('/caja/conceptos')).conceptos || [])
+        .filter((c) => c.tipo === tipo);
+    } catch { /* sin catálogo se escribe a mano, que es como era antes */ }
+
+    let conceptoId = null;
+    let concepto = '';
+
+    if (conceptos.length) {
+      const elegido = await menu({
+        titulo: esSalida ? 'Gasto o retiro' : 'Meter dinero al cajón',
+        texto: 'Toca el de siempre, o escribe uno.',
+        opciones: [
+          ...conceptos.map((c) => ({ valor: c.id, texto: c.nombre, detalle: c.ayuda || '' })),
+          { valor: '__otro', texto: '✎ Otro — escribirlo',
+            detalle: 'Para el que no se repite' }
+        ]
+      });
+      if (!elegido) return;
+      if (elegido !== '__otro') {
+        conceptoId = elegido;
+        concepto = conceptos.find((c) => c.id === elegido)?.nombre || '';
+      }
+    }
+
+    if (!conceptoId) {
+      concepto = await pedirTexto({
+        titulo: esSalida ? 'Gasto o retiro' : 'Meter dinero al cajón',
+        texto: esSalida
+          ? '¿En qué se usó el dinero? La gasolina, un refresco, el retiro a la caja fuerte...'
+          : '¿De dónde viene el dinero? Cambio del banco, dinero que se repuso...',
+        marcador: esSalida ? 'Gasolina de la camioneta' : 'Cambio del banco',
+        ok: 'Siguiente'
+      });
+      if (!concepto) return;
+    }
 
     const monto = await pedirTexto({
       titulo: concepto,
@@ -307,9 +346,172 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
     if (!monto) return;
 
     try {
-      await api.enviar('/caja/movimientos', { tipo, concepto, monto });
+      await api.enviar('/caja/movimientos',
+        conceptoId ? { tipo, conceptoId, monto } : { tipo, concepto, monto });
       avisar(esSalida ? 'Salida anotada' : 'Entrada anotada', 'bien');
       pintar();
+    } catch (e) { avisar(e.message, 'error'); }
+  }
+
+  // ==========================================================
+  // LOS GASTOS QUE SE REPITEN
+  //
+  // "Creo el gasto recurrente que se llama desayuno, es todos los días,
+  //  nunca es igual, y al final del mes quiero ver cuánto gasté."
+  //
+  // Aquí se dan de alta. Lo que se gana no es escribir menos: es que los
+  // cien desayunos del mes se llamen IGUAL y se puedan sumar.
+  // ==========================================================
+  async function verConceptos() {
+    const [{ conceptos }, resumen] = await Promise.all([
+      api.obtener('/caja/conceptos?todos=1'),
+      api.obtener(`/caja/conceptos/resumen?desde=${primerDiaDelMes()}`).catch(() => ({ porConcepto: [] }))
+    ]);
+    const gastado = new Map((resumen.porConcepto || []).map((r) => [r.id, r]));
+
+    pantalla.innerHTML = `
+      <button class="secundario chico" id="volver">‹ Caja</button>
+      <h2 style="margin-top:14px">Gastos que se repiten</h2>
+      <p class="ayuda">
+        El desayuno de los muchachos es todos los días y nunca es igual. Dado
+        de alta aquí, el cajero lo toca en vez de escribirlo, y a fin de mes
+        se puede sumar cuánto se fue en desayunos. Escrito a mano no se
+        puede: nadie escribe igual dos veces.
+      </p>
+
+      <div class="ancho-completo">
+        <div class="tarjeta plana">
+          <div class="hist-envoltura">
+            <table class="tabla hist-tabla concepto-tabla">
+              <tr>
+                <th class="cp-c-nombre">Concepto</th>
+                <th class="cp-c-tipo">Qué es</th>
+                <th class="cp-c-mes der">Este mes</th>
+                <th class="cp-c-usos der">Veces</th>
+                <th class="cp-c-acciones"></th>
+              </tr>
+              ${conceptos.map((c) => {
+                const g = gastado.get(c.id);
+                return `
+                <tr class="${c.activo ? '' : 'anulada'}">
+                  <td class="cp-c-nombre">
+                    <strong>${esc(c.nombre)}</strong>
+                    ${c.ayuda ? `<small>${esc(c.ayuda)}</small>` : ''}
+                  </td>
+                  <td class="cp-c-tipo">
+                    <span class="hist-que ${c.tipo === 'salida' ? 'que-gasto' : 'que-entrada'}">
+                      ${c.tipo === 'salida' ? '📤 Sale' : '📥 Entra'}
+                    </span>
+                    ${c.activo ? '' : '<span class="hist-que que-cancelada">de baja</span>'}
+                  </td>
+                  <td class="cp-c-mes der">${g ? pesos(g.centavos) : '—'}</td>
+                  <td class="cp-c-usos der">${g ? g.veces : 0}</td>
+                  <td class="cp-c-acciones">
+                    <button class="secundario chico" data-editar="${esc(c.id)}">Editar</button>
+                    <button class="secundario chico" data-baja="${esc(c.id)}"
+                            title="${c.activo ? 'Dejar de usarlo' : 'Volver a usarlo'}">
+                      ${c.activo ? '🗑' : '↩'}
+                    </button>
+                  </td>
+                </tr>`; }).join('')
+                || '<tr><td colspan="5">Todavía no hay ninguno.</td></tr>'}
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <button id="nuevo" style="margin-top:14px">＋ Nuevo concepto</button>
+
+      <p class="ayuda" style="margin-top:14px">
+        Dar de baja uno <b>no borra nada</b>: deja de salir en la caja y los
+        gastos que ya se anotaron con él siguen sumando. Un gasto de marzo no
+        desaparece porque en agosto se deje de usar.
+      </p>`;
+
+    pantalla.querySelector('#volver').onclick = pintar;
+    pantalla.querySelector('#nuevo').onclick = () => nuevoConcepto();
+    pantalla.querySelectorAll('[data-editar]').forEach((b) => {
+      b.onclick = () => editarConcepto(conceptos.find((c) => c.id === b.dataset.editar));
+    });
+    pantalla.querySelectorAll('[data-baja]').forEach((b) => {
+      b.onclick = () => cambiarBaja(conceptos.find((c) => c.id === b.dataset.baja));
+    });
+  }
+
+  /** El día 1 del mes en curso, en hora local. */
+  function primerDiaDelMes() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+  }
+
+  async function nuevoConcepto() {
+    const nombre = await pedirTexto({
+      titulo: 'Nuevo gasto que se repite',
+      texto: 'Cómo se va a llamar. Corto, que es lo que va a tocar el cajero.',
+      marcador: 'Desayuno', ok: 'Siguiente', largo: 40, unaLinea: true
+    });
+    if (!nombre) return;
+
+    const tipo = await menu({
+      titulo: nombre,
+      texto: '¿El dinero sale del cajón o entra?',
+      opciones: [
+        { valor: 'salida',  texto: '📤 Sale del cajón', detalle: 'Un gasto: gasolina, desayuno…' },
+        { valor: 'entrada', texto: '📥 Entra al cajón', detalle: 'Cambio del banco, dinero repuesto…' }
+      ]
+    });
+    if (!tipo) return;
+
+    const ayuda = await pedirTexto({
+      titulo: nombre, texto: 'Una nota para el cajero (opcional).',
+      marcador: 'El de los muchachos, no el del patrón',
+      ok: 'Crear', largo: 120, unaLinea: true
+    });
+    if (ayuda === null) return;
+
+    try {
+      await api.enviar('/caja/conceptos', { nombre, tipo, ayuda });
+      avisar(`"${nombre}" ya se puede tocar en la caja`, 'bien');
+      verConceptos();
+    } catch (e) { avisar(e.message, 'error'); }
+  }
+
+  async function editarConcepto(c) {
+    if (!c) return;
+    const nombre = await pedirTexto({
+      titulo: `Editar ${c.nombre}`,
+      texto: 'Cambiarle el nombre no parte la estadística: los gastos viejos ' +
+             'siguen contando aquí, y sus comprobantes siguen diciendo lo que decían.',
+      valor: c.nombre, ok: 'Siguiente', largo: 40, unaLinea: true
+    });
+    if (nombre === null) return;
+
+    const ayuda = await pedirTexto({
+      titulo: nombre || c.nombre, texto: 'La nota para el cajero.',
+      valor: c.ayuda || '', ok: 'Guardar', largo: 120, unaLinea: true
+    });
+    if (ayuda === null) return;
+
+    try {
+      await api.actualizar(`/caja/conceptos/${c.id}`, { nombre: nombre || c.nombre, ayuda });
+      avisar('Guardado', 'bien');
+      verConceptos();
+    } catch (e) { avisar(e.message, 'error'); }
+  }
+
+  async function cambiarBaja(c) {
+    if (!c) return;
+    if (c.activo && !await confirmar({
+      titulo: `¿Dejar de usar "${c.nombre}"?`,
+      texto: 'Deja de salir en la caja. Lo que ya se anotó con él no se toca ' +
+             'y sigue sumando en las cuentas del mes.',
+      ok: 'Dar de baja', peligro: true
+    })) return;
+
+    try {
+      await api.actualizar(`/caja/conceptos/${c.id}`, { activo: !c.activo });
+      avisar(c.activo ? 'Dado de baja' : 'Vuelve a estar disponible', 'bien');
+      verConceptos();
     } catch (e) { avisar(e.message, 'error'); }
   }
 
@@ -431,6 +633,15 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
               <td>${pesos(Math.abs(dif))}</td></tr>
         </table>
 
+        ${corte.porPersona?.length > 1 ? `
+          <div class="ticket-folio" style="margin-top:10px">CADA QUIEN</div>
+          <table class="ticket-tabla">
+            ${corte.porPersona.map((p) => `
+              <tr><td>${esc(p.nombre)}<br><small>${p.cobradas} ticket${p.cobradas === 1 ? '' : 's'}${
+                p.salidas ? ` · gastos ${pesos(p.salidas)}` : ''}</small></td>
+                  <td>${pesos(p.efectivo)}</td></tr>`).join('')}
+          </table>` : ''}
+
         ${movimientosEnDosColumnas(corte.movimientos)}
 
         <div class="ticket-pie">
@@ -439,8 +650,15 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
         </div>
       </div>
 
+      ${corte.porPersona?.length > 1 ? `
+        <p class="ayuda no-imprimir" style="margin-top:14px">
+          En este turno estuvo más de una persona en la caja. Al imprimir sale
+          <b>un papel por cada una</b> con lo suyo, además del corte del turno:
+          el dinero del cajón es uno solo, pero cada quien firma lo que metió.
+        </p>` : ''}
+
       <div class="fila-botones no-imprimir" style="margin-top:14px;flex-wrap:wrap">
-        <button id="imprimir">🖨️ Imprimir el corte</button>
+        <button id="imprimir">🖨️ Imprimir el corte y el día</button>
         <button class="secundario" id="compartir">📲 Mandar por WhatsApp</button>
         ${cerroSesion
           ? '<button class="grande crece" id="siguiente-cajero">Listo · pasa el siguiente</button>'
@@ -467,13 +685,26 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
       boton.disabled = true;
       try {
         const r = await api.enviar(`/impresion/corte/${corte.caja.id}`, {});
-        if (r.impreso) avisar('Corte impreso', 'bien');
+        if (r.impreso) avisar(`Impreso · ${r.papeles} papel${r.papeles === 1 ? '' : 'es'}`, 'bien');
         else window.print();               // sin impresora puesta, el navegador
       } catch (e) {
         avisar(e.message, 'error');
       }
       boton.disabled = false;
     };
+
+    // AL CERRAR EL TURNO EL CORTE SALE SOLO. Nadie tiene que acordarse de
+    // apretar un botón para el papel que se firma todos los días: si hay
+    // impresora puesta, se imprime en cuanto se cuenta el dinero. Solo la
+    // primera vez que se ve el corte —al cerrar—, no cada vez que alguien
+    // lo consulta desde el historial de cortes.
+    if (cerroSesion) {
+      api.enviar(`/impresion/corte/${corte.caja.id}`, {})
+        .then((r) => {
+          if (r.impreso) avisar(`Corte impreso · ${r.papeles} papeles`, 'bien');
+        })
+        .catch(() => avisar('El corte quedó guardado, pero no se pudo imprimir', 'error'));
+    }
 
     // La imagen del corte se arma en el momento, en el aparato: no se sube
     // a ningún lado ni pasa por el servidor.
