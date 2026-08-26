@@ -3,7 +3,7 @@
 Sistema para la fábrica de hielo de Hunucmá, Yucatán.
 Se construye **por versiones**: cada versión es un pedazo terminado, probado y usable.
 
-**Versión actual: v2.1**
+**Versión actual: v2.2**
 
 ---
 
@@ -706,6 +706,48 @@ Lo que añade `POST /ventas/:id/devolver` sobre cancelar:
 
 ---
 
+## El número del ticket (v2.2)
+
+Cada venta lleva **dos** números y conviene no confundirlos:
+
+| | Qué es | Se reinicia |
+|---|---|---|
+| `folio` | La identidad. Amarra un cambio con otro y un ticket con su corte | Nunca |
+| `serie` + `folio_anual` | Lo que se imprime y se dice: **2026-412** | Cada 1 de enero |
+
+Separarlos permite reiniciar la cuenta cada año **sin tocarle la identidad a
+papeles que ya se firmaron**. El año sale de `strftime('%Y','now','localtime')`
+— ver la trampa de la zona horaria, más abajo: el 31 de diciembre a las 7 de
+la tarde de aquí ya es enero en UTC.
+
+`leerNumero()` acepta `2026-412`, `412` y `#412`, y `numeroDeTicket()` lo
+escribe. Los dos viven en `src/modulos/ventas/folio.js` y el servidor manda
+el `numero` ya escrito en cada respuesta: así ninguna pantalla lo arma por
+su cuenta y ninguna se olvida de la serie.
+
+---
+
+## Actualizar desde un ZIP (v2.2)
+
+`POST /sistema/actualizar/revisar` dice qué trae sin tocar nada;
+`POST /sistema/actualizar` instala. El orden dentro de `instalar()` no es
+negociable: respaldo de la base → copia de la versión vieja → escribir.
+
+Lo que se reemplaza es una **lista blanca** (`src`, `public` y unos archivos
+sueltos). Con una lista negra, el día que el ZIP traiga una carpeta nueva
+que a nadie se le ocurrió prohibir, se copia. `datos` está además en la
+lista de intocables.
+
+`src/lib/zip.js` lee el formato a mano —directorio central e
+`inflateRawSync`— porque una actualización que necesita `npm install` para
+instalarse no se puede instalar en una fábrica sin internet.
+
+`instalar()` acepta `raiz` y `carpetaDatos` para poder probarse sobre una
+instalación de mentiras en `/tmp`. Es el código más peligroso del programa;
+probarlo "de mentiritas" sería no probarlo.
+
+---
+
 ## La trampa de la zona horaria
 
 Las fechas se guardan en **UTC** (`new Date().toISOString()`): un instante,
@@ -800,8 +842,8 @@ versión nueva le aparece un punto rojo en el menú.
 | **v2.0.1** | La impresora de red: basta con su dirección IP | ✅ listo |
 | **v2.0.2** | Zona horaria, el enter de vaciar, y elegir la impresora de una lista | ✅ listo |
 | **v2.1** | El cajón del dinero, sonido, devoluciones completas e impresoras por apartado | ✅ listo |
-| v2.2 | Actualizar el sistema desde un ZIP, sin perder datos | siguiente |
-| v2.3 | Estadísticas, gráficas, recibos de CFE y gastos grandes de la empresa | |
+| **v2.2** | El número del año en el ticket, y actualizar desde un ZIP | ✅ listo |
+| v2.3 | Estadísticas, gráficas, recibos de CFE y gastos grandes de la empresa | siguiente |
 | v2.4 | Reparto, pedidos y neveras en comodato | |
 | v2.5 | Planta de agua: garrafones, botellas y depósitos | |
 | v2.6 | Mantenimiento: compresores, ósmosis, membranas, horario punta | |

@@ -29,6 +29,7 @@ const { configuracion: configuracionImpresion } = require('../impresion/impresor
 const { cabeElCredito, estadoCliente, clientesConEstado } = require('../clientes/calculo');
 const { listaDeMayoreo, listaPorOmision, listasDeMayoreo,
         llevaMayoreo } = require('./mayoreo');
+const { serieDeHoy, siguienteEnLaSerie, numeroDeTicket, leerNumero } = require('./folio');
 const { comprobar: comprobarAutorizacion, comprobarAdmin,
         responsables, administradores } = require('../../lib/autorizacion');
 
@@ -75,7 +76,9 @@ router.get('/contexto', vender, (req, res) => {
     'SELECT id, nombre FROM almacenes WHERE activo = 1 AND recibe_produccion = 1 ORDER BY orden'
   ).all();
 
-  const ultimoFolio = bd.prepare('SELECT COALESCE(MAX(folio), 0) n FROM ventas').get().n;
+  // El número que va a llevar el siguiente ticket, ya con su serie.
+  const serieHoy = serieDeHoy(bd);
+  const siguienteNumero = `${serieHoy}-${siguienteEnLaSerie(bd, serieHoy)}`;
 
   // Se puede cobrar sin turno de caja abierto: la fábrica no se para porque
   // alguien olvidó abrirla. Pero ese dinero no entra en ningún corte, así
@@ -84,7 +87,7 @@ router.get('/contexto', vender, (req, res) => {
 
   return ok(res, {
     lista, precios, almacenes,
-    siguienteFolio: ultimoFolio + 1,
+    siguienteNumero,
     // Si el cajón está configurado, la caja lo abre sola al cobrar en
     // efectivo. Sin esto tendría que preguntar por la configuración de
     // impresión en cada venta.
@@ -395,14 +398,20 @@ function crearVenta({ lineas, total, pago, lista, almacenId, cajeroId, capturist
   const guardar = bd.transaction(() => {
     const folio = bd.prepare('SELECT COALESCE(MAX(folio), 0) n FROM ventas').get().n + 1;
 
+    // Y su número de la serie del año, que es el que se enseña. Los dos se
+    // toman aquí dentro, por lo mismo: dos cajas cobrando al mismo tiempo
+    // no pueden sacar el mismo.
+    const serie = serieDeHoy(bd);
+    const folioAnual = siguienteEnLaSerie(bd, serie);
+
     bd.prepare(`
-      INSERT INTO ventas (id, folio, fecha, cajero_id, capturista_id, almacen_id,
-                          lista_id, lista_nombre, total_centavos, pago_centavos,
+      INSERT INTO ventas (id, folio, serie, folio_anual, fecha, cajero_id, capturista_id,
+                          almacen_id, lista_id, lista_nombre, total_centavos, pago_centavos,
                           cambio_centavos, forma_pago, notas, caja_id, cambio_de_venta_id,
                           cliente_id, credito_autorizado_por)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, folio, fecha, cajeroId, capturistaId, almacenId,
-           lista.id, lista.nombre, total, pago ?? null, cambio,
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, folio, serie, folioAnual, fecha, cajeroId, capturistaId,
+           almacenId, lista.id, lista.nombre, total, pago ?? null, cambio,
            formaPago, notas, turno?.id || null, cambioDe,
            clienteId, autorizadoPor);
 
@@ -420,7 +429,12 @@ function crearVenta({ lineas, total, pago, lista, almacenId, cajeroId, capturist
   });
 
   const folio = guardar();
-  return { id, folio, cajaId: turno?.id || null, cajaFolio: turno?.folio || null };
+  const fila = bd.prepare('SELECT serie, folio_anual FROM ventas WHERE id = ?').get(id);
+  return {
+    id, folio, serie: fila.serie, folioAnual: fila.folio_anual,
+    numero: numeroDeTicket({ ...fila, folio }),
+    cajaId: turno?.id || null, cajaFolio: turno?.folio || null
+  };
 }
 
 function detalleVenta(id) {
@@ -443,6 +457,9 @@ function detalleVenta(id) {
 
   venta.lineas = bd.prepare('SELECT * FROM venta_lineas WHERE venta_id = ?').all(id)
     .map((l) => ({ ...l, texto: aTexto(l.dieciseisavos) }));
+  // El número ya escrito, para que ninguna pantalla tenga que armarlo y
+  // ninguna se olvide de la serie.
+  venta.numero = numeroDeTicket(venta);
   return venta;
 }
 
@@ -467,9 +484,18 @@ router.get('/', verVentas, (req, res) => {
   const valores = [];
 
   if (busca) {
+    // Se busca como lo diga la gente: "2026-412", "412", el importe o la
+    // hora. El número de la serie va primero porque es el que trae escrito
+    // el papel que el cliente tiene en la mano.
+    const num = leerNumero(busca);
     const comoNumero = Number(busca.replace(/[^0-9.]/g, ''));
-    filtros.push('(v.folio = ? OR v.total_centavos = ? OR v.fecha LIKE ?)');
-    valores.push(Math.trunc(comoNumero) || -1,
+    filtros.push(`(
+      (v.serie = ? AND v.folio_anual = ?) OR v.folio_anual = ? OR v.folio = ?
+      OR v.total_centavos = ? OR v.fecha LIKE ?
+    )`);
+    valores.push(num?.serie ?? -1, num?.folioAnual ?? -1,
+                 num?.serie ? -1 : (num?.folioAnual ?? -1),
+                 num?.folio ?? -1,
                  Math.round(comoNumero * 100) || -1,
                  `%${busca}%`);
   }
@@ -490,6 +516,8 @@ router.get('/', verVentas, (req, res) => {
 
   const filas = bd.prepare(`
     SELECT v.*, u.nombre AS cajero_nombre, cl.nombre AS cliente_nombre,
+           viejo.serie AS cambio_de_serie, viejo.folio_anual AS cambio_de_anual,
+           nuevo.serie AS cambiado_por_serie, nuevo.folio_anual AS cambiado_por_anual,
            viejo.folio AS cambio_de, nuevo.folio AS cambiado_por,
            -- Qué se llevó, en corto. Va en la lista para no tener que abrir
            -- el ticket —ni imprimirlo— para contestar "¿qué se llevó?".
@@ -506,7 +534,18 @@ router.get('/', verVentas, (req, res) => {
      ORDER BY v.fecha DESC LIMIT ?
   `).all(...valores, limite);
 
-  return ok(res, { ventas: filas });
+  return ok(res, {
+    ventas: filas.map((v) => ({
+      ...v,
+      numero: numeroDeTicket(v),
+      cambioDeNumero: v.cambio_de
+        ? numeroDeTicket({ serie: v.cambio_de_serie, folio_anual: v.cambio_de_anual,
+                           folio: v.cambio_de }) : null,
+      cambiadoPorNumero: v.cambiado_por
+        ? numeroDeTicket({ serie: v.cambiado_por_serie, folio_anual: v.cambiado_por_anual,
+                           folio: v.cambiado_por }) : null
+    }))
+  });
 });
 
 /**
@@ -614,7 +653,7 @@ router.delete('/:id', exigirPermiso('venta.cancelar'), (req, res) => {
                autorizo: quien.usuario.nombre }
   });
 
-  return ok(res, { borrada: true, folio: v.folio });
+  return ok(res, { borrada: true, folio: v.folio, numero: numeroDeTicket(v) });
 });
 
 /**
@@ -647,9 +686,10 @@ router.post('/:id/devolver', exigirPermiso('venta.cancelar'), (req, res) => {
   // contestar "ya está cancelado" a quien trae ese papel en la mano no le
   // dice qué hacer. Decirle "devuelve el nuevo" sí.
   if (v.cambiada_por_venta_id) {
-    const nueva = bd.prepare('SELECT folio FROM ventas WHERE id = ?').get(v.cambiada_por_venta_id);
+    const nueva = bd.prepare('SELECT folio, serie, folio_anual FROM ventas WHERE id = ?')
+      .get(v.cambiada_por_venta_id);
     return error(res,
-      `Ese ticket se cambió por el #${nueva?.folio ?? '?'}. Devuelve el nuevo.`, 409);
+      `Ese ticket se cambió por el ${numeroDeTicket(nueva)}. Devuelve el nuevo.`, 409);
   }
   if (v.cancelada_en) return error(res, 'Ese ticket ya está cancelado.');
 
@@ -696,6 +736,7 @@ router.post('/:id/devolver', exigirPermiso('venta.cancelar'), (req, res) => {
   return ok(res, {
     devuelta: true,
     folio: v.folio,
+    numero: numeroDeTicket(v),
     // Cuánto hay que sacar del cajón. En un fiado, nada: no entró dinero.
     centavos: fueEfectivo ? v.total_centavos : 0,
     enEfectivo: fueEfectivo,

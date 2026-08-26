@@ -89,7 +89,7 @@ export async function vistaHistorial(pantalla, estadoApp) {
         <div class="hist-fila">
           <label>
             <span class="etiqueta-chica">Ticket número</span>
-            <input type="search" id="folio" inputmode="numeric" placeholder="#412"
+            <input type="search" id="folio" placeholder="2026-412"
                    value="${esc(filtro.folio)}">
           </label>
           <label>
@@ -129,7 +129,7 @@ export async function vistaHistorial(pantalla, estadoApp) {
         </div>
         ${filtro.folio ? `
           <p class="ayuda" style="margin:10px 0 0">
-            Buscando el ticket <b>#${esc(filtro.folio)}</b>. Los demás filtros
+            Buscando el ticket <b>${esc(filtro.folio)}</b>. Los demás filtros
             no aplican mientras busques por número.
           </p>` : ''}
       </div>
@@ -198,16 +198,18 @@ export async function vistaHistorial(pantalla, estadoApp) {
     return `
       <tr class="${cancelado ? 'anulada' : ''} ${esCambio ? 'es-cambio' : ''}" data-fila="${esc(m.id)}">
         <td class="hist-c-num">
-          ${m.folio ? `<span class="hist-folio">#${m.folio}</span>` : '<span class="hist-folio vacio-folio">—</span>'}
+          ${m.numero ? `<span class="hist-folio">${esc(m.numero)}</span>`
+                     : '<span class="hist-folio vacio-folio">—</span>'}
         </td>
         <td class="hist-c-que">
           <span class="hist-tipo ${m.tipo}">${t.emoji} ${esc(t.texto)}</span>
           ${esCambio ? `
             <span class="hist-tipo cambio"
                   title="${m.cambiado_por
-                    ? `Este ticket se cambió por el #${m.cambiado_por}`
-                    : `Este ticket viene del cambio del #${m.cambio_de}`}">
-              ⇄ ${m.cambiado_por ? `#${m.folio}→#${m.cambiado_por}` : `#${m.cambio_de}→#${m.folio}`}
+                    ? `Este ticket se cambió por el ${m.cambiadoPorNumero}`
+                    : `Este ticket viene del cambio del ${m.cambioDeNumero}`}">
+              ⇄ ${m.cambiado_por ? `${m.numero}→${m.cambiadoPorNumero}`
+                                 : `${m.cambioDeNumero}→${m.numero}`}
             </span>` : ''}
           ${m.lista_tipo === 'mayoreo'
             ? `<span class="etiqueta-mayoreo">🏷️ ${esc(m.lista_nombre || 'mayoreo')}</span>` : ''}
@@ -268,7 +270,7 @@ export async function vistaHistorial(pantalla, estadoApp) {
    */
   async function masOpciones(id, folio) {
     const que = await menu({
-      titulo: `Ticket #${folio}`,
+      titulo: `Ticket ${folio}`,
       texto: '¿Qué le hacemos?',
       opciones: [
         { valor: 'cancelar', texto: '✕ Cancelar el ticket',
@@ -283,14 +285,14 @@ export async function vistaHistorial(pantalla, estadoApp) {
 
   async function cancelarVenta(id, folio) {
     const motivo = await pedirTexto({
-      titulo: `Cancelar el ticket #${folio}`,
+      titulo: `Cancelar el ticket ${folio}`,
       texto: 'Queda tachado con su motivo, el hielo vuelve al cuarto frío y la caja se ajusta sola.',
       marcador: 'Se equivocó de producto', ok: 'Cancelar el ticket', largo: 120, unaLinea: true
     });
     if (!motivo) return;
     try {
       await api.enviar(`/ventas/${id}/cancelar`, { motivo });
-      avisar(`Ticket #${folio} cancelado`, 'bien');
+      avisar(`Ticket ${folio} cancelado`, 'bien');
       await cargar();
     } catch (e) { avisar(e.message, 'error'); }
   }
@@ -302,7 +304,7 @@ export async function vistaHistorial(pantalla, estadoApp) {
    */
   async function borrarVenta(id, folio) {
     if (!await confirmar({
-      titulo: `¿Eliminar el ticket #${folio}?`,
+      titulo: `¿Eliminar el ticket ${folio}?`,
       texto: 'Desaparece como si nunca hubiera existido. Si ya se cortó el turno ' +
              'no se va a poder: para eso está cancelar.',
       ok: 'Eliminar', peligro: true
@@ -310,13 +312,13 @@ export async function vistaHistorial(pantalla, estadoApp) {
 
     const clave = await pedirContrasena({
       titulo: 'Tu contraseña de administrador',
-      texto: `Se va a eliminar el ticket #${folio}. Esto no se deshace.`
+      texto: `Se va a eliminar el ticket ${folio}. Esto no se deshace.`
     });
     if (!clave) return;
 
     try {
       await api.borrar(`/ventas/${id}`, { autorizacion: clave });
-      avisar(`Ticket #${folio} eliminado`, 'bien');
+      avisar(`Ticket ${folio} eliminado`, 'bien');
       await cargar();
     } catch (e) {
       avisar(e.message, 'error');
@@ -384,6 +386,6 @@ export async function vistaHistorial(pantalla, estadoApp) {
 
   /** El número del ticket del renglón donde vive un botón. */
   function folioDe(boton) {
-    return boton.closest('tr')?.querySelector('.hist-folio')?.textContent.replace('#', '').trim() || '';
+    return boton.closest('tr')?.querySelector('.hist-folio')?.textContent.trim() || '';
   }
 }

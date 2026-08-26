@@ -231,7 +231,7 @@ export async function vistaVenta(pantalla, estadoApp) {
 
         <section class="pos-ticket">
           <div class="pos-ticket-cabeza">
-            <span class="etiqueta-folio" id="etiqueta-folio">ticket #${ctx.siguienteFolio}</span>
+            <span class="etiqueta-folio" id="etiqueta-folio">ticket ${esc(ctx.siguienteNumero)}</span>
             ${ctx.caja
               ? `<span class="etiqueta-turno ${ctx.caja.sinDueno ? 'esperando' : ''}">
                    turno #${ctx.caja.folio}
@@ -825,7 +825,7 @@ export async function vistaVenta(pantalla, estadoApp) {
         <div class="pos-linea pos-linea-credito">
           <div class="pos-cant">⇄</div>
           <div class="pos-desc">
-            Devuelve el ticket #${cambiando.venta.folio}
+            Devuelve el ticket ${esc(cambiando.venta.numero || cambiando.venta.folio)}
             <small>a favor del cliente</small>
           </div>
           <div class="pos-importe">−${pesos(cambiando.aFavor)}</div>
@@ -1270,7 +1270,7 @@ export async function vistaVenta(pantalla, estadoApp) {
       <div class="pos-cobro-caja">
         ${cambiando ? `
           <div class="pos-cobro-cambio-aviso">
-            Cambio del ticket #${cambiando.venta.folio} ·
+            Cambio del ticket ${esc(cambiando.venta.numero || cambiando.venta.folio)} ·
             a favor ${pesos(cambiando.aFavor)}
           </div>` : ''}
 
@@ -1655,7 +1655,10 @@ export async function vistaVenta(pantalla, estadoApp) {
       tono('cobrado');
       // Lo que quedó debiendo, para poder decírselo al cliente en la cara.
       fiadoCobrado = respuesta.cliente || null;
-      ctx.siguienteFolio = venta.folio + 1;
+      // El número del que sigue: se le pide al servidor al recargar, pero
+      // mientras tanto se adelanta el de la serie para que la etiqueta no
+      // se quede en el que ya se cobró.
+      ctx.siguienteNumero = `${venta.serie}-${(venta.folio_anual || 0) + 1}`;
       // El cajón se abre al COBRAR, no al imprimir: el ticket solo sale si
       // alguien lo pide, y el cajón hace falta siempre que entre efectivo.
       if (ctx.abrirCajon && venta.forma_pago === 'efectivo') abrirCajon({ callado: true });
@@ -1718,7 +1721,8 @@ export async function vistaVenta(pantalla, estadoApp) {
     refs.cobro.innerHTML = `
       <div class="pos-cobro-caja pos-cobrada">
         <div class="pos-cobrada-folio">
-          Ticket #${v.folio}${c ? ` · cambio del #${c.anterior.folio}` : ''}
+          Ticket ${esc(v.numero || v.folio)}${
+            c ? ` · cambio del ${esc(c.anterior.numero || c.anterior.folio)}` : ''}
         </div>
 
         ${mayoreoCobrado ? `
@@ -1762,7 +1766,7 @@ export async function vistaVenta(pantalla, estadoApp) {
     fase = 'venta';
     refs.cobro.hidden = true;
     limpiarImpresion();
-    pantalla.querySelector('#etiqueta-folio').textContent = `ticket #${ctx.siguienteFolio}`;
+    pantalla.querySelector('#etiqueta-folio').textContent = `ticket ${ctx.siguienteNumero}`;
 
     // Si quedó alguien esperando, su ticket vuelve solo: es a lo que se
     // regresa después de atender al que se coló.
@@ -1813,7 +1817,7 @@ export async function vistaVenta(pantalla, estadoApp) {
     return `
       <div class="tk">
         <div class="tk-alto">
-          <span>#${v.folio}</span>
+          <span>${esc(v.numero || v.folio)}</span>
           <span>${f.toLocaleDateString('es-MX')} ${esc(soloHora(v.fecha))}</span>
           <span>${esc((v.cajero_nombre || '').split(' ')[0])}</span>
         </div>
@@ -1874,11 +1878,13 @@ export async function vistaVenta(pantalla, estadoApp) {
     try {
       const { ventas } = await api.obtener(
         `/ventas?limite=5&busca=${encodeURIComponent(folio.trim())}`);
-      const v = ventas.find((x) => String(x.folio) === folio.trim());
+      const buscado = folio.trim().replace(/^#/, '');
+      const v = ventas.find((x) =>
+        String(x.numero) === buscado || String(x.folio_anual) === buscado);
 
       if (!v) { avisar(`No hay ningún ticket #${folio.trim()}`, 'error'); enfocar(); return; }
       if (v.cancelada_en) {
-        avisar(`El ticket #${v.folio} está cancelado y no se puede cambiar`, 'error');
+        avisar(`El ticket ${v.numero} está cancelado y no se puede cambiar`, 'error');
         enfocar();
         return;
       }
@@ -1889,7 +1895,7 @@ export async function vistaVenta(pantalla, estadoApp) {
         .join(', ');
 
       if (!await confirmar({
-        titulo: `Ticket #${venta.folio} · ${pesos(venta.total_centavos)}`,
+        titulo: `Ticket ${venta.numero} · ${pesos(venta.total_centavos)}`,
         texto: `Traía: ${detalle}. Se le abona a favor y eliges por qué lo cambia.`,
         ok: 'Hacer el cambio'
       })) { enfocar(); return; }
@@ -1951,8 +1957,8 @@ export async function vistaVenta(pantalla, estadoApp) {
   function detalleDe(v) {
     const partes = [];
     if (v.cancelada_en) partes.push('CANCELADO');
-    if (v.cambiado_por) partes.push(`cambiado por #${v.cambiado_por}`);
-    else if (v.cambio_de) partes.push(`cambio del #${v.cambio_de}`);
+    if (v.cambiado_por) partes.push(`cambiado por ${v.cambiadoPorNumero}`);
+    else if (v.cambio_de) partes.push(`cambio del ${v.cambioDeNumero}`);
     if (v.cliente_nombre) {
       partes.push(v.forma_pago === 'credito' ? `fiado a ${v.cliente_nombre}` : v.cliente_nombre);
     }
@@ -1975,7 +1981,7 @@ export async function vistaVenta(pantalla, estadoApp) {
       // el detalle: con el detalle a la vista ese botón sobraba.
       caja.innerHTML = ventas.length ? ventas.map((v) => `
         <div class="ticket-fila fila-ticket ${v.cancelada_en ? 'anulada' : ''}">
-          <span class="tkl-folio">#${v.folio}</span>
+          <span class="tkl-folio">${esc(v.numero || v.folio)}</span>
           <span class="tkl-cuando">${esc(cuandoCorto(v.fecha))}</span>
           <span class="tkl-quien">${esc((v.cajero_nombre || '—').split(' ')[0])}</span>
           <span class="tkl-detalle" title="${esc(detalleDe(v))}">${esc(detalleDe(v))}</span>
@@ -2041,8 +2047,8 @@ export async function vistaVenta(pantalla, estadoApp) {
     try {
       const r = await api.enviar(`/ventas/${id}/devolver`, { motivo: cual, nota });
       avisar(r.enEfectivo
-        ? `Sácale ${pesos(r.centavos)} del cajón al ticket #${r.folio}`
-        : `El ticket #${r.folio} dejó de deberse`, 'bien');
+        ? `Sácale ${pesos(r.centavos)} del cajón al ticket ${r.numero}`
+        : `El ticket ${r.numero} dejó de deberse`, 'bien');
       // El cajón se abre solo: hay que meter la mano de todas formas.
       if (r.enEfectivo) abrirCajon({ callado: true });
       cargarTickets('');

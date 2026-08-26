@@ -17,9 +17,27 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '2.1';
+const VERSION_ACTUAL = '2.2';
 
 const VERSIONES = [
+  {
+    numero: '2.2',
+    nombre: 'El número del año, y actualizar solo',
+    fecha: '2026-08-26',
+    resumen:
+      'Los tickets se numeran por año —2026-412— y vuelven a empezar cada ' +
+      '1 de enero. Y el sistema se actualiza subiendo un archivo ZIP.',
+    cambios: [
+      { tipo: 'importante', texto: 'EL TICKET AHORA SE LLAMA 2026-412. El número vuelve a empezar en 1 cada 1 de enero, así que nunca se hace ridículamente grande. Y se dice fácil por teléfono, que es para lo único que sirve un número de ticket.' },
+      { tipo: 'nuevo', texto: 'Se busca como lo digas: "2026-412" o solo "412". Vale en la caja (F3), en el historial y en los cambios de ticket.' },
+      { tipo: 'importante', texto: 'Por dentro cada venta sigue teniendo su folio de siempre, que NO se reinicia nunca: es lo que amarra un cambio con otro y un ticket con su corte. Reiniciar ese habría sido cambiarle la identidad a papeles ya firmados.' },
+      { tipo: 'nuevo', texto: 'ACTUALIZAR EL SISTEMA DESDE UN ZIP. En Sistema, escoges el archivo que te mande y listo. Antes de instalar te enseña qué versión trae y cuántos archivos va a reemplazar: nadie debería apretar "actualizar" a ciegas.' },
+      { tipo: 'importante', texto: 'TUS DATOS NO SE TOCAN. Ventas, clientes, cortes y precios viven en la carpeta datos, que la actualización nunca abre. Aun así, antes de cambiar nada se hace un respaldo, y la versión anterior se guarda por si hay que volver a ella.' },
+      { tipo: 'nuevo', texto: 'El ZIP se revisa antes de tocar el disco: que sea del sistema y no de otro programa, que traiga código de verdad, y que ningún archivo intente salirse de la carpeta.' },
+      { tipo: 'mejora', texto: 'Sirve igual el ZIP hecho con el clic derecho de Windows, que mete todo dentro de una carpeta: el sistema se la quita solo.' }
+    ],
+    siguiente: 'v2.3 — Estadísticas, gráficas, recibos de CFE y gastos grandes de la empresa.'
+  },
   {
     numero: '2.1',
     nombre: 'El cajón, el sonido y las devoluciones',

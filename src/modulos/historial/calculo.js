@@ -24,6 +24,7 @@
  * el historial diría una cosa y la caja otra.
  */
 const { bd } = require('../../db/conexion');
+const { numeroDeTicket } = require('../ventas/folio');
 
 const TIPOS = ['venta', 'gasto', 'entrada', 'abono'];
 
@@ -80,10 +81,10 @@ function historial(opciones = {}) {
     : TIPOS;
 
   // BUSCAR POR NÚMERO DE TICKET. Es la pregunta más común del mundo —"a ver
-  // el #412"— y no tiene sentido en un gasto ni en un abono, que no llevan
-  // folio: buscando un número, solo hay ventas.
-  const folio = Number.isInteger(opciones.folio) ? opciones.folio : null;
-  if (folio !== null) tipos = ['venta'];
+  // el 2026-412"— y no tiene sentido en un gasto ni en un abono, que no
+  // llevan número: buscando uno, solo hay ventas.
+  const numero = opciones.numero || null;
+  if (numero) tipos = ['venta'];
 
   const filas = [];
 
@@ -93,9 +94,18 @@ function historial(opciones = {}) {
   // (regla 3.6, el relevo de las 2:30).
   if (tipos.includes('venta')) {
     const { donde, valores } = filtros(opciones, 'v.fecha', 'v.capturista_id');
-    if (folio !== null) { donde.push('v.folio = ?'); valores.push(folio); }
+    if (numero) {
+      // Se busca como lo diga la gente: "2026-412" o "412" a secas.
+      if (numero.serie) {
+        donde.push('(v.serie = ? AND v.folio_anual = ?)');
+        valores.push(numero.serie, numero.folioAnual);
+      } else {
+        donde.push('(v.folio_anual = ? OR v.folio = ?)');
+        valores.push(numero.folioAnual, numero.folio ?? -1);
+      }
+    }
     filas.push(...bd.prepare(`
-      SELECT 'venta' AS tipo, v.id, v.fecha, v.folio,
+      SELECT 'venta' AS tipo, v.id, v.fecha, v.folio, v.serie, v.folio_anual,
              v.total_centavos AS centavos, v.forma_pago,
              v.cancelada_en, v.motivo_cancelacion,
              u.nombre AS quien, cj.nombre AS cajero,
@@ -104,7 +114,9 @@ function historial(opciones = {}) {
              -- La pareja del cambio, para poder decir "#5 cambiado por #8"
              -- en los dos renglones y no dejar ninguno huérfano.
              viejo.folio AS cambio_de,
+             viejo.serie AS cambio_de_serie, viejo.folio_anual AS cambio_de_anual,
              nuevo.folio AS cambiado_por,
+             nuevo.serie AS cambiado_por_serie, nuevo.folio_anual AS cambiado_por_anual,
              lp.tipo AS lista_tipo, v.lista_nombre,
              -- Qué se llevó, en corto: "5 marquetas, 2 Coca".
              (SELECT group_concat(
@@ -136,11 +148,14 @@ function historial(opciones = {}) {
     }
     filas.push(...bd.prepare(`
       SELECT CASE m.tipo WHEN 'salida' THEN 'gasto' ELSE 'entrada' END AS tipo,
-             m.id, m.fecha, NULL AS folio, m.centavos, NULL AS forma_pago,
+             m.id, m.fecha, NULL AS folio, NULL AS serie, NULL AS folio_anual,
+             m.centavos, NULL AS forma_pago,
              m.anulado_en AS cancelada_en, m.motivo_anulacion AS motivo_cancelacion,
              u.nombre AS quien, e.nombre AS cajero,
              m.concepto AS cliente, c.folio AS turno, m.caja_id,
              NULL AS cambio_de, NULL AS cambiado_por,
+             NULL AS cambio_de_serie, NULL AS cambio_de_anual,
+             NULL AS cambiado_por_serie, NULL AS cambiado_por_anual,
              NULL AS lista_tipo, NULL AS lista_nombre, m.concepto AS detalle
         FROM movimientos_caja m
         LEFT JOIN usuarios u ON u.id = m.capturista_id
@@ -155,11 +170,14 @@ function historial(opciones = {}) {
   if (tipos.includes('abono')) {
     const { donde, valores } = filtros(opciones, 'a.fecha', 'a.capturista_id');
     filas.push(...bd.prepare(`
-      SELECT 'abono' AS tipo, a.id, a.fecha, NULL AS folio, a.centavos, a.forma_pago,
+      SELECT 'abono' AS tipo, a.id, a.fecha, NULL AS folio,
+             NULL AS serie, NULL AS folio_anual, a.centavos, a.forma_pago,
              a.anulado_en AS cancelada_en, a.motivo_anulacion AS motivo_cancelacion,
              u.nombre AS quien, e.nombre AS cajero,
              cl.nombre AS cliente, c.folio AS turno, a.caja_id,
              NULL AS cambio_de, NULL AS cambiado_por,
+             NULL AS cambio_de_serie, NULL AS cambio_de_anual,
+             NULL AS cambiado_por_serie, NULL AS cambiado_por_anual,
              NULL AS lista_tipo, NULL AS lista_nombre,
              'Abono a su cuenta' AS detalle
         FROM abonos a
@@ -173,7 +191,18 @@ function historial(opciones = {}) {
   }
 
   filas.sort((a, b) => (a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0));
-  return filas.slice(0, limite);
+
+  // El número ya escrito, para que la pantalla no tenga que armarlo.
+  return filas.slice(0, limite).map((f) => ({
+    ...f,
+    numero: f.folio ? numeroDeTicket(f) : null,
+    cambioDeNumero: f.cambio_de
+      ? numeroDeTicket({ serie: f.cambio_de_serie, folio_anual: f.cambio_de_anual,
+                         folio: f.cambio_de }) : null,
+    cambiadoPorNumero: f.cambiado_por
+      ? numeroDeTicket({ serie: f.cambiado_por_serie, folio_anual: f.cambiado_por_anual,
+                         folio: f.cambiado_por }) : null
+  }));
 }
 
 /**

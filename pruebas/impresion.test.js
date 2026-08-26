@@ -148,7 +148,9 @@ test('el ticket de una venta lleva la cantidad en grande', async () => {
   const papel = loImpreso();
   assert.match(papel, /3\/4/, 'la cantidad va en el ticket');
   assert.match(papel, /1\/2 \+ 1\/4/, 'y el desglose de cómo se formó el precio');
-  assert.match(papel, new RegExp(`#${venta.folio}`));
+  // El número que se dice en voz alta: "2026-412", no el folio interno.
+  assert.match(papel, new RegExp(venta.numero.replace('-', '\\-')),
+               'el ticket lleva su número de la serie del año');
   assert.ok(!papel.includes('COPIA'), 'el original no dice copia');
 });
 

@@ -11,6 +11,80 @@ solo para arreglos de algo que ya estaba, o para cambios de puro aspecto.
 
 ---
 
+## v2.2 — El número del año, y actualizar solo · 26 de agosto de 2026
+
+Migración `018_serie_anual.sql`: dos columnas en `ventas`.
+
+### 2026-412
+
+> *"El folio me llegó a preocupar: ¿qué va a pasar cuando el número esté tan
+> grande que se vea ridículamente grande?"*
+
+A 300 tickets diarios son 110,000 al año; en nueve años el ticket diría
+`#1,000,000`. No se rompe nada —es un entero— pero deja de servir para lo
+único que sirve: decirse en voz alta. *"Tráeme el 2026-412"* se dice; *"el
+un millón doce mil"* no.
+
+**Dos números, no uno.** El `folio` de siempre se queda igual: identidad
+interna, nunca se reinicia, y todo lo que ya lo referencia sigue
+funcionando. Encima van la **serie** (el año) y el número dentro del año,
+que es lo que se enseña, se imprime y se busca.
+
+Reiniciar el folio de verdad habría sido cambiarle la identidad a algo que
+ya está escrito en papeles firmados.
+
+El año sale del **reloj de la fábrica**, no de UTC: el 31 de diciembre a las
+7 de la tarde en Yucatán ya es 1 de enero en UTC, y sin `'localtime'` la
+serie nueva empezaría un día antes. Las pruebas corren con
+`TZ=America/Merida` puesto, por lo mismo que las de la v2.0.2.
+
+Se busca como lo diga la gente: `2026-412`, `412` o `#412`.
+
+### Actualizar desde un ZIP
+
+> *"Me das los archivos, los comprimimos en un ZIP, dentro del software el
+> administrador le da clic a actualizar, se sube y listo."*
+
+Es el botón más peligroso del programa: reemplaza el código que se está
+ejecutando. Lleva tres redes, en este orden:
+
+1. **Se revisa antes de tocar nada** — que sea un ZIP de verdad, con
+   `package.json` de `fabrica-hielo`, con código adentro (no solo el
+   `package.json`, que subiría el número de versión sin cambiar una línea),
+   y sin rutas que se salgan de la carpeta.
+2. **Se respalda la base**, aunque una actualización no debería tocarla:
+   las migraciones sí.
+3. **Se guarda la versión anterior** en `datos/version-anterior`.
+
+Y la regla que manda: **`datos` no se toca**. Lista blanca, no negra — con
+una lista negra, el día que el ZIP traiga una carpeta nueva que a nadie se
+le ocurrió prohibir, se copia.
+
+Las carpetas que sí se reemplazan se **borran antes** de escribir: un
+archivo que la versión nueva ya no usa, si se queda, produce los errores
+imposibles de explicar.
+
+**El lector de ZIP se escribió a mano** (`src/lib/zip.js`, ~130 líneas):
+directorio central + `inflateRawSync`. No es por presumir — el sistema se
+actualiza en una fábrica sin internet, y una actualización que necesita
+`npm install` para instalarse es una actualización que no se puede
+instalar.
+
+Cierra el *zip slip* dos veces: por el nombre antes de descomprimir, y por
+la ruta ya resuelta antes de escribir. Las dos son baratas y lo que está en
+juego es el disco entero.
+
+Y admite el ZIP del **clic derecho de Windows**, que mete todo dentro de una
+carpeta con el nombre del original: se le quita sola.
+
+Lo más peligroso está probado sobre una instalación de mentiras en una
+carpeta temporal: que el código se reemplace, que los archivos zombis
+desaparezcan, que `datos` siga intacta, que la versión vieja quede guardada,
+que el respaldo corra **antes** de escribir, y que un ZIP malo no llegue a
+tocar el disco.
+
+---
+
 ## v2.1 — El cajón, el sonido y las devoluciones · 26 de agosto de 2026
 
 Sin migración.

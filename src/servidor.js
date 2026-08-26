@@ -36,6 +36,11 @@ function crearApp() {
   app.use('/api/catalogo', express.json({ limit: '4mb' }),
           require('./modulos/catalogo/rutas'));
 
+  // Y la actualización, que es un ZIP con el programa entero: el que más
+  // pesa de todos. Va antes del lector general por lo mismo.
+  app.use('/api/sistema', express.json({ limit: '80mb' }),
+          require('./modulos/sistema/rutas'));
+
   app.get('/marca/logo', personalizacion.servirLogo('logo_claro'));
   app.get('/marca/logo-oscuro', personalizacion.servirLogo('logo_oscuro'));
   app.get('/fotos/:archivo', require('./modulos/catalogo/fotos').servir);
@@ -56,8 +61,6 @@ function crearApp() {
   app.use('/api/historial', require('./modulos/historial/rutas'));
   app.use('/api/ayuda', require('./modulos/ayuda/rutas'));
   app.use('/api/versiones', require('./modulos/versiones/rutas'));
-  app.use('/api/sistema', require('./modulos/sistema/rutas'));
-
   app.use('/api', (req, res) => error(res, 'Esa ruta de la API no existe.', 404));
 
   // Interfaz

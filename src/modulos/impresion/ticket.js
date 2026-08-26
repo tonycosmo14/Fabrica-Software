@@ -21,6 +21,7 @@ const { Ticket } = require('./escpos');
 const { configuracion } = require('./impresora');
 const { aTexto, desglose } = require('../../lib/fracciones');
 const { formato } = require('../../lib/dinero');
+const { numeroDeTicket } = require('../ventas/folio');
 
 /** 23/08/26 05:23 p.m. */
 function fechaCorta(iso) {
@@ -43,7 +44,7 @@ function ticketVenta(venta, { copia = false, negocio = '' } = {}) {
   const otras = venta.lineas.filter((l) => l.dieciseisavos === 0);
 
   t.izquierda().normal();
-  t.columnas3(`#${venta.folio}`, fechaCorta(venta.fecha),
+  t.columnas3(numeroDeTicket(venta), fechaCorta(venta.fecha),
               (venta.cajero_nombre || '').split(' ')[0]);
   t.separador();
 

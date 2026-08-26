@@ -11,6 +11,7 @@ const { ok, error: fallo } = require('../../lib/respuestas');
 const bitacora = require('../../lib/bitacora');
 const respaldos = require('../../db/respaldos');
 const { exigirPermiso } = require('../../middleware/sesion');
+const actualizador = require('./actualizar');
 
 const router = express.Router();
 
@@ -117,6 +118,100 @@ router.put('/respaldos', exigirPermiso('sistema.configurar'), (req, res) => {
   });
 
   return ok(res, { ajustes: respaldos.ajustes() });
+});
+
+// ============================================================
+// ACTUALIZAR EL SISTEMA
+// ============================================================
+//
+// El ZIP llega en base64 dentro del JSON, igual que el logo. No es la forma
+// más eficiente —ocupa un tercio más— pero es la que no necesita nada
+// especial ni en el navegador ni en el servidor, y una actualización se
+// hace una vez al mes, no cien veces al día.
+
+/** Saca los bytes del ZIP que mandó la pantalla. */
+function leerElZip(cuerpo) {
+  const crudo = String(cuerpo?.archivo || '');
+  if (!crudo) return { error: 'No llegó ningún archivo.' };
+
+  // Viene como "data:application/zip;base64,UEsDBA..." o solo el base64.
+  const base64 = crudo.includes(',') ? crudo.slice(crudo.indexOf(',') + 1) : crudo;
+  let buffer;
+  try { buffer = Buffer.from(base64, 'base64'); }
+  catch { return { error: 'El archivo llegó dañado.' }; }
+
+  // "PK" es la firma de todos los ZIP desde 1989.
+  if (buffer.length < 22 || buffer[0] !== 0x50 || buffer[1] !== 0x4b) {
+    return { error: 'Ese archivo no es un ZIP.' };
+  }
+  return { buffer };
+}
+
+/**
+ * REVISAR sin instalar.
+ *
+ * La pantalla enseña qué trae el ZIP y qué va a pasar ANTES de que el
+ * usuario confirme. Nadie debería apretar "actualizar" a ciegas cuando lo
+ * que está en juego es el programa con el que se cobra.
+ */
+router.post('/actualizar/revisar', exigirPermiso('sistema.configurar'), (req, res) => {
+  const { buffer, error } = leerElZip(req.body);
+  if (error) return fallo(res, error);
+
+  const revision = actualizador.revisar(buffer);
+  if (!revision.ok) return fallo(res, revision.error);
+
+  const { _plan, ...limpia } = revision;   // el plan es de adentro
+  return ok(res, { revision: limpia });
+});
+
+/**
+ * INSTALAR de verdad.
+ *
+ * Respalda la base, guarda la versión que se reemplaza y escribe encima.
+ * Después hay que reiniciar: el código viejo sigue cargado en memoria hasta
+ * que el programa se vuelve a abrir.
+ */
+router.post('/actualizar', exigirPermiso('sistema.configurar'), (req, res) => {
+  const { buffer, error } = leerElZip(req.body);
+  if (error) return fallo(res, error);
+
+  let resultado;
+  try {
+    resultado = actualizador.instalar(buffer);
+  } catch (e) {
+    // Que falle una actualización es malo; que además no se sepa por qué,
+    // peor. El motivo va tal cual y queda en la bitácora.
+    bitacora.registrar({
+      accion: 'sistema.actualizacion-fallida', entidad: 'sistema',
+      ejecutorId: req.usuario.id, detalle: { error: e.message }
+    });
+    return fallo(res, `No se pudo actualizar: ${e.message}`, 500);
+  }
+
+  bitacora.registrar({
+    accion: 'sistema.actualizado', entidad: 'sistema',
+    ejecutorId: req.usuario.id,
+    detalle: { de: resultado.versionAnterior, a: resultado.version,
+               archivos: resultado.archivos, respaldo: resultado.respaldo }
+  });
+
+  return ok(res, { actualizado: resultado });
+});
+
+/**
+ * REINICIAR.
+ *
+ * El programa se apaga y el .bat lo vuelve a levantar. Se contesta ANTES de
+ * apagarse: si se apagara primero, la pantalla se quedaría esperando una
+ * respuesta que nunca llega y parecería que se rompió.
+ */
+router.post('/reiniciar', exigirPermiso('sistema.configurar'), (req, res) => {
+  bitacora.registrar({
+    accion: 'sistema.reiniciado', entidad: 'sistema', ejecutorId: req.usuario.id
+  });
+  ok(res, { reiniciando: true });
+  setTimeout(() => process.exit(0), 400);
 });
 
 module.exports = router;

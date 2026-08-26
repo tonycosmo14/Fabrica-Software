@@ -8,6 +8,7 @@ const express = require('express');
 const { ok, error } = require('../../lib/respuestas');
 const { exigirPermiso } = require('../../middleware/sesion');
 const { historial, resumen, quienes, TIPOS } = require('./calculo');
+const { leerNumero } = require('../ventas/folio');
 
 const router = express.Router();
 
@@ -34,12 +35,12 @@ router.get('/', verHistorial, (req, res) => {
     horaHasta: leerHora(req.query.horaHasta),
     usuarioId: req.query.usuarioId || null,
     tipos: String(req.query.tipos || '').split(',').filter(Boolean),
-    folio: leerFolio(req.query.folio),
+    numero: leerNumero(req.query.folio),
     limite: Number(req.query.limite) || 150
   };
 
-  if (req.query.folio && opciones.folio === null) {
-    return error(res, 'El número de ticket se escribe con números.');
+  if (req.query.folio && !opciones.numero) {
+    return error(res, 'El número de ticket se escribe como 2026-412, o solo 412.');
   }
 
   if (req.query.desde && !opciones.desde) return error(res, 'Esa fecha no se entiende.');
@@ -52,14 +53,6 @@ router.get('/', verHistorial, (req, res) => {
     resumen: resumen(opciones)
   });
 });
-
-/** El número de un ticket. Solo dígitos: "#412" y "412" son lo mismo. */
-function leerFolio(valor) {
-  const t = String(valor || '').trim().replace(/^#/, '');
-  if (!t) return null;
-  if (!/^\d{1,9}$/.test(t)) return null;
-  return Number(t);
-}
 
 /** Una fecha del calendario: 2026-08-24. Nada más. */
 function leerFecha(valor) {

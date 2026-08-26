@@ -196,6 +196,14 @@ debería quedar − contado = FALTA</pre>
       <p>El ticket viejo queda cancelado y amarrado al nuevo, el hielo
       vuelve al cuarto frío solo y la caja cuadra sola. Todo queda anotado.</p>
 
+      <h4>El número del ticket</h4>
+      <p>Los tickets se numeran por año: <b>2026-412</b> es el ticket 412 de
+      2026. El 1 de enero vuelve a empezar en 1, así que el número nunca se
+      hace tan grande que no se pueda decir por teléfono.</p>
+      <p>Para buscarlo da igual cómo lo escribas: <b>2026-412</b> o solo
+      <b>412</b>. Vale aquí (<em>F3</em>), en el <b>Historial</b> y al hacer
+      un cambio de ticket.</p>
+
       <h4>Devolverle el dinero a un cliente</h4>
       <p>Pasa todos los días: se cansó de esperar la fila, llevaba prisa, o
       el hielo no estaba bien congelado. Regresa a la caja con su ticket y
@@ -932,14 +940,36 @@ debería haber − contado = FALTA</pre>
   {
     id: 'actualizar',
     titulo: 'Actualizar el sistema',
-    busca: 'actualizar versión nueva instalar archivos novedades',
+    busca: 'actualizar versión nueva instalar archivos novedades zip subir reiniciar',
     cuerpo: `
-      <p>Doble clic en <b>ACTUALIZAR.bat</b>. Baja la versión nueva y
-      reemplaza los archivos del programa.</p>
+      <p>Cuando haya una versión nueva te va a llegar un archivo
+      <b>.zip</b>. No hay que descomprimirlo ni copiar nada a mano.</p>
 
-      <p><b>Tus datos no se tocan.</b> Viven en la carpeta <code>datos</code>,
-      que la actualización nunca toca. Y antes de cambiar nada en la base, el
-      sistema hace un respaldo.</p>
+      <ol class="instrucciones">
+        <li>Entra a <b>Sistema</b> → <b>Actualizar el sistema</b>.</li>
+        <li><b>Escoger el archivo ZIP</b> y busca el que te mandé.</li>
+        <li>El sistema te enseña <b>qué versión trae</b> y cuántos archivos
+        va a reemplazar. Léelo antes de seguir.</li>
+        <li><b>Actualizar</b>, y cuando termine, <b>Reiniciar</b>.</li>
+      </ol>
+
+      <p class="ayuda-tip">Hazlo cuando <b>nadie esté cobrando</b>. El sistema
+      se apaga unos segundos para volver con el programa nuevo.</p>
+
+      <h4>Tus datos no se tocan</h4>
+      <p>Ventas, clientes, cortes, precios y el logo viven en la carpeta
+      <code>datos</code>, y la actualización <b>nunca la abre</b>. Aun así,
+      antes de cambiar nada:</p>
+      <ul>
+        <li>se hace un <b>respaldo de la base</b>;</li>
+        <li>y la <b>versión anterior</b> se guarda completa, por si hubiera
+        que volver a ella.</li>
+      </ul>
+
+      <h4>Si el archivo no sirve, te lo dice</h4>
+      <p>Antes de tocar nada, el sistema revisa que el ZIP sea de verdad de
+      este programa y que traiga código. Si algo no cuadra, no instala nada y
+      explica qué pasó.</p>
 
       <p>Después de actualizar, en el menú aparece un <b>punto rojo</b> en
       «Qué hay de nuevo»: ahí se ve todo lo que cambió.</p>`

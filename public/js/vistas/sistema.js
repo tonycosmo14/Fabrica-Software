@@ -4,7 +4,7 @@
  */
 import { api } from '../api.js';
 import { esc, fecha, avisar } from '../util.js';
-import { pedirTexto, pedirNumero } from '../dialogo.js';
+import { pedirTexto, pedirNumero, confirmar } from '../dialogo.js';
 
 export async function vistaSistema(pantalla, estadoApp) {
   const puedeConfigurar = estadoApp?.permisos?.includes('*') ||
@@ -116,6 +116,8 @@ export async function vistaSistema(pantalla, estadoApp) {
     </div>
     <div class="sistema-columna">
 
+    ${puedeConfigurar ? panelActualizar(estado) : ''}
+
     <h3>Dónde viven los datos</h3>
     <div class="tarjeta plana">
       <table class="tabla">
@@ -204,6 +206,13 @@ export async function vistaSistema(pantalla, estadoApp) {
       // La lista se llena sola al abrir la pantalla.
       llenarImpresoras();
 
+      const zip = pantalla.querySelector('#zip');
+      if (zip) zip.onchange = () => {
+        const archivo = zip.files?.[0];
+        zip.value = '';                       // que se pueda volver a escoger el mismo
+        if (archivo) revisarZip(archivo);
+      };
+
       pantalla.querySelector('#probar-cajon').onclick = async () => {
         try {
           await api.actualizar('/impresion/config', {
@@ -246,6 +255,137 @@ export async function vistaSistema(pantalla, estadoApp) {
   // respaldos: por eso vive aquí y no en Productos, que es donde estaba y
   // donde nadie la iba a buscar.
   // ==========================================================
+  /**
+   * ACTUALIZAR EL SISTEMA.
+   *
+   * Se sube un ZIP y el sistema se reemplaza a sí mismo. Es el botón más
+   * peligroso del programa, así que va en dos pasos: primero se REVISA y se
+   * enseña qué trae, y solo después se instala. Nadie debería apretar
+   * "actualizar" a ciegas cuando lo que está en juego es el programa con el
+   * que se cobra.
+   */
+  function panelActualizar(estado) {
+    return `
+      <h3>Actualizar el sistema</h3>
+      <div class="tarjeta">
+        <p class="ayuda" style="margin:0 0 12px">
+          Tienes la <b>v${esc(estado.version)}</b>. Cuando te mande una versión
+          nueva, va a llegar como un archivo <b>.zip</b>: lo subes aquí y el
+          sistema se actualiza solo.
+        </p>
+
+        <label class="subir" style="width:100%;justify-content:center">
+          📦 Escoger el archivo ZIP
+          <input type="file" id="zip" accept=".zip,application/zip" hidden>
+        </label>
+
+        <div id="revision-zip"></div>
+
+        <p class="ayuda" style="margin:12px 0 0">
+          <b>Tus datos no se tocan.</b> Ventas, clientes, cortes y precios
+          viven en la carpeta <code>datos</code>, que la actualización nunca
+          abre. Aun así, antes de cambiar nada se hace un respaldo, y la
+          versión anterior se guarda por si hay que volver a ella.
+        </p>
+      </div>`;
+  }
+
+  /** Sube el ZIP y enseña qué trae, sin instalar todavía. */
+  async function revisarZip(archivo) {
+    const caja = pantalla.querySelector('#revision-zip');
+    caja.innerHTML = '<p class="ayuda">Revisando el archivo…</p>';
+
+    let base64;
+    try { base64 = await leerComoBase64(archivo); }
+    catch { caja.innerHTML = '<p class="ayuda malo">No se pudo leer el archivo.</p>'; return; }
+
+    let revision;
+    try {
+      revision = (await api.enviar('/sistema/actualizar/revisar', { archivo: base64 })).revision;
+    } catch (e) {
+      caja.innerHTML = `<p class="ayuda malo">${esc(e.message)}</p>`;
+      return;
+    }
+
+    caja.innerHTML = `
+      <div class="cuadre" style="margin-top:14px">
+        <div class="cuadre-linea">
+          <span>Versión que traes ahora</span><strong>v${esc(revision.versionActual)}</strong>
+        </div>
+        <div class="cuadre-linea total">
+          <span>Versión del archivo</span>
+          <strong class="${revision.esMasNueva ? 'bueno' : 'malo'}">v${esc(revision.version)}</strong>
+        </div>
+        <div class="cuadre-linea">
+          <span>Archivos que se reemplazan</span><strong>${revision.archivos}</strong>
+        </div>
+      </div>
+      ${revision.avisos.map((a) => `
+        <div class="aviso-sin-caja" style="margin-top:10px">${esc(a)}</div>`).join('')}
+      <button id="instalar-zip" class="${revision.esMasNueva ? '' : 'peligro'}"
+              style="margin-top:14px;width:100%">
+        Actualizar a la v${esc(revision.version)}
+      </button>`;
+
+    caja.querySelector('#instalar-zip').onclick = () => instalarZip(base64, revision);
+  }
+
+  async function instalarZip(base64, revision) {
+    if (!await confirmar({
+      titulo: `¿Actualizar a la v${revision.version}?`,
+      texto: 'El sistema se va a reiniciar. Asegúrate de que nadie esté cobrando ' +
+             'en este momento.',
+      ok: 'Actualizar', peligro: !revision.esMasNueva
+    })) return;
+
+    const caja = pantalla.querySelector('#revision-zip');
+    caja.innerHTML = '<p class="ayuda">Actualizando… no cierres esta ventana.</p>';
+
+    let r;
+    try {
+      r = (await api.enviar('/sistema/actualizar', { archivo: base64 })).actualizado;
+    } catch (e) {
+      caja.innerHTML = `<p class="ayuda malo">${esc(e.message)}</p>`;
+      avisar(e.message, 'error');
+      return;
+    }
+
+    caja.innerHTML = `
+      <div class="tarjeta" style="margin-top:14px">
+        <p style="margin:0"><b>Listo: v${esc(r.versionAnterior)} → v${esc(r.version)}</b></p>
+        <p class="ayuda" style="margin:8px 0 0">
+          Se reemplazaron ${r.archivos} archivos.
+          ${r.respaldo ? `Respaldo guardado: <code>${esc(r.respaldo)}</code>.` : ''}
+        </p>
+        <p class="ayuda" style="margin:8px 0 12px">
+          Falta <b>reiniciar</b> para que el programa nuevo entre en marcha.
+          El código viejo sigue cargado en memoria hasta entonces.
+        </p>
+        <button id="reiniciar-ya" style="width:100%">Reiniciar el sistema ahora</button>
+      </div>`;
+
+    caja.querySelector('#reiniciar-ya').onclick = async () => {
+      try { await api.enviar('/sistema/reiniciar', {}); } catch { /* se está apagando */ }
+      caja.innerHTML = `
+        <p class="ayuda" style="margin-top:14px">
+          Reiniciando. Si en unos segundos no vuelve solo, cierra la ventana
+          negra y da doble clic en <b>INICIAR</b>.
+        </p>`;
+      // Se espera a que vuelva a levantar y se recarga.
+      setTimeout(() => location.reload(), 4000);
+    };
+  }
+
+  /** El ZIP como texto, para poder mandarlo en el JSON. */
+  function leerComoBase64(archivo) {
+    return new Promise((resolver, rechazar) => {
+      const lector = new FileReader();
+      lector.onload = () => resolver(lector.result);
+      lector.onerror = () => rechazar(lector.error);
+      lector.readAsDataURL(archivo);
+    });
+  }
+
   function panelImpresora(i) {
     const como = i.comoSeManda || { tipo: 'ninguno', texto: 'sin configurar' };
     impresorasPorApartado = Object.fromEntries(
