@@ -17,9 +17,26 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '2.0';
+const VERSION_ACTUAL = '2.0.1';
 
 const VERSIONES = [
+  {
+    numero: '2.0.1',
+    nombre: 'La impresora de red',
+    fecha: '2026-08-26',
+    resumen:
+      'El ticket ya se le puede mandar directo a una impresora de red, ' +
+      'escribiendo nada más su dirección.',
+    cambios: [
+      { tipo: 'arreglo', texto: 'ARREGLADO: si la impresora es de RED, el sistema no podía mandarle el ticket. Solo sabía escribirle a una impresora COMPARTIDA de Windows, y eso obliga a compartirla y a que el driver esté puesto.' },
+      { tipo: 'importante', texto: 'AHORA BASTA CON SU DIRECCIÓN. Escribe 192.168.1.65 en Sistema → Impresora de tickets y listo. El sistema le habla directo por el puerto 9100, que es por donde escuchan todas las térmicas de red.' },
+      { tipo: 'nuevo', texto: 'Botón BUSCAR LAS IMPRESORAS DE ESTA PC: le pregunta a Windows cuáles tiene y te ofrece la dirección ya masticada. Un toque en "Usar esta" y el campo se llena solo.' },
+      { tipo: 'nuevo', texto: 'Debajo del campo, un renglón dice POR DÓNDE VA A SALIR el ticket mientras escribes: "por red a 192.168.1.65:9100", "nombre compartido de Windows", "a un archivo". Ver qué entendió el programa es la mitad de arreglarlo.' },
+      { tipo: 'mejora', texto: 'Cuando falla, el aviso dice QUÉ REVISAR: que está apagada, que no se llega a esa dirección, que el puerto no es ese. No un error en inglés.' },
+      { tipo: 'importante', texto: 'Y si la impresora no contesta, la venta NO se cae: el dinero ya se cobró, y ningún problema de impresora puede tumbar eso. A los ocho segundos se rinde y avisa.' }
+    ],
+    siguiente: 'v2.1 — Actualizar el sistema desde un archivo ZIP, sin perder datos.'
+  },
   {
     numero: '2.0',
     nombre: 'La caja de diario',

@@ -3,7 +3,7 @@
 Sistema para la fábrica de hielo de Hunucmá, Yucatán.
 Se construye **por versiones**: cada versión es un pedazo terminado, probado y usable.
 
-**Versión actual: v2.0**
+**Versión actual: v2.0.1**
 
 ---
 
@@ -470,6 +470,38 @@ tampoco se borra suelto: dejaría al otro apuntando a la nada.
 
 ---
 
+## La impresora de tickets (v0.11, por red desde v2.0.1)
+
+El ticket lo manda **el servidor**, no el navegador: así sale al instante,
+sin que se asome la ventana de impresión. El destino se lee y el camino se
+elige solo:
+
+| Destino | Cómo se manda |
+|---|---|
+| `192.168.1.65` | socket al puerto **9100** (RAW) |
+| `192.168.1.65:9101` | socket a ese puerto |
+| `\\localhost\TICKET` | `copy /b` a un nombre compartido de Windows |
+| `LPT1:` | `copy /b` a un puerto |
+| `C:\tickets` | se guarda como archivo, para probar sin impresora |
+
+**Para una impresora de red basta su dirección.** No hace falta compartirla,
+ni que Windows tenga el driver, ni que sea Windows. Un nombre suelto sin
+puerto (`tickets`) se lee como archivo a propósito: leerlo como una máquina
+de la red convertiría una carpeta mal escrita en ocho segundos de espera por
+ticket.
+
+`GET /impresion/impresoras` le pregunta a Windows con `Get-Printer` y
+devuelve nombre, puerto y nombre compartido con la sugerencia ya resuelta.
+`GET /impresion/entender?destino=…` dice qué entendió, sin guardar nada: es
+lo que alimenta el renglón *"el ticket se manda por red a 192.168.1.65:9100"*
+debajo del campo.
+
+**Una impresora apagada no tumba una venta.** El socket lleva reloj de ocho
+segundos y `imprimirCrudo()` no lanza nunca: devuelve `{impreso:false,
+motivo}` con el motivo ya traducido a algo accionable.
+
+---
+
 ## El corte: dos columnas y WhatsApp (v1.9)
 
 Los movimientos del corte salen en **dos columnas** —gastos de un lado,
@@ -679,6 +711,7 @@ versión nueva le aparece un punto rojo en el menú.
 | **v1.8** | Historial con filtros, y borrar de verdad | ✅ listo |
 | **v1.9** | Precios de mayoreo, corte en dos columnas y compartir por WhatsApp | ✅ listo |
 | **v2.0** | Mayoreo tecleado, historial con acciones, mermas y listas de un renglón | ✅ listo |
+| **v2.0.1** | La impresora de red: basta con su dirección IP | ✅ listo |
 | v2.1 | Actualizar el sistema desde un ZIP, sin perder datos | siguiente |
 | v2.2 | Estadísticas, gráficas, recibos de CFE y gastos grandes de la empresa | |
 | v2.3 | Reparto, pedidos y neveras en comodato | |

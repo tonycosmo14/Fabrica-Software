@@ -182,6 +182,13 @@ export async function vistaSistema(pantalla, estadoApp) {
     if (guardarImp) {
       guardarImp.onclick = () => guardarImpresora();
       pantalla.querySelector('#probar-impresora').onclick = () => guardarImpresora({ probar: true });
+      pantalla.querySelector('#buscar-impresoras').onclick = buscarImpresoras;
+
+      // El cartel de "por dónde va a salir" se actualiza mientras se teclea:
+      // es lo que convierte este campo en algo que se puede depurar solo.
+      const destino = pantalla.querySelector('#imp-destino');
+      let espera;
+      destino.oninput = () => { clearTimeout(espera); espera = setTimeout(entenderDestino, 250); };
     }
 
     pantalla.querySelector('#frecuencia').onclick = async () => {
@@ -208,17 +215,33 @@ export async function vistaSistema(pantalla, estadoApp) {
   // donde nadie la iba a buscar.
   // ==========================================================
   function panelImpresora(i) {
+    const como = i.comoSeManda || { tipo: 'ninguno', texto: 'sin configurar' };
     return `
       <h3>Impresora de tickets</h3>
       <div class="tarjeta">
         <p class="ayuda" style="margin:0 0 12px">
-          Con el nombre puesto, el ticket sale <strong>al instante</strong>, sin
+          Con el destino puesto, el ticket sale <strong>al instante</strong>, sin
           que se asome la ventana de impresión del navegador.
         </p>
 
-        <label class="etiqueta-chica" for="imp-destino">Nombre compartido de la impresora</label>
-        <input id="imp-destino" autocomplete="off" placeholder="\\\\localhost\\TICKET"
+        <label class="etiqueta-chica" for="imp-destino">
+          Dirección de la impresora, o su nombre compartido
+        </label>
+        <input id="imp-destino" autocomplete="off" placeholder="192.168.1.65"
                value="${esc(i.destino)}" ${puedeConfigurar ? '' : 'disabled'}>
+        <p class="imp-entendido ${como.tipo}" id="imp-entendido">
+          ${como.tipo === 'ninguno'
+            ? 'Sin destino, el ticket se imprime por la ventana del navegador.'
+            : `El ticket se manda <b>${esc(como.texto)}</b>.`}
+        </p>
+
+        ${puedeConfigurar ? `
+          <div class="fila-botones" style="margin-bottom:14px">
+            <button class="secundario chico" id="buscar-impresoras">
+              🔍 Buscar las impresoras de esta PC
+            </button>
+          </div>
+          <div id="lista-impresoras"></div>` : ''}
 
         <div class="rejilla-config">
           <label>
@@ -246,20 +269,107 @@ export async function vistaSistema(pantalla, estadoApp) {
           </div>` : ''}
 
         <details class="ayuda-bloque" style="margin-top:14px">
-          <summary>¿De dónde saco ese nombre?</summary>
+          <summary>¿Qué escribo aquí?</summary>
           <div class="ayuda-cuerpo">
-            <p>Hay que <b>compartir la impresora</b> una vez en Windows: es para
-            que Windows le dé un nombre al que se le puede escribir directo,
-            saltándose el motor de impresión.</p>
+            <p>Depende de cómo esté conectada la impresora. El botón
+            <b>Buscar las impresoras de esta PC</b> te lo dice sin adivinar.</p>
+
+            <h4>Si es de RED (la más común en las térmicas de 80 mm)</h4>
+            <p>Escribe <b>su dirección IP</b> y ya:</p>
+            <pre class="ayuda-formula">192.168.1.65</pre>
+            <p>El sistema le habla directo por el puerto <b>9100</b>, que es por
+            donde escuchan todas las térmicas de red. <b>No hace falta
+            compartir nada</b> ni que Windows tenga el driver puesto.</p>
+            <p class="ayuda-tip">¿Y de dónde sale la IP? Del nombre que le puso
+            Windows a la impresora. Si en tus impresoras dice
+            <em>"ch-e80print en 192.168.1.65"</em>, la dirección es
+            <b>192.168.1.65</b>. También sale imprimiendo la hoja de prueba
+            de la impresora (se aprieta su botón de avance mientras se
+            enciende).</p>
+            <p>Si tu impresora usa otro puerto, se escribe con dos puntos:
+            <code>192.168.1.65:9100</code></p>
+
+            <h4>Si es de USB</h4>
+            <p>Hay que <b>compartirla</b> una vez en Windows. No es para que la
+            usen otras PC: es para que Windows le dé un nombre al que se le
+            puede escribir directo.</p>
             <ol class="instrucciones">
               <li>Panel de control → <b>Dispositivos e impresoras</b>.</li>
               <li>Clic derecho en la térmica → <b>Propiedades de impresora</b>.</li>
-              <li>Pestaña <b>Compartir</b> → nombre corto, por ejemplo <code>TICKET</code>.</li>
-              <li>Aquí escribe <code>\\\\localhost\\TICKET</code> y dale a probar.</li>
+              <li>Pestaña <b>Compartir</b> → un nombre corto y <b>sin espacios</b>,
+              por ejemplo <code>TICKET</code>.</li>
+              <li>Aquí escribe <code>\\\\localhost\\TICKET</code>.</li>
             </ol>
+
+            <h4>Si quieres probar sin impresora</h4>
+            <p>Escribe la ruta de una carpeta —por ejemplo
+            <code>C:\\tickets</code>— y ahí van a caer los tickets como
+            archivos, en vez de en papel.</p>
           </div>
         </details>
       </div>`;
+  }
+
+  /**
+   * Le pregunta a Windows qué impresoras tiene y las ofrece para tocarlas.
+   *
+   * De cada una viene ya masticado lo que hay que escribir: si su puerto es
+   * una dirección de red, esa dirección; si está compartida, su nombre
+   * compartido. Adivinarlo era lo que estaba costando trabajo.
+   */
+  async function buscarImpresoras() {
+    const caja = pantalla.querySelector('#lista-impresoras');
+    caja.innerHTML = '<p class="ayuda">Preguntándole a Windows…</p>';
+    try {
+      const { impresoras, sistema } = await api.obtener('/impresion/impresoras');
+      if (!impresoras.length) {
+        caja.innerHTML = `<p class="ayuda">${sistema === 'win32'
+          ? 'Windows no contestó con ninguna impresora. Escribe la dirección a mano.'
+          : 'Esto solo funciona en Windows. Escribe la dirección a mano.'}</p>`;
+        return;
+      }
+      caja.innerHTML = `
+        <div class="lista-impresoras">
+          ${impresoras.map((p) => `
+            <div class="ticket-fila">
+              <span class="crece">
+                <strong>${esc(p.nombre)}</strong>
+                <small>${p.puerto ? 'puerto ' + esc(p.puerto) : 'sin puerto'}${
+                  p.compartida ? ' · compartida como ' + esc(p.compartida) : ''}</small>
+              </span>
+              ${p.sugerencia
+                ? `<button class="secundario chico" data-usar="${esc(p.sugerencia)}">Usar esta</button>`
+                : '<span class="ayuda" style="margin:0">no se puede usar directo</span>'}
+            </div>`).join('')}
+        </div>
+        <p class="ayuda" style="margin-top:8px">
+          Toca <b>Usar esta</b> y luego <b>Imprimir una prueba</b>.
+        </p>`;
+
+      caja.querySelectorAll('[data-usar]').forEach((b) => {
+        b.onclick = () => {
+          pantalla.querySelector('#imp-destino').value = b.dataset.usar;
+          entenderDestino();
+        };
+      });
+    } catch (e) {
+      caja.innerHTML = `<p class="ayuda malo">${esc(e.message)}</p>`;
+    }
+  }
+
+  /** Va diciendo, mientras se teclea, por dónde va a salir el ticket. */
+  async function entenderDestino() {
+    const campo = pantalla.querySelector('#imp-destino');
+    const cartel = pantalla.querySelector('#imp-entendido');
+    if (!campo || !cartel) return;
+    try {
+      const { como } = await api.obtener(
+        `/impresion/entender?destino=${encodeURIComponent(campo.value.trim())}`);
+      cartel.className = `imp-entendido ${como.tipo}`;
+      cartel.innerHTML = como.tipo === 'ninguno'
+        ? 'Sin destino, el ticket se imprime por la ventana del navegador.'
+        : `El ticket se manda <b>${esc(como.texto)}</b>.`;
+    } catch { /* es un cartel de ayuda: si falla, no pasa nada */ }
   }
 
   async function guardarImpresora({ probar = false } = {}) {
@@ -270,13 +380,21 @@ export async function vistaSistema(pantalla, estadoApp) {
       pie: pantalla.querySelector('#imp-pie').value.trim()
     };
     try {
-      await api.actualizar('/impresion/config', datos);
-      if (probar) {
-        await api.enviar('/impresion/prueba', {});
-        avisar('Salió la prueba. Revisa el papel.', 'bien');
-      } else {
+      const r = await api.actualizar('/impresion/config', datos);
+      if (!probar) {
         avisar('Impresora guardada', 'bien');
+        entenderDestino();
+        return;
       }
-    } catch (e) { avisar(e.message, 'error'); }
+      const como = r.impresion?.comoSeManda;
+      await api.enviar('/impresion/prueba', {});
+      avisar(como?.tipo === 'archivo'
+        ? `Se guardó el ticket ${como.texto}.`
+        : 'Salió la prueba. Revisa el papel.', 'bien');
+    } catch (e) {
+      // El mensaje del servidor ya dice qué revisar; no se tapa con uno
+      // genérico, que es lo que deja al usuario sin saber por dónde seguir.
+      avisar(e.message, 'error');
+    }
   }
 }

@@ -11,6 +11,64 @@ solo para arreglos de algo que ya estaba, o para cambios de puro aspecto.
 
 ---
 
+## v2.0.1 — La impresora de red · 26 de agosto de 2026
+
+Sin migración. Un arreglo, pero de los que desbloquean.
+
+### El problema
+
+La térmica de la fábrica es de red: se llama `ch-e80print en 192.168.1.65`,
+o sea que vive en su propia dirección. El sistema solo sabía un camino para
+mandarle bytes:
+
+```
+copy /b ticket.bin \\localhost\TICKET
+```
+
+Eso obliga a **compartir** la impresora en Windows, a que el driver esté
+puesto y a que el nombre compartido no lleve espacios. Tres cosas que pueden
+fallar, y una impresora de red no necesita ninguna.
+
+### La solución
+
+Ahora el destino se lee y el sistema elige el camino solo:
+
+| Lo que se escribe | Cómo se manda |
+|---|---|
+| `192.168.1.65` | socket al puerto 9100 |
+| `192.168.1.65:9101` | socket a ese puerto |
+| `\\localhost\TICKET` | `copy /b` (Windows) |
+| `LPT1:` | `copy /b` (Windows) |
+| `C:\tickets` | se guarda como archivo, para probar sin impresora |
+
+El **9100 es RAW**: lo que entra por ahí se imprime tal cual. Es como hablan
+todas las térmicas de red desde hace treinta años, y no hace falta driver,
+ni compartir, ni siquiera que sea Windows.
+
+Un nombre suelto (`tickets`) **no** se lee como una máquina de la red: eso
+convertiría una carpeta mal escrita en una espera de ocho segundos por cada
+ticket. Para usar un nombre de red hay que ponerle el puerto.
+
+### Y que se pueda arreglar solo
+
+- **Buscar las impresoras de esta PC** le pregunta a Windows
+  (`Get-Printer`) y devuelve nombre, puerto y nombre compartido, con la
+  sugerencia ya masticada: si el puerto trae una IP, esa IP.
+- Debajo del campo, un renglón dice **por dónde va a salir el ticket**
+  mientras se escribe. Ver qué entendió el programa es la mitad de poder
+  arreglarlo.
+- Los errores se traducen: *"no contesta, ¿está encendida?"*, *"está ahí
+  pero no acepta nada en ese puerto, prueba el 9100"*, *"no se llega a esa
+  dirección desde esta computadora"*.
+
+### Lo que no cambia
+
+Que una impresora apagada **no tumba una venta**. El socket lleva reloj —
+ocho segundos— y `imprimirCrudo()` sigue sin lanzar nunca: devuelve
+`{ impreso: false, motivo }` y la venta, que ya se cobró, sigue su camino.
+
+---
+
 ## v2.0 — La caja de diario · 25 de agosto de 2026
 
 Migración `017_mayoreo_rapido.sql`: `productos.mayoreo`, `clientes.numero`,

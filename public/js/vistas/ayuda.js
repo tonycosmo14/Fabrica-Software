@@ -812,7 +812,7 @@ debería haber − contado = FALTA</pre>
   {
     id: 'respaldos',
     titulo: 'Respaldos y la impresora',
-    busca: 'respaldo copia seguridad usb drive restaurar disco perder datos impresora ticket térmica imprimir compartir windows',
+    busca: 'respaldo copia seguridad usb drive restaurar disco perder datos impresora ticket térmica imprimir compartir windows red ip 9100 puerto no imprime',
     cuerpo: `
       <p>El sistema se respalda <b>solo</b>: cada 4 horas y cada vez que se
       enciende. No hay que acordarse de nada.</p>
@@ -830,11 +830,24 @@ debería haber − contado = FALTA</pre>
 
       <h4>La impresora de tickets</h4>
       <p>Se configura en la misma pantalla de <b>Sistema</b>, más abajo. Con el
-      <b>nombre compartido</b> puesto, el ticket sale al instante; sin él lo
-      imprime el navegador y aparece la ventana de impresión.</p>
-      <p>Ese nombre sale de compartir la impresora una vez en Windows. En la
-      pantalla están los pasos, y el botón <b>Imprimir una prueba</b> dice si
-      quedó bien sin tener que hacer una venta.</p>
+      destino puesto, el ticket sale <b>al instante</b>; sin él lo imprime el
+      navegador y aparece la ventana de impresión.</p>
+
+      <p><b>Si la impresora es de red</b> —lo normal en las térmicas de
+      80 mm—, basta con escribir <b>su dirección IP</b>:</p>
+      <pre class="ayuda-formula">192.168.1.65</pre>
+      <p>El sistema le habla directo por el puerto <b>9100</b>. No hay que
+      compartir nada ni que Windows tenga el driver puesto.</p>
+      <p class="ayuda-tip">La IP suele estar en el nombre que le puso Windows:
+      si tu impresora se llama <em>"ch-e80print en 192.168.1.65"</em>, esa es.
+      El botón <b>Buscar las impresoras de esta PC</b> te la encuentra sola.</p>
+
+      <p><b>Si es de USB</b>, hay que compartirla una vez en Windows y escribir
+      <code>\\\\localhost\\TICKET</code>. Los pasos están en la pantalla.</p>
+
+      <p>Debajo del campo, un renglón te dice <b>por dónde va a salir el
+      ticket</b> según lo que escribiste. Y el botón <b>Imprimir una prueba</b>
+      lo comprueba sin tener que hacer una venta.</p>
 
       <h4>Si hay que restaurar</h4>
       <p>Las instrucciones están en la propia pantalla de Sistema, paso por
@@ -879,11 +892,29 @@ debería haber − contado = FALTA</pre>
 
       <h4>No imprime, o se asoma la ventana de impresión</h4>
       <p>El ticket lo manda <b>el sistema</b> directo a la impresora, sin pasar
-      por el navegador. Para eso hay que decirle una vez cómo se llama la
-      impresora, en <b>Productos y precios → Impresora de tickets</b>. Ahí
-      mismo hay un botón para <b>imprimir una prueba</b> y las instrucciones
-      para compartir la impresora en Windows.</p>
-      <p>Mientras no esté puesto ese nombre, imprime el navegador y aparece la
+      por el navegador. Para eso hay que decirle una vez a dónde mandarlo, en
+      <b>Sistema → Impresora de tickets</b>.</p>
+      <ol class="instrucciones">
+        <li>Toca <b>Buscar las impresoras de esta PC</b> y luego
+        <b>Usar esta</b> en la térmica. Se llena solo.</li>
+        <li>Mira el renglón de abajo: tiene que decir
+        <em>"El ticket se manda por red a 192.168.1.65:9100"</em> o algo
+        parecido. Si dice <em>"a un archivo"</em>, lo que escribiste no es una
+        dirección.</li>
+        <li><b>Imprimir una prueba</b>. Si algo falla, el aviso dice qué
+        revisar, no un error en inglés.</li>
+      </ol>
+      <p>Lo que suele pasar:</p>
+      <ul>
+        <li><em>"no contesta"</em> — está apagada, desconectada del cable de
+        red, o en otra red distinta a la de la PC.</li>
+        <li><em>"no acepta nada en el puerto"</em> — la dirección es correcta
+        pero el puerto no. Prueba <code>9100</code>.</li>
+        <li><em>"no se llega a esa dirección"</em> — la PC y la impresora no
+        se ven entre ellas. Casi siempre es que una está por WiFi y la otra
+        por cable en otra red.</li>
+      </ul>
+      <p>Mientras no esté puesto el destino, imprime el navegador y aparece la
       ventana de siempre. Todo funciona igual, solo que más lento.</p>
       <p>Si en vez de acentos salen cuadritos, la impresora usa otra tabla de
       caracteres. Es un número que se cambia en un momento: avísame.</p>

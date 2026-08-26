@@ -2355,6 +2355,18 @@ body.pantalla-fija main {
 
 /* El botón de mayoreo se distingue de su gemelo de público sin leerlo:
    tocar el equivocado es cobrar mal. */
+/* El cartel que dice por dónde va a salir el ticket. Verde cuando el
+   sistema entendió una impresora de verdad; gris cuando no hay nada. */
+.imp-entendido {
+  margin: 6px 0 14px; font-size: 13px; color: var(--suave);
+  padding: 8px 10px; border-radius: 8px; background: var(--superficie-alt);
+}
+.imp-entendido.red, .imp-entendido.compartida, .imp-entendido.puerto {
+  background: var(--et-cajero-f); color: var(--et-cajero-t);
+}
+.lista-impresoras { border: 2px solid var(--borde); border-radius: 10px; padding: 4px 12px; }
+.lista-impresoras .ticket-fila:last-child { border-bottom: 0; }
+
 .pos-boton-mayoreo { border-color: var(--verde); }
 .pos-boton-mayoreo .pos-boton-precio { color: var(--verde); }
 .etiqueta-mayoreo {

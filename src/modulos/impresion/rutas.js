@@ -13,7 +13,8 @@ const { bd } = require('../../db/conexion');
 const { ok, error } = require('../../lib/respuestas');
 const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
-const { configuracion, guardarAjuste, imprimirCrudo } = require('./impresora');
+const { configuracion, guardarAjuste, imprimirCrudo,
+        tipoDeDestino, impresorasDeWindows } = require('./impresora');
 const { ticketVenta, ticketMovimiento, ticketPrueba } = require('./ticket');
 const { aTexto } = require('../../lib/fracciones');
 
@@ -55,6 +56,28 @@ function ventaCompleta(id) {
 
 router.get('/config', puedeImprimir, (req, res) => {
   return ok(res, { impresion: configuracion() });
+});
+
+/**
+ * LAS IMPRESORAS QUE VE WINDOWS.
+ *
+ * Para no tener que adivinar la IP ni el nombre compartido. De cada una
+ * viene ya masticado lo que habría que escribir en el destino, y con un
+ * toque se llena el campo.
+ */
+router.get('/impresoras', configurar, async (req, res) => {
+  return ok(res, { impresoras: await impresorasDeWindows(), sistema: process.platform });
+});
+
+/**
+ * QUÉ ENTIENDE EL SISTEMA DE LO QUE SE ESTÁ ESCRIBIENDO.
+ *
+ * Se contesta sin guardar nada: sirve para que la pantalla vaya diciendo
+ * "voy a mandarlo por red a 192.168.1.65:9100" mientras se teclea. La mitad
+ * de arreglar una impresora que no imprime es ver qué entendió el programa.
+ */
+router.get('/entender', configurar, (req, res) => {
+  return ok(res, { como: tipoDeDestino(req.query.destino) });
 });
 
 router.put('/config', configurar, (req, res) => {

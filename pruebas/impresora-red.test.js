@@ -1,0 +1,188 @@
+/**
+ * IMPRIMIR POR RED  (v2.0.1)
+ *
+ * La térmica de la fábrica es de red: vive en su propia dirección y escucha
+ * en el puerto 9100. Hasta la v2.0 el sistema solo sabía escribirle a un
+ * nombre compartido de Windows, que obliga a compartir la impresora y a que
+ * el driver esté puesto. Por red no hace falta nada de eso.
+ *
+ * Aquí se levanta una impresora de mentiras —un servidor que escucha en un
+ * puerto y guarda lo que le llega— y se comprueba que:
+ *
+ *  · los bytes llegan tal cual, sin que nadie los toque
+ *  · una impresora apagada NO deja colgada la venta
+ *  · los errores se dicen para poder arreglarlos, no como los dice Node
+ */
+const test = require('node:test');
+const assert = require('node:assert');
+const net = require('node:net');
+const { fabricaDePrueba } = require('./ayudante');
+
+const { llamar, bd, preparar } = fabricaDePrueba('impresora-red');
+
+const {
+  tipoDeDestino, imprimirCrudo, guardarAjuste
+} = require('../src/modulos/impresion/impresora');
+
+/** Una impresora de mentiras: escucha, guarda lo que le llega y se calla. */
+function impresoraDeMentiras() {
+  const recibido = [];
+  const servidor = net.createServer((s) => {
+    const partes = [];
+    s.on('data', (d) => partes.push(d));
+    s.on('end', () => recibido.push(Buffer.concat(partes)));
+    s.on('error', () => { /* al cerrar de golpe, ni caso */ });
+  });
+  return new Promise((resolver) => {
+    servidor.listen(0, '127.0.0.1', () => resolver({
+      puerto: servidor.address().port,
+      recibido,
+      cerrar: () => new Promise((r) => servidor.close(r))
+    }));
+  });
+}
+
+/** Espera a que la impresora de mentiras termine de recibir. */
+function esperar(ms = 120) { return new Promise((r) => setTimeout(r, ms)); }
+
+// ============================================================
+// QUÉ ENTIENDE DE LO QUE SE ESCRIBE
+// ============================================================
+
+test('una IP sola quiere decir "por red, puerto 9100"', () => {
+  const c = tipoDeDestino('192.168.1.65');
+  assert.equal(c.tipo, 'red');
+  assert.equal(c.host, '192.168.1.65');
+  assert.equal(c.puerto, 9100, 'el 9100 es por donde escuchan todas las térmicas');
+});
+
+test('se puede pedir otro puerto', () => {
+  assert.deepEqual(
+    { ...tipoDeDestino('192.168.1.65:9101'), texto: undefined },
+    { tipo: 'red', host: '192.168.1.65', puerto: 9101, texto: undefined });
+});
+
+test('un nombre compartido sigue siendo un nombre compartido', () => {
+  assert.equal(tipoDeDestino('\\\\localhost\\TICKET').tipo, 'compartida');
+});
+
+test('LPT1 y COM3 son puertos, no direcciones', () => {
+  assert.equal(tipoDeDestino('LPT1:').tipo, 'puerto');
+  assert.equal(tipoDeDestino('COM3').tipo, 'puerto');
+});
+
+test('una ruta es una ruta, no una máquina de la red', () => {
+  // Si "tickets" se leyera como un nombre de red, una carpeta llamada así
+  // mandaría los tickets a buscar una computadora que no existe.
+  assert.equal(tipoDeDestino('C:\\tickets').tipo, 'archivo');
+  assert.equal(tipoDeDestino('/tmp/tickets').tipo, 'archivo');
+  assert.equal(tipoDeDestino('tickets').tipo, 'archivo');
+});
+
+test('vacío quiere decir que el servidor no imprime', () => {
+  assert.equal(tipoDeDestino('').tipo, 'ninguno');
+  assert.equal(tipoDeDestino('   ').tipo, 'ninguno');
+});
+
+// ============================================================
+// MANDAR EL TICKET
+// ============================================================
+
+test('los bytes llegan a la impresora tal cual', async () => {
+  const imp = await impresoraDeMentiras();
+  guardarAjuste('impresora_destino', `127.0.0.1:${imp.puerto}`);
+
+  const ticket = Buffer.from([0x1b, 0x40, 65, 66, 67, 0x0a]);
+  const r = await imprimirCrudo(ticket);
+  await esperar();
+
+  assert.equal(r.impreso, true);
+  assert.equal(r.motivo, 'red');
+  assert.equal(imp.recibido.length, 1);
+  assert.deepEqual(imp.recibido[0], ticket, 'ni un byte de más ni de menos');
+
+  await imp.cerrar();
+});
+
+test('dos tickets seguidos llegan los dos', async () => {
+  const imp = await impresoraDeMentiras();
+  guardarAjuste('impresora_destino', `127.0.0.1:${imp.puerto}`);
+
+  await imprimirCrudo(Buffer.from('uno'));
+  await imprimirCrudo(Buffer.from('dos'));
+  await esperar();
+
+  assert.equal(imp.recibido.length, 2);
+  assert.equal(Buffer.concat(imp.recibido).toString(), 'unodos');
+
+  await imp.cerrar();
+});
+
+test('una impresora que no acepta conexiones NO tumba la venta', async () => {
+  const imp = await impresoraDeMentiras();
+  const puerto = imp.puerto;
+  await imp.cerrar();                       // se apaga antes de imprimir
+
+  guardarAjuste('impresora_destino', `127.0.0.1:${puerto}`);
+  const r = await imprimirCrudo(Buffer.from('x'));
+
+  assert.equal(r.impreso, false, 'no se imprimió...');
+  assert.match(r.motivo, /9100|puerto/i, '...y el mensaje dice por dónde buscar');
+  // Lo importante: contestó. Una excepción aquí se llevaría por delante una
+  // venta que el cliente ya pagó.
+});
+
+test('el mensaje de una dirección inalcanzable se entiende', async () => {
+  // 192.0.2.x es el rango reservado para ejemplos: no existe en ninguna red.
+  guardarAjuste('impresora_destino', '192.0.2.77:9100');
+  const r = await imprimirCrudo(Buffer.from('x'));
+
+  assert.equal(r.impreso, false);
+  assert.match(r.motivo, /red|contesta|llega/i,
+               'tiene que decir qué revisar, no "ECONNREFUSED"');
+});
+
+// ============================================================
+// LA CONFIGURACIÓN LO CUENTA
+// ============================================================
+
+test('la configuración dice por dónde va a salir el ticket', async () => {
+  const r = await llamar('/api/impresion/config', {
+    method: 'PUT', cuerpo: { destino: '192.168.1.65' }
+  });
+  assert.equal(r.estado, 200);
+  assert.equal(r.json.datos.impresion.comoSeManda.tipo, 'red');
+  assert.equal(r.json.datos.impresion.comoSeManda.puerto, 9100);
+  assert.equal(r.json.datos.impresion.directa, true);
+});
+
+test('se puede preguntar qué entiende sin guardar nada', async () => {
+  const antes = (await llamar('/api/impresion/config')).json.datos.impresion.destino;
+
+  const r = await llamar('/api/impresion/entender?destino=10.0.0.5%3A9101');
+  assert.equal(r.json.datos.como.tipo, 'red');
+  assert.equal(r.json.datos.como.puerto, 9101);
+
+  assert.equal((await llamar('/api/impresion/config')).json.datos.impresion.destino, antes,
+               'preguntar no cambia nada');
+});
+
+test('la lista de impresoras contesta aunque no sea Windows', async () => {
+  const r = await llamar('/api/impresion/impresoras');
+  assert.equal(r.estado, 200);
+  assert.ok(Array.isArray(r.json.datos.impresoras),
+            'fuera de Windows viene vacía, pero viene: la pantalla no se rompe');
+});
+
+test('el cajero no configura la impresora', async () => {
+  await llamar('/api/usuarios', {
+    method: 'POST', cuerpo: { nombre: 'Mari', rol: 'cajero', pin: '7777' }
+  });
+  const u = bd.prepare("SELECT id FROM usuarios WHERE nombre = 'Mari'").get();
+  await llamar('/api/auth/entrar-pin', {
+    method: 'POST', cuerpo: { usuarioId: u.id, pin: '7777' }
+  });
+
+  assert.equal((await llamar('/api/impresion/impresoras')).estado, 403);
+  assert.equal((await llamar('/api/impresion/entender?destino=1.2.3.4')).estado, 403);
+});
