@@ -774,3 +774,70 @@ test('con una sola persona el corte no trae desglose: repetiría lo mismo', asyn
   const cerrar = await llamar('/api/caja/cerrar', { method: 'POST', cuerpo: { contado: 764 } });
   assert.deepEqual(cerrar.json.datos.corte.porPersona, []);
 });
+
+
+// ============================================================
+// EL DINERO QUE SOLO CAMBIA DE SITIO
+// ============================================================
+
+test('un retiro a la caja fuerte no cuenta como gasto de la fábrica', async () => {
+  await entrarAdmin();
+  await cerrarSiHayAbierto();
+  await llamar('/api/caja/abrir', { method: 'POST', cuerpo: { fondo: 500 } });
+
+  const { conceptos } = (await llamar('/api/caja/conceptos')).json.datos;
+  const retiro = conceptos.find((c) => c.id === 'gasto-retiro');
+  assert.equal(retiro.es_traspaso, 1, 'de fábrica el retiro viene marcado');
+
+  const antes = (await llamar('/api/caja/conceptos/resumen')).json.datos;
+
+  await llamar('/api/caja/movimientos', {
+    method: 'POST', cuerpo: { tipo: 'salida', conceptoId: retiro.id, monto: 400 } });
+
+  const d = (await llamar('/api/caja/conceptos/resumen')).json.datos;
+  assert.equal(d.gastado, antes.gastado,
+               'el dinero salió del cajón pero la fábrica no lo gastó');
+  assert.equal(d.traspasado, antes.traspasado + 40000, 'se cuenta aparte');
+
+  // Y sigue estando en la lista: no se esconde, se separa.
+  const fila = d.porConcepto.find((r) => r.id === retiro.id);
+  assert.ok(fila && fila.centavos >= 40000, 'el renglón está, marcado');
+  assert.equal(fila.es_traspaso, 1);
+});
+
+test('un concepto se puede marcar y desmarcar como traspaso', async () => {
+  await entrarAdmin();
+  const alta = await llamar('/api/caja/conceptos', {
+    method: 'POST', cuerpo: { nombre: 'A la cuenta del banco', tipo: 'salida', esTraspaso: true } });
+  assert.equal(alta.estado, 201);
+  assert.equal(alta.json.datos.concepto.es_traspaso, 1);
+
+  const id = alta.json.datos.concepto.id;
+  await llamar('/api/caja/movimientos', {
+    method: 'POST', cuerpo: { tipo: 'salida', conceptoId: id, monto: 1000 } });
+
+  const conTraspaso = (await llamar('/api/caja/conceptos/resumen')).json.datos;
+  assert.ok(!conTraspaso.porConcepto.filter((r) => !r.es_traspaso).some((r) => r.id === id));
+
+  // Si fue un error marcarlo, se corrige y el dinero pasa al otro lado.
+  const cambio = await llamar(`/api/caja/conceptos/${id}`, {
+    method: 'PUT', cuerpo: { esTraspaso: false } });
+  assert.equal(cambio.estado, 200);
+
+  const ya = (await llamar('/api/caja/conceptos/resumen')).json.datos;
+  assert.equal(ya.gastado, conTraspaso.gastado + 100000, 'ahora sí es gasto');
+  assert.equal(ya.traspasado, conTraspaso.traspasado - 100000);
+
+  await llamar(`/api/caja/conceptos/${id}`, { method: 'PUT', cuerpo: { activo: false } });
+});
+
+test('los gastos escritos a mano nunca son traspaso: no hay dónde marcarlo', async () => {
+  await entrarAdmin();
+  const d = (await llamar('/api/caja/conceptos/resumen')).json.datos;
+  // Los sueltos van por su cuenta y no entran ni en gastado ni en
+  // traspasado: son un tercer montón, y decir lo contrario sería inventar.
+  assert.ok(Array.isArray(d.sueltos));
+  assert.equal(d.gastado + d.traspasado,
+               d.porConcepto.reduce((n, r) => n + r.centavos, 0),
+               'los dos montones juntos son exactamente lo que tiene concepto');
+});

@@ -767,6 +767,112 @@ debería haber − contado = FALTA</pre>
 
   // ==========================================================
   {
+    id: 'empresa',
+    titulo: 'Las cuentas de la empresa: lo grande y la luz',
+    busca: 'empresa gastos grandes amoniaco sal aceite barril maquinaria refacciones mantenimiento proveedor factura pdf recibo luz cfe kwh kilowatt medidor marqueta mes corte del 12 al 12 periodo traspaso caja fuerte',
+    cuerpo: `
+      <p>Aquí va el <b>dinero grande</b>: el que se paga con cheque, con
+      transferencia o sacando efectivo aparte, y que <b>nunca pasa por el
+      cajón</b>. El amoniaco, la sal, los barriles de aceite, las
+      refacciones, el mantenimiento, la maquinaria y el recibo de la luz.</p>
+
+      <p class="ayuda-tip">Esta pantalla <b>no toca la caja</b>. No le mueve
+      el arqueo del turno, no le cambia un peso al corte y no aparece en el
+      ticket de nadie. Son dos libros distintos a propósito: el del cajón,
+      que se cuadra todos los días, y el de la fábrica, que se mira al mes.</p>
+
+      <h4>El mes del negocio</h4>
+      <p>El mes del calendario casi nunca es el mes del negocio. Si su recibo
+      de luz va <b>del 12 al 12</b>, con el botón <b>Cambiar dónde empieza el
+      mes</b> se pone 12 y de ahí en adelante <b>todo el sistema cuenta los
+      meses así</b>: agosto es del 12 de agosto al 11 de septiembre.</p>
+      <ul>
+        <li>Se puede del <b>1 al 28</b>. Del 29 en adelante no, porque
+        febrero no tiene esos días y habría meses sin principio.</li>
+        <li>El mes se llama como el mes en que <b>empieza</b>: "Agosto 2026"
+        es del 12 de agosto al 11 de septiembre.</li>
+      </ul>
+      <p class="ayuda-tip"><b>Ojo:</b> el día del corte es <b>uno solo para
+      todo el sistema</b>, no uno por mes. Si se cambia, los meses que ya
+      pasaron se vuelven a partir con la regla nueva y sus totales cambian.
+      No se pierde nada —cada gasto guarda su propia fecha, y cada recibo de
+      la CFE las suyas— pero un mes que decía $40,000 puede decir otra cosa.
+      Conviene elegirlo una vez y dejarlo.</p>
+
+      <h4>Anotar un gasto grande</h4>
+      <p>Además del monto se pide <b>cuánto</b> y <b>de qué</b>: un cilindro
+      de amoniaco, tres sacos de sal, medio barril de aceite.</p>
+      <p>Eso no es burocracia. Con la cantidad, el sistema saca <b>cuánto
+      costó la unidad</b>, y ese número es el que contesta "¿está subiendo el
+      barril de aceite?". Sin él, $12,000 puede ser una ganga o un robo y no
+      hay forma de saber cuál.</p>
+      <ul>
+        <li><b>Proveedor</b> y <b>factura</b> para poder buscarlo después.</li>
+        <li><b>El papel</b>: se le pega el PDF o la foto de la factura. Se
+        guarda en la carpeta de datos, así que actualizar el programa
+        <b>no se lo lleva</b>.</li>
+      </ul>
+
+      <h4>Cuándo fue la última vez</h4>
+      <p>Cada renglón dice cuándo se compró esa cosa por última vez y
+      <b>cuántos días hace</b>, aunque haya sido en otro mes: la pregunta
+      "¿hace cuánto que no compro sal?" no se contesta mirando solo este mes.</p>
+      <p>El sistema <b>aprende solo</b> cada cuánto se compra cada cosa: lo
+      saca de repartir el tiempo entre su primera y su última compra. Cuando
+      ya pasó más tiempo del que suele pasar, el renglón dice <b>toca
+      pronto</b>. No es una alarma —nadie sabe cuándo se acaba un cilindro de
+      amoniaco— sino un recordatorio de mirarlo.</p>
+
+      <h4>Los recibos de la luz</h4>
+      <p>Se captura el papel tal como viene: <b>de qué día a qué día</b>
+      midieron, cuántos <b>kWh</b> y cuánto se pagó. Las cuentas se hacen con
+      <b>las fechas del recibo</b>, no con el mes del negocio, porque ese es
+      el único periodo en el que esos kilowatts significan algo.</p>
+      <p>De ahí salen solos:</p>
+      <ul>
+        <li><b>Cuánto costó el kilowatt</b>. Sube con las tarifas y también
+        con el consumo, porque la CFE cobra por escalones.</li>
+        <li><b>Contra el recibo anterior</b>, en pesos y en por ciento. Es la
+        comparación que uno hace al abrir el sobre.</li>
+        <li><b>Cuánta luz cuesta cada marqueta</b>. Este es <b>el número</b>
+        de una fábrica de hielo: se saca de la producción de esos mismos
+        días. Cuando empieza a subir sin que suba la tarifa, una máquina se
+        está echando a perder — y se sabe mucho antes de que se pare.</li>
+      </ul>
+      <p class="ayuda-tip">El mismo recibo <b>no se puede capturar dos
+      veces</b>: duplicaría el gasto del año y partiría en dos los kWh por
+      marqueta. Si se capturó mal, se <b>anula</b> con su motivo y se vuelve a
+      hacer; el periodo queda libre otra vez.</p>
+
+      <h4>La luz dentro del mes</h4>
+      <p>Arriba, junto a lo gastado, sale la luz que le toca al mes. Como el
+      recibo casi nunca empieza el mismo día que el mes del negocio, lo que
+      se hace es <b>repartir el recibo entre los días que cubre</b> y quedarse
+      con los que caen dentro.</p>
+      <p>Por eso ese número es un <b>reparto</b>, no una factura. Si todavía
+      hay días del mes que ningún recibo cubre —lo normal, porque el recibo
+      llega después— la pantalla dice <b>cuántos faltan</b> y avisa que el
+      total <b>va a subir</b>, en vez de presumir una cifra que no está
+      completa.</p>
+
+      <h4>El dinero que solo cambia de sitio</h4>
+      <p>Un <b>retiro a la caja fuerte</b> sale del cajón, sí, pero la fábrica
+      no lo gastó: el dinero cambió de sitio. Si después con ese mismo
+      efectivo se paga el amoniaco y el amoniaco se anota aquí, sería el
+      <b>mismo peso contado dos veces</b>.</p>
+      <p>Por eso en <b>Caja › Gastos que se repiten</b> cada concepto dice si
+      es un <b>gasto</b> (el dinero se va) o un <b>traspaso ⇄</b> (solo cambia
+      de sitio), y los totales salen partidos en dos. El retiro a la caja
+      fuerte viene marcado de fábrica.</p>
+
+      <h4>Quién entra</h4>
+      <p>El <b>gerente</b> ve todas estas cuentas. Capturarlas —gastos,
+      recibos y el día del corte— es del <b>administrador</b>: son facturas de
+      decenas de miles de pesos, no es trabajo de turno.</p>`
+  },
+
+  // ==========================================================
+  {
     id: 'historial',
     titulo: 'Historial: revisar lo que se hizo',
     busca: 'historial revisar auditar quién hizo qué cajero fecha hora filtro tickets gastos entradas abonos borrar eliminar dar de baja contraseña ordenar columna cargar más hoy devolución cambio mayoreo',

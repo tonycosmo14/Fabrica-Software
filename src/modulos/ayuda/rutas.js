@@ -50,6 +50,9 @@ const ACCIONES = [
   { grupo: 'Inventario', permiso: 'inventario.mover',     texto: 'Registrar entradas, salidas y conteos' },
   { grupo: 'Inventario', permiso: 'productos.administrar', texto: 'Dar de alta productos y categorías' },
 
+  { grupo: 'Empresa',    permiso: 'empresa.ver',          texto: 'Ver los gastos grandes de la empresa y los recibos de luz' },
+  { grupo: 'Empresa',    permiso: 'empresa.administrar',   texto: 'Capturar gastos grandes, recibos de luz y el mes del negocio' },
+
   { grupo: 'Sistema',    permiso: 'usuarios.administrar', texto: 'Dar de alta y de baja usuarios' },
   { grupo: 'Sistema',    permiso: 'sistema.configurar',   texto: 'Configurar tanques, cuartos fríos, logo y respaldos' },
   { grupo: 'Sistema',    permiso: 'precios.configurar',   texto: 'Cambiar los precios' },

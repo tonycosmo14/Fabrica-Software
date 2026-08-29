@@ -402,6 +402,10 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
                     <span class="hist-que ${c.tipo === 'salida' ? 'que-gasto' : 'que-entrada'}">
                       ${c.tipo === 'salida' ? '📤 Sale' : '📥 Entra'}
                     </span>
+                    ${c.es_traspaso
+                      ? `<span class="hist-que que-cambio"
+                               title="El dinero no se gastó: cambió de sitio. No cuenta como gasto de la fábrica.">⇄ Traspaso</span>`
+                      : ''}
                     ${c.activo ? '' : '<span class="hist-que que-cancelada">de baja</span>'}
                   </td>
                   <td class="cp-c-mes der">${g ? pesos(g.centavos) : '—'}</td>
@@ -462,6 +466,22 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
     });
     if (!tipo) return;
 
+    // EL DINERO QUE SOLO SE MUEVE. Un retiro a la caja fuerte sale del
+    // cajón pero no sale de la empresa. Si no se distingue, cuando se
+    // capture el gasto que se pagó con ese efectivo el mismo peso quedaría
+    // contado dos veces.
+    const que = await menu({
+      titulo: nombre,
+      texto: '¿El dinero se GASTA, o solo cambia de sitio?',
+      opciones: [
+        { valor: 'gasto', texto: '💸 Se gasta',
+          detalle: 'Sale de la empresa: gasolina, desayuno, una refacción' },
+        { valor: 'traspaso', texto: '⇄ Solo cambia de sitio',
+          detalle: 'Un retiro a la caja fuerte, dinero que se pasa a otro lado' }
+      ]
+    });
+    if (!que) return;
+
     const ayuda = await pedirTexto({
       titulo: nombre, texto: 'Una nota para el cajero (opcional).',
       marcador: 'El de los muchachos, no el del patrón',
@@ -470,7 +490,8 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
     if (ayuda === null) return;
 
     try {
-      await api.enviar('/caja/conceptos', { nombre, tipo, ayuda });
+      await api.enviar('/caja/conceptos', {
+        nombre, tipo, ayuda, esTraspaso: que === 'traspaso' });
       avisar(`"${nombre}" ya se puede tocar en la caja`, 'bien');
       verConceptos();
     } catch (e) { avisar(e.message, 'error'); }

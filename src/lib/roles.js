@@ -60,7 +60,13 @@ const PERMISOS_POR_ROL = {
     'venta.credito',
     'credito.cobrar',
     'credito.autorizar',
-    'reparto.ver'
+    'reparto.ver',
+    // LOS GASTOS GRANDES DE LA EMPRESA: el amoniaco, la sal, la maquinaria,
+    // el recibo de la luz. El gerente los VE —hace falta para saber si un
+    // paro de máquina ya se pagó o no— pero solo el administrador los
+    // captura: es dinero que no pasa por ningún cajón y no lo cuadra nadie
+    // al final del turno.
+    'empresa.ver'
   ],
   admin: ['*'] // el comodin abre todo
 };

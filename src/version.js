@@ -17,9 +17,31 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '2.6';
+const VERSION_ACTUAL = '2.7';
 
 const VERSIONES = [
+  {
+    numero: '2.7',
+    nombre: 'Las cuentas de la empresa',
+    fecha: '2026-08-29',
+    resumen:
+      'El dinero grande —el que nunca pasa por el cajón— ya tiene dónde ' +
+      'anotarse: el amoniaco, la sal, los barriles de aceite, la ' +
+      'maquinaria y el recibo de la luz. Y el mes del negocio ya se puede ' +
+      'partir donde de verdad empieza, no donde diga el calendario.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'PANTALLA NUEVA: LAS CUENTAS DE LA EMPRESA (🏭). Ahí van los gastos que no salen del cajón. La caja sigue siendo la caja: esto no la toca, no le mueve el arqueo y no le cambia un peso al corte del turno.' },
+      { tipo: 'nuevo', texto: 'EL MES EMPIEZA DONDE USTED DIGA. Si su recibo de luz va del 12 al 12, ponga 12 y todo el sistema cuenta los meses así. Del 1 al 28: del 29 en adelante no se puede porque febrero no tiene esos días.' },
+      { tipo: 'nuevo', texto: 'CADA GASTO GRANDE SE ANOTA CON SU CANTIDAD Y SU UNIDAD: un cilindro de amoniaco, tres sacos de sal, medio barril de aceite. Por eso el sistema puede decir cuánto costó LA UNIDAD y contestar si el barril está subiendo, en vez de solo cuánto se pagó.' },
+      { tipo: 'nuevo', texto: 'CUÁNDO FUE LA ÚLTIMA VEZ Y CUÁNTO HACE. El sistema aprende solo cada cuánto se compra cada cosa —lo saca de sus propias compras, no de una tabla— y avisa "toca pronto" cuando ya pasó más tiempo del que suele pasar. No es una alarma; es un recordatorio de mirarlo.' },
+      { tipo: 'nuevo', texto: 'LOS RECIBOS DE LA CFE, CON SUS KILOWATTS. Se captura el papel con sus fechas de verdad, sus kWh y lo que se pagó. El sistema saca solo el precio del kilowatt, cuánto por día, cuánto contra el recibo anterior y —el número que importa en una fábrica de hielo— CUÁNTA LUZ CUESTA CADA MARQUETA.' },
+      { tipo: 'nuevo', texto: 'SE LE PUEDE PEGAR EL PDF O LA FOTO al gasto y al recibo. Los papeles se guardan en la carpeta de datos, así que una actualización del programa no se los lleva.' },
+      { tipo: 'importante', texto: 'EL DINERO QUE SOLO CAMBIA DE SITIO YA NO SE CUENTA DOS VECES. Un retiro a la caja fuerte salió del cajón, pero la fábrica no lo gastó. Si con ese mismo efectivo se paga el amoniaco y el amoniaco se anota aquí, sería el mismo peso contado dos veces. Ahora los conceptos se marcan "gasto" o "solo cambia de sitio" y los totales salen partidos.' },
+      { tipo: 'mejora', texto: 'La luz sale también en el total del mes, repartida por días cuando el recibo queda a caballo entre dos meses. Y si todavía faltan días sin recibo, la pantalla lo dice en vez de presumir un total que va a subir.' },
+      { tipo: 'mejora', texto: 'Un gasto anotado mal se anula con su motivo y quién lo anuló; no se borra (regla 3.4). El mismo recibo de la CFE no se puede capturar dos veces: partiría en dos los kWh por marqueta.' },
+      { tipo: 'mejora', texto: 'El gerente ve todas estas cuentas; capturarlas es del administrador. Son facturas de decenas de miles de pesos: no es trabajo de turno.' }
+    ]
+  },
   {
     numero: '2.6',
     nombre: 'El ticket chico',

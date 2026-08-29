@@ -2838,3 +2838,80 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 .etiqueta-chica small {
   display: block; font-weight: 400; text-transform: none; letter-spacing: 0;
 }
+
+
+/* =====================================================================
+   LAS CUENTAS DE LA EMPRESA  (v2.7)
+   ===================================================================== */
+
+.emp-pestanas { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
+.emp-pestanas button { width: auto; }
+.emp-pestanas button.activo {
+  border-color: var(--primario); color: var(--primario); font-weight: 800;
+}
+
+.emp-cabeza {
+  display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.emp-cabeza label { min-width: 240px; }
+.emp-cabeza button { width: auto; flex: 0 0 auto; }
+.emp-cabeza .crece { flex: 1 1 320px; }
+
+/* Los formularios de captura: dos o tres columnas en la PC, una en el
+   celular. Son seis o siete datos y en una sola columna obligan a
+   desplazarse para ver lo que ya se escribió. */
+.emp-campos {
+  display: grid; gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+.emp-campos label { min-width: 0; }
+.emp-campos input, .emp-campos select { width: 100%; }
+
+.emp-tabla { min-width: 780px; }
+.emp-c-que     { width: auto; }
+.emp-c-que small, .luz-c-periodo small, .emp-c-ultima small {
+  display: block; font-size: 11.5px; color: var(--suave); font-weight: 400;
+}
+.emp-c-mes     { width: 116px; font-variant-numeric: tabular-nums; }
+.emp-c-cuanto  { width: 118px; font-variant-numeric: tabular-nums; color: var(--suave); }
+.emp-c-unidad  { width: 116px; font-variant-numeric: tabular-nums; }
+.emp-c-ultima  { width: 148px; font-variant-numeric: tabular-nums; }
+/* Los dos botones van uno al lado del otro: apilados, cada renglón crece
+   al doble de alto y la tabla deja de leerse de un vistazo. */
+.emp-c-acciones { width: 128px; white-space: nowrap; }
+.emp-c-acciones > div { display: flex; gap: 6px; justify-content: flex-end; }
+.emp-c-acciones .chico { flex: 0 0 auto; }
+
+/* "Toca pronto": pasó más tiempo del que suele pasar entre una compra y la
+   siguiente. No es una alarma —nadie sabe cuándo se acaba un cilindro de
+   amoniaco— sino un recordatorio de mirarlo. */
+.emp-tabla tr.emp-toca .emp-c-ultima small { color: var(--ambar); font-weight: 700; }
+.emp-tabla tr.emp-toca td:first-child { box-shadow: inset 3px 0 0 var(--ambar); }
+
+.emp-tabla-luz { min-width: 900px; }
+.luz-c-periodo  { width: 158px; font-variant-numeric: tabular-nums; }
+.luz-c-kwh      { width: 96px; font-variant-numeric: tabular-nums; }
+.luz-c-pesos    { width: 108px; font-variant-numeric: tabular-nums; }
+.luz-c-marq     { width: 124px; font-variant-numeric: tabular-nums; }
+.luz-c-marq small { display: block; font-size: 11px; color: var(--suave); }
+.luz-c-dif      { width: 92px; font-variant-numeric: tabular-nums; font-weight: 700; }
+.luz-c-acciones { width: 118px; white-space: nowrap; }
+.luz-c-acciones > div { display: flex; gap: 6px; justify-content: flex-end; }
+.luz-c-acciones .chico { flex: 0 0 auto; }
+
+/* Un enlace que se ve y se toca como un botón: el PDF se abre en otra
+   pestaña, y para eso hace falta un <a> de verdad. */
+.boton-enlace {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 40px; padding: 8px 14px; border-radius: var(--radio);
+  background: var(--superficie); color: var(--primario);
+  border: 2px solid var(--borde); font-size: 15px; font-weight: 700;
+  text-decoration: none;
+}
+.boton-enlace:hover { border-color: var(--primario); }
+
+.emp-tabla tr.anulada, .emp-tabla-luz tr.anulada { text-decoration: none; opacity: .5; }
+.emp-tabla tr.anulada td:not(.emp-c-acciones),
+.emp-tabla-luz tr.anulada td:not(.luz-c-acciones) { text-decoration: line-through; }
+.emp-tabla td, .emp-tabla-luz td { height: auto; white-space: normal; }

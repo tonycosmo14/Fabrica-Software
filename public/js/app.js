@@ -20,6 +20,7 @@ import { vistaUsuarios } from './vistas/usuarios.js';
 import { vistaNovedades, hayVersionNueva } from './vistas/novedades.js';
 import { vistaAyuda } from './vistas/ayuda.js';
 import { vistaPersonalizar } from './vistas/personalizar.js';
+import { vistaEmpresa } from './vistas/empresa.js';
 import { vistaProductos } from './vistas/productos.js';
 import { vistaClientes } from './vistas/clientes.js';
 import { vistaHistorial } from './vistas/historial.js';
@@ -46,6 +47,10 @@ const RUTAS = {
   '#/productos': { titulo: 'Productos y precios', vista: vistaProductos, permiso: 'inventario.ver', fija: true },
   '#/clientes':  { titulo: 'Clientes',           vista: vistaClientes,  permiso: 'clientes.ver', fija: true },
   '#/historial': { titulo: 'Historial',          vista: vistaHistorial, permiso: 'historial.ver' },
+  // Es una página larga que se rueda con la rueda del ratón, como el
+  // historial: NO lleva 'fija', porque esa deja la pantalla sin rodar y los
+  // últimos renglones de la tabla no se podrían alcanzar.
+  '#/empresa':   { titulo: 'Cuentas de la empresa', vista: vistaEmpresa, permiso: 'empresa.ver' },
   '#/personalizar': { titulo: 'Personalizar',   vista: vistaPersonalizar, permiso: 'sistema.configurar' },
   '#/sistema':   { titulo: 'Sistema',           vista: vistaSistema,   permiso: 'sistema.ver' },
   '#/ayuda':     { titulo: 'Ayuda',              vista: vistaAyuda },

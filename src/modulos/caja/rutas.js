@@ -288,7 +288,7 @@ router.get('/conceptos/resumen', verCaja, (req, res) => {
   if (hasta) { donde.push("date(m.fecha, 'localtime') <= date(?)"); valores.push(hasta); }
 
   const porConcepto = bd.prepare(`
-    SELECT c.id, c.nombre, c.tipo, c.activo,
+    SELECT c.id, c.nombre, c.tipo, c.activo, c.es_traspaso,
            COUNT(*) AS veces,
            SUM(m.centavos) AS centavos,
            MIN(m.fecha) AS primero,
@@ -300,6 +300,19 @@ router.get('/conceptos/resumen', verCaja, (req, res) => {
      ORDER BY SUM(m.centavos) DESC
   `).all(...valores);
 
+  // LOS TRASPASOS VAN APARTE. Un retiro a la caja fuerte salió del cajón,
+  // sí, pero la fábrica no lo gastó: el dinero cambió de sitio. Si después
+  // ese mismo efectivo paga el amoniaco y el amoniaco se anota en los
+  // gastos grandes de la empresa, sumar las dos cosas contaría el mismo
+  // peso dos veces. Por eso el total sale partido en dos y quien lo lea
+  // decide cuál de los dos números necesita.
+  const gastado = porConcepto
+    .filter((r) => !r.es_traspaso)
+    .reduce((n, r) => n + r.centavos, 0);
+  const traspasado = porConcepto
+    .filter((r) => r.es_traspaso)
+    .reduce((n, r) => n + r.centavos, 0);
+
   const sueltos = bd.prepare(`
     SELECT m.tipo, COUNT(*) AS veces, SUM(m.centavos) AS centavos
       FROM movimientos_caja m
@@ -307,7 +320,7 @@ router.get('/conceptos/resumen', verCaja, (req, res) => {
      GROUP BY m.tipo
   `).all(...valores);
 
-  return ok(res, { desde, hasta, porConcepto, sueltos });
+  return ok(res, { desde, hasta, porConcepto, sueltos, gastado, traspasado });
 });
 
 /** Un día del calendario: 2026-08-26. Nada más. */
@@ -335,10 +348,11 @@ router.post('/conceptos', corregir, (req, res) => {
   ).get().n + 1;
 
   bd.prepare(`
-    INSERT INTO conceptos_gasto (id, nombre, tipo, orden, ayuda, fecha_alta)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO conceptos_gasto (id, nombre, tipo, orden, ayuda, es_traspaso, fecha_alta)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `).run(id, nombre, tipo, siguiente,
-         String(req.body?.ayuda || '').trim().slice(0, 120) || null, ahora());
+         String(req.body?.ayuda || '').trim().slice(0, 120) || null,
+         req.body?.esTraspaso ? 1 : 0, ahora());
 
   bitacora.registrar({
     accion: 'caja.concepto_alta', entidad: 'concepto_gasto', entidadId: id,
@@ -380,6 +394,14 @@ router.put('/conceptos/:id', corregir, (req, res) => {
     const n = Number(req.body.orden);
     if (!Number.isFinite(n)) return error(res, 'Ese orden no se entiende.');
     cambios.orden = Math.round(n);
+  }
+
+  // EL DINERO QUE SOLO SE MUEVE. Un retiro a la caja fuerte no es un gasto:
+  // el dinero no salió de la empresa, cambió de sitio. Marcarlo evita que
+  // más adelante se cuente dos veces —una como retiro y otra como la cosa
+  // que se pagó con ese efectivo—.
+  if (req.body?.esTraspaso !== undefined) {
+    cambios.es_traspaso = req.body.esTraspaso ? 1 : 0;
   }
 
   // DAR DE BAJA NO ES BORRAR (regla 3.4). Deja de salir en la caja, y los

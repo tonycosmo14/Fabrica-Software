@@ -60,6 +60,11 @@ function crearApp() {
   app.use('/api/clientes', require('./modulos/clientes/rutas'));
   app.use('/api/historial', require('./modulos/historial/rutas'));
   app.use('/api/ayuda', require('./modulos/ayuda/rutas'));
+  // Los papeles de un gasto —el PDF del recibo de la CFE, la foto de una
+  // factura— llegan en el cuerpo como texto base64, así que este necesita
+  // más sitio que los demás.
+  app.use('/api/empresa', express.json({ limit: '12mb' }),
+          require('./modulos/empresa/rutas'));
   app.use('/api/versiones', require('./modulos/versiones/rutas'));
   app.use('/api', (req, res) => error(res, 'Esa ruta de la API no existe.', 404));
 

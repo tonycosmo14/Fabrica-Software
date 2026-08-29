@@ -33,6 +33,31 @@ function ultimoConteo(almacenId) {
  * Marquetas buenas que salieron de los tanques desde una fecha.
  * Es lo que ENTRÓ al cuarto frío en esa ventana.
  */
+/**
+ * Marquetas BUENAS que salieron de los tanques entre dos días, en piezas.
+ *
+ * Es el mismo cálculo de `producidoDesde` pero acotado por los dos lados:
+ * lo pide el recibo de la luz, que cubre un periodo cerrado y necesita
+ * saber cuántas marquetas se hicieron con esos kilowatts.
+ *
+ * `desde` y `hasta` son días de calendario (2026-08-12), y por eso la
+ * comparación lleva 'localtime': un paño sacado a las 6:30 de la tarde se
+ * guarda con la fecha del día siguiente, y sin convertir se contaría en el
+ * mes que no es.
+ */
+function producidoEntreDias(desde, hasta) {
+  return bd.prepare(`
+    SELECT COUNT(*) n
+      FROM sacadas_moldes sm
+      JOIN sacadas s       ON s.id = sm.sacada_id
+      JOIN sacadas_pano sp ON sp.id = s.sacada_pano_id
+     WHERE sm.resultado = 'ok'
+       AND date(s.fecha, 'localtime') >= date(?)
+       AND date(s.fecha, 'localtime') <= date(?)
+       AND (sp.notas IS NULL OR sp.notas NOT LIKE 'ANULADA%')
+  `).get(desde, hasta).n;
+}
+
 function producidoDesde(desde) {
   const fila = bd.prepare(`
     SELECT COUNT(*) n
@@ -150,7 +175,7 @@ function aMarquetas(dieciseisavos) {
 }
 
 module.exports = {
-  ultimoConteo, producidoDesde, vendidoDesde, partidoPorLista,
+  ultimoConteo, producidoDesde, producidoEntreDias, vendidoDesde, partidoPorLista,
   mermaDesde, mermasDesde, estadoAlmacen,
   deMarquetas, aMarquetas, DIECISEISAVOS_POR_MARQUETA
 };
