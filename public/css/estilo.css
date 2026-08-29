@@ -2831,3 +2831,10 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 .cp-c-acciones .chico { margin-left: 4px; }
 .concepto-tabla tr.anulada { text-decoration: none; opacity: .55; }
 .concepto-tabla td { height: auto; white-space: normal; }
+
+/* La aclaración de una etiqueta va DEBAJO, no pegada al final del título:
+   "SALIDA DEL CONECTORSI NO ABRE, PRUEBA LA OTRA" se leía como una sola
+   palabra pegada. */
+.etiqueta-chica small {
+  display: block; font-weight: 400; text-transform: none; letter-spacing: 0;
+}

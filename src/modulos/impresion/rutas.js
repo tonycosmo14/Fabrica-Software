@@ -138,6 +138,14 @@ router.put('/config', configurar, (req, res) => {
     guardarAjuste('ticket_abrir_cajon', c.abrirCajon ? '1' : '0', req.usuario.id);
   }
 
+  if (c.avanceCorte !== undefined) {
+    const n = Number(c.avanceCorte);
+    if (!Number.isInteger(n) || n < 0 || n > 8) {
+      return error(res, 'El avance antes de cortar va de 0 a 8 renglones.');
+    }
+    guardarAjuste('ticket_avance_corte', n, req.usuario.id);
+  }
+
   // La impresora de cada apartado. Vacío = la de tickets, que es lo que
   // casi siempre se quiere.
   if (c.apartados && typeof c.apartados === 'object') {

@@ -1021,7 +1021,7 @@ EN REPARACION
   {
     id: 'respaldos',
     titulo: 'Respaldos y la impresora',
-    busca: 'respaldo copia seguridad usb drive restaurar disco perder datos impresora ticket térmica imprimir compartir windows red ip 9100 puerto no imprime',
+    busca: 'respaldo copia seguridad usb drive restaurar disco perder datos impresora ticket térmica imprimir compartir windows red ip 9100 puerto no imprime papel gasta avance cortar cuchilla ahorro',
     cuerpo: `
       <p>El sistema se respalda <b>solo</b>: cada 4 horas y cada vez que se
       enciende. No hay que acordarse de nada.</p>
@@ -1185,6 +1185,32 @@ EN REPARACION
       </ul>
       <p>Mientras no esté puesto el destino, imprime el navegador y aparece la
       ventana de siempre. Todo funciona igual, solo que más lento.</p>
+      <h4>El papel que gasta cada ticket</h4>
+      <p>Los tickets están hechos para gastar lo menos posible: se imprimen
+      cientos al día y cada renglón de más son metros de papel al mes. Una
+      venta son unos <b>48 mm</b>, un ticket de mostrador <b>39 mm</b> y el
+      corte del turno <b>84 mm</b>.</p>
+      <p>Hay un truco detrás: en una impresora térmica <b>el alto es lo que
+      cuesta y el ancho es gratis</b>. Una letra al doble de alto se come dos
+      renglones de papel; al doble de ancho, uno solo. Por eso los números
+      grandes del ticket son anchos y no altos: se ven igual de grandes y
+      valen la mitad.</p>
+
+      <h4>El avance antes de cortar</h4>
+      <p>La cuchilla no está donde la impresora imprime: está uno o dos
+      centímetros más arriba. Por eso el ticket manda unos renglones en
+      blanco antes de cortar, para que la cuchilla no parta el último
+      renglón de texto.</p>
+      <p>Pero la orden de cortar <b>ya le dice a la impresora «avanza hasta
+      donde cortas y corta»</b>, así que muchas no necesitan ni un renglón —y
+      ahí son <b>12 mm menos por ticket</b>—. Hay otras, más baratas, que
+      cortan donde están.</p>
+      <p>En <b>Sistema</b>, junto a lo del papel, está
+      <b>Avance antes de cortar</b>. Viene en 4 renglones, que es lo seguro.
+      <b>Bájalo, imprime una prueba y mira el papel:</b> si la cuchilla se
+      comió el último renglón, súbelo uno. Si no, déjalo bajo y te ahorras
+      papel en cada ticket del año.</p>
+
       <p>Si en vez de acentos salen cuadritos, la impresora usa otra tabla de
       caracteres. Es un número que se cambia en un momento: avísame.</p>
 

@@ -427,10 +427,10 @@ test('si el turno se relevó, sale un papel por cada quien', async () => {
   assert.equal(r.json.datos.papeles, 4, 'el corte, uno por cada quien, y el día');
 
   const papel = loImpreso();
-  assert.match(papel, /Su parte del turno/, 'cada uno firma lo suyo');
+  assert.match(papel, /Su parte del #/, 'cada uno firma lo suyo');
   assert.match(papel, /Nico/, 'el que llegó al relevo tiene su papel');
   assert.match(papel, /CADA QUIEN/, 'y el corte del turno los lista a los dos');
-  assert.match(papel, /El arqueo completo va en el corte del turno/,
+  assert.match(papel, /el arqueo va en el corte/,
                'porque el dinero del cajón es uno solo y no se parte');
 });
 
@@ -470,4 +470,85 @@ test('la impresora sigue arrancando con la tabla 2 (CP850)', () => {
   assert.equal(bytes[2], 0x1b);
   assert.equal(bytes[3], 0x74);
   assert.equal(bytes[4], 2, 'si esto cambia, la tabla de acentos deja de valer');
+});
+
+
+// ============================================================
+// EL AVANCE ANTES DE CORTAR  (v2.6)
+//
+// La cuchilla está uno o dos centímetros por encima del cabezal. La orden
+// de cortar de ESC/POS ya dice "avanza hasta donde cortas y corta", así
+// que en una impresora que la cumple, los renglones en blanco del final
+// son papel tirado: cuatro son 12 mm EN CADA TICKET. Pero hay impresoras
+// que cortan donde están. Por eso se configura y no se adivina.
+// ============================================================
+
+/**
+ * Los saltos de línea seguidos que van justo antes de la orden de cortar.
+ *
+ * OJO: el último renglón de texto trae su propio salto, así que en un
+ * ticket de verdad esto devuelve 1 + el avance. Para medir solo el avance
+ * se corta un ticket sin nada escrito.
+ */
+function avanceAntesDelCorte(bytes) {
+  const b = Buffer.from(bytes);
+  const corte = b.indexOf(Buffer.from([0x1d, 0x56, 0x42, 0x00]));
+  assert.ok(corte > 0, 'el ticket tiene que cortar el papel');
+  let n = 0;
+  for (let i = corte - 1; i >= 0 && b[i] === 0x0a; i--) n++;
+  return n;
+}
+
+test('de fábrica el ticket avanza cuatro renglones antes de cortar', () => {
+  assert.equal(avanceAntesDelCorte(new Ticket(80).cortar().bytes()), 4,
+               'lo de siempre: nadie se queda sin papel al actualizar');
+});
+
+test('el avance se puede bajar a cero para no tirar papel', () => {
+  assert.equal(avanceAntesDelCorte(new Ticket(80).cortar(0).bytes()), 0);
+  assert.equal(avanceAntesDelCorte(new Ticket(80).cortar(2).bytes()), 2);
+});
+
+test('un avance absurdo se recorta en vez de gastar un rollo', () => {
+  assert.equal(avanceAntesDelCorte(new Ticket(80).cortar(99).bytes()), 8);
+  assert.equal(avanceAntesDelCorte(new Ticket(80).cortar(-5).bytes()), 0);
+  assert.equal(avanceAntesDelCorte(new Ticket(80).cortar('mucho').bytes()), 0);
+});
+
+test('el avance se guarda y los tickets lo obedecen', async () => {
+  await entrarAdmin();
+  const r = await llamar('/api/impresion/config', { method: 'PUT', cuerpo: { avanceCorte: 1 } });
+  assert.equal(r.estado, 200);
+  assert.equal((await llamar('/api/impresion/config')).json.datos.impresion.avanceCorte, 1);
+
+  const v = await llamar('/api/ventas', {
+    method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 16 }], pago: 300 } });
+  limpiarPapel();
+  await llamar(`/api/impresion/venta/${v.json.datos.venta.id}`, { method: 'POST', cuerpo: {} });
+
+  const conUno = avanceAntesDelCorte(Buffer.from(loImpreso(), 'latin1'));
+
+  await llamar('/api/impresion/config', { method: 'PUT', cuerpo: { avanceCorte: 4 } });
+  const v2 = await llamar('/api/ventas', {
+    method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 16 }], pago: 300 } });
+  limpiarPapel();
+  await llamar(`/api/impresion/venta/${v2.json.datos.venta.id}`, { method: 'POST', cuerpo: {} });
+  const conCuatro = avanceAntesDelCorte(Buffer.from(loImpreso(), 'latin1'));
+
+  // Lo que importa no es el número absoluto —el último renglón de texto
+  // trae su propio salto— sino que bajar el ajuste de verdad gasta menos
+  // papel, renglón por renglón.
+  assert.equal(conCuatro - conUno, 3, 'tres renglones menos son nueve milímetros menos');
+
+  await llamar('/api/impresion/config', { method: 'PUT', cuerpo: { avanceCorte: 4 } });
+});
+
+test('un avance fuera de rango se rechaza, no se recorta en silencio', async () => {
+  await entrarAdmin();
+  for (const avanceCorte of [-1, 9, 2.5, 'dos']) {
+    const r = await llamar('/api/impresion/config', { method: 'PUT', cuerpo: { avanceCorte } });
+    assert.equal(r.estado, 400, String(avanceCorte));
+  }
+  assert.equal((await llamar('/api/impresion/config')).json.datos.impresion.avanceCorte, 4,
+               'y lo que estaba puesto no se movió');
 });

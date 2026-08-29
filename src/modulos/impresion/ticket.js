@@ -36,6 +36,25 @@ const { numeroDeTicket } = require('../ventas/folio');
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul',
                'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
+/**
+ * "8:00am" si es del mismo día, "25/Ago 10:00pm" si el turno cruzó la
+ * medianoche. La fecha larga no cabe cuando el renglón lleva dos datos, y
+ * cortada a la mitad —"26/08/26 08:00 a"— no dice nada.
+ */
+function cuandoCorto(iso, respectoA) {
+  const d = new Date(iso);
+  const otro = new Date(respectoA);
+  if (d.toDateString() === otro.toDateString()) return soloHora(iso);
+  return `${d.getDate()}/${MESES[d.getMonth()]} ${soloHora(iso)}`;
+}
+
+/** 5:45pm — solo la hora, para los renglones donde caben dos datos. */
+function soloHora(iso) {
+  const d = new Date(iso);
+  const h = d.getHours();
+  return `${h % 12 || 12}:${String(d.getMinutes()).padStart(2, '0')}${h < 12 ? 'am' : 'pm'}`;
+}
+
 /** 23/08/26 05:23 p.m. — la de siempre, para donde ya se usaba. */
 function fechaCorta(iso) {
   const d = new Date(iso);
@@ -68,10 +87,28 @@ function fechaTicket(iso) {
  * impresora térmica no sabe cambiar de tamaño a media línea.
  */
 function encabezado(t, { titulo, atendio, fecha }) {
-  t.izquierda().negrita().tamano(2, 2).linea(titulo).normal();
+  // DOBLE DE ANCHO, ALTO NORMAL. En una térmica el alto es lo que cuesta:
+  // tamano(2,2) ocupa DOS renglones de papel y tamano(2,1) uno solo. Se ve
+  // igual de grande de ancho —que es lo que hace que el número resalte— y
+  // vale la mitad.
+  t.izquierda().negrita().tamano(2, 1).linea(titulo).normal();
+
+  // Quién y cuándo, en UN renglón si caben. Eran dos, y son el mismo dato:
+  // quién estaba en la caja a qué hora.
+  const quien = atendio ? `Atendio: ${atendio}` : '';
+  const juntos = [quien, fecha].filter(Boolean).join('  ');
+
   t.derecha();
-  if (atendio) t.linea(`Atendio: ${atendio}`);
-  if (fecha) t.linea(fecha);
+  if (juntos.length <= t.ancho) {
+    if (juntos) t.linea(juntos);
+  } else {
+    // Con un nombre largo no caben: antes de recortar el nombre de nadie,
+    // se gasta el renglón. Y si ni siquiera el nombre solo cabe, se parte
+    // por palabras AQUÍ y no en la impresora: ella corta por donde le toca
+    // la columna 48, a media palabra.
+    if (quien) t.parrafo(quien);
+    if (fecha) t.linea(fecha);
+  }
   return t.izquierda();
 }
 
@@ -116,7 +153,7 @@ function ticketVenta(venta, { copia = false, negocio = '' } = {}) {
   // el otro lado del mostrador.
   if (copia) marcaCopia(t);
   if (venta.cancelada_en) {
-    t.centro().negrita().tamano(2, 2).linea('CANCELADO').normal().izquierda();
+    t.centro().negrita().tamano(2, 1).linea('CANCELADO').normal().izquierda();
   }
 
   encabezado(t, {
@@ -124,14 +161,17 @@ function ticketVenta(venta, { copia = false, negocio = '' } = {}) {
     atendio: venta.cajero_nombre,
     fecha: fechaTicket(venta.fecha)
   });
-  if (venta.cliente_nombre) t.linea(`Cliente: ${venta.cliente_nombre}`);
+  // Por palabras y no por la columna 48: "Abarrotes y Cremeria La
+  // Guadalupana del Centro" no cabe en un renglón, y cortado por la
+  // impresora se parte a media palabra.
+  if (venta.cliente_nombre) t.parrafo(`Cliente: ${venta.cliente_nombre}`);
   t.separador();
 
   // EL HIELO, EN GRANDE. Es lo único que el cliente comprueba de un
   // vistazo: que dice lo que se llevó. Debajo, en chico, de qué piezas
   // salió esa cuenta y cuánto costó.
   if (hielo) {
-    t.izquierda().negrita().tamano(3, 3).linea(aTexto(hielo)).normal();
+    t.izquierda().negrita().tamano(3, 2).linea(aTexto(hielo)).normal();
     const partes = desglose(hielo);
     t.punteado(partes !== aTexto(hielo) ? `(${partes})` : 'Hielo', formato(importeHielo));
   }
@@ -162,11 +202,24 @@ function ticketVenta(venta, { copia = false, negocio = '' } = {}) {
       : ['QUEDA A MANO:', formato(0)]
     ]);
   } else {
-    t.bloqueDerecha([
-      ['TOTAL:', formato(venta.total_centavos)],
-      venta.pago_centavos != null ? ['PAGO:', formato(venta.pago_centavos)] : null,
-      venta.pago_centavos != null ? ['CAMBIO:', formato(venta.cambio_centavos || 0)] : null
-    ]);
+    t.bloqueDerecha([['TOTAL:', formato(venta.total_centavos)]]);
+
+    // PAGO Y CAMBIO, EN UN RENGLÓN Y SOLO CUANDO DICEN ALGO.
+    //
+    // Eran dos renglones y salían siempre. Pero cuando el cliente paga
+    // justo —que es la mitad de los tickets del mostrador— decían "PAGO
+    // $17 · CAMBIO $0": el mismo número del total otra vez, y un cero. Dos
+    // renglones para no decir nada, en el papel que más se imprime.
+    //
+    // Cuando SÍ hubo cambio, los dos números importan y van juntos: es la
+    // cuenta que el cliente comprueba, y se lee mejor de corrido que en
+    // dos renglones separados.
+    const pago = venta.pago_centavos;
+    if (pago != null && pago !== venta.total_centavos) {
+      t.derecha()
+       .linea(`PAGO: ${formato(pago)}   CAMBIO: ${formato(venta.cambio_centavos || 0)}`)
+       .izquierda();
+    }
   }
 
   // FIADO. Va en grande y con el nombre porque este papel es el vale: el
@@ -174,7 +227,7 @@ function ticketVenta(venta, { copia = false, negocio = '' } = {}) {
   // línea para firmar, que es lo que hace que sirva de algo al reclamar.
   if (venta.forma_pago === 'credito') {
     t.separador();
-    t.centro().negrita().tamano(2, 2).linea('FIADO').normal();
+    t.centro().negrita().tamano(2, 1).linea('FIADO').normal();
     if (venta.cliente_negocio) t.centro().linea(venta.cliente_negocio);
     t.izquierda().firma('FIRMA DE RECIBIDO');
   } else if (venta.forma_pago === 'transferencia') {
@@ -197,7 +250,7 @@ function ticketVenta(venta, { copia = false, negocio = '' } = {}) {
     t.negrita().linea(`CAMBIO DEL #${venta.cambioDeNumero}`).negrita(false);
   }
 
-  t.izquierda().cortar();
+  t.izquierda().cortar(cfg.avanceCorte);
   return t.bytes();
 }
 
@@ -232,12 +285,12 @@ function ticketMovimiento(mov, { negocio = '' } = {}) {
   });
   t.separador();
 
-  t.izquierda().negrita().tamano(2, 2).linea(formato(mov.centavos)).normal();
+  t.izquierda().negrita().tamano(2, 1).linea(formato(mov.centavos)).normal();
   t.parrafo(String(mov.concepto || '').toUpperCase());
   if (mov.notas) t.parrafo(mov.notas);
 
   if (mov.anulado_en) {
-    t.centro().negrita().tamano(2, 2).linea('ANULADO').normal().izquierda();
+    t.centro().negrita().tamano(2, 1).linea('ANULADO').normal().izquierda();
   }
 
   t.separador();
@@ -246,7 +299,7 @@ function ticketMovimiento(mov, { negocio = '' } = {}) {
   if (salida) t.firma();
 
   pie(t, negocio);
-  t.izquierda().cortar();
+  t.izquierda().cortar(cfg.avanceCorte);
   return t.bytes();
 }
 
@@ -288,7 +341,9 @@ function ticketProduccion(datos, { negocio = '' } = {}) {
     if (grupo.enProceso?.length) {
       t.linea(`  a medias: ${grupo.enProceso.join(', ')} - terminar primero`);
     }
-    t.saltos(1);
+    // Sin renglón en blanco entre tanques: el nombre del tanque va en
+    // negritas y mayúsculas, y eso ya separa. Un renglón por tanque, en un
+    // papel que sale todos los días, son metros al año.
   }
 
   t.separador();
@@ -296,7 +351,7 @@ function ticketProduccion(datos, { negocio = '' } = {}) {
   t.firma('FIRMA DEL OBRERO');
 
   pie(t, negocio);
-  t.izquierda().cortar();
+  t.izquierda().cortar(cfg.avanceCorte);
   return t.bytes();
 }
 
@@ -357,7 +412,7 @@ function ticketResumenDia(datos, { negocio = '' } = {}) {
   }
 
   pie(t, negocio);
-  t.izquierda().cortar();
+  t.izquierda().cortar(cfg.avanceCorte);
   return t.bytes();
 }
 
@@ -382,7 +437,7 @@ function ticketPrueba({ negocio = 'Hielo LOLHA' } = {}) {
 
   t.centro().linea('Si se lee todo bien, esta listo.');
   if (negocio) t.linea(negocio);
-  t.izquierda().cortar();
+  t.izquierda().cortar(cfg.avanceCorte);
   return t.bytes();
 }
 
@@ -405,11 +460,12 @@ function ticketCorte(corte, { negocio = '' } = {}) {
   });
   t.separador();
 
-  t.columnas2('Abierto', fechaCorta(c.abierta_en));
-  t.columnas2('Cerrado', fechaCorta(c.cerrada_en));
-  t.columnas2('Tickets', String(corte.ventas.cobradas)
-    + (corte.ventas.canceladas ? `  (${corte.ventas.canceladas} cancelados)` : ''));
-  t.separador();
+  // "Cerrado" salía dos veces: la hora de cierre ya va en el encabezado,
+  // que es la fecha de este papel. Y "Abierto" y "Tickets" caben juntos.
+  const cancelados = corte.ventas.canceladas;
+  t.columnas2(`Abrio ${cuandoCorto(c.abierta_en, c.cerrada_en)}`,
+              `${corte.ventas.cobradas} tickets`
+              + (cancelados ? ` (${cancelados} cancelado${cancelados === 1 ? '' : 's'})` : ''));
 
   t.bloqueDerecha([
     ['Fondo', formato(c.fondo_centavos)],
@@ -420,15 +476,14 @@ function ticketCorte(corte, { negocio = '' } = {}) {
     ['CONTADO', formato(c.contado_centavos)]
   ]);
 
-  t.centro().negrita().tamano(2, 2)
+  t.centro().negrita().tamano(2, 1)
    .linea(dif === 0 ? 'CUADRO' : dif > 0 ? `SOBRA ${formato(dif)}` : `FALTA ${formato(-dif)}`)
    .normal().izquierda();
 
   // QUIÉN METIÓ QUÉ. Solo cuando de verdad hubo relevo: con una sola
   // persona esto repetiría el bloque de arriba con otro nombre.
   if (corte.porPersona?.length > 1) {
-    t.separador();
-    t.negrita().linea('CADA QUIEN').negrita(false);
+    t.negrita().separadorConTitulo('CADA QUIEN').negrita(false);
     for (const p of corte.porPersona) {
       t.columnas2(p.nombre, formato(p.efectivo));
       const extras = [
@@ -444,16 +499,16 @@ function ticketCorte(corte, { negocio = '' } = {}) {
   if (corte.movimientos.length) {
     const gastos = corte.movimientos.filter((m) => m.tipo === 'salida');
     const entradas = corte.movimientos.filter((m) => m.tipo !== 'salida');
-    t.separador();
     if (gastos.length) columnaDeMovimientos(t, 'GASTOS', gastos, '-');
     if (entradas.length) columnaDeMovimientos(t, 'ENTRADAS', entradas, '+');
   }
 
+  // Quién cerró y la raya para firmar, en el mismo renglón: es su firma la
+  // que va ahí, así que el nombre delante de la raya dice las dos cosas.
   t.separador();
-  t.linea(`Cerro: ${c.cerrada_por_nombre || '-'}`);
-  t.firma();
+  t.firma(`Cerro ${(c.cerrada_por_nombre || '-').slice(0, 24)}`);
   pie(t, negocio);
-  t.izquierda().cortar();
+  t.izquierda().cortar(cfg.avanceCorte);
   return t.bytes();
 }
 
@@ -470,19 +525,21 @@ function ticketCortePersona(corte, persona, { negocio = '' } = {}) {
   const t = new Ticket(cfg.anchoMm, cfg.codigoPagina);
   const c = corte.caja;
 
+  // "Su parte del turno" cabe en el título: es lo que ES este papel.
   encabezado(t, {
-    titulo: `Corte #${c.folio}`,
+    titulo: `Su parte del #${c.folio}`,
     atendio: persona.nombre,
     fecha: fechaTicket(c.cerrada_en)
   });
-  t.linea('Su parte del turno');
   t.separador();
 
-  if (persona.primera) t.columnas2('De las', fechaCorta(persona.primera));
-  if (persona.ultima) t.columnas2('A las', fechaCorta(persona.ultima));
-  t.columnas2('Tickets', String(persona.cobradas)
-    + (persona.canceladas ? `  (${persona.canceladas} cancelados)` : ''));
-  t.separador();
+  // De cuándo a cuándo y cuántos tickets, en un renglón. Eran tres.
+  const desde = persona.primera ? soloHora(persona.primera) : '';
+  const hasta = persona.ultima ? soloHora(persona.ultima) : '';
+  t.columnas2(desde && hasta ? `De ${desde} a ${hasta}` : 'Su parte del turno',
+              `${persona.cobradas} tickets`
+              + (persona.canceladas
+                 ? ` (${persona.canceladas} cancelado${persona.canceladas === 1 ? '' : 's'})` : ''));
 
   t.bloqueDerecha([
     ['Cobrado en efectivo', formato(persona.efectivo)],
@@ -493,25 +550,28 @@ function ticketCortePersona(corte, persona, { negocio = '' } = {}) {
     ['PUSO EN EL CAJON', formato(persona.aportado)]
   ]);
 
+  // La aclaración baja al letrero de la firma, que se imprime de todas
+  // formas: el que firma lo lee justo cuando le importa.
   t.separador();
-  t.linea('El arqueo completo va en el corte del turno.');
-  t.firma();
+  t.firma('Firma - el arqueo va en el corte');
   pie(t, negocio);
-  t.izquierda().cortar();
+  t.izquierda().cortar(cfg.avanceCorte);
   return t.bytes();
 }
 
 
 /** Un bloque de movimientos con su suma, para el corte. */
 function columnaDeMovimientos(t, titulo, lista, signo) {
-  t.negrita().linea(`${titulo} (${lista.length})`).negrita(false);
-  let suma = 0;
+  // El título va DENTRO de la raya en vez de en su propio renglón: la raya
+  // ya estaba y el título ya estaba, y juntos hacen el mismo trabajo.
+  t.negrita().separadorConTitulo(`${titulo} (${lista.length})`).negrita(false);
   for (const m of lista) {
-    if (!m.anulado_en) suma += m.centavos;
     t.columnas2(m.anulado_en ? `(anulado) ${m.concepto}` : m.concepto,
                 m.anulado_en ? '-' : signo + formato(m.centavos));
   }
-  t.negrita().columnas2('Suman', signo + formato(suma)).negrita(false);
+  // Sin renglón de "Suman": es exactamente el mismo número que
+  // "Gastos y retiros" (o "Entradas") del arqueo de arriba, que es el que
+  // manda. Dos veces el mismo total es un renglón regalado.
 }
 
 /**
@@ -525,17 +585,21 @@ function ticketConteo(conteo, { negocio = '' } = {}) {
   const t = new Ticket(cfg.anchoMm, cfg.codigoPagina);
   const r = conteo.resumen;
 
-  t.centro().negrita().linea((negocio || 'Hielo LOLHA').toUpperCase()).negrita(false);
-  t.linea(fechaCorta(conteo.fecha));
-  t.izquierda().separador();
-  t.centro().negrita().linea(`CONTEO - ${(conteo.almacen || '').toUpperCase()}`)
-   .negrita(false).izquierda();
+  // Se arma como todos los demás papeles: qué es arriba a la izquierda,
+  // quién y cuándo arriba a la derecha, el negocio abajo. Este era el único
+  // que se había quedado con la cabecera vieja, centrada y de cinco
+  // renglones. Ahora son tres, y además se reconoce como los otros.
+  encabezado(t, {
+    titulo: 'Conteo',
+    atendio: conteo.ejecutor,
+    fecha: fechaTicket(conteo.fecha)
+  });
+  t.negrita().linea((conteo.almacen || '').toUpperCase()).negrita(false);
   t.separador();
 
-  t.columnas2('Conto', conteo.ejecutor || '-');
   if (r.primerConteo) {
     t.separador();
-    t.centro().negrita().tamano(2, 2).linea(aTexto(r.contado)).normal().izquierda();
+    t.centro().negrita().tamano(2, 1).linea(aTexto(r.contado)).normal().izquierda();
     t.centro().linea('primer conteo').izquierda();
   } else {
     t.columnas2('Habia', aTexto(r.anterior));
@@ -545,15 +609,15 @@ function ticketConteo(conteo, { negocio = '' } = {}) {
     t.separador();
     t.negrita().columnas2('Deberia quedar', aTexto(r.esperado));
     t.columnas2('Contado', aTexto(r.contado)).negrita(false);
-    t.centro().negrita().tamano(2, 2)
+    t.centro().negrita().tamano(2, 1)
      .linea(r.faltante === 0 ? 'CUADRO'
             : r.faltante < 0 ? `SOBRA ${aTexto(-r.faltante)}` : `FALTA ${aTexto(r.faltante)}`)
      .normal().izquierda();
   }
 
-  t.separador();
-  t.saltos(2).linea('Firma: _____________________');
-  t.izquierda().cortar();
+  t.firma('Firma');
+  pie(t, negocio);
+  t.izquierda().cortar(cfg.avanceCorte);
   return t.bytes();
 }
 

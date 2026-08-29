@@ -170,6 +170,23 @@ class Ticket {
   }
 
   /**
+   * UNA RAYA CON SU TÍTULO DENTRO:
+   *
+   *     -- GASTOS (3) ---------------------------------
+   *
+   * La raya ya estaba y el título ya estaba, cada uno en su renglón. Juntos
+   * hacen el mismo trabajo —decir dónde empieza un bloque— y cuestan la
+   * mitad. En el corte, que tiene tres bloques, son tres renglones.
+   */
+  separadorConTitulo(titulo, caracter = '-') {
+    const texto = String(titulo).trim();
+    if (!texto) return this.separador(caracter);
+    const cabe = this.ancho - texto.length - 4;
+    if (cabe < 2) return this.linea(texto.slice(0, this.ancho));
+    return this.linea(`${caracter.repeat(2)} ${texto} ${caracter.repeat(cabe)}`);
+  }
+
+  /**
    * Un renglón con el concepto a la izquierda y el importe a la derecha,
    * como en una cuenta de papel. Si el concepto no cabe, se recorta: más
    * vale un nombre a medias que un renglón partido que desalinea todo.
@@ -204,7 +221,12 @@ class Ticket {
    */
   punteado(izquierda, derecha, caracter = '.') {
     const der = String(derecha);
-    const tope = Math.max(this.ancho - der.length - 2, 0);
+    // El renglón mide: izquierda + espacio + puntos + espacio + derecha.
+    // Así que a la izquierda le tocan las columnas que sobran DESPUÉS de
+    // reservar el importe, los dos espacios y al menos un punto. Aquí había
+    // un desbordamiento de una columna: se recortaba dejando sitio para
+    // cero puntos y luego se forzaba uno, y el renglón salía de 49.
+    const tope = Math.max(this.ancho - der.length - 3, 0);
     const izq = String(izquierda).slice(0, tope);
     const puntos = Math.max(this.ancho - izq.length - der.length - 2, 1);
     return this.linea(`${izq} ${caracter.repeat(puntos)} ${der}`);
@@ -225,11 +247,17 @@ class Ticket {
   bloqueDerecha(pares) {
     const filas = pares.filter(Boolean);
     if (!filas.length) return this;
-    const etiqueta = Math.max(...filas.map((f) => String(f[0]).length));
     const importe = Math.max(...filas.map((f) => String(f[1]).length));
+    // La etiqueta se queda con lo que sobre del papel una vez apartado el
+    // importe. Si no se recorta, con cifras de siete dígitos el renglón se
+    // sale y la impresora lo parte en dos por donde le toca.
+    const sitio = Math.max(this.ancho - importe - 1, 4);
+    const etiqueta = Math.min(Math.max(...filas.map((f) => String(f[0]).length)), sitio);
     const margen = Math.max(this.ancho - etiqueta - importe - 1, 0);
     for (const [a, b] of filas) {
-      this.linea(' '.repeat(margen) + String(a).padEnd(etiqueta) + ' ' + String(b).padStart(importe));
+      this.linea(' '.repeat(margen)
+        + String(a).slice(0, etiqueta).padEnd(etiqueta) + ' '
+        + String(b).padStart(importe));
     }
     return this;
   }
@@ -260,15 +288,46 @@ class Ticket {
     return this;
   }
 
-  /** La raya para firmar, centrada, con su letrero debajo. */
+  /**
+   * LA RAYA PARA FIRMAR, en un solo renglón: el letrero delante y la raya
+   * detrás, como en cualquier recibo de papel.
+   *
+   * Antes eran CUATRO renglones —dos en blanco, la raya centrada y el
+   * letrero debajo—, o sea 12 mm en papeles que salen dos y tres veces al
+   * día. Se firma SOBRE la raya, así que aquellos dos renglones en blanco
+   * eran margen y no sitio para firmar: queda uno, que separa la firma de
+   * lo que va arriba, y la raya llega hasta la orilla del papel, o sea que
+   * hay MÁS sitio para firmar que antes, no menos.
+   */
   firma(etiqueta = 'FIRMA') {
-    const raya = '_'.repeat(Math.min(this.ancho - 8, 30));
-    return this.saltos(2).centro().linea(raya).linea(etiqueta).izquierda();
+    this.saltos(1).izquierda();
+    const letrero = `${etiqueta}: `;
+    const hueco = this.ancho - letrero.length;
+
+    // Con un letrero largo no quedaría raya donde firmar —o peor, se
+    // saldría del papel—. Ahí sí valen dos renglones: el letrero arriba y
+    // la raya debajo, de orilla a orilla.
+    if (hueco < 14) {
+      this.parrafo(etiqueta);
+      return this.linea('_'.repeat(this.ancho));
+    }
+    return this.linea(letrero + '_'.repeat(hueco));
   }
 
-  /** Corta el papel dejando margen para que se pueda arrancar. */
-  cortar() {
-    return this.saltos(4).crudo([GS, 0x56, 0x42, 0x00]);
+  /**
+   * CORTA EL PAPEL.
+   *
+   * `avance` son los renglones en blanco que se mandan antes de la cuchilla,
+   * y valen dinero: cuatro renglones son 12 mm en cada ticket, o sea metros
+   * de papel al mes. Se configura en Sistema porque depende de la impresora
+   * (ver `avanceCorte` en impresora.js) y no hay forma de adivinarlo: se
+   * prueba, se mira el papel, y si la cuchilla se comió el último renglón se
+   * sube uno.
+   */
+  cortar(avance = 4) {
+    const n = Math.min(Math.max(Number(avance) || 0, 0), 8);
+    if (n) this.saltos(n);
+    return this.crudo([GS, 0x56, 0x42, 0x00]);
   }
 
   /**

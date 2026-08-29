@@ -217,7 +217,8 @@ export async function vistaSistema(pantalla, estadoApp) {
         try {
           await api.actualizar('/impresion/config', {
             abrirCajon: pantalla.querySelector('#imp-cajon').checked,
-            salidaCajon: Number(pantalla.querySelector('#imp-cajon-salida').value)
+            salidaCajon: Number(pantalla.querySelector('#imp-cajon-salida').value),
+            avanceCorte: Number(pantalla.querySelector('#imp-avance').value)
           });
           const r = await api.enviar('/impresion/cajon', {});
           avisar(r.abierto ? 'Se le mandó el pulso al cajón'
@@ -442,16 +443,43 @@ export async function vistaSistema(pantalla, estadoApp) {
         <input id="imp-pie" autocomplete="off" placeholder="Tel. 999 000 0000"
                value="${esc(i.pie)}" ${puedeConfigurar ? '' : 'disabled'}>
 
+        <div class="rejilla-config" style="margin-top:12px">
+          <label>
+            <span class="etiqueta-chica">
+              Avance antes de cortar
+              <small>renglones en blanco al final</small>
+            </span>
+            <select id="imp-avance" ${puedeConfigurar ? '' : 'disabled'}>
+              ${[0, 1, 2, 3, 4, 5, 6, 8].map((n) => `
+                <option value="${n}" ${Number(i.avanceCorte) === n ? 'selected' : ''}>
+                  ${n === 0 ? '0 — nada' : n + (n === 1 ? ' renglón' : ' renglones')}
+                  ${n ? ` (${n * 3} mm)` : ''}
+                </option>`).join('')}
+            </select>
+          </label>
+        </div>
+        <p class="ayuda" style="margin:8px 0 0;font-size:13.5px">
+          La cuchilla no está donde imprime: está uno o dos centímetros más
+          arriba. La orden de cortar ya le dice a la impresora <b>«avanza
+          hasta donde cortas y corta»</b>, así que muchas no necesitan ni un
+          renglón — y ahí son <b>12 mm menos por ticket</b>, que al mes son
+          metros. Pero hay impresoras baratas que cortan donde están.
+          <b>Baja el número, imprime una prueba y mira el papel:</b> si la
+          cuchilla se comió el último renglón, súbelo uno.
+        </p>
+
         <h4 class="cfg-subtitulo">El cajón del dinero</h4>
         <label class="interruptor">
           <input type="checkbox" id="imp-cajon" ${i.abrirCajon ? 'checked' : ''}
                  ${puedeConfigurar ? '' : 'disabled'}>
           <span>
-            <strong>Abrir el cajón al cobrar en efectivo</strong>
+            <strong>Abrir el cajón al imprimir</strong>
             <small>
               El cajón cuelga de la impresora por un cable: quien lo abre es
-              ella. Se abre al cobrar, no al imprimir, porque el ticket solo
-              sale si alguien lo pide.
+              ella. Por eso el pulso viaja pegado al ticket: si sale papel se
+              abre, y si la impresora está apagada no se abre ni se finge que
+              sí. Se abre cada vez que se imprime, y una sola vez aunque
+              salgan tres copias del mismo ticket.
             </small>
           </span>
         </label>
@@ -598,6 +626,7 @@ export async function vistaSistema(pantalla, estadoApp) {
       pie: pantalla.querySelector('#imp-pie').value.trim(),
       abrirCajon: pantalla.querySelector('#imp-cajon').checked,
       salidaCajon: Number(pantalla.querySelector('#imp-cajon-salida').value),
+      avanceCorte: Number(pantalla.querySelector('#imp-avance').value),
       apartados
     };
     try {

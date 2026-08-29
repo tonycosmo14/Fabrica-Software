@@ -154,6 +154,18 @@ function configuracion() {
     pie: ajuste('ticket_pie', ''),
     codigoPagina: Number(ajuste('ticket_codepage', '2')),
     abrirCajon: ajuste('ticket_abrir_cajon', '0') === '1',
+    // CUÁNTO PAPEL AVANZA ANTES DE CORTAR.
+    //
+    // La cuchilla no está donde imprime: está uno o dos centímetros más
+    // arriba. Si se corta sin avanzar, la cuchilla parte el último renglón.
+    //
+    // La orden de cortar de ESC/POS (GS V B n) dice "avanza hasta la
+    // posición de corte y corta", así que en una impresora que la cumple
+    // bien no hace falta avanzar nada y estos renglones son papel tirado:
+    // cuatro renglones son 12 mm en CADA ticket. Pero hay impresoras
+    // baratas que la entienden como "corta aquí mismo", y ahí sí hacen
+    // falta. Por eso se configura y no se adivina: se prueba y se ve.
+    avanceCorte: Math.min(Math.max(Number(ajuste('ticket_avance_corte', '4')) || 0, 0), 8),
     // Por cuál de las dos salidas del conector se manda el pulso. Casi
     // todos los cajones van en la 2; si no abre, se prueba la 5.
     salidaCajon: Number(ajuste('ticket_cajon_salida', '2')) === 5 ? 5 : 2,

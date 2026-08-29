@@ -17,9 +17,30 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '2.5';
+const VERSION_ACTUAL = '2.6';
 
 const VERSIONES = [
+  {
+    numero: '2.6',
+    nombre: 'El ticket chico',
+    fecha: '2026-08-29',
+    resumen:
+      'Los mismos papeles, con una cuarta parte menos de papel. Nada de ' +
+      'lo que dicen se perdió: se quitaron los renglones que decían dos ' +
+      'veces lo mismo o que no decían nada.',
+    cambios: [
+      { tipo: 'importante', texto: 'TODOS LOS TICKETS BAJARON UN 24% DE PAPEL. Una venta pasa de 60 a 48 mm, un ticket de mostrador de 54 a 39, y el corte del turno de 123 a 84. Se imprimen cientos al día: eso son metros al mes.' },
+      { tipo: 'mejora', texto: 'En una térmica el ALTO es lo que cuesta y el ancho es gratis: una letra a doble alto se come dos renglones de papel y a doble ancho, uno. Así que los números grandes ahora son anchos en vez de altos. Se ven igual de grandes y valen la mitad.' },
+      { tipo: 'mejora', texto: 'Quién estaba en la caja y a qué hora eran dos renglones y son el mismo dato: ahora van juntos. Con un nombre largo se separan solos antes que recortarle el nombre a nadie.' },
+      { tipo: 'mejora', texto: 'PAGANDO JUSTO ya no se imprime "PAGO $17 · CAMBIO $0". Era el total otra vez y un cero: dos renglones para no decir nada, en el papel que más se imprime. Cuando sí hay cambio, los dos números van juntos en un renglón.' },
+      { tipo: 'mejora', texto: 'La raya para firmar era cuatro renglones —dos en blanco, la raya y su letrero—. Ahora es uno: el letrero delante y la raya hasta la orilla. Se firma SOBRE la raya, así que hay más sitio para firmar que antes, no menos.' },
+      { tipo: 'mejora', texto: 'EN EL CORTE: la hora de cierre salía dos veces, el total de gastos salía dos veces, y cada bloque gastaba una raya y un título. Ahora el título va dentro de la raya —"-- GASTOS (3) ------"— y quién cerró va delante de la raya que va a firmar.' },
+      { tipo: 'mejora', texto: 'El papel del conteo se arma como todos los demás: qué es arriba a la izquierda, quién y cuándo a la derecha, el negocio abajo. Era el único que se había quedado con la cabecera vieja de cinco renglones.' },
+      { tipo: 'nuevo', texto: 'SE PUEDE AJUSTAR EL AVANCE ANTES DE CORTAR, en Sistema. La cuchilla está uno o dos centímetros por encima de donde imprime, y la orden de cortar ya le dice a la impresora "avanza hasta donde cortas": muchas no necesitan ni un renglón, y ahí son 12 mm menos POR TICKET. Se queda en 4 de fábrica porque hay impresoras que cortan donde están: baja el número, imprime una prueba y mira el papel.' },
+      { tipo: 'arreglo', texto: 'Tres renglones se salían del papel y la impresora los partía por donde le tocaba: el nombre de un cliente largo, un desglose con cifras grandes y un producto de nombre largo. Ahora se parten por palabras o se recortan a lo que cabe.' },
+      { tipo: 'arreglo', texto: 'En el corte, la hora de apertura salía cortada a la mitad ("08:00 a") y decía "1 cancelados".' }
+    ]
+  },
   {
     numero: '2.5',
     nombre: 'Los gastos de siempre y el turno relevado',
