@@ -1034,3 +1034,10 @@ router.get('/precios/sugerencia', configurarPrecios, (req, res) => {
 });
 
 module.exports = router;
+// La cotización imprime con LOS MISMOS precios y las mismas reglas que una
+// venta —incluida la lista de mayoreo del cliente—, así que reutiliza esta
+// función en vez de copiarla: si un día cambia cómo se cobra, la cotización
+// cambia sola.
+module.exports.prepararLineas = prepararLineas;
+module.exports.llevaMayoreoEnLineas = (lineas) =>
+  llevaMayoreo(lineas, { porId: productoPorId, porCodigo: productoPorCodigo });

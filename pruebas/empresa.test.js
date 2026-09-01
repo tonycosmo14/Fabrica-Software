@@ -541,6 +541,61 @@ test('un recibo anulado deja de contar en la luz del mes', async () => {
 
 
 // ============================================================
+// LOS PROVEEDORES — el manual de la fábrica  (v2.8)
+// ============================================================
+
+test('un proveedor se anota con lo que hay que saber de él', async () => {
+  await entrarAdmin();
+  const r = await llamar('/api/empresa/proveedores', {
+    method: 'POST',
+    cuerpo: { nombre: 'Amoniaco del Sureste',
+              queHace: 'Surte el amoniaco de los compresores. Se pide con una semana.',
+              telefono: '999 123 4567', horarios: 'L-V 8 a 6',
+              direccion: 'Calle 50, Mérida', notas: 'Preguntar por don Raúl' } });
+  assert.equal(r.estado, 201);
+  const pr = r.json.datos.proveedor;
+  assert.equal(pr.que_hace, 'Surte el amoniaco de los compresores. Se pide con una semana.');
+
+  const dos = await llamar('/api/empresa/proveedores', {
+    method: 'POST', cuerpo: { nombre: 'amoniaco del sureste' } });
+  assert.equal(dos.estado, 409, 'el mismo nombre dos veces, ni con minúsculas');
+});
+
+test('editar, dar de baja y borrar un proveedor', async () => {
+  await entrarAdmin();
+  const alta = await llamar('/api/empresa/proveedores', {
+    method: 'POST', cuerpo: { nombre: 'Taller Chuc' } });
+  const id = alta.json.datos.proveedor.id;
+
+  const ed = await llamar(`/api/empresa/proveedores/${id}`, {
+    method: 'PUT', cuerpo: { telefono: '999 000 1111', activo: false } });
+  assert.equal(ed.estado, 200);
+  assert.equal(ed.json.datos.proveedor.activo, 0);
+
+  const activos = (await llamar('/api/empresa/proveedores')).json.datos.proveedores;
+  assert.ok(!activos.some((x) => x.id === id), 'de baja no sale en la lista normal');
+  const todos = (await llamar('/api/empresa/proveedores?todos=1')).json.datos.proveedores;
+  assert.ok(todos.some((x) => x.id === id), 'pero con todos=1 sí');
+
+  // Borrar de verdad se puede: nada apunta a esta tabla; en los gastos el
+  // proveedor va copiado como texto (regla 3.5).
+  const b = await llamar(`/api/empresa/proveedores/${id}/eliminar`, { method: 'POST', cuerpo: {} });
+  assert.equal(b.estado, 200);
+  assert.ok(!bd.prepare('SELECT 1 FROM proveedores WHERE id = ?').get(id));
+});
+
+test('el gerente ve el directorio pero no lo edita', async () => {
+  await entrarAdmin();
+  await crearUsuario('Rosa Dos', 'gerente', '9092');
+  await entrarPorNombre('Rosa Dos', '9092');
+  assert.equal((await llamar('/api/empresa/proveedores')).estado, 200);
+  assert.equal((await llamar('/api/empresa/proveedores', {
+    method: 'POST', cuerpo: { nombre: 'X' } })).estado, 403);
+  await entrarAdmin();
+});
+
+
+// ============================================================
 // QUIÉN ENTRA
 // ============================================================
 

@@ -45,7 +45,9 @@ export async function vistaEmpresa(pantalla, estadoApp) {
     try {
       datos = seccion === 'luz'
         ? { recibos: (await api.obtener('/empresa/cfe')).recibos }
-        : await api.obtener(`/empresa/resumen?periodo=${encodeURIComponent(mes.clave)}`);
+        : seccion === 'proveedores'
+          ? { proveedores: (await api.obtener('/empresa/proveedores?todos=1')).proveedores }
+          : await api.obtener(`/empresa/resumen?periodo=${encodeURIComponent(mes.clave)}`);
     } catch (e) { pantalla.innerHTML = `<p class="vacio">${esc(e.message)}</p>`; return; }
 
     pantalla.innerHTML = `
@@ -64,9 +66,14 @@ export async function vistaEmpresa(pantalla, estadoApp) {
           <button class="secundario ${seccion === 'luz' ? 'activo' : ''}" data-seccion="luz">
             ⚡ Recibos de luz
           </button>
+          <button class="secundario ${seccion === 'proveedores' ? 'activo' : ''}" data-seccion="proveedores">
+            📒 Proveedores
+          </button>
         </div>
 
-        ${seccion === 'luz' ? panelLuz(datos.recibos) : panelGastos(datos)}
+        ${seccion === 'luz' ? panelLuz(datos.recibos)
+          : seccion === 'proveedores' ? panelProveedores(datos.proveedores)
+          : panelGastos(datos)}
       </div>`;
 
     enganchar(datos);
@@ -364,6 +371,17 @@ export async function vistaEmpresa(pantalla, estadoApp) {
     const nuevoRecibo = q('#nuevo-recibo');
     if (nuevoRecibo) nuevoRecibo.onclick = () => formularioRecibo();
 
+    const nuevoProv = q('#nuevo-proveedor');
+    if (nuevoProv) nuevoProv.onclick = () => formularioProveedor();
+    pantalla.querySelectorAll('[data-editar-proveedor]').forEach((b) => {
+      b.onclick = () => formularioProveedor(
+        datos.proveedores?.find((x) => x.id === b.dataset.editarProveedor));
+    });
+    pantalla.querySelectorAll('[data-eliminar-proveedor]').forEach((b) => {
+      b.onclick = () => eliminarProveedor(
+        datos.proveedores?.find((x) => x.id === b.dataset.eliminarProveedor));
+    });
+
     pantalla.querySelectorAll('[data-ver-gastos]').forEach((b) => {
       b.onclick = () => verGastos(b.dataset.verGastos,
         datos.conceptos?.find((c) => c.id === b.dataset.verGastos));
@@ -601,6 +619,11 @@ export async function vistaEmpresa(pantalla, estadoApp) {
   // corregir el primero.
   // ==========================================================
   async function formularioGasto() {
+    // El directorio de proveedores sugiere el nombre para que se escriba
+    // igual todas las veces; el que quede se COPIA al renglón (regla 3.5).
+    let sugerencias = [];
+    try { sugerencias = (await api.obtener('/empresa/proveedores')).proveedores; }
+    catch { sugerencias = []; }
     let conceptos = [];
     try { conceptos = (await api.obtener('/empresa/conceptos')).conceptos; }
     catch (e) { return avisar(e.message, 'error'); }
@@ -650,7 +673,11 @@ export async function vistaEmpresa(pantalla, estadoApp) {
               </label>
               <label>
                 <span class="etiqueta-chica">Proveedor</span>
-                <input id="proveedor" maxlength="60" placeholder="Quién lo vendió">
+                <input id="proveedor" maxlength="60" placeholder="Quién lo vendió"
+                       list="lista-proveedores">
+                <datalist id="lista-proveedores">
+                  ${sugerencias.map((x) => `<option value="${esc(x.nombre)}">`).join('')}
+                </datalist>
               </label>
               <label>
                 <span class="etiqueta-chica">Cómo se pagó</span>
@@ -735,6 +762,148 @@ export async function vistaEmpresa(pantalla, estadoApp) {
         await pintar();
       } catch (e) { avisar(e.message, 'error'); }
     };
+  }
+
+  // ==========================================================
+  // LOS PROVEEDORES — el manual de la fábrica
+  //
+  // La intención la dijo el dueño: que si un día él no está, sus hijos
+  // abran esta pantalla y sepan a quién hablarle para que la fábrica siga
+  // andando. Por eso el campo que manda es "qué hace", no el teléfono.
+  // ==========================================================
+  function panelProveedores(proveedores = []) {
+    return `
+      <div class="emp-cabeza">
+        <div class="crece">
+          <p class="ayuda" style="margin:0">
+            El directorio de la fábrica: quién es cada proveedor, <b>qué le
+            vende a la fábrica</b>, a qué teléfono se le habla y qué hay que
+            saber al tratar con él. Es parte del manual del negocio: escrito
+            aquí, no se lo lleva nadie en la cabeza.
+          </p>
+        </div>
+        ${puedeCapturar ? '<button id="nuevo-proveedor">＋ Nuevo proveedor</button>' : ''}
+      </div>
+
+      <div class="prov-lista">
+        ${proveedores.map((pr) => `
+          <div class="tarjeta prov-tarjeta ${pr.activo ? '' : 'anulada'}">
+            <div class="prov-cabeza">
+              <strong>${esc(pr.nombre)}</strong>
+              ${pr.activo ? '' : '<span class="hist-que que-cancelada">de baja</span>'}
+              ${puedeCapturar ? `
+                <span class="prov-acciones">
+                  <button class="secundario chico" data-editar-proveedor="${esc(pr.id)}">Editar</button>
+                  <button class="secundario chico" data-eliminar-proveedor="${esc(pr.id)}"
+                          title="Borrarlo del directorio">🗑</button>
+                </span>` : ''}
+            </div>
+            ${pr.que_hace ? `<p class="prov-que">${esc(pr.que_hace)}</p>` : ''}
+            <div class="prov-datos">
+              ${pr.telefono ? `<span>📞 <a href="tel:${esc(pr.telefono.replace(/[^+0-9]/g, ''))}">${esc(pr.telefono)}</a></span>` : ''}
+              ${pr.horarios ? `<span>🕐 ${esc(pr.horarios)}</span>` : ''}
+              ${pr.direccion ? `<span>📍 ${esc(pr.direccion)}</span>` : ''}
+              ${pr.ubicacion ? (/^https?:\/\//i.test(pr.ubicacion)
+                ? `<span>🗺 <a href="${esc(pr.ubicacion)}" target="_blank" rel="noopener">Cómo llegar</a></span>`
+                : `<span>🗺 ${esc(pr.ubicacion)}</span>`) : ''}
+            </div>
+            ${pr.notas ? `<p class="prov-notas">${esc(pr.notas)}</p>` : ''}
+          </div>`).join('')
+          || `<p class="vacio">Todavía no hay proveedores. Con ＋ se anota el
+              primero: el del amoniaco, el de la sal, el mecánico…</p>`}
+      </div>`;
+  }
+
+  /** Alta y edición comparten el mismo formulario. */
+  async function formularioProveedor(pr = null) {
+    pantalla.innerHTML = `
+      <div class="ancho-completo">
+        <button class="secundario chico" id="volver">‹ Las cuentas</button>
+        <h2 style="margin-top:14px">${pr ? `Editar a ${esc(pr.nombre)}` : 'Nuevo proveedor'}</h2>
+        <p class="ayuda">
+          Lo más valioso es <b>qué hace</b>: escrito como se lo contarías a
+          alguien que nunca ha tratado con él.
+        </p>
+
+        <div class="tarjeta">
+          <form id="f">
+            <div class="emp-campos">
+              <label>
+                <span class="etiqueta-chica">Cómo se llama</span>
+                <input id="p-nombre" maxlength="160" required
+                       value="${esc(pr?.nombre || '')}" placeholder="Amoniaco del Sureste">
+              </label>
+              <label>
+                <span class="etiqueta-chica">Teléfono</span>
+                <input id="p-telefono" maxlength="160"
+                       value="${esc(pr?.telefono || '')}" placeholder="999 123 4567 · preguntar por don Raúl">
+              </label>
+              <label>
+                <span class="etiqueta-chica">Horarios</span>
+                <input id="p-horarios" maxlength="160"
+                       value="${esc(pr?.horarios || '')}" placeholder="L-V 8 a 6, sábado hasta la 1">
+              </label>
+              <label>
+                <span class="etiqueta-chica">Dirección</span>
+                <input id="p-direccion" maxlength="160"
+                       value="${esc(pr?.direccion || '')}" placeholder="Calle 50 #123, Mérida">
+              </label>
+              <label>
+                <span class="etiqueta-chica">Ubicación<small>enlace de mapa, o señas</small></span>
+                <input id="p-ubicacion" maxlength="160"
+                       value="${esc(pr?.ubicacion || '')}" placeholder="https://maps.app.goo.gl/…">
+              </label>
+            </div>
+
+            <label>
+              <span class="etiqueta-chica">Qué hace<small>y para qué le sirve a la fábrica</small></span>
+              <textarea id="p-que" maxlength="600" rows="3"
+                        placeholder="Surte el amoniaco de los compresores. Se le pide con una semana; trae el cilindro y se lleva el vacío.">${esc(pr?.que_hace || '')}</textarea>
+            </label>
+            <label>
+              <span class="etiqueta-chica">Notas</span>
+              <textarea id="p-notas" maxlength="600" rows="2"
+                        placeholder="Solo acepta transferencia. En diciembre cierra dos semanas.">${esc(pr?.notas || '')}</textarea>
+            </label>
+
+            <button type="submit" style="margin-top:20px">${pr ? 'Guardar' : 'Anotarlo'}</button>
+          </form>
+        </div>
+      </div>`;
+
+    const q = (sel) => pantalla.querySelector(sel);
+    q('#volver').onclick = pintar;
+    q('#f').onsubmit = async (ev) => {
+      ev.preventDefault();
+      const cuerpo = {
+        nombre: q('#p-nombre').value, telefono: q('#p-telefono').value,
+        horarios: q('#p-horarios').value, direccion: q('#p-direccion').value,
+        ubicacion: q('#p-ubicacion').value, queHace: q('#p-que').value,
+        notas: q('#p-notas').value
+      };
+      try {
+        if (pr) await api.actualizar(`/empresa/proveedores/${pr.id}`, cuerpo);
+        else await api.enviar('/empresa/proveedores', cuerpo);
+        avisar('Guardado', 'bien');
+        seccion = 'proveedores';
+        await pintar();
+      } catch (e) { avisar(e.message, 'error'); }
+    };
+  }
+
+  async function eliminarProveedor(pr) {
+    if (!pr) return;
+    if (!await confirmar({
+      titulo: `¿Borrar a "${pr.nombre}" del directorio?`,
+      texto: 'Aquí sí se borra de verdad: el directorio es una libreta, no ' +
+             'un registro. Los gastos donde aparece su nombre no se tocan.',
+      ok: 'Borrarlo', peligro: true
+    })) return;
+    try {
+      await api.enviar(`/empresa/proveedores/${pr.id}/eliminar`, {});
+      avisar('Borrado del directorio', 'bien');
+      await pintar();
+    } catch (e) { avisar(e.message, 'error'); }
   }
 
   async function formularioRecibo(corregir = null) {

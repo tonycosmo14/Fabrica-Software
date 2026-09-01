@@ -149,7 +149,7 @@ debería quedar − contado = FALTA</pre>
   {
     id: 'venta',
     titulo: 'Punto de venta: cobrar',
-    busca: 'venta cobrar ticket precio fracción cambio devolución billete folio cancelar imprimir teclado enter f10 f2 f3 f4 código rápido categorías nueva venta espera pendiente aviso bolita se acabó agotado poco hielo inventario bajo atajos gastos historial reloj',
+    busca: 'venta cobrar ticket precio fracción cambio devolución billete folio cancelar imprimir teclado enter f10 f2 f3 f4 código rápido categorías nueva venta espera pendiente aviso bolita se acabó agotado poco hielo inventario bajo atajos gastos historial reloj cotización cotizar precio papel sujetos a cambio',
     cuerpo: `
       <p>Es la pantalla que se abre al entrar, porque es la que se usa casi
       todo el día. A la izquierda lo que lleva el cliente, a la derecha los
@@ -349,7 +349,18 @@ debería quedar − contado = FALTA</pre>
 
       <h4>Buscar un ticket viejo</h4>
       <p>Con el botón <b>Buscar tickets</b>: por número, por el importe o por
-      la hora. Los últimos 30 salen solos.</p>`
+      la hora. Los últimos 30 salen solos.</p>
+
+      <h4>Solo cotización</h4>
+      <p>A veces solo piden el precio en papel: "¿a cómo me saldrían
+      veinte?". Se arma el ticket normal y en vez de cobrar se toca
+      <b>📋 Solo cotización</b>: sale impreso con los precios de hoy, la
+      leyenda <b>precios sujetos a cambio sin previo aviso</b> y la fecha.</p>
+      <p class="ayuda-tip">Una cotización <b>no es una venta</b>: no tiene
+      folio, no abre el cajón, no toca la existencia y no entra al corte.
+      El ticket se queda armado por si el cliente dice "sí, dámelo". Si
+      lleva mayoreo, primero hay que decir de quién es, para cotizar con su
+      lista.</p>`
   },
 
   // ==========================================================
@@ -779,7 +790,7 @@ debería haber − contado = FALTA</pre>
   {
     id: 'empresa',
     titulo: 'Las cuentas de la empresa: lo grande y la luz',
-    busca: 'empresa gastos grandes amoniaco sal aceite barril maquinaria refacciones mantenimiento proveedor factura pdf recibo luz cfe kwh kilowatt medidor marqueta mes corte del 12 al 12 periodo traspaso caja fuerte',
+    busca: 'empresa gastos grandes amoniaco sal aceite barril maquinaria refacciones mantenimiento proveedor proveedores directorio manual teléfono horario factura pdf recibo luz cfe kwh kilowatt medidor marqueta mes corte del 12 al 12 periodo traspaso caja fuerte',
     cuerpo: `
       <p>Aquí va el <b>dinero grande</b>: el que se paga con cheque, con
       transferencia o sacando efectivo aparte, y que <b>nunca pasa por el
@@ -887,10 +898,21 @@ debería haber − contado = FALTA</pre>
       de gastos, y en los meses donde tuvo compras su renglón se queda para
       que la tabla cuadre.</p>
 
+      <h4>Los proveedores: el manual de la fábrica</h4>
+      <p>La pestaña <b>📒 Proveedores</b> es el directorio del negocio:
+      quién es cada proveedor, <b>qué hace y para qué sirve</b>, su
+      teléfono, dónde está, sus horarios y sus mañas ("solo efectivo",
+      "preguntar por don Raúl").</p>
+      <p class="ayuda-tip">La intención es que sea parte del <b>manual de la
+      fábrica</b>: que quien tenga que sacar adelante el negocio un día
+      —los hijos, un encargado nuevo— abra esta pantalla y sepa a quién
+      hablarle. Escrito aquí, no se lo lleva nadie en la cabeza. Al
+      capturar un gasto grande, el nombre del proveedor se sugiere solo.</p>
+
       <h4>Quién entra</h4>
       <p>El <b>gerente</b> ve todas estas cuentas. Capturarlas —gastos,
-      recibos y el día del corte— es del <b>administrador</b>: son facturas de
-      decenas de miles de pesos, no es trabajo de turno.</p>`
+      recibos, proveedores y el día del corte— es del <b>administrador</b>:
+      son facturas de decenas de miles de pesos, no es trabajo de turno.</p>`
   },
 
   // ==========================================================
@@ -1237,6 +1259,50 @@ EN REPARACION
       <p>Las instrucciones están en la propia pantalla de Sistema, paso por
       paso. En resumen: se apaga el sistema, se copia el respaldo encima del
       archivo de datos y se vuelve a encender.</p>`
+  },
+
+  // ==========================================================
+  {
+    id: 'arranque',
+    titulo: 'La puesta en marcha y el cuadre',
+    busca: 'puesta en marcha arranque empezar producción real borrar pruebas cuadrar realidad rotación paños congelando fondo inicial primer conteo apagón',
+    cuerpo: `
+      <p>La fábrica ya trabajaba cuando llegó el sistema. La <b>puesta en
+      marcha</b> (🚀 en Sistema, solo el administrador) es el día en que se
+      le dice cómo está el mundo real, en orden y una sola vez:</p>
+      <ul>
+        <li><b>Borrar las pruebas</b> — todo lo capturado en el ensayo se
+        borra para que los números empiecen limpios. Se quedan usuarios,
+        tanques, productos, precios, clientes y toda la bitácora. Antes se
+        hace un respaldo solo, y pide escribir BORRAR PRUEBAS más la
+        contraseña. El primer ticket real vuelve a ser el <b>#1</b>.</li>
+        <li><b>Los paños</b> — cuáles llevan horas congelando (y desde
+        cuándo) y cuáles están fuera. "Sin tocar" no escribe nada.</li>
+        <li><b>La rotación</b> — cuál fue el último paño que se sacó; el
+        sistema contesta "entonces toca el N".</li>
+        <li><b>El hielo</b> — el primer conteo del cuarto frío fija cuánto
+        hay, sin cuadrar contra nada.</li>
+        <li><b>Los productos</b> — su primer conteo cada uno.</li>
+        <li><b>El dinero</b> — el cajero entra con su PIN y registra una
+        entrada "Fondo inicial" con lo que haya en el cajón.</li>
+      </ul>
+
+      <p class="ayuda-tip">Los paños fijados aquí <b>no inventan
+      marquetas</b>: la producción y las estadísticas solo cuentan lo que de
+      verdad se registró. Por eso las marquetas producidas antes de la hora
+      cero no aparecen: las absorbe el primer conteo, que es la verdad.</p>
+
+      <h4>Después: cuadrar con la realidad</h4>
+      <p>Al dar por hecha la puesta en marcha, el botón de borrar pruebas
+      <b>desaparece para siempre</b> y la pantalla se convierte en el
+      <b>cuadre</b>: la misma captura de paños, para el apagón o la semana
+      que nadie anotó. Cada cuadre exige su <b>motivo</b>, queda firmado en
+      la bitácora con el antes y el después, y la pantalla dice cuántas
+      veces se ha usado.</p>
+      <p class="ayuda-tip">El hielo, los productos y el dinero no tienen
+      botón de cuadre, a propósito: <b>los conteos y movimientos de siempre
+      son el cuadre</b>, y son los que destapan un faltante en vez de
+      taparlo.</p>`
   },
 
   // ==========================================================

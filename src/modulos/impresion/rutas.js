@@ -13,9 +13,12 @@ const { bd } = require('../../db/conexion');
 const { ok, error } = require('../../lib/respuestas');
 const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
+const { prepararLineas, llevaMayoreoEnLineas } = require('../ventas/rutas');
+const { listaActiva } = require('../ventas/precios');
+const { listaDeMayoreo } = require('../ventas/mayoreo');
 const { configuracion, guardarAjuste, imprimirCrudo,
         tipoDeDestino, impresorasDeWindows, APARTADOS } = require('./impresora');
-const { ticketVenta, ticketMovimiento, ticketPrueba, pulsoCajon, ticketProduccion,
+const { ticketCotizacion, ticketVenta, ticketMovimiento, ticketPrueba, pulsoCajon, ticketProduccion,
         ticketCorte, ticketCortePersona, ticketConteo,
         ticketResumenDia } = require('./ticket');
 
@@ -227,6 +230,71 @@ function recortarEspejo(renglones = []) {
   while (r.length && !r[r.length - 1].t.trim()) r.pop();
   return r;
 }
+
+/**
+ * LA COTIZACIÓN  (v2.8)
+ *
+ * Imprime el papel del precio SIN vender: no hay folio, no se toca la
+ * existencia, no entra al corte y el cajón NO se abre (no entró dinero).
+ * Los precios los calcula el servidor con las mismas reglas que una venta
+ * —lista activa, y la de mayoreo del cliente si va con nombre—, porque una
+ * cotización con precios inventados por la pantalla no promete nada.
+ * En la bitácora queda constancia de que se dio, con su total.
+ */
+router.post('/cotizacion', puedeImprimir, async (req, res) => {
+  const lineas = req.body?.lineas;
+  if (!Array.isArray(lineas) || !lineas.length) {
+    return error(res, 'No hay nada que cotizar.');
+  }
+
+  const lista = listaActiva();
+  if (!lista) return error(res, 'No hay ninguna lista de precios activa.', 409);
+
+  const cliente = req.body?.clienteId
+    ? bd.prepare('SELECT * FROM clientes WHERE id = ?').get(req.body.clienteId)
+    : null;
+  const conMayoreo = llevaMayoreoEnLineas(lineas);
+  if (conMayoreo && !cliente) {
+    return error(res, 'Esta cotización lleva mayoreo: falta decir de quién es.', 409,
+                 { faltaCliente: true });
+  }
+
+  const preparadas = prepararLineas(lineas, lista, conMayoreo ? listaDeMayoreo(cliente) : null);
+  if (preparadas.error) return error(res, preparadas.error, preparadas.codigo || 400);
+
+  const cot = {
+    fecha: new Date().toISOString(),
+    atendio: req.usuario.nombre,
+    cliente: cliente?.nombre || null,
+    lineas: preparadas.lineas,
+    total: preparadas.total
+  };
+
+  const papel = ticketCotizacion(cot, { negocio: nombreNegocio() });
+
+  bitacora.registrar({
+    accion: 'venta.cotizacion', entidad: 'usuario', entidadId: req.usuario.id,
+    ejecutorId: req.usuario.id,
+    detalle: { total: preparadas.total, renglones: preparadas.lineas.length,
+               cliente: cliente?.nombre || null }
+  });
+
+  const cfg = configuracion();
+  // SIN pulso de cajón: no entró dinero, no hay billetes que guardar.
+  const r = cfg.directa
+    ? await imprimirCrudo(papel, { seccion: 'venta' })
+    : { impreso: false, motivo: 'sin-destino' };
+
+  // Con o sin impresora, el espejo viaja: si no salió papel, la pantalla
+  // lo enseña como ticket simulado y el precio no se queda sin darse.
+  return ok(res, {
+    impreso: r.impreso,
+    motivo: r.impreso ? undefined : r.motivo,
+    total: preparadas.total,
+    renglones: recortarEspejo(papel.espejo),
+    ancho: papel.anchoTicket
+  });
+});
 
 router.post('/venta/:id', puedeImprimir, async (req, res) => {
   const venta = ventaCompleta(req.params.id);

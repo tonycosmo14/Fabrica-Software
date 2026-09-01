@@ -17,9 +17,27 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '2.7.1';
+const VERSION_ACTUAL = '2.8';
 
 const VERSIONES = [
+  {
+    numero: '2.8',
+    nombre: 'El día del arranque',
+    fecha: '2026-09-01',
+    resumen:
+      'Todo lo que hace falta para pasar de probar el sistema a usarlo de ' +
+      'verdad: la puesta en marcha que cuadra el sistema con la realidad, ' +
+      'las cotizaciones que no son venta, y el directorio de proveedores — ' +
+      'el principio del manual de la fábrica.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'LA PUESTA EN MARCHA (🚀, en Sistema, solo administrador). El día que el sistema entre a trabajar de verdad, se le dice cómo está el mundo real: qué paños llevan horas congelando y cuáles están fuera, cuál fue el último que se sacó (la rotación), el primer conteo del hielo, los productos y el dinero del cajón. Casi todo son las herramientas de siempre, enlazadas en orden.' },
+      { tipo: 'importante', texto: 'BORRAR LOS DATOS DE PRUEBA, una sola vez. Las ventas y sacadas de ensayo se borran para que los números del negocio empiecen limpios; se quedan usuarios, tanques, productos, precios, clientes y TODA la bitácora. Antes de borrar se hace un respaldo solo, pide escribir BORRAR PRUEBAS y la contraseña del administrador, y en cuanto se da por hecha la puesta en marcha, el botón desaparece para siempre. El primer ticket real vuelve a ser el #1.' },
+      { tipo: 'nuevo', texto: 'CUADRAR CON LA REALIDAD, para después: el apagón, la semana que nadie capturó. La misma captura de paños queda para siempre, pero cada uso exige su motivo, queda firmado en la bitácora y la pantalla dice cuántas veces se ha usado. Los paños fijados así NUNCA inventan marquetas: la producción solo cuenta lo que de verdad se registró.' },
+      { tipo: 'nuevo', texto: 'SOLO COTIZACIÓN (📋, en la caja). Se arma el ticket normal y en vez de cobrar se toca "Solo cotización": sale el papel con los precios de HOY, la leyenda PRECIOS SUJETOS A CAMBIO SIN PREVIO AVISO y la fecha. No es una venta: sin folio, sin abrir el cajón, sin tocar la existencia y sin entrar al corte. Si lleva mayoreo, pide el nombre del cliente y cotiza con SU lista.' },
+      { tipo: 'nuevo', texto: 'PROVEEDORES (📒, en las cuentas de la empresa). El directorio de la fábrica: quién es cada proveedor, QUÉ HACE y para qué sirve, teléfono, dirección, horarios y sus mañas. Es el principio del manual del negocio: escrito aquí, no se lo lleva nadie en la cabeza. Al capturar un gasto grande, el nombre del proveedor se sugiere solo del directorio.' },
+      { tipo: 'mejora', texto: 'El gerente ve el directorio de proveedores; editarlo es del administrador.' }
+    ]
+  },
   {
     numero: '2.7.1',
     nombre: 'Los arreglos del estreno',

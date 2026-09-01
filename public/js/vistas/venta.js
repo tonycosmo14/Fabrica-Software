@@ -23,7 +23,7 @@
 import { api } from '../api.js';
 import { esc, avisar, soloHora, fecha as formatoFecha, ETIQUETAS_ROL } from '../util.js';
 import { pedirTexto, pedirImporte, pedirCantidad, pedirEntero, confirmar,
-         pedirAutorizacion, menu } from '../dialogo.js';
+         pedirAutorizacion, menu, verTicket } from '../dialogo.js';
 import { aTexto, descomponer, desglose, pesos, paraEditar } from '../fracciones.js';
 import { cargarMarca } from '../marca.js';
 import { imprimirTicket, limpiarImpresion } from '../imprimir.js';
@@ -272,6 +272,11 @@ export async function vistaVenta(pantalla, estadoApp) {
 
           <button class="pos-cobrar" id="cobrar">
             <span>Cobrar</span><small>F10</small>
+          </button>
+
+          <button class="secundario chico pos-cotizar" id="cotizar"
+                  title="Imprime el precio SIN vender: no hay folio, no se abre el cajón y no entra al corte.">
+            📋 Solo cotización
           </button>
         </section>
 
@@ -940,6 +945,8 @@ export async function vistaVenta(pantalla, estadoApp) {
          </div>`;
 
     pantalla.querySelector('#cobrar').disabled = !hayAlgo();
+    const btnCotizar = pantalla.querySelector('#cotizar');
+    if (btnCotizar) btnCotizar.disabled = !hayAlgo() || Boolean(cambiando);
     pantalla.querySelector('#cobrar').querySelector('span').textContent =
       cambiando ? 'Hacer el cambio' : 'Cobrar';
 
@@ -1677,6 +1684,39 @@ export async function vistaVenta(pantalla, estadoApp) {
     pintarPista();
   }
 
+  /**
+   * SOLO COTIZACIÓN  (v2.8)
+   *
+   * "¿A cómo me saldrían veinte?" — se arma el ticket normal y en vez de
+   * cobrar se toca este botón: sale el papel con los precios de HOY y la
+   * leyenda de que pueden cambiar sin aviso. NO es una venta: no hay folio,
+   * no se abre el cajón, no se toca la existencia y no entra al corte. El
+   * ticket se queda armado por si el cliente dice "sí, dámelo".
+   */
+  async function darCotizacion() {
+    if (!hayAlgo() || cambiando) return;
+
+    const lineas = [];
+    if (hielo > 0) lineas.push({ dieciseisavos: hielo });
+    for (const a of articulos) lineas.push({ productoId: a.producto.id, cantidad: a.cantidad });
+
+    try {
+      const r = await api.enviar('/impresion/cotizacion', {
+        lineas, ...(cliente ? { clienteId: cliente.id } : {})
+      });
+      if (r.impreso) {
+        avisar(`Cotización impresa: ${pesos(r.total)}. No es venta.`, 'bien');
+      } else {
+        // Sin impresora, se enseña en pantalla con forma de ticket.
+        await verTicket({ titulo: 'Cotización', renglones: r.renglones, ancho: r.ancho });
+      }
+    } catch (e) {
+      if (e.faltaCliente) {
+        avisar('Lleva mayoreo: primero dile de quién es el ticket', 'error');
+      } else avisar(e.message, 'error');
+    }
+  }
+
   async function registrar(autorizacion = null) {
     if (fase !== 'cambio' && fase !== 'guardando') return;
     fase = 'guardando';
@@ -2268,6 +2308,7 @@ export async function vistaVenta(pantalla, estadoApp) {
     () => document.getElementById('btn-menu')?.click();
 
   pantalla.querySelector('#cobrar').onclick = irACobro;
+  pantalla.querySelector('#cotizar').onclick = darCotizacion;
   pantalla.querySelector('#historial').onclick = () => verHistorial();
   pantalla.querySelector('#nueva-venta').onclick = () => verEnEspera();
   pantalla.querySelector('#cambio').onclick = () => iniciarCambio();

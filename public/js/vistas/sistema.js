@@ -34,6 +34,18 @@ export async function vistaSistema(pantalla, estadoApp) {
     <div class="ancho-completo">
     <h2>Sistema</h2>
 
+    ${estadoApp?.permisos?.includes('*') ? `
+      <div class="tarjeta arranque-acceso">
+        <div class="crece">
+          <strong>🚀 Puesta en marcha / cuadrar con la realidad</strong>
+          <small style="display:block">
+            El día del arranque: paños, rotación, hielo y dinero como están
+            en la realidad. Después queda como cuadre de emergencia, firmado.
+          </small>
+        </div>
+        <a class="secundario chico boton-enlace" href="#/arranque">Abrir</a>
+      </div>` : ''}
+
     <div class="tarjeta">
       <table class="tabla">
         <tr><th>Versión</th><td>v${esc(estado.version)}</td></tr>

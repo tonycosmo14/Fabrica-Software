@@ -91,7 +91,8 @@ function encabezado(t, { titulo, atendio, fecha }) {
   // tamano(2,2) ocupa DOS renglones de papel y tamano(2,1) uno solo. Se ve
   // igual de grande de ancho —que es lo que hace que el número resalte— y
   // vale la mitad.
-  t.izquierda().negrita().tamano(2, 1).linea(titulo).normal();
+  // Sin título (la cotización trae el suyo propio) no se gasta el renglón.
+  if (titulo) t.izquierda().negrita().tamano(2, 1).linea(titulo).normal();
 
   // Quién y cuándo, en UN renglón si caben. Eran dos, y son el mismo dato:
   // quién estaba en la caja a qué hora.
@@ -252,6 +253,66 @@ function ticketVenta(venta, { copia = false, negocio = '' } = {}) {
 
   t.izquierda().cortar(cfg.avanceCorte);
   return t.bytes();
+}
+
+/**
+ * LA COTIZACIÓN  (v2.8)
+ *
+ * "¿A cómo me saldrían veinte marquetas?" — a veces solo piden el papel
+ * con el precio, para llevarlo o compararlo. Es un ticket que NO es venta:
+ * no hay folio (no se vendió nada), no se abre el cajón, no se toca la
+ * existencia y no entra al corte. Lo único que promete es el precio de HOY,
+ * y por eso lleva impreso que puede cambiar sin previo aviso.
+ */
+function ticketCotizacion(cot, { negocio = '' } = {}) {
+  const cfg = configuracion();
+  const t = new Ticket(cfg.anchoMm, cfg.codigoPagina);
+
+  t.centro().negrita().tamano(2, 2).linea('COTIZACION').normal().izquierda();
+
+  encabezado(t, {
+    titulo: '',
+    atendio: cot.atendio,
+    fecha: fechaTicket(cot.fecha)
+  });
+  if (cot.cliente) t.parrafo(`Para: ${cot.cliente}`);
+  t.separador();
+
+  const lineasHielo = cot.lineas.filter((l) => l.dieciseisavos > 0);
+  const otras = cot.lineas.filter((l) => !l.dieciseisavos);
+  const hielo = lineasHielo.reduce((n, l) => n + l.dieciseisavos, 0);
+  const importeHielo = lineasHielo.reduce((n, l) => n + l.centavos, 0);
+
+  if (hielo) {
+    t.izquierda().negrita().tamano(3, 2).linea(aTexto(hielo)).normal();
+    const partes = desglose(hielo);
+    t.punteado(partes !== aTexto(hielo) ? `(${partes})` : 'Hielo', formato(importeHielo));
+  }
+  for (const l of otras) {
+    const cuantas = Number(l.cantidad) > 1 ? `${l.cantidad} ` : '';
+    t.punteado(`${cuantas}${l.concepto}`, formato(l.centavos));
+  }
+
+  t.separador();
+  t.bloqueDerecha([['TOTAL:', formato(cot.total)]]);
+  t.saltos(1);
+
+  // La letra chica que aquí es la letra grande: esto no es una venta.
+  t.centro().negrita().linea('PRECIOS SUJETOS A CAMBIO').linea('SIN PREVIO AVISO').normal();
+  t.centro().linea(`Precios del ${soloDia(cot.fecha)}`);
+  t.izquierda();
+
+  pie(t, negocio);
+  t.izquierda().cortar(cfg.avanceCorte);
+  return t.bytes();
+}
+
+/** "1/Sep/2026", para decir de qué día son los precios. */
+function soloDia(iso) {
+  const d = new Date(iso);
+  const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+                 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  return `${d.getDate()}/${meses[d.getMonth()]}/${d.getFullYear()}`;
 }
 
 /**
@@ -637,6 +698,6 @@ function pulsoCajon(salida = 2) {
 }
 
 module.exports = {
-  ticketVenta, ticketMovimiento, ticketPrueba,
+  ticketVenta, ticketMovimiento, ticketCotizacion, ticketPrueba,
   ticketCorte, ticketCortePersona, ticketConteo, ticketProduccion, ticketResumenDia, pulsoCajon, fechaCorta, fechaTicket
 };

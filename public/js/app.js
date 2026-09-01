@@ -21,6 +21,7 @@ import { vistaNovedades, hayVersionNueva } from './vistas/novedades.js';
 import { vistaAyuda } from './vistas/ayuda.js';
 import { vistaPersonalizar } from './vistas/personalizar.js';
 import { vistaEmpresa } from './vistas/empresa.js';
+import { vistaArranque } from './vistas/arranque.js';
 import { vistaProductos } from './vistas/productos.js';
 import { vistaClientes } from './vistas/clientes.js';
 import { vistaHistorial } from './vistas/historial.js';
@@ -53,6 +54,9 @@ const RUTAS = {
   '#/empresa':   { titulo: 'Cuentas de la empresa', vista: vistaEmpresa, permiso: 'empresa.ver' },
   '#/personalizar': { titulo: 'Personalizar',   vista: vistaPersonalizar, permiso: 'sistema.configurar' },
   '#/sistema':   { titulo: 'Sistema',           vista: vistaSistema,   permiso: 'sistema.ver' },
+  // La puesta en marcha: el permiso no lo lista ningún rol, así que solo lo
+  // alcanza el comodín del administrador.
+  '#/arranque':  { titulo: 'Puesta en marcha',  vista: vistaArranque,  permiso: 'sistema.puesta_en_marcha' },
   '#/ayuda':     { titulo: 'Ayuda',              vista: vistaAyuda },
   '#/novedades': { titulo: 'Qué hay de nuevo',  vista: vistaNovedades }
 };

@@ -621,3 +621,48 @@ test('la previa no gasta papel: no imprime nada', async () => {
   assert.ok(!fs.existsSync(salida) || fs.readFileSync(salida).length === 0,
             'la impresora no recibió un solo byte');
 });
+
+
+// ============================================================
+// LA COTIZACIÓN  (v2.8)
+// ============================================================
+
+test('la cotización imprime el precio sin vender nada', async () => {
+  await entrarAdmin();
+  const ventasAntes = (await llamar('/api/ventas?limite=1')).json.datos?.ventas?.length ?? null;
+
+  limpiarPapel();
+  const r = await llamar('/api/impresion/cotizacion', {
+    method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 32 }] } });
+  assert.equal(r.estado, 200);
+  assert.ok(r.json.datos.total > 0, 'trae el total calculado por el servidor');
+
+  const papel = fs.readFileSync(salida, 'latin1');
+  assert.match(papel, /COTIZACION/);
+  assert.match(papel, /PRECIOS SUJETOS A CAMBIO/);
+  assert.match(papel, /SIN PREVIO AVISO/);
+  assert.ok(!/PAGO/.test(papel), 'no hay pago: no es venta');
+  // Sin pulso de cajón: no entró dinero. ESC p es 1B 70.
+  assert.ok(!papel.includes('\x1b\x70'), 'el cajón no se abre');
+
+  // Y no nació ninguna venta.
+  const despues = (await llamar('/api/ventas?limite=1')).json.datos?.ventas?.length ?? null;
+  assert.equal(despues, ventasAntes);
+});
+
+test('la cotización también viaja como renglones para la pantalla', async () => {
+  await entrarAdmin();
+  const r = await llamar('/api/impresion/cotizacion', {
+    method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 8 }] } });
+  const { renglones, ancho } = r.json.datos;
+  assert.equal(ancho, 48);
+  assert.match(renglones.map((x) => x.t).join('\n'), /COTIZACION/);
+});
+
+test('una cotización vacía o con producto inexistente se rechaza', async () => {
+  await entrarAdmin();
+  assert.equal((await llamar('/api/impresion/cotizacion', {
+    method: 'POST', cuerpo: { lineas: [] } })).estado, 400);
+  assert.equal((await llamar('/api/impresion/cotizacion', {
+    method: 'POST', cuerpo: { lineas: [{ productoId: 'nope', cantidad: 1 }] } })).estado, 409);
+});

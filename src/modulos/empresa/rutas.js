@@ -582,6 +582,106 @@ router.post('/cfe/:id/anular', administrar, (req, res) => {
   return ok(res, { anulado: true });
 });
 
+// ============================================================
+// LOS PROVEEDORES — el manual de la fábrica
+//
+// "Para dejárselo a mis hijos si un día no estoy: mínimo que sepan qué
+// hacer." No es un catálogo de compras: es a quién hablarle para que la
+// fábrica siga andando, y qué hay que saber al tratar con cada uno.
+// ============================================================
+
+const CAMPOS_PROVEEDOR = ['nombre', 'que_hace', 'telefono', 'direccion',
+                          'ubicacion', 'horarios', 'notas'];
+
+function leerProveedor(cuerpo = {}) {
+  const limpio = {};
+  for (const campo of CAMPOS_PROVEEDOR) {
+    // En el cuerpo llegan en camelCase (queHace); en la tabla van con guion.
+    const clave = campo.replace(/_(\w)/g, (_, l) => l.toUpperCase());
+    if (cuerpo[clave] === undefined) continue;
+    const tope = campo === 'que_hace' || campo === 'notas' ? 600 : 160;
+    limpio[campo] = String(cuerpo[clave]).trim().slice(0, tope) || null;
+  }
+  return limpio;
+}
+
+router.get('/proveedores', ver, (req, res) => {
+  const todos = req.query.todos === '1';
+  return ok(res, {
+    proveedores: bd.prepare(`
+      SELECT * FROM proveedores
+       ${todos ? '' : 'WHERE activo = 1'}
+       ORDER BY activo DESC, nombre
+    `).all()
+  });
+});
+
+router.post('/proveedores', administrar, (req, res) => {
+  const datos = leerProveedor(req.body);
+  if (!datos.nombre) return error(res, 'Escribe cómo se llama el proveedor.');
+
+  const repetido = bd.prepare(
+    'SELECT id FROM proveedores WHERE lower(nombre) = lower(?) AND activo = 1'
+  ).get(datos.nombre);
+  if (repetido) return error(res, `Ya hay un proveedor que se llama "${datos.nombre}".`, 409);
+
+  const id = nuevoId();
+  bd.prepare(`
+    INSERT INTO proveedores (id, nombre, que_hace, telefono, direccion,
+                             ubicacion, horarios, notas, fecha_alta)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, datos.nombre, datos.que_hace || null, datos.telefono || null,
+         datos.direccion || null, datos.ubicacion || null,
+         datos.horarios || null, datos.notas || null, ahora());
+
+  bitacora.registrar({
+    accion: 'empresa.proveedor_alta', entidad: 'proveedor', entidadId: id,
+    ejecutorId: req.usuario.id, detalle: { nombre: datos.nombre }
+  });
+  return ok(res, { proveedor: bd.prepare('SELECT * FROM proveedores WHERE id = ?').get(id) }, 201);
+});
+
+router.put('/proveedores/:id', administrar, (req, res) => {
+  const pr = bd.prepare('SELECT * FROM proveedores WHERE id = ?').get(req.params.id);
+  if (!pr) return error(res, 'Ese proveedor no existe.', 404);
+
+  const cambios = leerProveedor(req.body);
+  if (cambios.nombre === null) return error(res, 'El nombre no puede quedar vacío.');
+
+  if (req.body?.activo !== undefined) {
+    cambios.activo = req.body.activo ? 1 : 0;
+    cambios.fecha_baja = req.body.activo ? null : ahora();
+  }
+  if (!Object.keys(cambios).length) return error(res, 'No mandaste nada que cambiar.');
+
+  const campos = Object.keys(cambios).map((k) => `${k} = ?`).join(', ');
+  bd.prepare(`UPDATE proveedores SET ${campos} WHERE id = ?`)
+    .run(...Object.values(cambios), pr.id);
+
+  bitacora.registrar({
+    accion: 'empresa.proveedor_editado', entidad: 'proveedor', entidadId: pr.id,
+    ejecutorId: req.usuario.id, detalle: { cambios: Object.keys(cambios) }
+  });
+  return ok(res, { proveedor: bd.prepare('SELECT * FROM proveedores WHERE id = ?').get(pr.id) });
+});
+
+/**
+ * Eliminar un proveedor de verdad. Aquí sí se puede: ningún registro apunta
+ * a esta tabla —en los gastos el proveedor va COPIADO como texto (regla
+ * 3.5)—, así que borrar un renglón no deja a nadie mintiendo.
+ */
+router.post('/proveedores/:id/eliminar', administrar, (req, res) => {
+  const pr = bd.prepare('SELECT * FROM proveedores WHERE id = ?').get(req.params.id);
+  if (!pr) return error(res, 'Ese proveedor no existe.', 404);
+
+  bd.prepare('DELETE FROM proveedores WHERE id = ?').run(pr.id);
+  bitacora.registrar({
+    accion: 'empresa.proveedor_eliminado', entidad: 'proveedor', entidadId: pr.id,
+    ejecutorId: req.usuario.id, detalle: { nombre: pr.nombre }
+  });
+  return ok(res, { eliminado: true });
+});
+
 /** El PDF del recibo. */
 router.get('/cfe/:id/archivo', ver, (req, res) => {
   const r = bd.prepare('SELECT archivo, desde FROM recibos_cfe WHERE id = ?').get(req.params.id);

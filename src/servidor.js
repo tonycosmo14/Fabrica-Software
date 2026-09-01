@@ -63,6 +63,9 @@ function crearApp() {
   // Los papeles de un gasto —el PDF del recibo de la CFE, la foto de una
   // factura— llegan en el cuerpo como texto base64, así que este necesita
   // más sitio que los demás.
+  // La puesta en marcha: solo el administrador (permiso que ningún rol
+  // lista, así que solo lo alcanza el comodín).
+  app.use('/api/arranque', require('./modulos/arranque/rutas'));
   app.use('/api/empresa', express.json({ limit: '12mb' }),
           require('./modulos/empresa/rutas'));
   app.use('/api/versiones', require('./modulos/versiones/rutas'));

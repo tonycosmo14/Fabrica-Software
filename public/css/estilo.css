@@ -2980,3 +2980,32 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 .tira-linea.alin-derecha span  { transform-origin: bottom right; }
 .tira-linea .negra { font-weight: 700; }
 .tira-notas { margin-top: 12px; text-align: center; }
+
+/* ============================================================
+   LOS PROVEEDORES — el manual de la fábrica  (v2.8)
+   ============================================================ */
+
+.prov-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; }
+.prov-tarjeta { max-width: none; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.prov-tarjeta.anulada { opacity: .55; }
+.prov-cabeza { display: flex; align-items: center; gap: 8px; }
+.prov-cabeza strong { font-size: 16.5px; }
+.prov-acciones { margin-left: auto; display: flex; gap: 6px; }
+.prov-que { margin: 0; color: var(--texto); line-height: 1.45; }
+.prov-datos { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 14px; color: var(--suave); }
+.prov-datos a { color: var(--acento); }
+.prov-notas {
+  margin: 0; font-size: 13.5px; color: var(--suave);
+  border-top: 1px dashed var(--borde); padding-top: 8px;
+}
+
+/* El botón de "solo cotización": abajo del de cobrar, discreto a propósito
+   —se usa una o dos veces al mes— pero a la mano cuando lo piden. */
+.pos-cotizar { width: 100%; margin-top: 8px; }
+
+/* La puesta en marcha (v2.8): tarjetas-paso y la tabla de paños. */
+.arr-paso { max-width: none; margin-bottom: 14px; }
+.arr-paso a { color: var(--acento); font-weight: 600; }
+.arr-tabla select { padding: 6px 8px; font-size: 14px; }
+.arr-tabla td { vertical-align: middle; }
+.arranque-acceso { display: flex; align-items: center; gap: 12px; }
