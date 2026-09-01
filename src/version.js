@@ -17,9 +17,29 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '2.7';
+const VERSION_ACTUAL = '2.7.1';
 
 const VERSIONES = [
+  {
+    numero: '2.7.1',
+    nombre: 'Los arreglos del estreno',
+    fecha: '2026-09-01',
+    resumen:
+      'Los detalles que salieron al probar la v2.7: el ojito del historial ' +
+      'ahora enseña el ticket con forma de ticket, el paño se ve en una ' +
+      'sola fila como está en el tanque, y las listas se pueden limpiar de ' +
+      'verdad sin borrar ni un registro.',
+    cambios: [
+      { tipo: 'mejora', texto: 'EL OJITO DEL HISTORIAL ENSEÑA EL TICKET, con su forma de ticket: papel blanco, la misma letra, los mismos renglones que salen por la impresora. No es una imagen —son los datos del propio ticket— así que abre al instante, y desde ahí mismo se saca la copia.' },
+      { tipo: 'mejora', texto: 'EL PAÑO SE VE EN UNA SOLA FILA, con sus canastas una al lado de la otra, igual que está metido en el tanque. Así quien anota no se confunde de renglón.' },
+      { tipo: 'mejora', texto: 'EN "QUIÉN LO SACÓ" SOLO SALEN LOS OPERARIOS —sacar paños es su trabajo— más la opción "Otro…" para escribir el nombre del eventual de un día, o del patrón. El nombre queda guardado tal cual, y aparte queda siempre quién lo anotó.' },
+      { tipo: 'mejora', texto: 'LAS LISTAS SE PUEDEN LIMPIAR DE VERDAD. Un concepto dado de baja ahora se puede borrar de la lista para siempre (✕), en la caja y en las cuentas de la empresa. NO se borra ningún registro: sus gastos siguen en el historial y siguen sumando; solo desaparece el renglón que estorbaba. Lo puede hacer el gerente o el administrador.' },
+      { tipo: 'mejora', texto: 'LOS RECIBOS DE LUZ SE PUEDEN CORREGIR (✎), no solo anular: se abre el formulario con los datos capturados, se corrige el que estaba mal y listo. Por dentro el renglón viejo queda anulado con la nota "corregido" y se guarda el bueno, para que siempre se pueda ver qué decía antes.' },
+      { tipo: 'mejora', texto: 'EN UNA LAPTOP EL HISTORIAL Y LAS TABLAS ANCHAS USAN LA PANTALLA COMPLETA. En un monitor muy panorámico se quedan centradas con un tope, porque leer renglones de tres mil píxeles es peor que un margen.' },
+      { tipo: 'arreglo', texto: 'Las cuentas de la empresa ya salen en la pantalla de inicio (🏦) y ya se pueden crear conceptos nuevos desde ahí mismo.' },
+      { tipo: 'arreglo', texto: 'La pantalla de las cuentas de la empresa no se podía rodar hasta abajo; los últimos renglones quedaban escondidos.' }
+    ]
+  },
   {
     numero: '2.7',
     nombre: 'Las cuentas de la empresa',

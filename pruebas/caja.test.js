@@ -841,3 +841,52 @@ test('los gastos escritos a mano nunca son traspaso: no hay dónde marcarlo', as
                d.porConcepto.reduce((n, r) => n + r.centavos, 0),
                'los dos montones juntos son exactamente lo que tiene concepto');
 });
+
+
+// ============================================================
+// BORRAR UN CONCEPTO DE LA LISTA  (v2.7.1)
+// ============================================================
+
+test('eliminar un concepto lo esconde de la lista pero no borra sus gastos', async () => {
+  await entrarAdmin();
+  const alta = await llamar('/api/caja/conceptos', {
+    method: 'POST', cuerpo: { nombre: 'Se creó por error', tipo: 'salida' } });
+  const id = alta.json.datos.concepto.id;
+
+  await cerrarSiHayAbierto();
+  await llamar('/api/caja/abrir', { method: 'POST', cuerpo: { fondo: 500 } });
+  await llamar('/api/caja/movimientos', {
+    method: 'POST', cuerpo: { tipo: 'salida', conceptoId: id, monto: 70 } });
+
+  const antes = (await llamar('/api/caja/conceptos/resumen')).json.datos;
+
+  const r = await llamar(`/api/caja/conceptos/${id}/eliminar`, { method: 'POST', cuerpo: {} });
+  assert.equal(r.estado, 200);
+
+  // Ya no sale ni en la lista de administrar…
+  const todos = (await llamar('/api/caja/conceptos?todos=1')).json.datos.conceptos;
+  assert.ok(!todos.some((c) => c.id === id), 'ni tachado ni nada: ya no está');
+
+  // …pero su gasto sigue sumando exactamente igual.
+  const despues = (await llamar('/api/caja/conceptos/resumen')).json.datos;
+  assert.equal(despues.gastado, antes.gastado, 'el gasto de $70 no desapareció');
+  assert.ok(despues.porConcepto.some((x) => x.id === id),
+            'y su renglón sigue en el resumen, porque tiene dinero');
+
+  // Eliminarlo dos veces ya no encuentra nada.
+  const otra = await llamar(`/api/caja/conceptos/${id}/eliminar`, { method: 'POST', cuerpo: {} });
+  assert.equal(otra.estado, 404);
+});
+
+test('un cajero no puede eliminar conceptos', async () => {
+  await entrarAdmin();
+  const alta = await llamar('/api/caja/conceptos', {
+    method: 'POST', cuerpo: { nombre: 'Prueba de permiso', tipo: 'salida' } });
+  const id = alta.json.datos.concepto.id;
+
+  await crearUsuario('Caja Dos', 'cajero', '3434');
+  await entrarPorNombre('Caja Dos', '3434');
+  const r = await llamar(`/api/caja/conceptos/${id}/eliminar`, { method: 'POST', cuerpo: {} });
+  assert.equal(r.estado, 403, 'eliminar es del gerente o del administrador');
+  await entrarAdmin();
+});

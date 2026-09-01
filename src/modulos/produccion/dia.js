@@ -23,7 +23,7 @@ function panosDelDia(dia = null) {
            t.nombre            AS tanque,
            MIN(s.fecha)        AS empezo,
            MAX(s.fecha)        AS termino,
-           u.nombre            AS quien,
+           COALESCE(u.nombre, sp.ejecutor_libre) AS quien,
            sp.terminada_en,
            sp.notas,
            COUNT(*) FILTER (WHERE sm.resultado = 'ok')    AS buenas,

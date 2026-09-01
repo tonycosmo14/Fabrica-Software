@@ -416,6 +416,9 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
                             title="${c.activo ? 'Dejar de usarlo' : 'Volver a usarlo'}">
                       ${c.activo ? '🗑' : '↩'}
                     </button>
+                    ${c.activo ? '' : `
+                      <button class="secundario chico" data-eliminar="${esc(c.id)}"
+                              title="Borrarlo de esta lista para siempre. Sus gastos no se tocan.">✕</button>`}
                   </td>
                 </tr>`; }).join('')
                 || '<tr><td colspan="5">Todavía no hay ninguno.</td></tr>'}
@@ -440,6 +443,30 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
     pantalla.querySelectorAll('[data-baja]').forEach((b) => {
       b.onclick = () => cambiarBaja(conceptos.find((c) => c.id === b.dataset.baja));
     });
+    pantalla.querySelectorAll('[data-eliminar]').forEach((b) => {
+      b.onclick = () => eliminarConcepto(conceptos.find((c) => c.id === b.dataset.eliminar));
+    });
+  }
+
+  /**
+   * Borrarlo de la lista, ahora sí para siempre. NO borra registros: los
+   * gastos anotados con él siguen en el historial y en las estadísticas.
+   * Solo desaparece el renglón del catálogo, que era lo que estorbaba.
+   */
+  async function eliminarConcepto(c) {
+    if (!c) return;
+    if (!await confirmar({
+      titulo: `¿Borrar "${c.nombre}" de esta lista?`,
+      texto: 'Desaparece de aquí para siempre; ya no se puede recuperar con ↩. ' +
+             'Lo que se anotó con él NO se borra: sigue en el historial y sigue ' +
+             'sumando en las cuentas.',
+      ok: 'Borrarlo de la lista', peligro: true
+    })) return;
+    try {
+      await api.enviar(`/caja/conceptos/${c.id}/eliminar`, {});
+      avisar(`"${c.nombre}" ya no sale en la lista`, 'bien');
+      verConceptos();
+    } catch (e) { avisar(e.message, 'error'); }
   }
 
   /** El día 1 del mes en curso, en hora local. */

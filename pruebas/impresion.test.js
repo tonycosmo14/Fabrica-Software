@@ -552,3 +552,72 @@ test('un avance fuera de rango se rechaza, no se recorta en silencio', async () 
   assert.equal((await llamar('/api/impresion/config')).json.datos.impresion.avanceCorte, 4,
                'y lo que estaba puesto no se movió');
 });
+
+
+// ============================================================
+// EL TICKET EN PANTALLA  (v2.7.1)
+//
+// El ojito del historial enseña el ticket con forma de ticket. Los
+// renglones NO se arman aparte: son el espejo del mismo constructor que
+// imprime, así que lo que se ve en pantalla es lo que sale en papel.
+// ============================================================
+
+test('el espejo trae los mismos renglones que el papel, con su estilo', () => {
+  const t = new Ticket(80);
+  t.centro().negrita().tamano(2, 1).linea('HIELO LOLHA').normal();
+  t.izquierda().linea('renglón normal');
+  t.derecha().linea('$100');
+  const b = t.bytes();
+
+  assert.equal(b.anchoTicket, 48);
+  assert.deepEqual(b.espejo[0],
+    { t: 'HIELO LOLHA', alin: 'centro', negrita: true, anchoLetra: 2, altoLetra: 1 });
+  assert.deepEqual(b.espejo[1],
+    { t: 'renglón normal', alin: 'izquierda', negrita: false, anchoLetra: 1, altoLetra: 1 });
+  assert.equal(b.espejo[2].alin, 'derecha');
+});
+
+test('la previa de una venta devuelve el ticket como renglones', async () => {
+  await entrarAdmin();
+  const v = await llamar('/api/ventas', {
+    method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 16 }], pago: 500 } });
+  const venta = v.json.datos.venta;
+
+  const r = await llamar(`/api/impresion/venta/${venta.id}/previa`);
+  assert.equal(r.estado, 200);
+
+  const { renglones, ancho } = r.json.datos;
+  assert.equal(ancho, 48);
+  const todo = renglones.map((x) => x.t).join('\n');
+  assert.match(todo, new RegExp(venta.numero.replace('-', '\\-')), 'trae el folio');
+  assert.match(todo, /TOTAL/, 'trae el total');
+  assert.ok(renglones.some((x) => x.altoLetra > 1 || x.anchoLetra > 1),
+            'y la cantidad va en grande, igual que en el papel');
+  assert.ok(!renglones.length || renglones[renglones.length - 1].t.trim() !== '',
+            'los saltos del corte no llegan a la pantalla');
+});
+
+test('la previa de un gasto también, y la de algo inexistente es 404', async () => {
+  await entrarAdmin();
+  await llamar('/api/caja/abrir', { method: 'POST', cuerpo: { fondo: 200 } });
+  const g = await llamar('/api/caja/movimientos', {
+    method: 'POST', cuerpo: { tipo: 'salida', concepto: 'Gasolina', monto: 80 } });
+  const id = g.json.datos.movimientoId;
+
+  const r = await llamar(`/api/impresion/movimiento/${id}/previa`);
+  assert.equal(r.estado, 200);
+  assert.match(r.json.datos.renglones.map((x) => x.t).join('\n'), /GASOLINA/);
+
+  assert.equal((await llamar('/api/impresion/venta/nope/previa')).estado, 404);
+  assert.equal((await llamar('/api/impresion/movimiento/nope/previa')).estado, 404);
+});
+
+test('la previa no gasta papel: no imprime nada', async () => {
+  await entrarAdmin();
+  const v = await llamar('/api/ventas', {
+    method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 4 }], pago: 100 } });
+  limpiarPapel();
+  await llamar(`/api/impresion/venta/${v.json.datos.venta.id}/previa`);
+  assert.ok(!fs.existsSync(salida) || fs.readFileSync(salida).length === 0,
+            'la impresora no recibió un solo byte');
+});

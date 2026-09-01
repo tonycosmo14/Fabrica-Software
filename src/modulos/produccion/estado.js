@@ -142,7 +142,8 @@ function ultimoResultadoPorMolde(tanqueId) {
 /** Sacadas de paño empezadas y sin terminar en un tanque. */
 function panosEnProceso(tanqueId) {
   return bd.prepare(`
-    SELECT sp.*, p.numero AS pano_numero, u.nombre AS ejecutor_nombre
+    SELECT sp.*, p.numero AS pano_numero,
+           COALESCE(u.nombre, sp.ejecutor_libre) AS ejecutor_nombre
       FROM sacadas_pano sp
       JOIN panos p ON p.id = sp.pano_id
       LEFT JOIN usuarios u ON u.id = sp.ejecutor_id

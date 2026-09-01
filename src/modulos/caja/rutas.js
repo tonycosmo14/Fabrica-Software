@@ -251,16 +251,45 @@ router.get('/movimientos', verCaja, (req, res) => {
 /** Los conceptos que se pueden tocar. Los usa la caja al anotar un gasto. */
 router.get('/conceptos', verCaja, (req, res) => {
   const todos = req.query.todos === '1';
+  // Los ocultos no salen NUNCA, ni con todos=1: "eliminar" es para que el
+  // renglón deje de estorbar en la pantalla. Sus gastos viejos siguen
+  // sumando en las estadísticas y en el historial (regla 3.4).
   const lista = bd.prepare(`
     SELECT c.*,
            -- Cuántas veces se ha usado. Es lo que deja saber si un concepto
            -- se puede dar de baja sin que nadie lo extrañe.
            (SELECT COUNT(*) FROM movimientos_caja m WHERE m.concepto_id = c.id) AS usos
       FROM conceptos_gasto c
-     ${todos ? '' : 'WHERE c.activo = 1'}
+     WHERE c.oculto = 0 ${todos ? '' : 'AND c.activo = 1'}
      ORDER BY c.activo DESC, c.orden, c.nombre
   `).all();
   return ok(res, { conceptos: lista });
+});
+
+/**
+ * BORRARLO DE LA LISTA, ahora sí "para siempre".
+ *
+ * Dar de baja lo deja tachado en la pantalla de conceptos, por si vuelve
+ * (la temporada, el proveedor que regresa). Eliminar lo esconde del todo:
+ * ni activo ni tachado. Pero NO borra nada (regla 3.4): los gastos que se
+ * anotaron con él siguen en el historial y siguen sumando. Solo puede el
+ * gerente o el administrador, y queda en la bitácora quién fue.
+ */
+router.post('/conceptos/:id/eliminar', corregir, (req, res) => {
+  const c = bd.prepare('SELECT * FROM conceptos_gasto WHERE id = ? AND oculto = 0')
+    .get(req.params.id);
+  if (!c) return error(res, 'Ese concepto no existe.', 404);
+
+  bd.prepare('UPDATE conceptos_gasto SET oculto = 1, activo = 0, fecha_baja = COALESCE(fecha_baja, ?) WHERE id = ?')
+    .run(ahora(), c.id);
+
+  bitacora.registrar({
+    accion: 'caja.concepto_eliminado', entidad: 'concepto_gasto', entidadId: c.id,
+    ejecutorId: req.usuario.id,
+    detalle: { nombre: c.nombre, nota: 'Se ocultó de la lista; sus gastos siguen contando.' }
+  });
+
+  return ok(res, { eliminado: true });
 });
 
 /**

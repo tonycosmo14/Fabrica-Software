@@ -952,9 +952,18 @@ select { color-scheme: light dark; }
 }
 tr.anulada { opacity: .45; text-decoration: line-through; }
 
+/* EL PAÑO ES UNA SOLA FILA. Así está metido en el tanque —sus canastas una
+   al lado de la otra— y así se tiene que ver en la pantalla, para que quien
+   anota no se confunda de renglón. Si son muchas canastas, la fila se rueda
+   de lado dentro de su propia caja en vez de partirse en dos pisos. */
 @media (min-width: 760px) {
-  .canastas-merma { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-  .canastas-merma .tarjeta { max-width: none; margin-bottom: 0; }
+  .canastas-merma {
+    display: flex; flex-wrap: nowrap; gap: 12px;
+    overflow-x: auto; padding-bottom: 4px;
+  }
+  .canastas-merma .tarjeta {
+    flex: 1 1 0; min-width: fit-content; max-width: none; margin-bottom: 0;
+  }
 }
 
 @media (min-width: 620px) {
@@ -2071,6 +2080,15 @@ body.pantalla-fija main {
 .ancho-completo { max-width: none; }
 .ancho-completo .tarjeta, .ancho-completo .tabla { max-width: none; }
 
+/* Y merece también todo el ANCHO de la máquina en la que se mira: en una
+   laptop normal (1366–1600) la pantalla se usa completa; solo en un monitor
+   ultrapanorámico se pone tope y se centra, porque leer renglones de 3,000
+   píxeles de largo es peor que un margen. El tope lo pone el <main> cuando
+   la vista trae una tabla ancha adentro. */
+@media (min-width: 900px) {
+  main:has(.ancho-completo) { max-width: 1640px; }
+}
+
 /* ---------- La tabla del historial (v2.0) ----------
 
    UN RENGLÓN ES UNA LÍNEA. Nada se parte en dos, nada crece más que sus
@@ -2896,7 +2914,7 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 .luz-c-marq     { width: 124px; font-variant-numeric: tabular-nums; }
 .luz-c-marq small { display: block; font-size: 11px; color: var(--suave); }
 .luz-c-dif      { width: 92px; font-variant-numeric: tabular-nums; font-weight: 700; }
-.luz-c-acciones { width: 118px; white-space: nowrap; }
+.luz-c-acciones { width: 156px; white-space: nowrap; }
 .luz-c-acciones > div { display: flex; gap: 6px; justify-content: flex-end; }
 .luz-c-acciones .chico { flex: 0 0 auto; }
 
@@ -2915,3 +2933,50 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 .emp-tabla tr.anulada td:not(.emp-c-acciones),
 .emp-tabla-luz tr.anulada td:not(.luz-c-acciones) { text-decoration: line-through; }
 .emp-tabla td, .emp-tabla-luz td { height: auto; white-space: normal; }
+
+/* ============================================================
+   EL TICKET EN PANTALLA  (v2.7.1)
+
+   El ojito del historial enseña el ticket con su forma de ticket: los
+   renglones que manda el servidor son los MISMOS que van a la impresora.
+   El papel es blanco aunque el sistema esté en oscuro, porque es papel.
+   ============================================================ */
+
+.tira-envoltura { display: flex; justify-content: center; max-height: 55vh; overflow: auto; }
+.tira {
+  background: #fff; color: #191919;
+  font-family: 'Courier New', ui-monospace, Menlo, monospace;
+  font-size: 11.5px; line-height: 1.4;
+  width: calc(var(--cols, 48) * 1ch + 24px);
+  max-width: 100%;
+  padding: 14px 12px 18px;
+  border-radius: 3px;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, .25);
+  /* El borde de abajo, dentado como papel cortado. */
+  -webkit-mask-image: linear-gradient(#000 calc(100% - 7px), transparent calc(100% - 7px)),
+    radial-gradient(circle at 5px 100%, transparent 5px, #000 5px);
+  -webkit-mask-size: 100% 100%, 14px 8px;
+  -webkit-mask-position: top, bottom left;
+  -webkit-mask-repeat: no-repeat, repeat-x;
+  mask-image: linear-gradient(#000 calc(100% - 7px), transparent calc(100% - 7px)),
+    radial-gradient(circle at 5px 100%, transparent 5px, #000 5px);
+  mask-size: 100% 100%, 14px 8px;
+  mask-position: top, bottom left;
+  mask-repeat: no-repeat, repeat-x;
+}
+.tira-linea {
+  display: flex; align-items: flex-end;
+  min-height: calc(1.4em * var(--ay, 1));
+  overflow: hidden;
+}
+.tira-linea span {
+  white-space: pre;
+  transform: scale(var(--ax, 1), var(--ay, 1));
+  transform-origin: bottom left;
+}
+.tira-linea.alin-centro   { justify-content: center; }
+.tira-linea.alin-centro span   { transform-origin: bottom center; }
+.tira-linea.alin-derecha  { justify-content: flex-end; }
+.tira-linea.alin-derecha span  { transform-origin: bottom right; }
+.tira-linea .negra { font-weight: 700; }
+.tira-notas { margin-top: 12px; text-align: center; }

@@ -45,7 +45,7 @@ const TEMAS = [
   {
     id: 'produccion',
     titulo: 'Producción: sacar el hielo de los tanques',
-    busca: 'producción tanque paño canasta molde sacar rellenar rotación intercalado merma agua purificada potable congelación',
+    busca: 'producción tanque paño canasta molde sacar rellenar rotación intercalado merma agua purificada potable congelación quién lo sacó otro eventual nombre',
     cuerpo: `
       <h4>Cómo está armado un tanque</h4>
       <p>Un <b>tanque</b> tiene varios <b>paños</b>. Cada paño tiene
@@ -76,6 +76,16 @@ const TEMAS = [
       <p>El gerente y el administrador pueden imprimir <b>la lista de los
       números que tocan</b>, con tanque, fecha y hora. Se les entrega a los
       muchachos en la mañana y a las 3 te dicen qué sacaron.</p>
+
+      <h4>Quién lo sacó</h4>
+      <p>En la lista de "¿Quién lo sacó?" salen <b>solo los operarios</b>:
+      sacar paños es su trabajo. Cuando saca alguien más —un eventual de un
+      día, alguien que vino a ayudar, el patrón— se elige <b>Otro…</b> y se
+      escribe su nombre tal cual. Ese nombre queda guardado, y sus paños
+      cuentan a su nombre en el día, no al del cajero.</p>
+      <p class="ayuda-tip">Quién lo <b>anotó</b> no se pregunta nunca: es el
+      usuario que tiene la sesión abierta, y queda guardado siempre. Una cosa
+      es quién estuvo en la grúa y otra quién lo capturó.</p>
 
       <p class="ayuda-tip">Los obreros no capturan nada. Ellos sacan hielo y
       reportan; quien captura es quien recibe la existencia.</p>`
@@ -841,8 +851,11 @@ debería haber − contado = FALTA</pre>
       </ul>
       <p class="ayuda-tip">El mismo recibo <b>no se puede capturar dos
       veces</b>: duplicaría el gasto del año y partiría en dos los kWh por
-      marqueta. Si se capturó mal, se <b>anula</b> con su motivo y se vuelve a
-      hacer; el periodo queda libre otra vez.</p>
+      marqueta. Un dato mal tecleado se arregla con <b>✎ Corregir</b>: se
+      abre el formulario con lo capturado, se corrige y listo — por dentro el
+      renglón viejo queda anulado con la nota "corregido", para que siempre
+      se pueda ver qué decía antes. Y el <b>🗑</b> anula con su motivo, si el
+      recibo entero estaba de más.</p>
 
       <h4>La luz dentro del mes</h4>
       <p>Arriba, junto a lo gastado, sale la luz que le toca al mes. Como el
@@ -864,6 +877,15 @@ debería haber − contado = FALTA</pre>
       es un <b>gasto</b> (el dinero se va) o un <b>traspaso ⇄</b> (solo cambia
       de sitio), y los totales salen partidos en dos. El retiro a la caja
       fuerte viene marcado de fábrica.</p>
+
+      <h4>Los conceptos son suyos</h4>
+      <p>Con <b>＋ Nuevo concepto</b> se da de alta lo que haga falta —
+      llantas, un motor, lo que sea — con su unidad y su ritmo. Y desde
+      <b>Editar</b> un concepto se puede renombrar, dar de baja o
+      <b>borrar de la lista</b> (✕): desaparece del catálogo para siempre,
+      pero lo que ya se compró con él <b>no se borra</b> — sigue en la lista
+      de gastos, y en los meses donde tuvo compras su renglón se queda para
+      que la tabla cuadre.</p>
 
       <h4>Quién entra</h4>
       <p>El <b>gerente</b> ve todas estas cuentas. Capturarlas —gastos,
@@ -917,9 +939,11 @@ debería haber − contado = FALTA</pre>
 
       <h4>Los botones de cada renglón</h4>
       <ul>
-        <li><b>👁</b> — enseña el movimiento entero: sus renglones, su
-        cliente, su motivo. La columna de "se llevó" va recortada porque es
-        la que más ocupa y la que menos se lee.</li>
+        <li><b>👁</b> — enseña el <b>ticket con forma de ticket</b>: papel
+        blanco, la misma letra y los mismos renglones que salen por la
+        impresora. No es una imagen, así que abre al instante, y desde ahí
+        mismo se saca la copia. Si el renglón no tiene ticket (un abono),
+        sale el resumen de texto.</li>
         <li><b>Copia</b> — vuelve a imprimir el ticket con <b>** COPIA **</b>
         hasta arriba. Lo puede cualquiera.</li>
         <li><b>⋯</b> — cancelar o eliminar. Solo el administrador; a los
@@ -940,7 +964,7 @@ debería haber − contado = FALTA</pre>
   {
     id: 'borrar',
     titulo: 'Dar de baja o eliminar',
-    busca: 'borrar eliminar dar de baja recuperar producto categoría cliente gasto contraseña administrador temporada',
+    busca: 'borrar eliminar dar de baja recuperar producto categoría cliente gasto concepto lista contraseña administrador temporada',
     cuerpo: `
       <p>Son <b>dos cosas distintas</b>, y elegir bien evita problemas:</p>
 
@@ -960,6 +984,15 @@ debería haber − contado = FALTA</pre>
       borrarlo dejaría el histórico mintiendo. El sistema te lo dice y te
       manda a darlo de baja. Lo mismo con un cliente que ya se llevó algo
       fiado, y con una categoría que todavía tiene productos dentro.</p>
+
+      <h4>Los conceptos: borrarlos de la lista</h4>
+      <p>Los <b>conceptos</b> —los gastos que se repiten de la caja y los
+      gastos grandes de la empresa— tienen un tercer camino: <b>✕ borrarlo de
+      la lista</b>. El renglón desaparece del catálogo para siempre, aunque
+      ya se haya usado, porque lo que se borra es <b>el botón, no los
+      registros</b>: los gastos anotados con él siguen en el historial y
+      siguen sumando en las cuentas. Lo puede hacer el gerente o el
+      administrador.</p>
 
       <h4>Pide la contraseña, no el PIN</h4>
       <p>Y solo la del <b>administrador</b>. El PIN se teclea veinte veces al

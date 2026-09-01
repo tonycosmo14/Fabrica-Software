@@ -21,7 +21,7 @@
  */
 import { api } from '../api.js';
 import { esc, avisar, fecha as formatoFecha } from '../util.js';
-import { pedirTexto, confirmar, pedirContrasena, menu } from '../dialogo.js';
+import { pedirTexto, confirmar, pedirContrasena, menu, verTicket } from '../dialogo.js';
 import { pesos } from '../fracciones.js';
 
 const TIPOS = [
@@ -383,15 +383,34 @@ export async function vistaHistorial(pantalla, estadoApp) {
     const m = movimientos.find((x) => x.id === id);
     if (!m) return;
 
-    // De una venta se piden sus renglones: es lo único que la lista no trae
-    // y es justo lo que se quiere ver.
-    let lineas = null;
-    if (m.tipo === 'venta') {
-      try { lineas = (await api.obtener(`/ventas/${m.id}`)).venta?.lineas || []; }
-      catch { lineas = null; }
+    // EL TICKET CON FORMA DE TICKET. El servidor manda los mismos renglones
+    // que irían a la impresora y aquí se pintan sobre papel simulado: tiene
+    // más información que un resumen y ya se sabe leer. No es una imagen:
+    // son datos, y carga al instante.
+    const q = m.que || {};
+    try {
+      const ruta = m.tipo === 'venta'
+        ? `/impresion/venta/${m.id}/previa`
+        : `/impresion/movimiento/${m.id}/previa`;
+      const { renglones, ancho } = await api.obtener(ruta);
+
+      const notas = [
+        m.quien ? `Lo anotó ${m.quien}` : '',
+        m.cancelada_en ? `✕ Cancelado: ${m.motivo_cancelacion || 'sin motivo'}` : ''
+      ].filter(Boolean);
+
+      const accion = await verTicket({
+        titulo: m.numero ? `Ticket ${m.numero}` : q.texto || 'Movimiento',
+        renglones, ancho, notas,
+        acciones: m.tipo === 'venta' ? [{ valor: 'copia', texto: '🖨 Copia' }] : []
+      });
+      if (accion === 'copia') sacarCopia(m.id);
+      return;
+    } catch {
+      // Si no hay ticket que enseñar (un abono, un registro muy viejo), se
+      // cae al resumen de texto de siempre.
     }
 
-    const q = m.que || {};
     await menu({
       titulo: m.numero ? `Ticket ${m.numero}` : q.texto || 'Movimiento',
       texto: [
@@ -400,9 +419,7 @@ export async function vistaHistorial(pantalla, estadoApp) {
         m.quien ? `Lo hizo ${m.quien}` : '',
         m.turno ? `Turno #${m.turno}` : '',
         m.cliente ? `Cliente: ${m.cliente}` : '',
-        lineas?.length
-          ? lineas.map((l) => `· ${l.cantidad > 1 ? l.cantidad + ' × ' : ''}${l.concepto} — ${pesos(l.precio_centavos)}`).join('\n')
-          : (m.detalle || ''),
+        m.detalle || '',
         `Importe: ${pesos(m.centavos)}`,
         m.cancelada_en ? `Cancelado: ${m.motivo_cancelacion || 'sin motivo'}` : ''
       ].filter(Boolean).join('\n'),

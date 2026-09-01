@@ -314,8 +314,54 @@ export function pedirImporte({ titulo, texto = '', valor = '', marcador = '0.00'
  * meter un salto de línea. Para un nombre o un concepto corto, el salto de
  * línea nunca es lo que se quería.
  */
+/**
+ * EL TICKET EN PANTALLA.
+ *
+ * Pinta los renglones tal como los armó la impresora —el "espejo" que
+ * devuelve el servidor—: misma letra de máquina, misma alineación, mismos
+ * tamaños (la térmica estira las letras, y aquí se estiran con transform).
+ * El papel es blanco aunque el sistema esté en oscuro: es papel.
+ */
+export function verTicket({ titulo = 'Ticket', renglones = [], ancho = 48,
+                            notas = [], acciones = [] }) {
+  return new Promise((resolver) => {
+    const linea = (r) => {
+      const escapado = String(r.t)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return `
+        <div class="tira-linea alin-${r.alin || 'izquierda'}"
+             style="--ax:${r.anchoLetra || 1};--ay:${r.altoLetra || 1}">
+          <span class="${r.negrita ? 'negra' : ''}">${escapado || ' '}</span>
+        </div>`;
+    };
+
+    const { caja, salir } = montar(`
+      <h3 class="dialogo-titulo">${titulo}</h3>
+      <div class="tira-envoltura">
+        <div class="tira" style="--cols:${Number(ancho) || 48}">
+          ${renglones.map(linea).join('')}
+        </div>
+      </div>
+      ${notas.length
+        ? `<p class="dialogo-texto tira-notas">${notas.map((n) => String(n)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')).join('<br>')}</p>`
+        : ''}
+      <div class="dialogo-botones">
+        ${acciones.map((a) => `
+          <button class="secundario" data-accion="${a.valor}">${a.texto}</button>`).join('')}
+        <button data-si>Cerrar</button>
+      </div>`, resolver);
+
+    caja.querySelector('[data-si]').onclick = () => salir(null);
+    caja.querySelectorAll('[data-accion]').forEach((b) => {
+      b.onclick = () => salir(b.dataset.accion);
+    });
+  });
+}
+
 export function pedirTexto({ titulo, texto = '', valor = '', marcador = '',
-                             ok = 'Guardar', largo = 200, unaLinea = false }) {
+                             ok = 'Guardar', largo = 200, unaLinea = false,
+                             opcional = false }) {
   return new Promise((resolver) => {
     // Un campo corto se escribe en un renglón; ahí enter acepta.
     const corto = unaLinea || largo <= 60;
@@ -338,7 +384,9 @@ export function pedirTexto({ titulo, texto = '', valor = '', marcador = '',
 
     const enviar = () => {
       const v = campo.value.trim();
-      if (!v) { campo.focus(); return; }
+      // Un campo opcional se puede dejar vacío: se entrega '' y quien lo
+      // pidió decide qué hacer. null sigue significando "canceló".
+      if (!v && !opcional) { campo.focus(); return; }
       salir(v);
     };
 

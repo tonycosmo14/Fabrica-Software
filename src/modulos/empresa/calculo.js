@@ -72,7 +72,12 @@ function porConcepto({ desde = null, hasta = null } = {}) {
 
   const conceptos = bd.prepare(
     'SELECT * FROM conceptos_empresa ORDER BY activo DESC, orden, nombre'
-  ).all();
+  ).all()
+    // Un concepto eliminado desaparece de la tabla… salvo que tenga dinero
+    // en el periodo que se está mirando: entonces su renglón se queda, para
+    // que la tabla siga cuadrando con el total de abajo. Eliminar esconde
+    // el botón, no las compras que ya se hicieron (regla 3.4).
+    .filter((c) => !c.oculto || (porId.get(c.id)?.veces > 0));
 
   return conceptos.map((c) => {
     const e = porId.get(c.id);

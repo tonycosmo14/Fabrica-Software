@@ -42,12 +42,21 @@ const registrar = exigirPermiso('produccion.registrar');
 const RESULTADOS = ['ok', 'merma', 'hueco'];
 const TIPOS_AGUA = ['purificada', 'potable'];
 
-/** Quién lo hizo físicamente: puede ser otro obrero distinto de quien captura. */
-function resolverEjecutor(req) {
+/**
+ * Quién lo hizo físicamente: puede ser otro obrero distinto de quien captura,
+ * o alguien sin usuario —un eventual de un día, el dueño— cuyo nombre llega
+ * escrito en ejecutorNombre. En ese caso el id queda vacío y el nombre se
+ * copia al registro (regla 3.5); el capturista sigue siendo la sesión (3.6).
+ */
+function resolverQuien(req) {
   const pedido = req.body?.ejecutorId;
-  if (!pedido || pedido === req.usuario.id) return req.usuario.id;
-  const existe = bd.prepare('SELECT 1 FROM usuarios WHERE id = ? AND activo = 1').get(pedido);
-  return existe ? pedido : req.usuario.id;
+  if (pedido) {
+    const existe = bd.prepare('SELECT 1 FROM usuarios WHERE id = ? AND activo = 1').get(pedido);
+    if (existe) return { id: pedido, libre: null };
+  }
+  const nombre = String(req.body?.ejecutorNombre || '').trim().slice(0, 40);
+  if (nombre) return { id: null, libre: nombre };
+  return { id: req.usuario.id, libre: null };
 }
 
 /** Comprobar el PIN de quien autoriza. El ayudante vive en lib. */
@@ -143,10 +152,13 @@ router.get('/siguientes', exigirPermiso('produccion.numeros'), (req, res) => {
 
 /** Obreros a los que se les puede atribuir el trabajo. */
 router.get('/obreros', verProduccion, (req, res) => {
+  // Solo los operarios: sacar paños es su trabajo. Cuando saca alguien más
+  // —un eventual, el dueño— su nombre se escribe con la opción "Otro" y se
+  // guarda tal cual; darlo de alta como usuario para un día no tiene caso.
   const obreros = bd.prepare(`
     SELECT id, nombre, rol FROM usuarios
-     WHERE activo = 1 AND rol IN ('operario','cajero','gerente','admin')
-     ORDER BY CASE rol WHEN 'operario' THEN 0 ELSE 1 END, nombre
+     WHERE activo = 1 AND rol = 'operario'
+     ORDER BY nombre
   `).all();
   return ok(res, { obreros });
 });
@@ -236,7 +248,11 @@ router.post('/panos/:id/sacar', registrar, (req, res) => {
   }
 
   const fecha = ahora();
-  const ejecutorId = resolverEjecutor(req);
+  const quien = resolverQuien(req);
+  // En los renglones hijos (sacadas, rellenados) el responsable con usuario:
+  // el ejecutor si lo hay, si no el capturista. El nombre escrito vive en
+  // sacadas_pano, que es el registro del paño.
+  const ejecutorId = quien.id || req.usuario.id;
 
   // --- ¿Continúa una sacada a medias, o empieza una nueva? ---
   let sacadaPano = bd.prepare(
@@ -249,10 +265,10 @@ router.post('/panos/:id/sacar', registrar, (req, res) => {
     if (!sacadaPano) {
       const id = nuevoId();
       bd.prepare(`
-        INSERT INTO sacadas_pano (id, pano_id, iniciada_en, ejecutor_id, capturista_id,
-                                  autorizada_por, motivo_orden, notas)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(id, pano.id, fecha, ejecutorId, req.usuario.id,
+        INSERT INTO sacadas_pano (id, pano_id, iniciada_en, ejecutor_id, ejecutor_libre,
+                                  capturista_id, autorizada_por, motivo_orden, notas)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(id, pano.id, fecha, quien.id, quien.libre, req.usuario.id,
              autorizadaPor, motivo || null, req.body?.notas || null);
       sacadaPano = { id, pano_id: pano.id };
     }
@@ -360,7 +376,8 @@ router.post('/panos/:id/rellenar', registrar, (req, res) => {
   if (!fuera.length) return error(res, 'Ese paño no tiene canastas fuera del tanque.', 409);
 
   const fecha = ahora();
-  const ejecutorId = resolverEjecutor(req);
+  const quien = resolverQuien(req);
+  const ejecutorId = quien.id || req.usuario.id;
 
   const guardar = bd.transaction(() => {
     const insertar = bd.prepare(`
@@ -403,7 +420,8 @@ router.post('/lote', registrar, (req, res) => {
     return error(res, 'Indica si se rellenó con agua purificada o potable.');
   }
 
-  const ejecutorId = resolverEjecutor(req);
+  const quien = resolverQuien(req);
+  const ejecutorId = quien.id || req.usuario.id;
   const fecha = ahora();
   const hechos = [];
   let marquetas = 0;
@@ -429,10 +447,10 @@ router.post('/lote', registrar, (req, res) => {
       const sacadaPanoId = nuevoId();
       bd.prepare(`
         INSERT INTO sacadas_pano (id, pano_id, iniciada_en, terminada_en,
-                                  ejecutor_id, capturista_id, autorizada_por,
-                                  motivo_orden, notas)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(sacadaPanoId, pano.id, fecha, fecha, ejecutorId, req.usuario.id,
+                                  ejecutor_id, ejecutor_libre, capturista_id,
+                                  autorizada_por, motivo_orden, notas)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(sacadaPanoId, pano.id, fecha, fecha, quien.id, quien.libre, req.usuario.id,
              permiso?.usuarioId || null, permiso?.motivo || null,
              req.body?.notas || 'Capturado en lote al final de la jornada');
 
@@ -561,22 +579,30 @@ router.get('/hoy', verProduccion, (req, res) => {
      WHERE s.fecha >= ? AND sm.resultado IN ('merma','hueco')
   `).get(desde).n;
 
+  // Los de nombre escrito ("Otro") también cuentan aquí, agrupados por su
+  // nombre: si Juan el eventual sacó tres paños, sus tres paños son suyos,
+  // no del cajero que los capturó.
   const porObrero = bd.prepare(`
-    SELECT u.nombre, COUNT(DISTINCT sp.id) AS panos,
+    SELECT COALESCE(u.nombre, sp.ejecutor_libre, '—') AS nombre,
+           COUNT(DISTINCT sp.id) AS panos,
            (SELECT COUNT(*) FROM sacadas_moldes sm
               JOIN sacadas s ON s.id = sm.sacada_id
-             WHERE s.sacada_pano_id IN (
-                     SELECT id FROM sacadas_pano WHERE ejecutor_id = u.id AND iniciada_en >= ?)
+              JOIN sacadas_pano sp2 ON sp2.id = s.sacada_pano_id
+             WHERE COALESCE(sp2.ejecutor_id, 'L:' || sp2.ejecutor_libre)
+                   = COALESCE(sp.ejecutor_id, 'L:' || sp.ejecutor_libre)
+               AND sp2.iniciada_en >= ?
                AND sm.resultado = 'ok') AS marquetas
       FROM sacadas_pano sp
-      JOIN usuarios u ON u.id = sp.ejecutor_id
+      LEFT JOIN usuarios u ON u.id = sp.ejecutor_id
      WHERE sp.iniciada_en >= ?
-     GROUP BY u.id ORDER BY marquetas DESC
+     GROUP BY COALESCE(sp.ejecutor_id, 'L:' || sp.ejecutor_libre)
+     ORDER BY marquetas DESC
   `).all(desde, desde);
 
   const panos = bd.prepare(`
     SELECT sp.id, sp.iniciada_en, sp.terminada_en, sp.notas,
-           t.nombre AS tanque, p.numero AS pano, u.nombre AS quien,
+           t.nombre AS tanque, p.numero AS pano,
+           COALESCE(u.nombre, sp.ejecutor_libre) AS quien,
            sp.autorizada_por, sp.motivo_orden,
            (SELECT COUNT(*) FROM sacadas_moldes sm
               JOIN sacadas s ON s.id = sm.sacada_id

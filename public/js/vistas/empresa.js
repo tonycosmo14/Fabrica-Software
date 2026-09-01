@@ -152,6 +152,10 @@ export async function vistaEmpresa(pantalla, estadoApp) {
         </div>
       </div>
 
+      ${puedeCapturar
+        ? '<button class="secundario" id="nuevo-concepto-emp" style="margin-top:12px">＋ Nuevo concepto</button>'
+        : ''}
+
       <p class="ayuda" style="margin-top:12px">
         <b>Por unidad</b> es lo que costó cada barril, cada saco o cada
         cilindro este mes. Es el número que dice si el proveedor te está
@@ -326,7 +330,9 @@ export async function vistaEmpresa(pantalla, estadoApp) {
                   href="/api/empresa/cfe/${esc(r.id)}/archivo">📄 Ver</a>`
             : '<small class="vacio-folio">sin PDF</small>'}
           ${puedeCapturar && !r.anulado_en
-            ? `<button class="secundario chico" data-anular-recibo="${esc(r.id)}"
+            ? `<button class="secundario chico" data-corregir-recibo="${esc(r.id)}"
+                       title="Corregir este recibo">✎</button>
+               <button class="secundario chico" data-anular-recibo="${esc(r.id)}"
                        title="Anular este recibo">🗑</button>` : ''}
         </div></td>
       </tr>`;
@@ -352,6 +358,9 @@ export async function vistaEmpresa(pantalla, estadoApp) {
     const nuevoGasto = q('#nuevo-gasto');
     if (nuevoGasto) nuevoGasto.onclick = () => formularioGasto();
 
+    const nuevoConc = q('#nuevo-concepto-emp');
+    if (nuevoConc) nuevoConc.onclick = () => nuevoConcepto();
+
     const nuevoRecibo = q('#nuevo-recibo');
     if (nuevoRecibo) nuevoRecibo.onclick = () => formularioRecibo();
 
@@ -361,6 +370,10 @@ export async function vistaEmpresa(pantalla, estadoApp) {
     });
     pantalla.querySelectorAll('[data-editar-concepto]').forEach((b) => {
       b.onclick = () => editarConcepto(datos.conceptos.find((c) => c.id === b.dataset.editarConcepto));
+    });
+    pantalla.querySelectorAll('[data-corregir-recibo]').forEach((b) => {
+      b.onclick = () => formularioRecibo(
+        datos.recibos?.find((r) => r.id === b.dataset.corregirRecibo));
     });
     pantalla.querySelectorAll('[data-anular-recibo]').forEach((b) => {
       b.onclick = () => anularRecibo(b.dataset.anularRecibo);
@@ -466,6 +479,38 @@ export async function vistaEmpresa(pantalla, estadoApp) {
     });
   }
 
+  /** Dar de alta un concepto nuevo: nombre, en qué se compra y su ritmo. */
+  async function nuevoConcepto() {
+    const nombre = await pedirTexto({
+      titulo: 'Nuevo gasto grande',
+      texto: 'Cómo se llama lo que se compra: Amoniaco, Sal, Llantas…',
+      marcador: 'Amoniaco', ok: 'Siguiente', largo: 40, unaLinea: true
+    });
+    if (!nombre) return;
+
+    const unidad = await pedirTexto({
+      titulo: nombre,
+      texto: '¿En qué se compra? Barril, saco, cilindro, kilo, pieza, servicio… ' +
+             'Con esto el sistema saca el precio POR UNIDAD. Se puede dejar vacío.',
+      marcador: 'barril', ok: 'Siguiente', largo: 20, unaLinea: true, opcional: true
+    });
+    if (unidad === null) return;
+
+    const cadaDias = await pedirTexto({
+      titulo: nombre,
+      texto: 'Cada cuántos días se suele comprar, para avisar cuando toque. ' +
+             'Si no tiene ritmo, se deja vacío y el sistema lo aprende solo.',
+      marcador: '90', ok: 'Crear', largo: 4, unaLinea: true, opcional: true
+    });
+    if (cadaDias === null) return;
+
+    try {
+      await api.enviar('/empresa/conceptos', { nombre, unidad, cadaDias });
+      avisar(`"${nombre}" ya se puede capturar`, 'bien');
+      await pintar();
+    } catch (e) { avisar(e.message, 'error'); }
+  }
+
   async function editarConcepto(c) {
     if (!c) return;
     const que = await menu({
@@ -479,7 +524,9 @@ export async function vistaEmpresa(pantalla, estadoApp) {
         { valor: 'ritmo', texto: '📅 Cada cuánto se compra',
           detalle: c.cadaDias ? `Ahora: cada ${c.cadaDias} días` : 'Para saber cuándo toca' },
         { valor: 'baja', texto: c.activo ? '🗑 Dejar de usarlo' : '↩ Volver a usarlo',
-          detalle: 'No borra nada de lo ya comprado', peligro: c.activo }
+          detalle: 'No borra nada de lo ya comprado' },
+        { valor: 'eliminar', texto: '✕ Borrarlo de esta lista',
+          detalle: 'Para siempre. Lo ya comprado sigue contando', peligro: true }
       ]
     });
     if (!que) return;
@@ -516,6 +563,14 @@ export async function vistaEmpresa(pantalla, estadoApp) {
           ok: 'Dar de baja', peligro: true
         })) return;
         await api.actualizar(`/empresa/conceptos/${c.id}`, { activo: !c.activo });
+      } else if (que === 'eliminar') {
+        if (!await confirmar({
+          titulo: `¿Borrar "${c.nombre}" de esta lista?`,
+          texto: 'Desaparece de aquí para siempre. Lo que ya se compró con él NO ' +
+                 'se borra: sigue en la lista de gastos y sigue sumando en el mes.',
+          ok: 'Borrarlo de la lista', peligro: true
+        })) return;
+        await api.enviar(`/empresa/conceptos/${c.id}/eliminar`, {});
       }
       avisar('Guardado', 'bien');
       await pintar();
@@ -615,7 +670,8 @@ export async function vistaEmpresa(pantalla, estadoApp) {
 
             <label>
               <span class="etiqueta-chica">Notas</span>
-              <input id="notas" maxlength="300" placeholder="Lo que haga falta recordar">
+              <input id="notas" maxlength="300" placeholder="Lo que haga falta recordar"
+                     value="${esc(corregir?.notas || '')}">
             </label>
 
             <label class="subir" for="archivo" style="margin-top:14px">
@@ -681,11 +737,17 @@ export async function vistaEmpresa(pantalla, estadoApp) {
     };
   }
 
-  async function formularioRecibo() {
+  async function formularioRecibo(corregir = null) {
     pantalla.innerHTML = `
       <div class="ancho-completo">
         <button class="secundario chico" id="volver">‹ Las cuentas</button>
-        <h2 style="margin-top:14px">Capturar un recibo de luz</h2>
+        <h2 style="margin-top:14px">${corregir ? 'Corregir el recibo' : 'Capturar un recibo de luz'}</h2>
+        ${corregir ? `
+          <p class="ayuda">
+            El renglón viejo no se retoca: queda <b>anulado</b> con la nota
+            "corregido" y se guarda el bueno. Así siempre se puede ver qué
+            decía antes. El papel adjunto se queda, salvo que subas otro.
+          </p>` : ''}
         <p class="ayuda">
           Las fechas son las que vienen <b>impresas en el recibo</b>, no las
           del mes del negocio. Con esas se hacen las cuentas, porque son las
@@ -697,23 +759,26 @@ export async function vistaEmpresa(pantalla, estadoApp) {
             <div class="emp-campos">
               <label>
                 <span class="etiqueta-chica">Del día<small>lo dice el recibo</small></span>
-                <input id="desde" type="date" required>
+                <input id="desde" type="date" required value="${esc(corregir?.desde || '')}">
               </label>
               <label>
                 <span class="etiqueta-chica">Al día</span>
-                <input id="hasta" type="date" required>
+                <input id="hasta" type="date" required value="${esc(corregir?.hasta || '')}">
               </label>
               <label>
                 <span class="etiqueta-chica">Kilowatts (kWh)</span>
-                <input id="kwh" inputmode="numeric" required placeholder="8450">
+                <input id="kwh" inputmode="numeric" required placeholder="8450"
+                       value="${corregir ? corregir.kwh : ''}">
               </label>
               <label>
                 <span class="etiqueta-chica">Cuánto cobraron</span>
-                <input id="monto" inputmode="decimal" required placeholder="42350">
+                <input id="monto" inputmode="decimal" required placeholder="42350"
+                       value="${corregir ? (corregir.centavos / 100) : ''}">
               </label>
               <label>
                 <span class="etiqueta-chica">Número de servicio o recibo</span>
-                <input id="numero" maxlength="40" placeholder="Para buscarlo con la CFE">
+                <input id="numero" maxlength="40" placeholder="Para buscarlo con la CFE"
+                       value="${esc(corregir?.numero || '')}">
               </label>
             </div>
 
@@ -731,7 +796,9 @@ export async function vistaEmpresa(pantalla, estadoApp) {
               <b>datos</b> y no se pierde al actualizar.
             </p>
 
-            <button type="submit" style="margin-top:20px">Guardar el recibo</button>
+            <button type="submit" style="margin-top:20px">
+              ${corregir ? 'Guardar la corrección' : 'Guardar el recibo'}
+            </button>
           </form>
         </div>
       </div>`;
@@ -753,14 +820,16 @@ export async function vistaEmpresa(pantalla, estadoApp) {
 
     q('#f').onsubmit = async (ev) => {
       ev.preventDefault();
+      const cuerpo = {
+        desde: q('#desde').value, hasta: q('#hasta').value,
+        kwh: q('#kwh').value, monto: q('#monto').value,
+        numero: q('#numero').value, notas: q('#notas').value,
+        ...(archivo ? { archivo } : {})
+      };
       try {
-        await api.enviar('/empresa/cfe', {
-          desde: q('#desde').value, hasta: q('#hasta').value,
-          kwh: q('#kwh').value, monto: q('#monto').value,
-          numero: q('#numero').value, notas: q('#notas').value,
-          ...(archivo ? { archivo } : {})
-        });
-        avisar('Recibo guardado', 'bien');
+        if (corregir) await api.actualizar(`/empresa/cfe/${corregir.id}`, cuerpo);
+        else await api.enviar('/empresa/cfe', cuerpo);
+        avisar(corregir ? 'Recibo corregido' : 'Recibo guardado', 'bien');
         seccion = 'luz';
         await pintar();
       } catch (e) { avisar(e.message, 'error'); }

@@ -486,3 +486,58 @@ test('anular exige motivo', async () => {
   });
   assert.equal(r.estado, 400);
 });
+
+
+// ============================================================
+// QUIÉN LO SACÓ CUANDO NO ES DE LA CASA  (v2.7.1)
+// ============================================================
+
+test('la lista de quién lo sacó trae solo operarios', async () => {
+  await entrarAdmin();
+  const { obreros } = (await llamar('/api/produccion/obreros')).json.datos;
+  assert.ok(obreros.length >= 1);
+  assert.ok(obreros.every((o) => o.rol === 'operario'),
+            'sacar paños es trabajo de operario; los demás van por "Otro"');
+});
+
+test('un eventual sin usuario queda con su nombre, y el capturista con el suyo', async () => {
+  await entrarAdmin();
+  const d = await estadoTanque();
+  const pano = d.tanque.siguiente;
+
+  const r = await llamar(`/api/produccion/panos/${pano.id}/sacar`, {
+    method: 'POST',
+    cuerpo: { tipoAgua: 'purificada', ejecutorNombre: 'Juan el eventual' }
+  });
+  assert.equal(r.estado, 201);
+
+  const sp = bd.prepare(
+    'SELECT * FROM sacadas_pano ORDER BY iniciada_en DESC, rowid DESC LIMIT 1'
+  ).get();
+  assert.equal(sp.ejecutor_libre, 'Juan el eventual');
+  assert.equal(sp.ejecutor_id, null, 'no se le cuelga el paño a nadie con usuario');
+  assert.ok(sp.capturista_id, 'pero siempre queda quién lo anotó (regla 3.6)');
+
+  // Y en el día aparece con su nombre, no en blanco ni a nombre del cajero.
+  const hoy = (await llamar('/api/produccion/hoy')).json.datos;
+  const suyo = hoy.porObrero.find((o) => o.nombre === 'Juan el eventual');
+  assert.ok(suyo, 'el eventual tiene su renglón en el día');
+  assert.equal(suyo.panos, 1);
+  assert.ok(hoy.panos.some((p) => p.quien === 'Juan el eventual'));
+});
+
+test('si mandan un ejecutorId inválido y un nombre, gana el nombre', async () => {
+  await entrarAdmin();
+  const d = await estadoTanque();
+  const pano = d.tanque.siguiente;
+
+  const r = await llamar(`/api/produccion/panos/${pano.id}/sacar`, {
+    method: 'POST',
+    cuerpo: { tipoAgua: 'purificada', ejecutorId: 'no-existe', ejecutorNombre: 'El patrón' }
+  });
+  assert.equal(r.estado, 201);
+  const sp = bd.prepare(
+    'SELECT * FROM sacadas_pano ORDER BY iniciada_en DESC, rowid DESC LIMIT 1'
+  ).get();
+  assert.equal(sp.ejecutor_libre, 'El patrón');
+});

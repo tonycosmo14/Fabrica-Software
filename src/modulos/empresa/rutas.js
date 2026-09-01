@@ -111,9 +111,11 @@ router.put('/periodos', administrar, (req, res) => {
 router.get('/conceptos', ver, (req, res) => {
   const todos = req.query.todos === '1';
   return ok(res, {
+    // Los ocultos no salen ni con todos=1: "eliminar" los saca de esta
+    // pantalla para siempre. Sus compras viejas siguen contando.
     conceptos: bd.prepare(`
       SELECT * FROM conceptos_empresa
-       ${todos ? '' : 'WHERE activo = 1'}
+       WHERE oculto = 0 ${todos ? '' : 'AND activo = 1'}
        ORDER BY activo DESC, orden, nombre
     `).all()
   });
@@ -153,6 +155,30 @@ router.post('/conceptos', administrar, (req, res) => {
   });
 
   return ok(res, { concepto: bd.prepare('SELECT * FROM conceptos_empresa WHERE id = ?').get(id) }, 201);
+});
+
+/**
+ * BORRARLO DE LA LISTA. Igual que en los conceptos de la caja: eliminar lo
+ * esconde del catálogo para siempre, pero NO borra nada (regla 3.4). Las
+ * facturas que se capturaron con él siguen en la lista de gastos, siguen
+ * sumando en el total del mes, y si tienen dinero en el periodo que se está
+ * mirando, su renglón sigue saliendo en la tabla de "en qué se fue".
+ */
+router.post('/conceptos/:id/eliminar', administrar, (req, res) => {
+  const c = bd.prepare('SELECT * FROM conceptos_empresa WHERE id = ? AND oculto = 0')
+    .get(req.params.id);
+  if (!c) return error(res, 'Ese concepto no existe.', 404);
+
+  bd.prepare('UPDATE conceptos_empresa SET oculto = 1, activo = 0, fecha_baja = COALESCE(fecha_baja, ?) WHERE id = ?')
+    .run(ahora(), c.id);
+
+  bitacora.registrar({
+    accion: 'empresa.concepto_eliminado', entidad: 'concepto_empresa', entidadId: c.id,
+    ejecutorId: req.usuario.id,
+    detalle: { nombre: c.nombre, nota: 'Se ocultó del catálogo; sus compras siguen contando.' }
+  });
+
+  return ok(res, { eliminado: true });
 });
 
 /**
@@ -458,6 +484,81 @@ router.post('/cfe', administrar, (req, res) => {
   });
 
   return ok(res, { recibo: calculo.recibo(id) }, 201);
+});
+
+/**
+ * CORREGIR UN RECIBO capturado con un dato mal.
+ *
+ * No se retoca el renglón (regla 3.2: los registros no se editan por
+ * debajo): se ANULA el viejo con el motivo "corregido" y se captura el
+ * bueno, las dos cosas en una sola transacción para que no pueda quedar el
+ * periodo sin recibo si algo falla a la mitad. El papel adjunto se hereda
+ * salvo que venga uno nuevo, y en la bitácora quedan el viejo y el nuevo.
+ */
+router.put('/cfe/:id', administrar, (req, res) => {
+  const viejo = bd.prepare('SELECT * FROM recibos_cfe WHERE id = ?').get(req.params.id);
+  if (!viejo) return error(res, 'Ese recibo no existe.', 404);
+  if (viejo.anulado_en) return error(res, 'Ese recibo está anulado; captura uno nuevo.');
+
+  const desde = leerDia(req.body?.desde);
+  const hasta = leerDia(req.body?.hasta);
+  if (!desde || !hasta) {
+    return error(res, 'Escribe las dos fechas del recibo, las que vienen impresas.');
+  }
+  if (hasta <= desde) return error(res, 'La fecha de fin va después de la de inicio.');
+  if (calculo.diasEntre(desde, hasta) > 200) {
+    return error(res, 'Ese periodo es de más de seis meses. Revisa las fechas.');
+  }
+
+  const kwh = Math.round(Number(req.body?.kwh));
+  if (!Number.isFinite(kwh) || kwh <= 0 || kwh > 100000000) {
+    return error(res, 'Escribe los kilowatts que dice el recibo.');
+  }
+
+  const centavos = leerCentavos(req.body?.monto);
+  if (centavos === null || centavos === 0) return error(res, 'Escribe cuánto cobraron.');
+
+  // El periodo nuevo no puede chocar con OTRO recibo vivo (el propio no
+  // cuenta: es el que se está corrigiendo).
+  const choca = bd.prepare(`
+    SELECT id FROM recibos_cfe
+     WHERE desde = ? AND hasta = ? AND anulado_en IS NULL AND id <> ?
+  `).get(desde, hasta, viejo.id);
+  if (choca) return error(res, `Ya hay otro recibo capturado del ${desde} al ${hasta}.`, 409);
+
+  const id = nuevoId();
+
+  let archivo = viejo.archivo;
+  if (req.body?.archivo) {
+    const r = archivos.guardar(req.body.archivo, `cfe-${id}`);
+    if (r.error) return error(res, r.error);
+    archivo = r.archivo;
+  }
+
+  bd.transaction(() => {
+    bd.prepare(`
+      UPDATE recibos_cfe SET anulado_en = ?, anulado_por = ?, motivo_anulacion = ?
+       WHERE id = ?
+    `).run(ahora(), req.usuario.id, 'Corregido: lo sustituye otro renglón', viejo.id);
+
+    bd.prepare(`
+      INSERT INTO recibos_cfe
+        (id, desde, hasta, kwh, centavos, numero, archivo, notas, capturista_id, fecha_captura)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, desde, hasta, kwh, centavos,
+           String(req.body?.numero || '').trim().slice(0, 40) || null,
+           archivo,
+           String(req.body?.notas || '').trim().slice(0, 300) || null,
+           req.usuario.id, ahora());
+  })();
+
+  bitacora.registrar({
+    accion: 'empresa.cfe_corregido', entidad: 'recibo_cfe', entidadId: id,
+    ejecutorId: req.usuario.id,
+    detalle: { sustituyeA: viejo.id, desde, hasta, kwh, centavos }
+  });
+
+  return ok(res, { recibo: calculo.recibo(id) });
 });
 
 router.post('/cfe/:id/anular', administrar, (req, res) => {

@@ -366,6 +366,102 @@ test('un recibo que no existe no sirve ningún archivo', async () => {
 
 
 // ============================================================
+// BORRAR UN CONCEPTO DE LA LISTA Y CORREGIR UN RECIBO  (v2.7.1)
+// ============================================================
+
+test('eliminar un concepto lo esconde, pero si tiene compras en el mes su renglón se queda', async () => {
+  await entrarAdmin();
+  const alta = await llamar('/api/empresa/conceptos', {
+    method: 'POST', cuerpo: { nombre: 'Compresor viejo', unidad: 'pieza' } });
+  const id = alta.json.datos.concepto.id;
+
+  await llamar('/api/empresa/gastos', {
+    method: 'POST',
+    cuerpo: { conceptoId: id, fecha: '2026-08-20', cantidad: 1, monto: 500 } });
+
+  const r = await llamar(`/api/empresa/conceptos/${id}/eliminar`, { method: 'POST', cuerpo: {} });
+  assert.equal(r.estado, 200);
+
+  const lista = (await llamar('/api/empresa/conceptos?todos=1')).json.datos.conceptos;
+  assert.ok(!lista.some((c) => c.id === id), 'ya no sale en el catálogo');
+
+  // En el mes de la compra su renglón sigue, para que la tabla cuadre.
+  await llamar('/api/empresa/periodos', { method: 'PUT', cuerpo: { diaCorte: 12 } });
+  const agosto = (await llamar('/api/empresa/resumen?periodo=2026-08')).json.datos;
+  const fila = agosto.conceptos.find((c) => c.id === id);
+  assert.ok(fila, 'la compra de agosto sigue sumando en agosto');
+  assert.equal(fila.centavos, 50000);
+
+  // En un mes donde no compró nada, ya no aparece.
+  const dic = (await llamar('/api/empresa/resumen?periodo=2026-12')).json.datos;
+  assert.ok(!dic.conceptos.some((c) => c.id === id));
+});
+
+test('corregir un recibo anula el viejo y guarda el bueno de un solo golpe', async () => {
+  await entrarAdmin();
+  const alta = await llamar('/api/empresa/cfe', {
+    method: 'POST',
+    cuerpo: { desde: '2026-11-12', hasta: '2026-12-11', kwh: 9000, monto: 46000 } });
+  assert.equal(alta.estado, 201);
+  const viejo = alta.json.datos.recibo;
+
+  // Los kilowatts estaban mal tecleados: se corrige el número, no el papel.
+  const r = await llamar(`/api/empresa/cfe/${viejo.id}`, {
+    method: 'PUT',
+    cuerpo: { desde: '2026-11-12', hasta: '2026-12-11', kwh: 9500, monto: 46000,
+              notas: 'kWh corregidos' } });
+  assert.equal(r.estado, 200);
+  const nuevo = r.json.datos.recibo;
+  assert.notEqual(nuevo.id, viejo.id, 'es un renglón nuevo (regla 3.2)');
+  assert.equal(nuevo.kwh, 9500);
+
+  const muerto = bd.prepare('SELECT * FROM recibos_cfe WHERE id = ?').get(viejo.id);
+  assert.ok(muerto.anulado_en, 'el viejo queda anulado, no borrado');
+  assert.match(muerto.motivo_anulacion, /Corregido/);
+
+  // El periodo NO queda duplicado: vivo solo hay uno.
+  const vivos = bd.prepare(
+    "SELECT COUNT(*) n FROM recibos_cfe WHERE desde = '2026-11-12' AND anulado_en IS NULL"
+  ).get().n;
+  assert.equal(vivos, 1);
+});
+
+test('la corrección no puede chocar con otro recibo vivo', async () => {
+  await entrarAdmin();
+  const { recibos } = (await llamar('/api/empresa/cfe')).json.datos;
+  const sept = recibos.find((x) => x.desde === '2026-11-12');
+  const julio = recibos.find((x) => x.desde === '2026-07-12');
+  assert.ok(sept && julio, 'hay dos recibos vivos con qué probar');
+
+  const r = await llamar(`/api/empresa/cfe/${sept.id}`, {
+    method: 'PUT',
+    cuerpo: { desde: julio.desde, hasta: julio.hasta, kwh: 1, monto: 1 } });
+  assert.equal(r.estado, 409, 'duplicaría el periodo de julio');
+});
+
+test('la corrección hereda el papel adjunto si no mandan otro', async () => {
+  await entrarAdmin();
+  const alta = await llamar('/api/empresa/cfe', {
+    method: 'POST',
+    cuerpo: { desde: '2026-10-12', hasta: '2026-11-11', kwh: 8000, monto: 40000,
+              archivo: comoDataUrl(PDF, 'application/pdf') } });
+  assert.equal(alta.estado, 201);
+  const viejo = alta.json.datos.recibo;
+  assert.ok(viejo.archivo);
+
+  const r = await llamar(`/api/empresa/cfe/${viejo.id}`, {
+    method: 'PUT',
+    cuerpo: { desde: '2026-10-12', hasta: '2026-11-11', kwh: 8100, monto: 40000 } });
+  assert.equal(r.estado, 200);
+  assert.equal(r.json.datos.recibo.archivo, viejo.archivo,
+               'el PDF del recibo sigue siendo el mismo papel');
+
+  const servido = await llamar(`/api/empresa/cfe/${r.json.datos.recibo.id}/archivo`);
+  assert.equal(servido.estado, 200, 'y se sirve desde el renglón nuevo');
+});
+
+
+// ============================================================
 // LA LUZ DENTRO DEL MES DEL NEGOCIO
 // ============================================================
 
@@ -411,8 +507,10 @@ test('un mes sin recibo dice que le falta, en vez de decir cero y ya', async () 
   await entrarAdmin();
   await llamar('/api/empresa/periodos', { method: 'PUT', cuerpo: { diaCorte: 1 } });
 
-  // Diciembre no tiene recibo capturado: es lo normal, llega después.
-  const d = (await llamar('/api/empresa/resumen?periodo=2026-12')).json.datos;
+  // Marzo del año que entra no tiene recibo capturado: es lo normal.
+  // (Diciembre ya no sirve de ejemplo: la prueba de corregir capturó un
+  // recibo que le pisa once días.)
+  const d = (await llamar('/api/empresa/resumen?periodo=2027-03')).json.datos;
   assert.equal(d.luz.centavos, 0);
   assert.equal(d.luz.dias, 0);
   assert.equal(d.luz.completo, false, 'para que la pantalla avise que va a subir');

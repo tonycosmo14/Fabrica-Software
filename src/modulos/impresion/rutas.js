@@ -188,6 +188,46 @@ router.post('/prueba', configurar, async (req, res) => {
  * reimpresión sale marcada como COPIA para que no se confunda con el
  * original.
  */
+/**
+ * EL TICKET EN PANTALLA, sin gastar papel.
+ *
+ * Devuelve los renglones del ticket tal como saldrían por la térmica —el
+ * espejo que arma el propio constructor de ESC/POS—, y la pantalla los
+ * pinta con forma de ticket. No es una imagen: carga al instante, y si un
+ * día cambia el diseño del papel, esta vista cambia sola.
+ */
+router.get('/venta/:id/previa', exigirPermiso('venta.ver'), (req, res) => {
+  const venta = ventaCompleta(req.params.id);
+  if (!venta) return error(res, 'Esa venta no existe.', 404);
+
+  const papel = ticketVenta(venta, { negocio: nombreNegocio() });
+  return ok(res, { renglones: recortarEspejo(papel.espejo), ancho: papel.anchoTicket });
+});
+
+router.get('/movimiento/:id/previa', exigirPermiso('caja.ver'), (req, res) => {
+  const mov = bd.prepare(`
+    SELECT m.*, u.nombre AS ejecutor_nombre, c.nombre AS capturista_nombre,
+           k.nombre AS cajero_nombre
+      FROM movimientos_caja m
+      LEFT JOIN usuarios u ON u.id = m.ejecutor_id
+      LEFT JOIN usuarios c ON c.id = m.capturista_id
+      LEFT JOIN cajas   j ON j.id = m.caja_id
+      LEFT JOIN usuarios k ON k.id = j.cajero_id
+     WHERE m.id = ?
+  `).get(req.params.id);
+  if (!mov) return error(res, 'Ese movimiento no existe.', 404);
+
+  const papel = ticketMovimiento(mov, { negocio: nombreNegocio() });
+  return ok(res, { renglones: recortarEspejo(papel.espejo), ancho: papel.anchoTicket });
+});
+
+/** Los saltos del final —el avance para el corte— en pantalla solo estorban. */
+function recortarEspejo(renglones = []) {
+  const r = [...renglones];
+  while (r.length && !r[r.length - 1].t.trim()) r.pop();
+  return r;
+}
+
 router.post('/venta/:id', puedeImprimir, async (req, res) => {
   const venta = ventaCompleta(req.params.id);
   if (!venta) return error(res, 'Esa venta no existe.', 404);

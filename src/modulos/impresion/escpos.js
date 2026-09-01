@@ -83,6 +83,12 @@ class Ticket {
   constructor(anchoMm = 80, codigoPagina = 2) {
     this.ancho = columnas(anchoMm);
     this.partes = [];
+    // EL ESPEJO: los mismos renglones que van a la impresora, pero como
+    // datos —texto, alineación, negrita, tamaño—. Con él la pantalla puede
+    // pintar el ticket TAL CUAL sin gastar papel ni reimplementar nada:
+    // si un día cambia el diseño del papel, la pantalla cambia sola.
+    this.espejo = [];
+    this.estilo = { alin: 'izquierda', negrita: false, anchoLetra: 1, altoLetra: 1 };
     // ESC @ deja la impresora en un estado conocido: si el ticket anterior
     // se cortó a la mitad, el siguiente no hereda letra gigante.
     this.crudo([ESC, 0x40]);
@@ -138,19 +144,27 @@ class Ticket {
 
   /** Un renglón de texto y su salto. */
   linea(cadena = '') {
+    this.espejo.push({ t: String(cadena), ...this.estiloActual() });
     return this.texto(cadena).crudo([0x0a]);
   }
 
   /** Renglones en blanco. */
   saltos(n = 1) {
+    for (let i = 0; i < n; i++) this.espejo.push({ t: '', ...this.estiloActual() });
     return this.crudo(new Array(n).fill(0x0a));
   }
 
-  izquierda() { return this.crudo([ESC, 0x61, 0]); }
-  centro()    { return this.crudo([ESC, 0x61, 1]); }
-  derecha()   { return this.crudo([ESC, 0x61, 2]); }
+  /** El estilo vigente, aplanado para el espejo. */
+  estiloActual() {
+    const e = this.estilo;
+    return { alin: e.alin, negrita: e.negrita, anchoLetra: e.anchoLetra, altoLetra: e.altoLetra };
+  }
 
-  negrita(si = true) { return this.crudo([ESC, 0x45, si ? 1 : 0]); }
+  izquierda() { this.estilo.alin = 'izquierda'; return this.crudo([ESC, 0x61, 0]); }
+  centro()    { this.estilo.alin = 'centro';    return this.crudo([ESC, 0x61, 1]); }
+  derecha()   { this.estilo.alin = 'derecha';   return this.crudo([ESC, 0x61, 2]); }
+
+  negrita(si = true) { this.estilo.negrita = Boolean(si); return this.crudo([ESC, 0x45, si ? 1 : 0]); }
 
   /**
    * Tamaño de letra. GS ! guarda el ancho en los 4 bits de arriba y el alto
@@ -159,6 +173,8 @@ class Ticket {
   tamano(ancho = 1, alto = 1) {
     const a = Math.min(Math.max(ancho, 1), 8) - 1;
     const b = Math.min(Math.max(alto, 1), 8) - 1;
+    this.estilo.anchoLetra = a + 1;
+    this.estilo.altoLetra = b + 1;
     return this.crudo([GS, 0x21, (a << 4) | b]);
   }
 
@@ -351,7 +367,12 @@ class Ticket {
   }
 
   bytes() {
-    return Buffer.concat(this.partes);
+    const b = Buffer.concat(this.partes);
+    // El espejo viaja pegado a los bytes: quien imprime lo ignora, y quien
+    // quiere enseñar el ticket en pantalla lo lee de aquí mismo.
+    b.espejo = this.espejo;
+    b.anchoTicket = this.ancho;
+    return b;
   }
 }
 

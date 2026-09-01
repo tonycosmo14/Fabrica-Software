@@ -216,8 +216,12 @@ export async function vistaProduccion(pantalla, estado) {
 
     // Quién lo sacó: por omisión el que tiene la sesión, pero casi siempre
     // es otra persona la que estuvo en la grúa.
+    // Solo salen los operarios: sacar paños es su trabajo. Para el eventual
+    // de un día, o el dueño, está "Otro…" y su nombre se escribe tal cual.
+    // Quién lo ANOTÓ no se pregunta: es el usuario de la sesión, siempre.
     const { obreros } = await api.obtener('/produccion/obreros');
-    let quienId = obreros.find((o) => o.id === estado.usuario.id)?.id || obreros[0]?.id || null;
+    let quienId = obreros.find((o) => o.id === estado.usuario.id)?.id || obreros[0]?.id || '';
+    let quienNombre = '';
 
     const dibujar = () => {
       const buenas = dentro.reduce((n, c) => n + c.moldes.length, 0) - marcas.size;
@@ -244,6 +248,9 @@ export async function vistaProduccion(pantalla, estado) {
                 <option value="${esc(o.id)}" ${o.id === quienId ? 'selected' : ''}>
                   ${esc(o.nombre)}
                 </option>`).join('')}
+              <option value="" ${quienId ? '' : 'selected'}>
+                Otro… ${quienNombre ? `(${esc(quienNombre)})` : ''}
+              </option>
             </select>
           </div>
           <div class="campo-agua">
@@ -315,7 +322,20 @@ export async function vistaProduccion(pantalla, estado) {
         <p class="firma">Los números en rojo son las veces seguidas que ha fallado ese molde.</p>`;
 
       pantalla.querySelector('#volver').onclick = pintar;
-      pantalla.querySelector('#quien').onchange = (e) => { quienId = e.target.value; };
+      pantalla.querySelector('#quien').onchange = async (e) => {
+        quienId = e.target.value;
+        if (!quienId) {
+          const nombre = await pedirTexto({
+            titulo: '¿Quién lo sacó?',
+            texto: 'El nombre de quien sacó el paño: un eventual, alguien de ' +
+                   'fuera… Queda guardado tal cual, y también queda quién lo anotó.',
+            valor: quienNombre, marcador: 'Juan', ok: 'Ese fue', largo: 40, unaLinea: true
+          });
+          if (nombre) quienNombre = nombre;
+          else if (!quienNombre) { quienId = obreros[0]?.id || ''; }
+          dibujar();
+        }
+      };
 
       // El agua se cambia aquí mismo y se queda para las siguientes veces.
       pantalla.querySelector('#agua-pano').onclick = () => {
@@ -338,7 +358,7 @@ export async function vistaProduccion(pantalla, estado) {
       if (btnRellenar) btnRellenar.onclick = async () => {
         try {
           const r = await api.enviar(`/produccion/panos/${pano.id}/rellenar`,
-            { tipoAgua: agua, ejecutorId: quienId });
+            { tipoAgua: agua, ejecutorId: quienId || null, ejecutorNombre: quienNombre || null });
           avisar(`${r.rellenadas} canastas rellenadas con agua ${agua}`, 'bien');
           pintar();
         } catch (e) { avisar(e.message, 'error'); }
@@ -367,7 +387,8 @@ export async function vistaProduccion(pantalla, estado) {
 
       try {
         const r = await api.enviar(`/produccion/panos/${pano.id}/sacar`, {
-          tipoAgua: agua, resultados, ejecutorId: quienId, vale, ...opciones, autorizacion
+          tipoAgua: agua, resultados, ejecutorId: quienId || null,
+          ejecutorNombre: quienNombre || null, vale, ...opciones, autorizacion
         });
         avisar(
           `Paño ${pano.numero}: ${r.marquetas} marquetas` +
@@ -475,7 +496,8 @@ export async function vistaProduccion(pantalla, estado) {
   async function capturaEnLote() {
     const { obreros } = await api.obtener('/produccion/obreros');
     const todos = await api.obtener('/produccion/estado');
-    let quienId = obreros[0]?.id || null;
+    let quienId = obreros[0]?.id || '';
+    let quienNombre = '';
     const elegidos = new Set();
     const valesPorPano = {};           // paños marcados fuera de orden
 
@@ -532,6 +554,9 @@ export async function vistaProduccion(pantalla, estado) {
               <option value="${esc(o.id)}" ${o.id === quienId ? 'selected' : ''}>
                 ${esc(o.nombre)}
               </option>`).join('')}
+            <option value="" ${quienId ? '' : 'selected'}>
+              Otro… ${quienNombre ? `(${esc(quienNombre)})` : ''}
+            </option>
           </select>
 
           <label style="margin-top:16px">Agua con la que se rellenó</label>
@@ -565,7 +590,20 @@ export async function vistaProduccion(pantalla, estado) {
         </button>`;
 
       pantalla.querySelector('#volver').onclick = pintar;
-      pantalla.querySelector('#quien').onchange = (e) => { quienId = e.target.value; };
+      pantalla.querySelector('#quien').onchange = async (e) => {
+        quienId = e.target.value;
+        if (!quienId) {
+          const nombre = await pedirTexto({
+            titulo: '¿Quién los sacó?',
+            texto: 'El nombre de quien sacó los paños. Queda guardado tal cual, ' +
+                   'y también queda quién lo anotó.',
+            valor: quienNombre, marcador: 'Juan', ok: 'Ese fue', largo: 40, unaLinea: true
+          });
+          if (nombre) quienNombre = nombre;
+          else if (!quienNombre) { quienId = obreros[0]?.id || ''; }
+          dibujar();
+        }
+      };
 
       pantalla.querySelectorAll('[data-agua]').forEach((b) => {
         b.onclick = () => { agua = b.dataset.agua; localStorage.setItem('tipo_agua', agua); dibujar(); };
@@ -577,7 +615,8 @@ export async function vistaProduccion(pantalla, estado) {
       pantalla.querySelector('#guardar').onclick = async () => {
         try {
           const r = await api.enviar('/produccion/lote', {
-            ejecutorId: quienId, panos: [...elegidos], tipoAgua: agua, vales: valesPorPano
+            ejecutorId: quienId || null, ejecutorNombre: quienNombre || null,
+            panos: [...elegidos], tipoAgua: agua, vales: valesPorPano
           });
           avisar(`${r.panos.length} paños · ${r.marquetas} marquetas`, 'bien');
           pintar();
