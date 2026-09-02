@@ -17,9 +17,26 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '3.5';
+const VERSION_ACTUAL = '3.6';
 
 const VERSIONES = [
+  {
+    numero: '3.6',
+    nombre: 'Las dos temperaturas',
+    fecha: '2026-09-02',
+    resumen:
+      'La de afuera, que se toma de internet sola y se va guardando, junto ' +
+      'al reloj de la caja. Y la de la salmuera de los tanques, con sus ' +
+      'tres tomas y su promedio, para cuando alguien se acuerda de medirla.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'LA TEMPERATURA DE AFUERA, JUNTO AL RELOJ DE LA CAJA. En una fábrica de hielo el clima es materia prima: en mayo, cuando calientan los tanques, el hielo no se forma por más días que pase en el molde, y cuando llueve mucho sale sellado sin que nadie haya hecho nada distinto. Tenerla a la vista mientras se cobra la deja ligada a los días buenos y a los malos sin que nadie apunte nada.' },
+      { tipo: 'importante', texto: 'Y SE VA GUARDANDO SOLA, una medida por hora. Ese dato no estaba en ninguna parte, y dentro de un año, mirando un mes malo, no habría manera de saber si hizo calor. Ahora cuando haga falta ya va a existir.' },
+      { tipo: 'importante', texto: 'SI NO HAY INTERNET NO PASA ABSOLUTAMENTE NADA. La fábrica vende hielo sin internet, así que el clima es un dato de más y nunca una condición: la llamada lleva reloj y si no contesta se abandona, se enseña la última que se pudo tomar diciendo de cuándo es, y si nunca se pudo tomar ninguna simplemente no se enseña. No sale ningún error. Y si un día hace falta, se puede escribir a mano mirando el termómetro de la pared.' },
+      { tipo: 'nuevo', texto: 'LA TEMPERATURA DE LA SALMUERA, en el panel de Producción de hielo. Tres tomas —cerca de los serpentines, en la salida más cercana y en la más lejana— y el sistema saca el promedio. Sin horario ninguno: se anota cuando se mide, que es cuando alguien se acuerda. El panel dice cuándo fue la última vez de ese tanque, y adentro está la lista de todas las anteriores con quién las tomó.' },
+      { tipo: 'mejora', texto: 'El promedio de la salmuera NO se guarda: se saca de las tres tomas cada vez que se mira. Un promedio guardado es un número que puede dejar de cuadrar con los suyos el día que alguien corrija una toma.' },
+      { tipo: 'importante', texto: 'OJO CON ESTO, TONY: la llamada a internet NO se pudo probar de verdad, porque la computadora donde te escribo tiene bloqueado ese servicio. Todo lo demás está probado —el reloj, el guardado, qué pasa cuando falla— con un servicio de mentira. La primera vez que abras la caja en la fábrica, dime si sale la temperatura o no, y si no sale lo arreglo con lo que veas.' }
+    ]
+  },
   {
     numero: '3.5',
     nombre: 'Lo que estaba roto y lo que estorbaba',

@@ -67,6 +67,9 @@ export async function vistaProduccion(pantalla, estado) {
   let tanqueActivo = localStorage.getItem('tanque_activo') || null;
   let datos = null;
   let hoy = null;
+  // La última vez que se midió la salmuera de cada tanque. Se mide de vez
+  // en cuando, sin horario: aquí solo se enseña cuándo fue y cuánto dio.
+  let ultimaSalmuera = {};
 
   // Los estados del hielo y sus destinos los manda el servidor con el
   // estado del tanque: aquí no hay una segunda copia de los nombres que
@@ -100,10 +103,13 @@ export async function vistaProduccion(pantalla, estado) {
   async function pintar() {
     // Las dos llamadas van juntas: el panel de la derecha enseña lo de hoy
     // y esperar una después de la otra pintaría la pantalla en dos tiempos.
-    [datos, hoy] = await Promise.all([
+    let salmuera;
+    [datos, hoy, salmuera] = await Promise.all([
       api.obtener(`/produccion/estado${tanqueActivo ? `?tanque=${encodeURIComponent(tanqueActivo)}` : ''}`),
-      api.obtener('/produccion/hoy').catch(() => null)
+      api.obtener('/produccion/hoy').catch(() => null),
+      api.obtener('/clima/salmuera?limite=1').catch(() => null)
     ]);
+    ultimaSalmuera = salmuera?.ultimaPorTanque || {};
 
     if (!datos.tanques.length) return sinTanques();
 
@@ -190,6 +196,8 @@ export async function vistaProduccion(pantalla, estado) {
       b.onclick = () => { tanqueActivo = b.dataset.tanque; pintar(); };
     });
     pantalla.querySelector('#ver-hoy').onclick = verHoy;
+    const btnSalmuera = pantalla.querySelector('#medir-salmuera');
+    if (btnSalmuera) btnSalmuera.onclick = medirSalmuera;
 
     // El ojo abre el paño para MIRARLO. No pide permiso a nadie porque no
     // cambia nada, y es lo que uno hace cuando ve un molde en rojo.
@@ -246,6 +254,8 @@ export async function vistaProduccion(pantalla, estado) {
               ⚠ ${marcados} ${marcados === 1 ? 'molde viene saliendo' : 'moldes vienen saliendo'}
               peor que sus vecinos. Toca el ojo del paño para ver cuál.
             </p>` : ''}
+
+          ${salmueraHTML(tanque)}
         </div>
 
         ${hoy ? `
@@ -1069,6 +1079,148 @@ export async function vistaProduccion(pantalla, estado) {
     }
 
     return { resultado: elegido, destino, nota };
+  }
+
+  /**
+   * LA SALMUERA DEL TANQUE.
+   *
+   * Se mide de vez en cuando, sin horario: cuando alguien se acuerda. Tres
+   * tomas —cerca de los serpentines, en la salida más cercana y en la más
+   * lejana— y lo que interesa es el promedio. Aquí solo se dice cuándo fue
+   * la última y cuánto dio, porque son datos que a veces sirven y que hasta
+   * hoy no quedaban en ninguna parte.
+   */
+  function salmueraHTML(tanque) {
+    const u = ultimaSalmuera[tanque.id];
+    const dias = u ? Math.floor((Date.now() - new Date(u.fecha).getTime()) / 86400000) : null;
+
+    return `
+      <div class="salmuera">
+        <span class="salmuera-etiqueta">Salmuera</span>
+        ${u ? `
+          <strong class="salmuera-grados">${u.promedio}°</strong>
+          <small>${dias === 0 ? 'medida hoy'
+            : dias === 1 ? 'medida ayer'
+            : `medida hace ${dias} días`}</small>`
+          : '<small class="salmuera-nunca">nunca se ha medido</small>'}
+        ${puedeRegistrar ? `
+          <button class="secundario chico" id="medir-salmuera">🌡 Medir</button>` : ''}
+      </div>`;
+  }
+
+  /**
+   * MEDIR LA SALMUERA: las tres tomas.
+   *
+   * Las tres son opcionales por separado —a veces solo se alcanza una— pero
+   * alguna tiene que venir. El promedio sale de las que haya y no se
+   * guarda: se calcula cada vez, para que corregir una toma no deje un
+   * promedio viejo diciendo otra cosa.
+   */
+  async function medirSalmuera() {
+    const tanque = datos.tanque;
+    const { mediciones } = await api.obtener(
+      `/clima/salmuera?tanque=${encodeURIComponent(tanque.id)}&limite=20`);
+    const { obreros } = await api.obtener('/produccion/obreros');
+
+    const campo = (id, titulo, ayuda) => `
+      <label>
+        <span class="etiqueta-chica">${titulo}<small>${ayuda}</small></span>
+        <input id="${id}" inputmode="decimal" placeholder="-8.5" autocomplete="off">
+      </label>`;
+
+    pantalla.innerHTML = `
+      <button class="secundario chico" id="volver">‹ ${esc(tanque.nombre)}</button>
+      <h2 style="margin-top:14px">Temperatura de la salmuera · ${esc(tanque.nombre)}</h2>
+      <p class="ayuda">
+        Tres tomas y el sistema saca el promedio. No hace falta hacerlo con
+        ningún horario: se anota cuando se mide, y queda de registro.
+      </p>
+
+      <div class="tarjeta">
+        <div class="salmuera-campos">
+          ${campo('t-serp', 'Cerca de los serpentines', 'donde más frío hace')}
+          ${campo('t-cerca', 'Salida más cercana', '')}
+          ${campo('t-lejos', 'Salida más lejana', 'donde menos frío llega')}
+        </div>
+        <p class="ayuda">
+          En grados, y con su signo: la salmuera trabaja bajo cero, así que
+          casi siempre van con un menos delante. Se puede dejar alguna vacía.
+        </p>
+
+        <label style="margin-top:10px">
+          <span class="etiqueta-chica">¿Quién la midió?</span>
+          <select id="t-quien" class="select-angosto">
+            <option value="">Yo mismo</option>
+            ${obreros.map((o) => `
+              <option value="${esc(o.id)}">${esc(o.nombre)}</option>`).join('')}
+          </select>
+        </label>
+        <label style="margin-top:10px">
+          <span class="etiqueta-chica">Notas<small>opcional</small></span>
+          <input id="t-notas" maxlength="300" placeholder="Se acababa de arrancar el compresor…">
+        </label>
+
+        <div class="acciones-centradas">
+          <button id="t-guardar">Guardar la medición</button>
+        </div>
+      </div>
+
+      ${mediciones.length ? `
+        <h3>Las anteriores</h3>
+        <div class="hist-envoltura">
+          <table class="tabla hist-tabla">
+            <tr><th>Cuándo</th><th class="der">Serpentines</th><th class="der">Cerca</th>
+                <th class="der">Lejos</th><th class="der">Promedio</th><th>Quién</th><th></th></tr>
+            ${mediciones.map((m) => `
+              <tr class="${m.anulada_en ? 'anulada' : ''}">
+                <td>${esc(fechaCorta(m.fecha))}</td>
+                <td class="der">${m.serpentines ?? '—'}</td>
+                <td class="der">${m.salida_cerca ?? '—'}</td>
+                <td class="der">${m.salida_lejos ?? '—'}</td>
+                <td class="der"><strong>${m.anulada_en ? '—' : `${m.promedio}°`}</strong></td>
+                <td>${esc(nombreDePila(m.ejecutor_nombre))}</td>
+                <td>${puedeCorregir && !m.anulada_en
+                  ? `<button class="secundario chico" data-anular-medicion="${esc(m.id)}"
+                             title="Anularla">×</button>` : ''}</td>
+              </tr>
+              ${m.notas ? `<tr class="${m.anulada_en ? 'anulada' : ''}">
+                <td colspan="7"><small>${esc(m.notas)}</small></td></tr>` : ''}`).join('')}
+          </table>
+        </div>` : '<p class="vacio">Todavía no se ha medido la salmuera de este tanque.</p>'}`;
+
+    const q = (sel) => pantalla.querySelector(sel);
+    q('#volver').onclick = pintar;
+
+    q('#t-guardar').onclick = async () => {
+      try {
+        await api.enviar('/clima/salmuera', {
+          tanqueId: tanque.id,
+          serpentines: q('#t-serp').value,
+          salidaCerca: q('#t-cerca').value,
+          salidaLejos: q('#t-lejos').value,
+          ejecutorId: q('#t-quien').value || null,
+          notas: q('#t-notas').value
+        });
+        avisar('Medición guardada', 'bien');
+        medirSalmuera();
+      } catch (e) { avisar(e.message, 'error'); }
+    };
+
+    pantalla.querySelectorAll('[data-anular-medicion]').forEach((b) => {
+      b.onclick = async () => {
+        const motivo = await pedirTexto({
+          titulo: 'Anular la medición',
+          texto: 'No se borra: queda tachada con su motivo.',
+          marcador: 'Se apuntó el tanque equivocado', ok: 'Anular'
+        });
+        if (!motivo) return;
+        try {
+          await api.enviar(`/clima/salmuera/${b.dataset.anularMedicion}/anular`, { motivo });
+          avisar('Medición anulada', 'bien');
+          medirSalmuera();
+        } catch (e) { avisar(e.message, 'error'); }
+      };
+    });
   }
 
   // ==========================================================

@@ -172,6 +172,9 @@ export async function vistaVenta(pantalla, estadoApp) {
 
   document.addEventListener('keydown', alTeclado);
   const relojito = setInterval(pintarHora, 10000);
+  // La temperatura cambia despacio: cada diez minutos sobra, y el servidor
+  // además no le pregunta a internet más de una vez cada cuarto de hora.
+  const termometro = setInterval(pintarClima, 10 * 60 * 1000);
 
   // El alto de cada cuadro depende de lo que mida la rejilla, y eso cambia
   // al agrandar la ventana o al girar la tablet. Se vuelve a medir sola.
@@ -183,6 +186,7 @@ export async function vistaVenta(pantalla, estadoApp) {
   pantalla.addEventListener('vista-desmontada', () => {
     document.removeEventListener('keydown', alTeclado);
     clearInterval(relojito);
+    clearInterval(termometro);
     if (vigilante) vigilante.disconnect();
     limpiarImpresion();
   }, { once: true });
@@ -1100,6 +1104,7 @@ export async function vistaVenta(pantalla, estadoApp) {
         <strong id="pos-hora">—</strong>
         <small id="pos-fecha"></small>
       </span>
+      <span class="pos-clima" id="pos-clima" hidden></span>
       ${marca.nombreNegocio
         ? `<span class="pos-marca">${esc(marca.nombreNegocio)}</span>` : ''}
       <span class="pos-teclas">
@@ -1113,6 +1118,46 @@ export async function vistaVenta(pantalla, estadoApp) {
           ${puedeVerClientes ? '<span><kbd>F6</kbd> cliente</span>' : ''}` : ''}
       </span>`;
     pintarHora();
+    pintarClima();
+  }
+
+  /**
+   * LA TEMPERATURA DE AFUERA, junto al reloj.
+   *
+   * En una fábrica de hielo el clima es materia prima: en mayo, cuando
+   * calientan los tanques, el hielo no se forma por más días que pase en
+   * el molde. Tenerla a la vista mientras se cobra es la manera de que
+   * quede ligada a los días buenos y a los malos sin que nadie apunte nada.
+   *
+   * SI NO SE PUDO TOMAR, NO SE ENSEÑA NADA. Ni un error, ni un hueco: la
+   * venta no depende de esto. Y si el dato es viejo se dice, para que nadie
+   * confunda la de hoy con la del martes.
+   */
+  let climaAhora = null;
+
+  async function pintarClima() {
+    const caja = pantalla.querySelector('#pos-clima');
+    if (!caja) return;
+    try {
+      const { clima } = await api.obtener('/clima');
+      climaAhora = clima;
+    } catch { climaAhora = null; }
+
+    if (!climaAhora || climaAhora.temperatura == null) { caja.hidden = true; return; }
+
+    const viejo = climaAhora.minutos != null && climaAhora.minutos > 120;
+    caja.hidden = false;
+    caja.className = `pos-clima ${viejo ? 'vieja' : ''}`;
+    caja.innerHTML =
+      `<span class="pos-grados">${climaAhora.temperatura}°</span>` +
+      (climaAhora.sensacion != null && Math.abs(climaAhora.sensacion - climaAhora.temperatura) >= 2
+        ? `<small>se sienten ${climaAhora.sensacion}°</small>` : '') +
+      (viejo ? '<small class="pos-clima-vieja">dato viejo</small>' : '');
+    caja.title = climaAhora.hayInternet === false
+      ? `Sin internet. Es la última que se pudo tomar${
+          climaAhora.cuando ? `, de hace ${climaAhora.minutos} minutos` : ''}.`
+      : `Temperatura de afuera${climaAhora.humedad != null
+          ? ` · ${climaAhora.humedad}% de humedad` : ''}`;
   }
 
   function pintarHora() {

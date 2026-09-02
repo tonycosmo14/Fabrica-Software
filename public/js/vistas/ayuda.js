@@ -156,6 +156,18 @@ const TEMAS = [
       paño entero esté salado. Salmuera dentro del molde es un molde roto, y
       si están rotos varios hay que verlos todos.</p>
 
+      <h4>La temperatura de la salmuera</h4>
+      <p>De vez en cuando se mide la salmuera de un tanque. Se toman
+      <b>tres</b> —cerca de los serpentines, en la salida más cercana y en la
+      más lejana— y el sistema saca el promedio. No hace falta ningún
+      horario: se anota cuando se mide.</p>
+      <p>Está en el panel de la derecha de Producción de hielo, con el botón
+      <b>🌡 Medir</b>. Ahí mismo se ve cuándo fue la última vez de ese tanque
+      y la lista de las anteriores.</p>
+      <p class="ayuda-tip">El promedio <b>no se guarda</b>: se saca de las tres
+      tomas cada vez que se mira. Un promedio guardado es un número que puede
+      dejar de cuadrar con los suyos el día que alguien corrija una toma.</p>
+
       <h4>Sacar canasta por canasta</h4>
       <p>Un paño no siempre sale de un jalón. A veces se saca una canasta y
       no se toca la siguiente hasta que esa se gasta, para darle más horas al
@@ -322,11 +334,22 @@ debería quedar − contado = FALTA</pre>
   {
     id: 'venta',
     titulo: 'Punto de venta: cobrar',
-    busca: 'venta cobrar ticket precio fracción cambio devolución billete folio cancelar imprimir teclado enter f10 f2 f3 f4 código rápido categorías nueva venta espera pendiente aviso bolita se acabó agotado poco hielo inventario bajo atajos gastos historial reloj cotización cotizar precio papel sujetos a cambio',
+    busca: 'venta cobrar ticket precio fracción cambio devolución billete folio cancelar imprimir teclado enter f10 f2 f3 f4 código rápido categorías nueva venta espera pendiente aviso bolita se acabó agotado poco hielo inventario bajo atajos gastos historial reloj cotización cotizar precio papel sujetos a cambio temperatura clima grados afuera termómetro',
     cuerpo: `
       <p>Es la pantalla que se abre al entrar, porque es la que se usa casi
       todo el día. A la izquierda lo que lleva el cliente, a la derecha los
       botones. <b>No se desplaza:</b> todo está siempre en el mismo sitio.</p>
+
+      <h4>La temperatura de afuera</h4>
+      <p>Junto al reloj, abajo, sale la <b>temperatura de ahora</b>, tomada
+      de internet. En una fábrica de hielo el clima es materia prima: en
+      mayo, cuando calientan los tanques, el hielo no se forma por más días
+      que pase en el molde. Tenerla a la vista mientras se cobra la deja
+      ligada a los días buenos y a los malos sin que nadie apunte nada, y
+      además se va guardando la de cada día.</p>
+      <p class="ayuda-tip"><b>Si no hay internet no pasa nada.</b> No sale
+      ningún error: simplemente no se enseña, o se enseña la última que se
+      pudo tomar diciendo que es vieja. La venta nunca depende de esto.</p>
 
       <h4>Con el ratón</h4>
       <ol class="instrucciones">

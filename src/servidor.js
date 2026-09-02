@@ -69,6 +69,7 @@ function crearApp() {
   app.use('/api/estadisticas', require('./modulos/estadisticas/rutas'));
   app.use('/api/empresa', express.json({ limit: '12mb' }),
           require('./modulos/empresa/rutas'));
+  app.use('/api/clima', require('./modulos/clima/rutas'));
   app.use('/api/versiones', require('./modulos/versiones/rutas'));
   app.use('/api', (req, res) => error(res, 'Esa ruta de la API no existe.', 404));
 
