@@ -19,7 +19,7 @@ const { nuevoId, ahora } = require('../../lib/ids');
 const { ok, error } = require('../../lib/respuestas');
 const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
-const { estadoAlmacen, ultimoConteo, mermasDesde } = require('./calculo');
+const { estadoAlmacen, ultimoConteo, mermasDesde, cortesDesde } = require('./calculo');
 const { aTexto, DIECISEISAVOS_POR_MARQUETA } = require('../../lib/fracciones');
 
 const router = express.Router();
@@ -108,6 +108,7 @@ router.get('/', verExistencia, (req, res) => {
         vendidoPublico: aTexto(estado.vendidoPublico),
         vendidoMayoreo: aTexto(estado.vendidoMayoreo),
         merma: aTexto(estado.merma),
+        cortado: aTexto(estado.cortado),
         esperado: aTexto(estado.esperado)
       }
     };
@@ -191,6 +192,87 @@ router.post('/mermas/:id/anular', exigirPermiso('existencia.corregir'), (req, re
   return ok(res, { anulada: true });
 });
 
+/**
+ * EL HIELO QUE SE CORTÓ para volverlo gourmet.
+ *
+ * Sale del cuarto frío igual que una venta, pero no pasa por la caja ni se
+ * derritió: dejó de ser marqueta. Se anota aparte para que el FALTANTE —el
+ * número que de verdad hay que vigilar— siga significando lo que significa.
+ */
+router.get('/cortes', verExistencia, (req, res) => {
+  const almacen = bd.prepare('SELECT * FROM almacenes WHERE id = ?').get(req.query.almacenId ?? null)
+    || almacenesActivos()[0];
+  if (!almacen) return ok(res, { cortes: [] });
+
+  const ultimo = ultimoConteo(almacen.id);
+  return ok(res, {
+    almacen,
+    cortes: cortesDesde(ultimo?.fecha || null, almacen.id).map((c) => ({
+      ...c, texto: aTexto(c.dieciseisavos)
+    }))
+  });
+});
+
+router.post('/cortes', contar, (req, res) => {
+  const almacen = bd.prepare('SELECT * FROM almacenes WHERE id = ? AND activo = 1')
+    .get(req.body?.almacenId ?? null) || almacenesActivos()[0];
+  if (!almacen) return error(res, 'No hay ningún cuarto frío dado de alta.', 404);
+
+  const cantidad = Number(req.body?.dieciseisavos);
+  if (!Number.isInteger(cantidad) || cantidad <= 0 || cantidad > MAX_DIECISEISAVOS) {
+    return error(res, 'Escribe cuánto hielo se cortó.');
+  }
+
+  // Las bolsas son opcionales: si nadie las contó, se deja vacío en vez de
+  // guardar un cero que después parecería un dato.
+  let bolsas = null;
+  if (req.body?.bolsas !== undefined && req.body?.bolsas !== null && req.body?.bolsas !== '') {
+    bolsas = Number(req.body.bolsas);
+    if (!Number.isInteger(bolsas) || bolsas < 0 || bolsas > 1000000) {
+      return error(res, 'Las bolsas se escriben en números enteros.');
+    }
+  }
+
+  const ejecutorId = req.body?.ejecutorId || req.usuario.id;
+  const id = nuevoId();
+  bd.prepare(`
+    INSERT INTO cortes_hielo (id, fecha, almacen_id, dieciseisavos, bolsas, notas,
+                              ejecutor_id, capturista_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, ahora(), almacen.id, cantidad, bolsas,
+         String(req.body?.notas || '').trim().slice(0, 200) || null,
+         ejecutorId, req.usuario.id);
+
+  bitacora.registrar({
+    accion: 'existencia.corte', entidad: 'corte', entidadId: id,
+    ejecutorId, capturistaId: req.usuario.id,
+    detalle: { almacen: almacen.nombre, dieciseisavos: cantidad,
+               texto: aTexto(cantidad), bolsas }
+  });
+
+  return ok(res, { corte: bd.prepare('SELECT * FROM cortes_hielo WHERE id = ?').get(id) }, 201);
+});
+
+router.post('/cortes/:id/anular', exigirPermiso('existencia.corregir'), (req, res) => {
+  const c = bd.prepare('SELECT * FROM cortes_hielo WHERE id = ?').get(req.params.id);
+  if (!c) return error(res, 'Ese corte no existe.', 404);
+  if (c.anulado_en) return error(res, 'Ese corte ya está anulado.');
+
+  const motivo = String(req.body?.motivo || '').trim();
+  if (!motivo) return error(res, 'Escribe por qué se anula.');
+
+  bd.prepare(`
+    UPDATE cortes_hielo SET anulado_en = ?, anulado_por = ?, motivo_anulacion = ? WHERE id = ?
+  `).run(ahora(), req.usuario.id, motivo, c.id);
+
+  bitacora.registrar({
+    accion: 'existencia.corte-anulado', entidad: 'corte', entidadId: c.id,
+    ejecutorId: req.usuario.id, detalle: { dieciseisavos: c.dieciseisavos, motivo }
+  });
+
+  return ok(res, { anulado: true });
+});
+
 /** Historial de conteos de un almacén. */
 router.get('/conteos', verExistencia, (req, res) => {
   const limite = Math.min(Number(req.query.limite) || 30, 200);
@@ -228,7 +310,9 @@ router.post('/conteos', contar, (req, res) => {
   // que corregir una sacada vieja no cambie un corte que ya se hizo.
   const estado = estadoAlmacen(almacen);
   const salidas = estado.teorico - contado;
-  const faltante = salidas - estado.vendido;
+  // El faltante es lo que NADIE explicó: ni la caja, ni lo que se derritió,
+  // ni lo que se cortó para gourmet. Ese es el número que hay que vigilar.
+  const faltante = salidas - estado.vendido - estado.merma - estado.cortado;
 
   const ejecutorId = req.body?.ejecutorId || req.usuario.id;
   const id = nuevoId();
@@ -236,10 +320,12 @@ router.post('/conteos', contar, (req, res) => {
 
   bd.prepare(`
     INSERT INTO conteos (id, almacen_id, fecha, ejecutor_id, capturista_id, contado,
-                         existencia_anterior, producido, vendido, salidas, desde, notas)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         existencia_anterior, producido, vendido, merma, cortado,
+                         salidas, desde, notas)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(id, almacen.id, fecha, ejecutorId, req.usuario.id, contado,
-         estado.existenciaAnterior, estado.producido, estado.vendido, salidas,
+         estado.existenciaAnterior, estado.producido, estado.vendido,
+         estado.merma, estado.cortado, salidas,
          estado.desde, req.body?.notas || null);
 
   bitacora.registrar({
@@ -251,6 +337,8 @@ router.post('/conteos', contar, (req, res) => {
       anterior: aTexto(estado.existenciaAnterior),
       producido: aTexto(estado.producido),
       vendido: aTexto(estado.vendido),
+      merma: aTexto(estado.merma),
+      cortado: aTexto(estado.cortado),
       salidas: aTexto(salidas),
       faltante: aTexto(faltante)
     }
@@ -263,6 +351,8 @@ router.post('/conteos', contar, (req, res) => {
       producido: estado.producido,
       teorico: estado.teorico,
       vendido: estado.vendido,
+      merma: estado.merma,
+      cortado: estado.cortado,
       esperado: estado.esperado,
       contado,
       salidas,

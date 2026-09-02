@@ -19,8 +19,9 @@
  */
 import { api } from '../api.js';
 import { esc, avisar, fecha as formatoFecha } from '../util.js';
-import { pedirTexto, pedirCantidad, menu } from '../dialogo.js';
+import { pedirTexto, pedirCantidad, pedirNumero, menu } from '../dialogo.js';
 import { aTexto } from '../fracciones.js';
+import { capturaDePanos } from '../captura-panos.js';
 
 /** "+3", "−1/2"... pero un cero se escribe "0" a secas, sin signo. */
 function signo(simbolo, dieciseisavos) {
@@ -60,7 +61,7 @@ export async function vistaExistencia(pantalla, estadoApp) {
     if (puedeConfigurar) pantalla.querySelector('#config').onclick = configuracion;
 
     pantalla.querySelectorAll('[data-contar]').forEach((b) => {
-      b.onclick = () => hacerConteo(almacenes.find((a) => a.almacen.id === b.dataset.contar));
+      b.onclick = () => anotarExistencia(almacenes.find((a) => a.almacen.id === b.dataset.contar));
     });
     pantalla.querySelectorAll('[data-merma]').forEach((b) => {
       b.onclick = () => anotarMerma(almacenes.find((a) => a.almacen.id === b.dataset.merma));
@@ -162,6 +163,11 @@ export async function vistaExistencia(pantalla, estadoApp) {
             <span>− Derretidas, rotas o regaladas</span>
             <strong>${t.merma}</strong>
           </div>
+          ${a.cortado ? `
+            <div class="cuadre-linea vendido">
+              <span>− Se cortó para hielo gourmet</span>
+              <strong>${t.cortado}</strong>
+            </div>` : ''}
           <div class="cuadre-linea total">
             <span>= Debería haber ahora</span>
             <strong>${t.esperado}</strong>
@@ -171,7 +177,7 @@ export async function vistaExistencia(pantalla, estadoApp) {
         <div class="fila-botones" style="margin-top:14px;flex-wrap:wrap">
           ${puedeContar
             ? `<button class="crece" data-contar="${esc(a.almacen.id)}">
-                 📋 Contar el ${esc(a.almacen.nombre.toLowerCase())}
+                 📋 Anotar la existencia
                </button>`
             : ''}
           ${puedeContar
@@ -186,6 +192,151 @@ export async function vistaExistencia(pantalla, estadoApp) {
   // ==========================================================
   // HACER EL CONTEO
   // ==========================================================
+  // ==========================================================
+  // ANOTAR LA EXISTENCIA — los tres pasos, en el orden en que se cantan
+  //
+  // EL ORDEN NO ES CAPRICHO. El obrero llega con su papel y canta las dos
+  // cosas juntas: los paños que sacó y cuánto quedó en el cuarto frío.
+  // Anotando el conteo primero, la producción de esa misma jornada todavía
+  // no estaría capturada y el cuadre saldría mal — parecería que sobra
+  // hielo, cuando lo que falta es el registro.
+  //
+  // Y en medio va el hielo que se cortó, porque esas marquetas salieron del
+  // cuarto frío sin pasar por la caja: si no se anotan, aparecen como
+  // faltante, que es el número que de verdad hay que vigilar.
+  //
+  //     1. ¿Qué paños se sacaron?      → entra hielo
+  //     2. ¿Se cortó hielo?            → sale hielo, sin ticket
+  //     3. ¿Cuánto quedó?              → la foto
+  //
+  // Quien lo anota es siempre el usuario que tiene la sesión abierta: eso
+  // no se pregunta, se guarda solo (regla 3.6).
+  // ==========================================================
+
+  function anotarExistencia(a) {
+    return paso1(a.almacen);
+  }
+
+  /** PASO 1 — lo que entró: los paños de la jornada. */
+  function paso1(almacen) {
+    return capturaDePanos(pantalla, estadoApp, {
+      paso: 'Paso 1 de 3',
+      titulo: '¿Qué paños se sacaron?',
+      textoVolver: 'Existencia',
+      textoBoton: 'Registrar',
+      textoSaltar: 'No se sacó ninguno',
+      alVolver: pintar,
+      alGuardar: () => paso2(almacen)
+    });
+  }
+
+  /** PASO 2 — lo que salió sin pasar por la caja: el hielo que se cortó. */
+  function paso2(almacen) {
+    pantalla.innerHTML = `
+      <button class="secundario chico" id="volver">‹ Existencia</button>
+      <p class="paso-de">Paso 2 de 3</p>
+      <h2 style="margin-top:14px">¿Se cortó hielo?</h2>
+      <p class="ayuda">
+        Marquetas que se agarraron del cuarto frío para cortarlas y hacer
+        <b>hielo gourmet</b>. Salen de la existencia porque dejan de ser
+        marquetas: se vuelven bolsas.
+      </p>
+      <p class="ayuda">
+        Anotarlo aquí es lo que evita que aparezcan como hielo perdido. En
+        temporada, sin esto el corte diría que faltan cuarenta marquetas y
+        nadie sabría si es robo o es trabajo.
+      </p>
+
+      <div class="acciones-centradas" style="margin-top:24px">
+        <button class="secundario" id="nada">No se cortó nada</button>
+        <button id="si">Sí, se cortó hielo</button>
+      </div>`;
+
+    pantalla.querySelector('#volver').onclick = pintar;
+    pantalla.querySelector('#nada').onclick = () => paso3(almacen);
+    pantalla.querySelector('#si').onclick = async () => {
+      const dieciseisavos = await pedirCantidad({
+        titulo: '¿Cuánto hielo se cortó?',
+        texto: 'Las marquetas que se agarraron del cuarto frío para cortarlas.',
+        valor: 0, ok: 'Siguiente',
+        ayuda: 'Escríbelo como se dicta: "8 marquetas" o "3 y 1/2".'
+      });
+      if (!dieciseisavos) return;
+
+      // Las bolsas son opcionales a propósito: si nadie las contó, mejor
+      // vacío que un cero que mañana parecería un dato.
+      const bolsas = await pedirNumero({
+        titulo: '¿Cuántas bolsas salieron?',
+        texto: 'Si nadie las contó, déjalo en cero y se guarda sin ese dato. ' +
+               'Las bolsas todavía no son un producto del sistema; el día que ' +
+               'lo sean, este número va a hacer falta y ya no se puede ir a ' +
+               'buscar hacia atrás.',
+        valor: 0, min: 0, max: 100000, ok: 'Anotar el corte'
+      });
+      if (bolsas === null) return;
+
+      try {
+        await api.enviar('/existencia/cortes', {
+          almacenId: almacen.id, dieciseisavos, bolsas: bolsas || null
+        });
+        avisar(`${aTexto(dieciseisavos)} de hielo cortado`, 'bien');
+        paso3(almacen);
+      } catch (e) { avisar(e.message, 'error'); }
+    };
+  }
+
+  /**
+   * PASO 3 — la foto: cuánto hay de verdad.
+   *
+   * AQUÍ NO SE ENSEÑA CUÁNTO DEBERÍA HABER, y es a propósito. Con el número
+   * esperado a la vista, contar se vuelve confirmar: se aprieta aceptar, el
+   * cuadre da cero siempre y el conteo deja de servir para lo único que
+   * sirve, que es descubrir lo que no cuadra. Sale enseguida, en el
+   * resultado, cuando ya no puede influir en nadie.
+   */
+  function paso3(almacen) {
+    pantalla.innerHTML = `
+      <button class="secundario chico" id="volver">‹ Existencia</button>
+      <p class="paso-de">Paso 3 de 3</p>
+      <h2 style="margin-top:14px">¿Cuánto quedó en el cuarto frío?</h2>
+      <p class="ayuda">
+        Cuenta las marquetas de <b>${esc(almacen.nombre)}</b> ahora.
+      </p>
+      <p class="ayuda">
+        El sistema <b>no te enseña cuánto debería haber</b> hasta que anotes
+        tu número. Con el número a la vista, contar se vuelve confirmar, y el
+        conteo deja de servir para lo único que sirve: descubrir lo que no
+        cuadra. Sale enseguida, en el resultado.
+      </p>
+
+      <div class="acciones-centradas" style="margin-top:24px">
+        <button id="contar">Escribir lo que conté</button>
+      </div>`;
+
+    pantalla.querySelector('#volver').onclick = pintar;
+    pantalla.querySelector('#contar').onclick = async () => {
+      const dieciseisavos = await pedirCantidad({
+        titulo: `Contar ${almacen.nombre}`,
+        texto: '¿Cuánto hay físicamente?',
+        valor: 0,
+        ok: 'Registrar el conteo',
+        ayuda: 'Si te dictan "14 marquetas y 5/8", escríbelo tal cual o tócalo con los botones.'
+      });
+      if (dieciseisavos === null) return;
+
+      try {
+        const r = await api.enviar('/existencia/conteos', {
+          almacenId: almacen.id, dieciseisavos
+        });
+        // El estado de la tarjeta se vuelve a pedir para que el resultado
+        // enseñe el nombre y los textos ya con el conteo aplicado.
+        const { almacenes } = await api.obtener('/existencia');
+        const suyo = almacenes.find((x) => x.almacen.id === almacen.id);
+        resultado(suyo, r.resumen, r.conteo);
+      } catch (e) { avisar(e.message, 'error'); }
+    };
+  }
+
   async function hacerConteo(a) {
     const dieciseisavos = await pedirCantidad({
       titulo: `Contar ${a.almacen.nombre}`,
@@ -236,6 +387,8 @@ export async function vistaExistencia(pantalla, estadoApp) {
             <div class="cuadre-linea vendido"><span>− Se vendió con ticket</span><strong>${aTexto(r.vendido)}</strong></div>
             ${r.merma ? `
               <div class="cuadre-linea vendido"><span>− Derretidas, rotas o regaladas</span><strong>${aTexto(r.merma)}</strong></div>` : ''}
+            ${r.cortado ? `
+              <div class="cuadre-linea vendido"><span>− Se cortó para hielo gourmet</span><strong>${aTexto(r.cortado)}</strong></div>` : ''}
             <div class="cuadre-linea total"><span>= Debería quedar</span><strong>${aTexto(r.esperado)}</strong></div>
             <div class="cuadre-linea contado"><span>− Contaste</span><strong>${aTexto(r.contado)}</strong></div>
           </div>
@@ -269,6 +422,8 @@ export async function vistaExistencia(pantalla, estadoApp) {
               <tr><td>Había</td><td>${aTexto(r.anterior)}</td></tr>
               <tr><td>Se produjo</td><td>${signo('+', r.producido)}</td></tr>
               <tr><td>Vendido</td><td>${signo('−', r.vendido)}</td></tr>
+              ${r.merma ? `<tr><td>Merma</td><td>${signo('−', r.merma)}</td></tr>` : ''}
+              ${r.cortado ? `<tr><td>Se cortó</td><td>${signo('−', r.cortado)}</td></tr>` : ''}
               <tr><td>Debería quedar</td><td>${aTexto(r.esperado)}</td></tr>`}
             <tr class="fuerte"><td>Contado</td><td>${aTexto(r.contado)}</td></tr>
             ${r.primerConteo ? '' : `

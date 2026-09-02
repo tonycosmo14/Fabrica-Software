@@ -1222,6 +1222,13 @@ select { color-scheme: light dark; }
   color: var(--ambar); border-left: 3px solid var(--ambar); padding-left: 10px;
 }
 
+/* El renglón de "Paso 2 de 3": chico, arriba del título, para que se sepa
+   dónde va uno sin que le quite protagonismo a la pregunta. */
+.paso-de {
+  margin: 12px 0 0; font-size: 12px; font-weight: 800;
+  letter-spacing: .8px; text-transform: uppercase; color: var(--acento);
+}
+
 /* Fichas de paño para la captura en lote */
 .rejilla-panos {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));

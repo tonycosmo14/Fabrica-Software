@@ -17,9 +17,27 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '3.3';
+const VERSION_ACTUAL = '3.4';
 
 const VERSIONES = [
+  {
+    numero: '3.4',
+    nombre: 'Anotar la existencia, en el orden en que se canta',
+    fecha: '2026-09-02',
+    resumen:
+      'El conteo del cuarto frío deja de ser una pregunta suelta y pasa a ' +
+      'ser tres pasos en el orden real: primero los paños que se sacaron, ' +
+      'luego el hielo que se cortó para gourmet, y al final cuánto quedó.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'EL BOTÓN AHORA DICE "ANOTAR LA EXISTENCIA" y no empieza preguntando cuánto hielo queda. EMPIEZA POR LOS PAÑOS, y el orden no es capricho: el obrero llega y canta las dos cosas juntas —los números que sacó y cuánto quedó—. Anotando el conteo primero, la producción de esa jornada todavía no está capturada y el cuadre sale mal: parece que SOBRA hielo, cuando lo que falta es el registro.' },
+      { tipo: 'nuevo', texto: 'PASO 2: ¿SE CORTÓ HIELO? Hay temporadas en que se agarran marquetas del cuarto frío y se cortan para hacer hielo gourmet en bolsas. Esas salen de la existencia sin pasar por la caja y sin haberse derretido: DEJAN DE SER MARQUETAS. Hasta hoy el sistema no tenía dónde ponerlas y aparecían dentro del FALTANTE, revueltas con lo derretido y con lo que se fue sin pagar. En temporada, el corte decía que faltan cuarenta marquetas y nadie sabía si era robo o era trabajo.' },
+      { tipo: 'nuevo', texto: 'LAS BOLSAS SE ANOTAN SI SE CONTARON, y si no, se dejan vacías en vez de guardar un cero que mañana parecería un dato. Todavía no son un producto del sistema —lo serán—, pero el día que lo sean ese número va a hacer falta, y ya no se puede ir a buscar hacia atrás.' },
+      { tipo: 'importante', texto: 'EL PASO 3 YA NO TE DICE CUÁNTO DEBERÍA HABER antes de que anotes tu número, y esto es un cambio de fondo: antes el cuadrito venía relleno con el número esperado. Con ese número a la vista, contar se vuelve confirmar —se aprieta aceptar, el cuadre da cero siempre— y el conteo deja de servir para lo único que sirve, que es descubrir lo que no cuadra. El número sale enseguida, en el resultado, cuando ya no puede influir en nadie. Si lo prefieres como antes, se cambia en un renglón.' },
+      { tipo: 'arreglo', texto: 'DOS NÚMEROS DE LA MISMA PANTALLA NO PODÍAN CUADRAR ENTRE SÍ. "Debería quedar" ya descontaba lo derretido, pero "Falta" solo restaba lo vendido: el hielo que alguien anotaba como derretido volvía a aparecer como faltante. Ahora los dos hablan de lo mismo, y FALTA es exactamente lo que NADIE explicó.' },
+      { tipo: 'mejora', texto: 'El renglón del hielo cortado sale en la tarjeta del cuarto frío, en el cuadre del conteo y en el papel de la térmica. Y el conteo se guarda su copia de lo derretido y lo cortado, para que corregir algo viejo no cambie un corte que ya se firmó.' },
+      { tipo: 'mejora', texto: 'POR DENTRO: la pantalla de "registrar lo que se sacó" ahora vive en un solo sitio y la usan las dos —Producción de hielo y el paso 1 de la existencia—. Copiada dos veces sería una pantalla que tarde o temprano se comporta de dos maneras distintas.' }
+    ]
+  },
   {
     numero: '3.3',
     nombre: 'Configurar tanques, donde le toca',

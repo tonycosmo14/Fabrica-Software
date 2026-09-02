@@ -162,6 +162,35 @@ function mermaDesde(desde, almacenId) {
   return fila.n;
 }
 
+/**
+ * EL HIELO QUE SE CORTÓ desde una fecha.
+ *
+ * Marquetas que salieron del cuarto frío para volverse hielo gourmet en
+ * bolsas. No es merma —no se perdió, se vendió en otra forma— y por eso
+ * lleva su propio renglón: si se revolviera con lo derretido, "lo que se
+ * derrite" crecería en temporada alta sin que se hubiera derretido nada.
+ */
+function cortadoDesde(desde, almacenId) {
+  const fila = bd.prepare(`
+    SELECT COALESCE(SUM(dieciseisavos), 0) n
+      FROM cortes_hielo
+     WHERE fecha > ? AND almacen_id = ? AND anulado_en IS NULL
+  `).get(desde || '', almacenId);
+  return fila.n;
+}
+
+/** Los cortes con su detalle, para enseñarlos y poder anular uno. */
+function cortesDesde(desde, almacenId, limite = 50) {
+  return bd.prepare(`
+    SELECT c.*, u.nombre AS ejecutor_nombre, p.nombre AS capturista_nombre
+      FROM cortes_hielo c
+      LEFT JOIN usuarios u ON u.id = c.ejecutor_id
+      LEFT JOIN usuarios p ON p.id = c.capturista_id
+     WHERE c.fecha > ? AND c.almacen_id = ?
+     ORDER BY c.fecha DESC LIMIT ?
+  `).all(desde || '', almacenId, limite);
+}
+
 /** Las mermas con su detalle, para enseñarlas y poder anular una. */
 function mermasDesde(desde, almacenId, limite = 50) {
   return bd.prepare(`
@@ -191,6 +220,9 @@ function estadoAlmacen(almacen) {
   const vendido = ventas.total;
   // Y lo que se explicó sin ticket: lo derretido, lo roto, lo regalado.
   const merma = mermaDesde(desde, almacen.id);
+  // Y lo que se cortó para volverlo hielo gourmet: salió del cuarto frío,
+  // pero no se perdió ni se fue sin pagar. Se vendió en otra forma.
+  const cortado = cortadoDesde(desde, almacen.id);
   const teorico = anterior + producido;
 
   return {
@@ -203,11 +235,12 @@ function estadoAlmacen(almacen) {
     vendidoPublico: ventas.publico,
     vendidoMayoreo: ventas.mayoreo,
     merma,
+    cortado,
     // Lo que debería haber si nada hubiera salido.
     teorico,
     // Lo que debería haber ahora ya descontando todo lo que se explicó:
     // este es el número contra el que se compara el conteo físico.
-    esperado: teorico - vendido - merma
+    esperado: teorico - vendido - merma - cortado
   };
 }
 
@@ -223,6 +256,6 @@ function aMarquetas(dieciseisavos) {
 
 module.exports = {
   ultimoConteo, producidoDesde, producidoEntreDias, producidoPorRangos, vendidoDesde, partidoPorLista,
-  mermaDesde, mermasDesde, estadoAlmacen,
+  mermaDesde, mermasDesde, cortadoDesde, cortesDesde, estadoAlmacen,
   deMarquetas, aMarquetas, DIECISEISAVOS_POR_MARQUETA
 };

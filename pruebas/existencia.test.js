@@ -351,3 +351,87 @@ test('los rangos que se encima cuentan cada uno lo suyo, sin restarse', async ()
   ]);
   assert.ok(ancho >= angosto, 'el año no puede tener menos que uno de sus meses');
 });
+
+// ============================================================
+// EL HIELO QUE SE CORTA  (v3.4)
+// ============================================================
+
+test('el hielo cortado sale de la existencia sin ser faltante', async () => {
+  // En temporada se agarran marquetas del cuarto frío y se cortan para
+  // hacer gourmet. Salen sin pasar por la caja y sin derretirse: si el
+  // sistema no las anota aparte, el corte dice que faltan cuarenta
+  // marquetas y nadie sabe si es robo o es trabajo.
+  await entrarAdmin();
+  const antes = (await llamar('/api/existencia')).json.datos.almacenes[0];
+
+  const r = await llamar('/api/existencia/cortes', {
+    method: 'POST',
+    cuerpo: { almacenId, dieciseisavos: 3 * 16, bolsas: 42 }
+  });
+  assert.equal(r.estado, 201);
+
+  const d = (await llamar('/api/existencia')).json.datos.almacenes[0];
+  assert.equal(d.cortado, 3 * 16);
+  assert.equal(d.esperado, antes.esperado - 3 * 16,
+    'ese hielo ya no está en el cuarto frío');
+  assert.equal(d.merma, antes.merma, 'y NO es merma: no se perdió, se transformó');
+});
+
+test('las bolsas se guardan si se contaron, y si no se dejan vacías', async () => {
+  await entrarAdmin();
+  await llamar('/api/existencia/cortes', {
+    method: 'POST', cuerpo: { almacenId, dieciseisavos: 16 }
+  });
+
+  const filas = bd.prepare(
+    'SELECT bolsas FROM cortes_hielo ORDER BY fecha').all().map((f) => f.bolsas);
+  assert.deepEqual(filas, [42, null],
+    'un cero mañana parecería un dato; vacío dice la verdad: nadie las contó');
+});
+
+test('el corte anulado deja de contar', async () => {
+  await entrarAdmin();
+  const { cortes } = (await llamar(`/api/existencia/cortes?almacenId=${almacenId}`)).json.datos;
+  const antes = (await llamar('/api/existencia')).json.datos.almacenes[0].cortado;
+
+  const r = await llamar(`/api/existencia/cortes/${cortes[0].id}/anular`, {
+    method: 'POST', cuerpo: { motivo: 'Se capturó dos veces' }
+  });
+  assert.equal(r.estado, 200);
+
+  const despues = (await llamar('/api/existencia')).json.datos.almacenes[0].cortado;
+  assert.equal(despues, antes - cortes[0].dieciseisavos);
+});
+
+test('lo que falta es lo que NADIE explicó', async () => {
+  // Antes, "falta" restaba solo lo vendido, mientras que "debería quedar"
+  // restaba también lo derretido: dos números de la misma pantalla que no
+  // podían cuadrar entre sí. Ahora los dos hablan de lo mismo.
+  await entrarAdmin();
+  await llamar('/api/existencia/mermas', {
+    method: 'POST', cuerpo: { almacenId, dieciseisavos: 16, motivo: 'derretida' }
+  });
+  await llamar('/api/existencia/cortes', {
+    method: 'POST', cuerpo: { almacenId, dieciseisavos: 2 * 16 }
+  });
+
+  const d = (await llamar('/api/existencia')).json.datos.almacenes[0];
+  const r = await llamar('/api/existencia/conteos', {
+    method: 'POST', cuerpo: { almacenId, dieciseisavos: d.esperado }
+  });
+  const s = r.json.datos.resumen;
+
+  assert.equal(s.faltante, 0,
+    'se contó exactamente lo esperado: no falta nada');
+  assert.equal(s.esperado - s.contado, s.faltante,
+    'el faltante ES la diferencia contra lo esperado, no otra cuenta distinta');
+  assert.ok(s.merma > 0 && s.cortado > 0, 'y los dos renglones viajan a la pantalla');
+});
+
+test('el conteo guarda su foto de lo derretido y lo cortado', async () => {
+  // Regla 3.2: corregir una merma vieja no puede cambiar un corte que ya se
+  // hizo y se firmó, así que el conteo se lleva su copia.
+  const c = bd.prepare('SELECT * FROM conteos ORDER BY fecha DESC LIMIT 1').get();
+  assert.ok(c.merma > 0);
+  assert.ok(c.cortado > 0);
+});

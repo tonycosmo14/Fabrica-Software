@@ -223,12 +223,57 @@ const TEMAS = [
   {
     id: 'existencia',
     titulo: 'Existencia: contar el cuarto frío',
-    busca: 'existencia conteo cuarto frío contar marquetas fracción 5/8 cuadre faltante vendido salidas almacén horarios',
+    busca: 'existencia conteo cuarto frío contar marquetas fracción 5/8 cuadre faltante vendido salidas almacén horarios anotar la existencia tres pasos hielo cortado gourmet bolsas turnos nocturno',
     cuerpo: `
-      <h4>Cuándo se cuenta</h4>
-      <p>A las horas que estén configuradas (de fábrica, <b>3 de la tarde y 8
-      de la noche</b>). Cuando pasa la hora y nadie ha contado, la pantalla lo
-      marca en naranja.</p>
+      <h4>Los turnos de la fábrica</h4>
+      <p>El de la mañana va de <b>7 a 3</b>, el de la tarde de <b>3 a 8</b>, y
+      a las 8 se cierra al público. A veces —no siempre— hay un
+      <b>trabajador nocturno</b> que saca hielo a media noche o a las 3 de la
+      mañana. Ese no vende: solo saca, y lo suyo se anota igual que lo demás,
+      a su nombre.</p>
+
+      <h4>Cuándo se anota</h4>
+      <p>Normalmente al mismo tiempo que el corte de caja, a las horas que
+      estén configuradas (de fábrica, <b>3 de la tarde y 8 de la noche</b>).
+      Cuando pasa la hora y nadie ha anotado, la pantalla lo marca en
+      naranja.</p>
+
+      <h4>Anotar la existencia: tres pasos, en ese orden</h4>
+      <p>El botón <b>Anotar la existencia</b> no empieza preguntando cuánto
+      hielo queda. Empieza por los paños, y el orden no es capricho:</p>
+      <ol>
+        <li><b>¿Qué paños se sacaron?</b> — con su calidad, sus mermas, sus
+        huecas y sus aguadas. Va primero porque el obrero canta las dos cosas
+        juntas, y si el conteo se anota antes, la producción de esa jornada
+        todavía no está capturada: el cuadre diría que <b>sobra</b> hielo
+        cuando lo que falta es el registro.</li>
+        <li><b>¿Se cortó hielo?</b> — marquetas que se agarraron del cuarto
+        frío para cortarlas y hacer <b>hielo gourmet</b> en bolsas.</li>
+        <li><b>¿Cuánto quedó en el cuarto frío?</b> — el conteo de siempre.</li>
+      </ol>
+      <p class="ayuda-tip">Quién lo anota <b>no se pregunta</b>: es el usuario
+      que tiene la sesión abierta en esa computadora, y queda guardado
+      siempre.</p>
+
+      <h4>El hielo que se corta no se pierde</h4>
+      <p>Esas marquetas salen del cuarto frío sin pasar por la caja y sin
+      haberse derretido: <b>dejan de ser marquetas y se vuelven bolsas</b>.
+      Antes no había dónde ponerlas y aparecían dentro del faltante,
+      revueltas con lo que se derritió y con lo que se fue sin pagar. En
+      temporada, eso hacía que el corte dijera que faltan cuarenta marquetas
+      sin que nadie supiera si era robo o era trabajo.</p>
+      <p>Las <b>bolsas</b> se anotan si alguien las contó, y si no se dejan en
+      cero y se guarda sin ese dato. Todavía no son un producto del sistema
+      —lo serán—, pero el día que lo sean ese número va a hacer falta y ya no
+      se puede ir a buscar hacia atrás.</p>
+
+      <h4>Por qué no te dice cuánto debería haber</h4>
+      <p>En el paso 3, el sistema <b>no enseña el número esperado</b> hasta
+      que anotes el tuyo. Con el número a la vista, contar se vuelve
+      confirmar: se aprieta aceptar, el cuadre da cero siempre y el conteo
+      deja de servir para lo único que sirve, que es descubrir lo que no
+      cuadra. Sale enseguida, en el resultado, cuando ya no puede influir en
+      nadie.</p>
 
       <h4>Cómo se captura</h4>
       <p>Tal como te lo dictan. Si te dicen <b>"quedan 14 marquetas y 5/8"</b>,

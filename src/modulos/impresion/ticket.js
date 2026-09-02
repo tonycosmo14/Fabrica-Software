@@ -693,6 +693,10 @@ function ticketConteo(conteo, { negocio = '' } = {}) {
     t.columnas2('+ Se produjo', aTexto(r.producido));
     t.columnas2('- Se vendio', aTexto(r.vendido));
     if (r.merma) t.columnas2('- Merma', aTexto(r.merma));
+    // El hielo que se cortó para gourmet sale del cuarto frío sin pasar por
+    // la caja. Sin este renglón, el papel salta de "vendido" a "deberia
+    // quedar" con un hueco que nadie sabe explicar.
+    if (r.cortado) t.columnas2('- Se corto (gourmet)', aTexto(r.cortado));
     t.separador();
     t.negrita().columnas2('Deberia quedar', aTexto(r.esperado));
     t.columnas2('Contado', aTexto(r.contado)).negrita(false);
