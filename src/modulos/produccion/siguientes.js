@@ -31,12 +31,42 @@ function numerosASacar(entregadoPor = '') {
     const numeros = estado.panos.map((p) => p.numero);
     const enProceso = estado.panos.filter((p) => p.enProceso).map((p) => p.numero);
 
+    // LAS CANASTAS QUE QUEDARON PENDIENTES.
+    //
+    // Un paño se puede sacar canasta por canasta —no se saca la siguiente
+    // hasta que se gasta la anterior—, y cuando el turno cierra a media
+    // faena quedan canastas colgadas. Este papel es el que se le entrega al
+    // turno que llega, así que tiene que decirlo con nombre y apellido:
+    // qué paño, cuántas canastas faltan y quién empezó. Sin eso, alguien
+    // pregunta y otro adivina.
+    const aMedias = estado.panos.filter((p) => p.enProceso).map((p) => ({
+      pano: p.numero,
+      faltan: p.faltan,
+      total: p.canastas.length,
+      empezadoPor: p.empezadoPor || null,
+      empezadoEn: p.empezadoEn || null
+    }));
+
     for (let i = 0; i < Math.min(CUANTOS, numeros.length); i++) {
       const n = siguientePano(numeros, ultimo, i === 0 ? enProceso : []);
       if (n == null || orden.includes(n)) break;
       const pano = estado.panos.find((p) => p.numero === n);
       orden.push(n);
-      if (!(i === 0 && enProceso.length)) ultimo = n;
+
+      // AVANZAR O NO AVANZAR LA CUENTA.
+      //
+      // Si el que va es el que le tocaba a la rotación, se avanza y punto.
+      // Si es un paño A MEDIAS que se había sacado FUERA de orden, la
+      // secuencia normal se queda donde estaba: ese paño de emergencia no
+      // debe descolocar la fila del resto de la jornada.
+      //
+      // Antes se dejaba quieta la cuenta siempre que hubiera algo a medias,
+      // y eso borraba la lista entera: al dar la segunda vuelta salía otra
+      // vez el mismo número, se detectaba repetido y el papel se quedaba
+      // con un solo paño. El obrero perdía la fila de toda su jornada por
+      // una canasta colgada.
+      if (n === siguientePano(numeros, ultimo, [])) ultimo = n;
+
       if (!pano) break;
     }
 
@@ -44,6 +74,7 @@ function numerosASacar(entregadoPor = '') {
       tanque: t.nombre,
       siguientes: orden,
       enProceso,
+      aMedias,
       horasConfiguradas: estado.horas_congelacion
     };
   });

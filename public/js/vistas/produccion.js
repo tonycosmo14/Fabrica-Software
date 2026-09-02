@@ -305,6 +305,38 @@ export async function vistaProduccion(pantalla, estado) {
                   : p.estado === 'lista' ? 'listo'
                   : `${Math.floor(p.horas)} h`;
 
+    // Un paño a medias enseña lo que falta, no lo que se sacó la vez pasada:
+    // es lo único que hay que hacer con él, y quien mira la lista tiene que
+    // verlo sin entrar.
+    if (p.enProceso) {
+      const quien = p.empezadoPor ? nombreDePila(p.empezadoPor) : null;
+      // Un paño a medias es siempre el que toca, así que lleva también el
+      // aro verde: si no, el que toca desaparecía de la pantalla justo
+      // cuando hay algo urgente que hacer con él.
+      return `
+      <div class="pano-prod en-proceso ${esElQueToca ? 'toca-este' : ''}">
+        <button class="pano-prod-cuerpo" data-pano="${esc(p.id)}">
+          <span class="pano-prod-num">${p.numero}</span>
+          <span class="pano-prod-medio">
+            <span class="canastas-prod">
+              ${p.canastas.map((c) => `
+                <span class="canasta-prod ${c.yaSacada ? 'sacada' : c.estado}
+                             ${c.tipoAgua === 'potable' ? 'potable' : ''}">
+                  ${c.moldes.map((m) => `<i class="molde"></i>`).join('')}
+                </span>`).join('')}
+            </span>
+            <small class="pano-prod-historia">
+              a medias · faltan ${p.faltan} de ${p.canastas.length} canastas${
+                quien ? ` · lo empezó ${esc(quien)}` : ''}
+            </small>
+          </span>
+          <span class="pano-prod-horas proceso">a medias</span>
+        </button>
+        <button class="pano-prod-ojo" data-ficha="${esc(p.id)}"
+                title="Ver el detalle de este paño (no cambia nada)">👁</button>
+      </div>`;
+    }
+
     const u = p.ultimaSacada;
     const historia = u
       ? [fechaCorta(u.fecha),
@@ -410,6 +442,20 @@ export async function vistaProduccion(pantalla, estado) {
     const fuera = pano.canastas.filter((c) => c.estado === 'fuera');
     const dentro = pano.canastas.filter((c) => c.estado !== 'fuera');
 
+    // CANASTA POR CANASTA.
+    //
+    // Un paño no siempre sale de un jalón: a veces se saca una canasta y no
+    // se toca la siguiente hasta que esa se gasta, para darle más horas al
+    // hielo. Entonces el turno cierra a media faena y quedan canastas
+    // colgadas, que las saca el turno de mañana — y cada una guarda quién
+    // la sacó de verdad.
+    //
+    // Por omisión van todas marcadas: sacar el paño entero sigue siendo un
+    // solo toque, como siempre. Desmarcar es la excepción, y se paga.
+    const hechas = dentro.filter((c) => c.yaSacada);
+    const porSacar = dentro.filter((c) => !c.yaSacada);
+    const elegidas = new Set(porSacar.map((c) => c.id));
+
     // Quién lo sacó: por omisión el que tiene la sesión, pero casi siempre
     // es otra persona la que estuvo en la grúa.
     // Solo salen los operarios: sacar paños es su trabajo. Para el eventual
@@ -429,7 +475,7 @@ export async function vistaProduccion(pantalla, estado) {
     function contar() {
       const cuenta = {};
       let alAlmacen = 0;
-      for (const c of dentro) {
+      for (const c of porSacar.filter((x) => elegidas.has(x.id))) {
         for (const m of c.moldes) {
           const r = deMolde(m.id);
           cuenta[r.resultado] = (cuenta[r.resultado] || 0) + 1;
@@ -444,13 +490,15 @@ export async function vistaProduccion(pantalla, estado) {
       const { cuenta, alAlmacen } = contar();
       const elegida = CALIDADES.find((c) => c.clave === calidadPano);
       const destino = DESTINOS.find((d) => d.clave === destinoPano);
-      const totalMoldes = dentro.reduce((n, c) => n + c.moldes.length, 0);
+      const marcadas = porSacar.filter((c) => elegidas.has(c.id));
+      const totalMoldes = marcadas.reduce((n, c) => n + c.moldes.length, 0);
+      const quedarian = porSacar.length - marcadas.length;
 
       pantalla.innerHTML = `
         ${cabezaPano(pano, ficha, vale, mirando)}
 
         ${mirando ? fichaHTML(ficha, pano) : `
-          ${dentro.length ? `
+          ${porSacar.length ? `
             <div class="pano-captura">
               <div class="tarjeta">
                 <label for="quien">¿Quién lo sacó?</label>
@@ -506,18 +554,60 @@ export async function vistaProduccion(pantalla, estado) {
               💧 Rellenar con agua ${agua}
             </button>` : ''}
 
-          ${dentro.length ? `
+          ${hechas.length ? `
+            <div class="aviso-medias">
+              <strong>Este paño quedó a medias.</strong>
+              Ya se ${hechas.length === 1 ? 'sacó' : 'sacaron'} ${hechas.length} de
+              ${dentro.length} canastas${pano.empezadoPor
+                ? `; ${hechas.length === 1 ? 'la sacó' : 'las sacó'} ${esc(pano.empezadoPor)}` : ''}.
+              ${porSacar.length
+                ? `Faltan ${porSacar.length}, y hasta terminarlas nadie puede pasar al siguiente paño.`
+                : 'Ya no falta ninguna.'}
+            </div>
+
+            <div class="canastas-merma">
+              ${hechas.map((c) => `
+                <div class="tarjeta canasta-hecha">
+                  <div class="canasta-cabeza">
+                    <strong>✓ Canasta ${c.numero}</strong>
+                    <small>${esc([c.sacadaPor && nombreDePila(c.sacadaPor),
+                                  c.sacadaEn && fechaCorta(c.sacadaEn)].filter(Boolean).join(' · ')
+                                 || 'ya se sacó')}</small>
+                  </div>
+                  <div class="moldes-detalle">
+                    ${c.moldes.map((m) => `
+                      <span class="molde-boton ${esc(m.ultimoResultado || 'normal')} sin-tocar"
+                            title="${esc(nombreLargo({ resultado: m.ultimoResultado }))}">
+                        <span class="molde-num">${m.numero}</span>
+                        <span class="molde-estado">${esc(etiqueta({ resultado: m.ultimoResultado }))}</span>
+                      </span>`).join('')}
+                  </div>
+                </div>`).join('')}
+            </div>` : ''}
+
+          ${porSacar.length ? `
             <p class="ayuda">
-              Así queda TODO el paño. Toca un molde suelto solo si ese salió
-              distinto del resto.
+              ${porSacar.length === dentro.length
+                ? 'Así queda TODO el paño. Toca un molde suelto solo si ese salió distinto del resto.'
+                : 'Así quedan las canastas que faltan. Toca un molde suelto si salió distinto del resto.'}
+              ${porSacar.length > 1
+                ? ' Si hoy solo vas a sacar unas, desmárcalas: las demás quedan pendientes.'
+                : ''}
             </p>
 
             <div class="canastas-merma">
-              ${dentro.map((c) => `
-                <div class="tarjeta">
+              ${porSacar.map((c) => `
+                <div class="tarjeta ${elegidas.has(c.id) ? '' : 'canasta-dejada'}">
                   <div class="canasta-cabeza">
-                    <strong>Canasta ${c.numero}</strong>
-                    <small>${c.tipoAgua ? `agua ${esc(c.tipoAgua)}` : 'sin registro'}</small>
+                    ${porSacar.length > 1 ? `
+                      <label class="canasta-elegir">
+                        <input type="checkbox" data-canasta="${esc(c.id)}"
+                               ${elegidas.has(c.id) ? 'checked' : ''}>
+                        <strong>Canasta ${c.numero}</strong>
+                      </label>` : `<strong>Canasta ${c.numero}</strong>`}
+                    <small>${elegidas.has(c.id)
+                      ? (c.tipoAgua ? `agua ${esc(c.tipoAgua)}` : 'sin registro')
+                      : 'queda pendiente'}</small>
                   </div>
                   <div class="moldes-detalle">
                     ${c.moldes.map((m) => {
@@ -525,6 +615,7 @@ export async function vistaProduccion(pantalla, estado) {
                       const propia = marcas.has(m.id);
                       return `<button class="molde-boton ${esc(r.resultado)} ${propia ? 'aparte' : ''}"
                                       data-molde="${esc(m.id)}"
+                                      ${elegidas.has(c.id) ? '' : 'disabled'}
                                       title="${esc(nombreLargo(r))}">
                                 <span class="molde-num">${m.numero}</span>
                                 <span class="molde-estado">${esc(etiqueta(r))}</span>
@@ -544,6 +635,12 @@ export async function vistaProduccion(pantalla, estado) {
                   <strong>${alAlmacen}</strong>
                   <small>de ${totalMoldes} moldes entran al cuarto frío</small>
                 </div>
+                ${quedarian ? `
+                  <p class="cierre-aviso">
+                    ${quedarian} ${quedarian === 1 ? 'canasta queda' : 'canastas quedan'}
+                    pendiente${quedarian === 1 ? '' : 's'}: el paño sigue a medias y no se
+                    puede pasar al siguiente hasta terminarlo.
+                  </p>` : ''}
                 <div class="mezcla-viva">
                   ${CALIDADES.filter((c) => cuenta[c.clave])
                       .map((c) => `<span class="mezcla-parte ${esc(c.clave)}"
@@ -552,8 +649,12 @@ export async function vistaProduccion(pantalla, estado) {
                 </div>
               </div>
               <div class="cierre-botones">
-                <button id="sacar">Sacar el paño ${pano.numero}</button>
-                <button class="secundario" id="sacar-fuera">Sacar y dejarlo fuera</button>
+                <button id="sacar" ${marcadas.length ? '' : 'disabled'}>${
+                  marcadas.length === dentro.length
+                    ? `Sacar el paño ${pano.numero}`
+                    : `Sacar ${marcadas.length} ${marcadas.length === 1 ? 'canasta' : 'canastas'}`}</button>
+                <button class="secundario" id="sacar-fuera"
+                        ${marcadas.length ? '' : 'disabled'}>Sacar y dejarlo fuera</button>
               </div>
             </div>` : ''}
 
@@ -592,6 +693,13 @@ export async function vistaProduccion(pantalla, estado) {
       if (btnMirar) btnMirar.onclick = () => { mirando = true; dibujar(); };
 
       if (mirando) return;
+
+      // La tarjeta de captura solo existe si queda algo por sacar.
+      if (!porSacar.length) {
+        const btnAnularSolo = pantalla.querySelector('#anular');
+        if (btnAnularSolo) btnAnularSolo.onclick = anular;
+        return;
+      }
 
       pantalla.querySelector('#quien').onchange = async (e) => {
         quienId = e.target.value;
@@ -640,6 +748,14 @@ export async function vistaProduccion(pantalla, estado) {
         b.onclick = () => { destinoPano = b.dataset.destino; dibujar(); };
       });
 
+      pantalla.querySelectorAll('[data-canasta]').forEach((casilla) => {
+        casilla.onchange = () => {
+          if (casilla.checked) elegidas.add(casilla.dataset.canasta);
+          else elegidas.delete(casilla.dataset.canasta);
+          dibujar();
+        };
+      });
+
       // UN MOLDE SUELTO. Se abre la lista y se elige: con nueve estados,
       // ir cambiando de uno en uno a cada toque sería peor que buscar.
       pantalla.querySelectorAll('[data-molde]').forEach((b) => {
@@ -675,8 +791,10 @@ export async function vistaProduccion(pantalla, estado) {
       const btnFuera = pantalla.querySelector('#sacar-fuera');
       if (btnFuera) btnFuera.onclick = async () => {
         const sigue = await confirmar({
-          titulo: `¿Dejar el paño ${pano.numero} fuera?`,
-          texto: 'Se saca el hielo pero los moldes NO se rellenan. Quedará en la alerta ' +
+          titulo: marcadas.length === dentro.length
+            ? `¿Dejar el paño ${pano.numero} fuera?`
+            : `¿Dejar fuera ${marcadas.length} ${marcadas.length === 1 ? 'canasta' : 'canastas'}?`,
+          texto: 'Se saca el hielo pero los moldes NO se rellenan. Quedarán en la alerta ' +
                  'hasta que alguien los llene.',
           ok: 'Dejarlo fuera'
         });
@@ -688,12 +806,18 @@ export async function vistaProduccion(pantalla, estado) {
     };
 
     async function sacar(opciones, autorizacion) {
-      const resultados = [...marcas.entries()].map(([moldeId, m]) => ({ moldeId, ...m }));
+      // Solo los moldes de las canastas que de verdad se van a sacar: una
+      // marca en una canasta desmarcada no tiene dónde guardarse.
+      const deLasElegidas = new Set(
+        porSacar.filter((c) => elegidas.has(c.id)).flatMap((c) => c.moldes.map((m) => m.id)));
+      const resultados = [...marcas.entries()]
+        .filter(([moldeId]) => deLasElegidas.has(moldeId))
+        .map(([moldeId, m]) => ({ moldeId, ...m }));
 
       try {
         const r = await api.enviar(`/produccion/panos/${pano.id}/sacar`, {
           tipoAgua: agua, calidad: calidadPano, destino: destinoPano,
-          nota: notaPano || null,
+          nota: notaPano || null, canastas: [...elegidas],
           resultados, ejecutorId: quienId || null,
           ejecutorNombre: quienNombre || null, vale, ...opciones, autorizacion
         });
@@ -702,7 +826,7 @@ export async function vistaProduccion(pantalla, estado) {
           `Paño ${pano.numero}: ${r.marquetas} al cuarto frío` +
           (fuera ? ` · ${fuera} no entraron` : '') +
           (r.merma ? ` · ${r.merma} rotas` : '') +
-          (r.terminado ? '' : ' · queda a medias'), 'bien');
+          (r.faltan ? ` · quedan ${r.faltan} canastas pendientes` : ''), 'bien');
         await pintar();
       } catch (e) {
         if (e.requiereAutorizacion || /autoriza|PIN/i.test(e.message)) {

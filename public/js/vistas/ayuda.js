@@ -45,7 +45,7 @@ const TEMAS = [
   {
     id: 'produccion',
     titulo: 'Producción: sacar el hielo de los tanques',
-    busca: 'producción tanque paño canasta molde sacar rellenar rotación intercalado merma agua purificada potable congelación quién lo sacó otro eventual nombre calidad sellada normal hueca cáscara aguada salada contaminada salmuera condensadores destino cómo salió el hielo mezcla ojo ficha historia última vez F2 atajo panel',
+    busca: 'producción tanque paño canasta molde sacar rellenar rotación intercalado merma agua purificada potable congelación quién lo sacó otro eventual nombre calidad sellada normal hueca cáscara aguada salada contaminada salmuera condensadores destino cómo salió el hielo mezcla ojo ficha historia última vez F2 atajo panel canastas pendientes a medias turno canasta por canasta terminar',
     cuerpo: `
       <h4>Cómo está armado un tanque</h4>
       <p>Un <b>tanque</b> tiene varios <b>paños</b>. Cada paño tiene
@@ -151,6 +151,31 @@ const TEMAS = [
       <p>La <b>contaminada</b> es la excepción: esa marca siempre, aunque el
       paño entero esté salado. Salmuera dentro del molde es un molde roto, y
       si están rotos varios hay que verlos todos.</p>
+
+      <h4>Sacar canasta por canasta</h4>
+      <p>Un paño no siempre sale de un jalón. A veces se saca una canasta y
+      no se toca la siguiente hasta que esa se gasta, para darle más horas al
+      hielo. Para eso, en la pantalla del paño cada canasta trae su
+      <b>casilla</b>: desmarca las que hoy no vas a sacar y el botón cambia a
+      <b>«Sacar 2 canastas»</b>. Las demás quedan pendientes.</p>
+
+      <p>A partir de ahí el paño queda <b>a medias</b>, y eso significa que
+      <b>nadie puede pasar al siguiente paño</b> hasta terminarlo. Aparece
+      así en la lista —"faltan 3 de 4 canastas, lo empezó Chema"— y también
+      en el papel de <b>Números a sacar</b>, para que el turno que llega
+      sepa qué hacer sin preguntarle a nadie.</p>
+
+      <p>Al día siguiente se entra al mismo paño y solo salen <b>las que
+      faltan</b>: las de ayer se ven marcadas con un ✓, con quién las sacó y
+      a qué hora, y ya no se pueden volver a registrar. <b>Cada canasta
+      guarda su propio responsable</b>, así que si Chema sacó una y Juan las
+      otras tres, el papel del día lo dice.</p>
+
+      <p class="ayuda-tip">¿Y si el hielo que falta <b>ya no va a salir</b>?
+      No se borra: se saca marcándolo por lo que es —<b>aguada</b>,
+      <b>se rompió</b>, lo que haya pasado— y con eso el paño se cierra y la
+      rotación avanza. Un paño abandonado a medias trabaría el tanque para
+      siempre.</p>
 
       <h4>Mirar un paño sin tocarlo</h4>
       <p>Cada paño tiene un <b>👁 al lado</b>. Ábrelo y verás la historia de

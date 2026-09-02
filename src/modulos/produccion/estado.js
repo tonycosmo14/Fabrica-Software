@@ -159,6 +159,33 @@ function ultimoResultadoPorMolde(tanqueId) {
   return mapa;
 }
 
+/**
+ * LAS CANASTAS QUE YA SE SACARON DE UN PAÑO EMPEZADO.
+ *
+ * Un paño se puede sacar canasta por canasta: no se saca la siguiente
+ * hasta que se gasta la anterior, para darle más horas al hielo. Cuando el
+ * turno cierra a media faena, quedan canastas pendientes, y al día
+ * siguiente hay que saber CUÁLES quedaron y QUIÉN sacó las de ayer.
+ *
+ * Hace falta también para no sacarlas dos veces: al sacar una canasta se
+ * rellena en el mismo movimiento, así que al ratito vuelve a verse
+ * "congelando" y sin esta lista el sistema la ofrecería otra vez —
+ * inventando marquetas que nadie sacó.
+ */
+function canastasYaSacadas(sacadaPanoId) {
+  const filas = bd.prepare(`
+    SELECT s.canasta_id, s.fecha, COALESCE(u.nombre, '') AS quien
+      FROM sacadas s
+      LEFT JOIN usuarios u ON u.id = s.ejecutor_id
+     WHERE s.sacada_pano_id = ?
+     ORDER BY s.fecha
+  `).all(sacadaPanoId);
+
+  const mapa = new Map();
+  for (const f of filas) mapa.set(f.canasta_id, f);
+  return mapa;
+}
+
 /** Sacadas de paño empezadas y sin terminar en un tanque. */
 function panosEnProceso(tanqueId) {
   return bd.prepare(`
@@ -306,12 +333,26 @@ function tanqueConEstado(tanqueId) {
 
     // Un paño empezado y sin terminar: alguien tiene que ir a acabarlo.
     pano.enProceso = panosEnProcesoIds.has(pano.id);
+    pano.faltan = pano.canastas.length;
+
     if (pano.enProceso) {
       const abierta = enProceso.find((x) => x.pano_id === pano.id);
       pano.sacadaPanoId = abierta.id;
       pano.empezadoPor = abierta.ejecutor_nombre;
       pano.empezadoEn = abierta.iniciada_en;
       pano.estado = 'proceso';
+
+      // Cuáles ya se sacaron, quién y cuándo. Con eso la pantalla puede
+      // enseñar las de ayer marcadas y ofrecer solo las que faltan.
+      const hechas = canastasYaSacadas(abierta.id);
+      for (const c of pano.canastas) {
+        const h = hechas.get(c.id);
+        c.yaSacada = Boolean(h);
+        c.sacadaPor = h?.quien || null;
+        c.sacadaEn = h?.fecha || null;
+      }
+      pano.faltan = pano.canastas.filter((c) => !c.yaSacada).length;
+      pano.sacadas = pano.canastas.length - pano.faltan;
     }
 
     // Moldes señalados en este paño: los que vienen saliendo peor que sus
@@ -405,5 +446,6 @@ function canastasFuera() {
 module.exports = {
   ESTADOS, horasDesde, ultimosEventos, estadoDeCanasta,
   tanqueConEstado, panoSugerido, canastasFuera,
-  ultimoResultadoPorMolde, panosEnProceso, ultimaSacadaPorPano
+  ultimoResultadoPorMolde, panosEnProceso, ultimaSacadaPorPano,
+  canastasYaSacadas
 };

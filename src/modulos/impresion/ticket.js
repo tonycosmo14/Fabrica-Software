@@ -400,7 +400,16 @@ function ticketProduccion(datos, { negocio = '' } = {}) {
       if (luego.length) t.linea(`  luego: ${luego.join(', ')}`);
     }
 
-    if (grupo.enProceso?.length) {
+    // LO QUE QUEDÓ A MEDIAS VA CON DETALLE, no con un número suelto.
+    // Este papel se le entrega al turno que llega: "a medias: 3" obliga a
+    // ir a contar canastas al tanque. Diciendo cuántas faltan y quién
+    // empezó, el que llega sabe qué hacer sin preguntarle a nadie.
+    for (const m of grupo.aMedias || []) {
+      t.linea(`  PANO ${m.pano} A MEDIAS: faltan ${m.faltan} de ${m.total} canastas`);
+      if (m.empezadoPor) t.linea(`    lo empezo ${m.empezadoPor} - terminarlo primero`);
+      else t.linea('    terminarlo primero');
+    }
+    if (!grupo.aMedias?.length && grupo.enProceso?.length) {
       t.linea(`  a medias: ${grupo.enProceso.join(', ')} - terminar primero`);
     }
     // Sin renglón en blanco entre tanques: el nombre del tanque va en

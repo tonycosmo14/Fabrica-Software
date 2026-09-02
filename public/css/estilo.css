@@ -1170,6 +1170,45 @@ select { color-scheme: light dark; }
 .hist-tabla tr.anulada { opacity: .55; text-decoration: line-through; }
 .hist-tabla tr.anulada .mezcla-parte { text-decoration: none; }
 
+/* ============================================================
+   CANASTA POR CANASTA  (v3.2)
+
+   Un paño no siempre sale de un jalón. A veces se saca una canasta y no
+   se toca la siguiente hasta que esa se gasta, para darle más horas al
+   hielo; entonces el turno cierra a media faena y quedan canastas
+   colgadas que saca el turno de mañana. Aquí se distinguen de un vistazo
+   las tres situaciones: la que ya se sacó, la que se va a sacar ahora y
+   la que se deja pendiente a propósito.
+   ============================================================ */
+
+.aviso-medias {
+  margin: 0 0 14px; padding: 12px 14px; border-radius: var(--radio);
+  background: var(--est-fuera-f); border-left: 4px solid var(--ambar);
+  color: var(--texto); font-size: 13.5px; line-height: 1.5;
+}
+.aviso-medias strong { color: var(--ambar); }
+
+/* Ya se sacó: se enseña con su resultado, pero apagada y sin tocar. */
+.canasta-hecha { opacity: .72; border-style: dashed; }
+.canasta-hecha .canasta-cabeza strong { color: var(--verde); }
+
+/* Se deja pendiente a propósito: los moldes se apagan para que no quepa
+   duda de que eso NO se va a registrar hoy. */
+.canasta-dejada { opacity: .5; }
+.canasta-dejada .canasta-cabeza small { color: var(--ambar); font-weight: 700; }
+
+.canasta-elegir { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.canasta-elegir input { width: 18px; height: 18px; margin: 0; accent-color: var(--acento); }
+
+/* En la lista de paños, la canasta que ya salió va en verde. */
+.canasta-prod.sacada { border-color: var(--verde); background: var(--et-cajero-f); }
+.canasta-prod.sacada .molde { background: var(--verde); }
+
+.cierre-aviso {
+  margin: 8px 0 0; font-size: 12.5px; line-height: 1.45;
+  color: var(--ambar); border-left: 3px solid var(--ambar); padding-left: 10px;
+}
+
 /* Fichas de paño para la captura en lote */
 .rejilla-panos {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));

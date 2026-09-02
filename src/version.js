@@ -17,9 +17,28 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '3.1';
+const VERSION_ACTUAL = '3.2';
 
 const VERSIONES = [
+  {
+    numero: '3.2',
+    nombre: 'Las canastas que quedaron pendientes',
+    fecha: '2026-09-02',
+    resumen:
+      'Un paño no siempre sale de un jalón: a veces se saca una canasta y ' +
+      'no se toca la siguiente hasta que esa se gasta. Ahora eso se puede ' +
+      'registrar tal cual, retomarlo al día siguiente con otro turno, y ' +
+      'sale impreso en el papel del obrero.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'SACAR CANASTA POR CANASTA. En la pantalla del paño cada canasta trae su casilla: desmarca las que hoy no vas a sacar y el botón cambia a «Sacar 2 canastas». Las demás quedan pendientes. Sacar el paño entero sigue siendo un solo toque, como siempre: desmarcar es la excepción.' },
+      { tipo: 'importante', texto: 'Y CON ESO EL PAÑO QUEDA A MEDIAS, que quiere decir que NADIE PUEDE PASAR AL SIGUIENTE hasta terminarlo. En la lista sale con lo que falta —"faltan 3 de 4 canastas, lo empezó Chema"— en vez de con la fecha de la última vez, porque eso es lo único que hay que hacer con ese paño.' },
+      { tipo: 'nuevo', texto: 'AL DÍA SIGUIENTE SE RETOMA SOLO. Se entra al mismo paño y aparecen únicamente las canastas que faltan; las de ayer se ven marcadas con un ✓, con quién las sacó y a qué hora, y ya no se pueden volver a registrar. CADA CANASTA GUARDA SU PROPIO RESPONSABLE: si Chema sacó una y Juan las otras tres, el papel del día lo dice, y la ficha del paño los nombra a los dos.' },
+      { tipo: 'importante', texto: 'ESO ERA UN AGUJERO DE VERDAD, no una comodidad. Al sacar una canasta se rellena en el mismo movimiento, así que al ratito vuelve a verse "congelando": sin llevar la cuenta de cuáles ya salieron, terminar un paño a medias habría vuelto a registrar las canastas de ayer e inventado marquetas que nadie sacó.' },
+      { tipo: 'nuevo', texto: 'EL PAPEL DEL OBRERO LO DICE. "Números a sacar" ahora imprime PAÑO 3 A MEDIAS: FALTAN 2 DE 4 CANASTAS, y quién lo empezó. Antes decía "a medias: 3" y había que ir a contar canastas al tanque.' },
+      { tipo: 'arreglo', texto: 'Y de paso, ese mismo papel PERDÍA LA FILA DE TODA LA JORNADA cuando había un paño a medias: la cuenta de la rotación se quedaba quieta, en la segunda vuelta salía otra vez el mismo número, se detectaba repetido y el papel se quedaba con un solo paño. Ya sale la lista completa, con el de a medias primero.' },
+      { tipo: 'mejora', texto: 'Si el hielo que falta YA NO VA A SALIR, no se borra: se saca marcándolo por lo que es —aguada, se rompió, lo que haya pasado— y con eso el paño se cierra y la rotación avanza. Un paño abandonado a medias trabaría el tanque para siempre.' }
+    ]
+  },
   {
     numero: '3.1',
     nombre: 'Lo que faltaba del hielo, y la pantalla ordenada',

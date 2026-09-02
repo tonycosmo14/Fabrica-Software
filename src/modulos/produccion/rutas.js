@@ -338,14 +338,26 @@ router.post('/panos/:id/sacar', registrar, (req, res) => {
   const panoActual = estadoTanque.panos.find((p) => p.id === pano.id);
   if (!panoActual) return error(res, 'Ese paño no está activo.', 404);
 
-  const pendientes = panoActual.canastas.filter((c) => c.estado !== 'fuera');
+  //
+  // LAS QUE YA SE SACARON EN ESTA MISMA FAENA NO VUELVEN A SALIR. Al sacar
+  // una canasta se rellena en el mismo movimiento, así que al ratito vuelve
+  // a verse "congelando"; sin esta resta, terminar un paño a medias
+  // inventaría otra vez las canastas de ayer.
+  const yaSacada = new Set(
+    panoActual.canastas.filter((c) => c.yaSacada).map((c) => c.id));
+
+  const pendientes = panoActual.canastas
+    .filter((c) => c.estado !== 'fuera' && !yaSacada.has(c.id));
+
   const pedidas = req.body?.canastas;
   const canastas = pedidas?.length
     ? pendientes.filter((c) => pedidas.includes(c.id))
     : pendientes;
 
   if (!canastas.length) {
-    return error(res, 'Este paño ya está fuera del tanque. Lo que falta es rellenarlo.', 409);
+    return error(res, yaSacada.size
+      ? 'De este paño ya no falta ninguna canasta por sacar.'
+      : 'Este paño ya está fuera del tanque. Lo que falta es rellenarlo.', 409);
   }
 
   // --- CÓMO SALIÓ EL HIELO ---
@@ -490,7 +502,9 @@ router.post('/panos/:id/sacar', registrar, (req, res) => {
     merma: cuenta.merma,
     mezcla: cuenta,
     terminado: Boolean(terminada),
-    canastas: canastas.length
+    canastas: canastas.length,
+    // Cuántas quedaron para otro rato (o para otro turno).
+    faltan: panoActual.canastas.length - yaSacada.size - canastas.length
   }, 201);
 });
 
