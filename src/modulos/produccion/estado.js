@@ -14,7 +14,7 @@
  */
 const { bd } = require('../../db/conexion');
 const { siguientePano, explicar, ordenIntercalado } = require('./rotacion');
-const { esFallo, comoSalioLaMayoria } = require('./calidad');
+const { esFallo, comoSalioLaMayoria, alAlmacen } = require('./calidad');
 
 const ESTADOS = {
   CONGELANDO: 'congelando',
@@ -173,6 +173,81 @@ function panosEnProceso(tanqueId) {
 }
 
 /**
+ * LA ÚLTIMA VEZ QUE SE SACÓ CADA PAÑO.
+ *
+ * Cuándo, quién y cuántas horas llevaba congelando. Es lo primero que se
+ * pregunta mirando la lista de paños, y hasta ahora había que entrar paño
+ * por paño para averiguarlo.
+ *
+ * QUIÉN puede ser MÁS DE UNO. Un paño se puede sacar canasta por canasta, y
+ * pasa que lo empieza el turno de la tarde y lo termina el de la mañana
+ * siguiente: cada canasta guarda su propio responsable. Aquí se juntan los
+ * nombres de todos los que le metieron mano, sin repetir.
+ *
+ * Los paños anulados no cuentan: si alguien se equivocó de paño y lo anuló,
+ * ese paño NO se sacó, y decir lo contrario mandaría a la gente a buscar
+ * hielo que no existe.
+ */
+function ultimaSacadaPorPano(tanqueId) {
+  const filas = bd.prepare(`
+    SELECT sp.id, sp.pano_id, sp.iniciada_en, sp.terminada_en,
+           COALESCE(u.nombre, sp.ejecutor_libre) AS quien
+      FROM sacadas_pano sp
+      JOIN panos p         ON p.id = sp.pano_id
+      LEFT JOIN usuarios u ON u.id = sp.ejecutor_id
+     WHERE p.tanque_id = ?
+       AND sp.terminada_en IS NOT NULL
+       AND (sp.notas IS NULL OR sp.notas NOT LIKE 'ANULADA%')
+     ORDER BY sp.pano_id, sp.terminada_en DESC
+  `).all(tanqueId);
+
+  // La primera fila de cada paño es su última sacada: la consulta ya viene
+  // ordenada de la más nueva a la más vieja dentro de cada paño.
+  const mapa = new Map();
+  for (const f of filas) if (!mapa.has(f.pano_id)) mapa.set(f.pano_id, f);
+  if (!mapa.size) return mapa;
+
+  const ids = [...mapa.values()].map((f) => f.id);
+  const huecos = ids.map(() => '?').join(',');
+
+  // Los responsables de cada canasta y las horas que estuvo congelando.
+  const detalle = bd.prepare(`
+    SELECT s.sacada_pano_id,
+           COALESCE(u.nombre, '') AS nombre,
+           AVG(s.horas_congelacion) AS horas
+      FROM sacadas s
+      LEFT JOIN usuarios u ON u.id = s.ejecutor_id
+     WHERE s.sacada_pano_id IN (${huecos})
+     GROUP BY s.sacada_pano_id, s.ejecutor_id
+  `).all(...ids);
+
+  const alMacen = bd.prepare(`
+    SELECT s.sacada_pano_id, COUNT(*) AS n
+      FROM sacadas_moldes sm
+      JOIN sacadas s ON s.id = sm.sacada_id
+     WHERE s.sacada_pano_id IN (${huecos})
+       AND ${alAlmacen('sm')}
+     GROUP BY s.sacada_pano_id
+  `).all(...ids);
+  const marquetas = new Map(alMacen.map((f) => [f.sacada_pano_id, f.n]));
+
+  for (const [panoId, f] of mapa) {
+    const suyas = detalle.filter((d) => d.sacada_pano_id === f.id);
+    const nombres = new Set([f.quien, ...suyas.map((d) => d.nombre)].filter(Boolean));
+    const horas = suyas.map((d) => d.horas).filter((h) => h != null);
+
+    mapa.set(panoId, {
+      fecha: f.terminada_en,
+      empezada: f.iniciada_en,
+      quienes: [...nombres],
+      horas: horas.length ? horas.reduce((a, b) => a + b, 0) / horas.length : null,
+      marquetas: marquetas.get(f.id) || 0
+    });
+  }
+  return mapa;
+}
+
+/**
  * Estructura completa de un tanque con el estado de cada canasta.
  * Es lo que pinta la pantalla de producción.
  */
@@ -182,6 +257,7 @@ function tanqueConEstado(tanqueId) {
 
   const eventos = ultimosEventos(tanqueId);
   const resultados = ultimoResultadoPorMolde(tanqueId);
+  const ultimas = ultimaSacadaPorPano(tanqueId);
   const enProceso = panosEnProceso(tanqueId);
   const panosEnProcesoIds = new Set(enProceso.map((x) => x.pano_id));
 
@@ -238,9 +314,15 @@ function tanqueConEstado(tanqueId) {
       pano.estado = 'proceso';
     }
 
-    // Moldes que fallaron la última vez que se sacó este paño.
-    pano.mermaUltima = pano.canastas.reduce(
-      (n, c) => n + c.moldes.filter((m) => m.ultimoResultado && m.ultimoResultado !== 'ok').length, 0);
+    // Moldes señalados en este paño: los que vienen saliendo peor que sus
+    // vecinos. Es el número rojo del renglón.
+    pano.moldesMarcados = pano.canastas.reduce(
+      (n, c) => n + c.moldes.filter((m) => m.ultimoFallo).length, 0);
+
+    // La última vez que este paño se sacó de verdad: cuándo, quién y
+    // cuántas horas llevaba congelando. Es lo que se pregunta al mirar la
+    // lista —"¿este cuándo se sacó?"— y antes había que entrar a buscarlo.
+    pano.ultimaSacada = ultimas.get(pano.id) || null;
   }
 
   tanque.panos = panos;
@@ -255,6 +337,11 @@ function tanqueConEstado(tanqueId) {
   // preguntarle al servidor en cada toque.
   tanque.ordenRotacion = ordenIntercalado(numeros);
   tanque.ultimoPanoSacado = tanque.ultimo_pano_sacado;
+
+  // Cuándo salió hielo de este tanque por última vez. Va junto al "toca"
+  // porque la pregunta viene enseguida: "¿y eso cuándo fue?".
+  const fechas = [...ultimas.values()].map((u) => u.fecha).filter(Boolean).sort();
+  tanque.ultimaSalida = fechas.length ? fechas[fechas.length - 1] : null;
 
   tanque.siguiente = toca == null ? null : {
     numero: toca,
@@ -318,5 +405,5 @@ function canastasFuera() {
 module.exports = {
   ESTADOS, horasDesde, ultimosEventos, estadoDeCanasta,
   tanqueConEstado, panoSugerido, canastasFuera,
-  ultimoResultadoPorMolde, panosEnProceso
+  ultimoResultadoPorMolde, panosEnProceso, ultimaSacadaPorPano
 };

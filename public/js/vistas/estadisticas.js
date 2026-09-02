@@ -334,7 +334,7 @@ export async function vistaEstadisticas(pantalla) {
     const p = d.produccion;
     const cal = d.calidades || [];
     const conAlgo = cal.filter((c) => p[c.clave] > 0);
-    const fuera = (p.cascara || 0) - (p.cascarasAlAlmacen || 0);
+    const fuera = p.fueraDelAlmacen || 0;
     const total = p.salieron || 0;
     const porCiento = (n) => (total ? Math.round((n / total) * 100) : 0);
 
@@ -399,11 +399,13 @@ export async function vistaEstadisticas(pantalla) {
           varios días seguidos, algo está pasando (el amoniaco, un
           compresor, el calor de mayo) y se ve <b>antes</b> de que una
           máquina se pare.
-          ${fuera > 0 ? `<br><br>De las cáscaras, ${fuera.toLocaleString('es-MX')}
-            no ${fuera === 1 ? 'entró' : 'entraron'} al cuarto frío: se ${fuera === 1
-            ? 'fue' : 'fueron'} a los condensadores o se ${fuera === 1 ? 'botó' : 'botaron'}.
-            Siguen contando para el costo por marqueta —gastaron la misma agua, la misma
-            luz y el mismo molde— pero no son hielo que se pueda vender.` : ''}
+          ${fuera > 0 ? `<br><br>${fuera.toLocaleString('es-MX')} marquetas
+            ${fuera === 1 ? 'salió del molde pero no entró' : 'salieron del molde pero no entraron'}
+            al cuarto frío: cáscaras, contaminadas o lo que se anotó aparte, que
+            ${fuera === 1 ? 'se fue' : 'se fueron'} a los condensadores o
+            ${fuera === 1 ? 'se botó' : 'se botaron'}. Siguen contando para el costo por
+            marqueta —gastaron la misma agua, la misma luz y el mismo molde— pero no son
+            hielo que se pueda vender.` : ''}
           <br><br>
           Lo producido y lo vendido <b>no tienen por qué cuadrar</b>: entre
           los dos está lo que quedó en el cuarto frío y lo que se derritió.

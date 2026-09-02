@@ -484,8 +484,8 @@ function ticketResumenDia(datos, { negocio = '' } = {}) {
       t.separador('.');
       t.negrita().linea('COMO SALIO').negrita(false);
       for (const c of salieron) t.columnas2(`  ${c.corto}`, String(p[c.clave]));
-      const fuera = (p.cascara || 0) - (p.cascarasAlAlmacen || 0);
-      if (fuera > 0) t.linea(`  (${fuera} cáscaras no entraron al cuarto frío)`);
+      const fuera = p.fueraDelAlmacen || 0;
+      if (fuera > 0) t.linea(`  (${fuera} no entraron al cuarto frío)`);
     }
   }
 

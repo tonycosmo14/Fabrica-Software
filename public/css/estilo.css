@@ -52,6 +52,12 @@
   --cal-poco_hueca: #b87400;  --cal-poco_hueca-f: #fbf0d6;
   --cal-hueca:      #d2621b;  --cal-hueca-f:      #fbe3d2;
   --cal-cascara:    #c02a20;  --cal-cascara-f:    #f7e0de;
+  /* Estas tres no hablan del frío, así que salen del carril de arriba: la
+     contaminación es un daño del molde, la aguada es agua que nunca fue
+     hielo, y "otro" es lo que hubo que escribir a mano. */
+  --cal-contaminada: #8a3ab0; --cal-contaminada-f: #f0e3f8;
+  --cal-aguada:      #2f5f7a; --cal-aguada-f:      #dceaf2;
+  --cal-otro:        #5d7383; --cal-otro-f:        #e6edf2;
 
   --ancho: 1180px;              /* ancho útil en pantallas grandes */
   --sombra:      0 2px 10px rgba(16, 60, 90, .10);
@@ -94,6 +100,9 @@
     --cal-poco_hueca: #e8b25a;  --cal-poco_hueca-f: #3d2c10;
     --cal-hueca:      #f0913f;  --cal-hueca-f:      #46270f;
     --cal-cascara:    #ff6b5f;  --cal-cascara-f:    #40201e;
+    --cal-contaminada: #c48ce8; --cal-contaminada-f: #2e1c3c;
+    --cal-aguada:      #7fb6d4; --cal-aguada-f:      #16303e;
+    --cal-otro:        #a3b8c6; --cal-otro-f:        #202d38;
 
     --sombra:      0 2px 10px rgba(0, 0, 0, .45);
     --sombra-alta: 0 10px 34px rgba(0, 0, 0, .55);
@@ -824,11 +833,16 @@ select { color-scheme: light dark; }
 }
 
 /* Barra: qué paño toca y con qué agua se está rellenando */
+/* El renglón del "toca". Envuelve a propósito: con la fecha de la última
+   salida dentro, en un celular el texto empujaba el botón del agua fuera
+   de la pantalla. */
 .barra-produccion {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px 10px; flex-wrap: wrap;
   padding: 8px 10px 8px 12px; margin-bottom: 10px; border-radius: 10px;
   background: var(--superficie); border: 1px solid var(--borde);
 }
+.barra-produccion .toca { flex: 1 1 200px; }
 .toca { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; min-width: 0; }
 .toca-etiqueta {
   font-size: 10px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase;
@@ -930,6 +944,9 @@ select { color-scheme: light dark; }
 /* Marcar merma molde por molde */
 .moldes-detalle { display: flex; flex-wrap: wrap; gap: 8px; }
 .molde-boton {
+  /* display explícito: en la ficha estos mismos chips son <span>, y un
+     span no hereda el flex que el navegador le da a un <button>. */
+  display: inline-flex; align-items: center; justify-content: center;
   width: auto; min-width: 62px; min-height: 62px; padding: 6px;
   flex-direction: column; gap: 2px;
   border: 2px solid var(--est-lista); background: var(--est-lista-f); color: var(--texto);
@@ -940,7 +957,12 @@ select { color-scheme: light dark; }
 .molde-boton.normal     { border-color: var(--cal-normal);     background: var(--cal-normal-f);     color: var(--cal-normal); }
 .molde-boton.poco_hueca { border-color: var(--cal-poco_hueca); background: var(--cal-poco_hueca-f); color: var(--cal-poco_hueca); }
 .molde-boton.hueca      { border-color: var(--cal-hueca);      background: var(--cal-hueca-f);      color: var(--cal-hueca); }
-.molde-boton.cascara    { border-color: var(--cal-cascara);    background: var(--cal-cascara-f);    color: var(--cal-cascara); }
+.molde-boton.cascara     { border-color: var(--cal-cascara);     background: var(--cal-cascara-f);     color: var(--cal-cascara); }
+.molde-boton.contaminada { border-color: var(--cal-contaminada); background: var(--cal-contaminada-f); color: var(--cal-contaminada); }
+.molde-boton.aguada      { border-color: var(--cal-aguada);      background: var(--cal-aguada-f);      color: var(--cal-aguada); }
+.molde-boton.otro        { border-color: var(--cal-otro);        background: var(--cal-otro-f);        color: var(--cal-otro); }
+/* En la ficha los moldes se enseñan pero no se tocan. */
+.molde-boton.sin-tocar { cursor: default; }
 .molde-boton.merma { border-color: var(--est-fuera); background: var(--est-fuera-f); color: var(--est-fuera); }
 
 /* El molde que se marcó APARTE del resto del paño va con el borde cortado:
@@ -964,7 +986,13 @@ select { color-scheme: light dark; }
    ============================================================ */
 .calidades {
   display: grid; gap: 8px; margin-top: 8px;
-  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+}
+/* CUATRO Y CUATRO, no ocho seguidos. Ocho botones en fila salen tan
+   angostos que "Saladas o contaminadas" se parte en tres renglones, y en
+   una pantalla táctil el dedo agradece el ancho. */
+@media (min-width: 700px) {
+  .calidades { grid-template-columns: repeat(4, 1fr); }
 }
 .calidad-boton {
   width: 100%; min-width: 0; min-height: 66px; padding: 8px 6px;
@@ -979,10 +1007,13 @@ select { color-scheme: light dark; }
 .calidad-boton.normal.elegida     { border-color: var(--cal-normal);     background: var(--cal-normal-f);     color: var(--cal-normal); }
 .calidad-boton.poco_hueca.elegida { border-color: var(--cal-poco_hueca); background: var(--cal-poco_hueca-f); color: var(--cal-poco_hueca); }
 .calidad-boton.hueca.elegida      { border-color: var(--cal-hueca);      background: var(--cal-hueca-f);      color: var(--cal-hueca); }
-.calidad-boton.cascara.elegida    { border-color: var(--cal-cascara);    background: var(--cal-cascara-f);    color: var(--cal-cascara); }
+.calidad-boton.cascara.elegida     { border-color: var(--cal-cascara);     background: var(--cal-cascara-f);     color: var(--cal-cascara); }
+.calidad-boton.contaminada.elegida { border-color: var(--cal-contaminada); background: var(--cal-contaminada-f); color: var(--cal-contaminada); }
+.calidad-boton.aguada.elegida      { border-color: var(--cal-aguada);      background: var(--cal-aguada-f);      color: var(--cal-aguada); }
+.calidad-boton.otro.elegida        { border-color: var(--cal-otro);        background: var(--cal-otro-f);        color: var(--cal-otro); }
 .calidad-boton.elegida { box-shadow: inset 0 0 0 1px currentColor; }
 
-.calidad-nota { margin: 10px 0 0; min-height: 2.6em; }
+.calidad-nota { margin: 10px 0 0; min-height: 2.4em; }
 
 /* La mezcla del día, en una barra de proporciones. Se lee de un vistazo:
    cuánto del hielo salió de cada clase. */
@@ -998,7 +1029,10 @@ select { color-scheme: light dark; }
 .mezcla-tramo.normal     { background: var(--cal-normal); }
 .mezcla-tramo.poco_hueca { background: var(--cal-poco_hueca); }
 .mezcla-tramo.hueca      { background: var(--cal-hueca); }
-.mezcla-tramo.cascara    { background: var(--cal-cascara); }
+.mezcla-tramo.cascara     { background: var(--cal-cascara); }
+.mezcla-tramo.contaminada { background: var(--cal-contaminada); }
+.mezcla-tramo.aguada      { background: var(--cal-aguada); }
+.mezcla-tramo.otro        { background: var(--cal-otro); }
 .mezcla-tramo.merma      { background: var(--suave); }
 
 .mezcla-lista, .mezcla-viva {
@@ -1013,8 +1047,128 @@ select { color-scheme: light dark; }
 .mezcla-parte.normal     { color: var(--cal-normal);     background: var(--cal-normal-f); }
 .mezcla-parte.poco_hueca { color: var(--cal-poco_hueca); background: var(--cal-poco_hueca-f); }
 .mezcla-parte.hueca      { color: var(--cal-hueca);      background: var(--cal-hueca-f); }
-.mezcla-parte.cascara    { color: var(--cal-cascara);    background: var(--cal-cascara-f); }
+.mezcla-parte.cascara     { color: var(--cal-cascara);     background: var(--cal-cascara-f); }
+.mezcla-parte.contaminada { color: var(--cal-contaminada); background: var(--cal-contaminada-f); }
+.mezcla-parte.aguada      { color: var(--cal-aguada);      background: var(--cal-aguada-f); }
+.mezcla-parte.otro        { color: var(--cal-otro);        background: var(--cal-otro-f); }
 .mezcla-parte.merma      { color: var(--suave);          background: var(--superficie-alt); }
+
+/* ============================================================
+   PRODUCCIÓN: EL ORDEN DE LA PANTALLA  (v3.1)
+
+   Esta pantalla se usa casi siempre en PC o en un monitor táctil
+   cuadrado, y estaba desperdiciando espacio en las dos direcciones:
+   dos botones grandes uno debajo del otro arriba, y a la derecha de los
+   paños un hueco vacío del ancho de media pantalla. Aquí se arregla lo
+   uno y lo otro, sin que el celular pierda nada: todo lo que va en dos
+   columnas se apila solo cuando no cabe.
+   ============================================================ */
+
+/* Los dos botones de arriba, en un renglón. Números a sacar primero,
+   que es lo que más veces al día se aprieta. */
+.prod-acciones {
+  display: grid; gap: 10px; margin-bottom: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+.prod-acciones .accion-principal { margin-bottom: 0; }
+.accion-principal.suave {
+  background: var(--superficie); color: var(--texto);
+  border: 1px solid var(--borde-fuerte);
+}
+
+/* Los paños a la izquierda, el panel a la derecha. Con `auto-fit` no
+   hace falta una consulta de medios: si no caben 300px de panel, se va
+   abajo solo. */
+.prod-cuerpo { display: grid; gap: 14px; align-items: start; }
+@media (min-width: 900px) {
+  .prod-cuerpo { grid-template-columns: minmax(0, 1fr) 300px; }
+}
+.prod-panel { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.prod-panel .tarjeta { margin-bottom: 0; max-width: none; }
+.panel-titulo { margin: 0 0 10px; font-size: 14px; }
+.panel-cuentas { display: flex; flex-wrap: wrap; gap: 10px 16px; }
+.panel-cuentas span { display: flex; flex-direction: column; line-height: 1.15; }
+.panel-cuentas strong { font-size: 20px; color: var(--acento); }
+.panel-cuentas small { font-size: 11.5px; color: var(--suave); }
+.panel-aviso {
+  margin: 12px 0 0; font-size: 12.5px; line-height: 1.45;
+  color: var(--ambar); border-left: 3px solid var(--ambar); padding-left: 10px;
+}
+.panel-botones { display: flex; flex-direction: column; gap: 8px; }
+.panel-botones .boton, .panel-botones button { width: 100%; text-align: center; }
+
+/* Cada paño lleva ahora su historia debajo de las canastas, y un ojo
+   aparte para mirarlo sin sacarlo. */
+.pano-prod-medio { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pano-prod-historia {
+  font-size: 11px; color: var(--suave); text-align: left;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pano-prod-historia.nunca { font-style: italic; opacity: .7; }
+.pano-prod-ojo {
+  width: 30px; min-width: 30px; height: 30px; padding: 0; font-size: 14px;
+  background: transparent; border: 1px solid var(--borde);
+  color: var(--suave); border-radius: 8px;
+}
+.pano-prod-ojo:hover { border-color: var(--acento); color: var(--acento); }
+
+/* La cabecera del paño: volver, número y datos en un solo renglón. */
+.pano-cabeza {
+  display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap;
+  margin: 4px 0 16px;
+}
+.pano-cabeza h2 { margin: 0; }
+.pano-cabeza-datos, .pano-cabeza-ultima { font-size: 13px; color: var(--suave); }
+.pano-cabeza-ultima {
+  margin-left: auto; padding: 4px 10px; border-radius: 999px;
+  background: var(--superficie-alt); border: 1px solid var(--borde);
+  white-space: nowrap;
+}
+.pano-cabeza .secundario.chico { margin: 0; }
+
+/* Quién lo sacó (angosto) y cómo salió el hielo (ancho), lado a lado. */
+.pano-captura { display: grid; gap: 12px; align-items: start; }
+@media (min-width: 820px) {
+  .pano-captura { grid-template-columns: minmax(200px, 270px) minmax(0, 1fr); }
+}
+.pano-captura .tarjeta { margin-bottom: 0; max-width: none; }
+.select-angosto { max-width: 100%; }
+
+.nota-escrita {
+  margin: 10px 0 0; font-size: 13px; padding: 8px 10px; border-radius: 8px;
+  background: var(--cal-otro-f); color: var(--cal-otro);
+  border: 1px solid var(--cal-otro);
+}
+.enlace {
+  background: none; border: 0; padding: 0 0 0 8px; width: auto; min-width: 0;
+  color: var(--acento); text-decoration: underline; font-size: 12px;
+}
+
+/* El resultado y los botones de sacar, en el mismo renglón. */
+.pano-cierre {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px;
+  margin-top: 14px; padding: 12px 14px;
+  background: var(--superficie); border: 1px solid var(--borde);
+  border-radius: var(--radio);
+}
+.cierre-resultado { flex: 1 1 240px; min-width: 0; }
+.cierre-numero { display: flex; align-items: baseline; gap: 8px; }
+.cierre-numero strong { font-size: 30px; color: var(--acento); line-height: 1; }
+.cierre-numero small { font-size: 12.5px; color: var(--suave); }
+.cierre-resultado .mezcla-viva { justify-content: flex-start; margin-top: 8px; }
+.cierre-botones { display: flex; gap: 10px; flex-wrap: wrap; }
+.cierre-botones button { width: auto; min-width: 150px; }
+
+/* Corregir: plegado, que es lo raro, no lo de todos los días. */
+.corregir { margin-top: 18px; }
+.corregir summary {
+  cursor: pointer; color: var(--acento); font-weight: 700; font-size: 14px;
+  padding: 6px 0;
+}
+.corregir .tarjeta { margin-top: 10px; }
+
+.hist-tabla tr.anulada { opacity: .55; text-decoration: line-through; }
+.hist-tabla tr.anulada .mezcla-parte { text-decoration: none; }
 
 /* Fichas de paño para la captura en lote */
 .rejilla-panos {
@@ -1735,8 +1889,11 @@ body.imprimir-hoja { page: hoja; }
   body.imprimir-hoja .mezcla-tramo.normal     { background: #d8d8d8; }
   body.imprimir-hoja .mezcla-tramo.poco_hueca { background: #a8a8a8; }
   body.imprimir-hoja .mezcla-tramo.hueca      { background: #737373; color: #fff; }
-  body.imprimir-hoja .mezcla-tramo.cascara    { background: #3f3f3f; color: #fff; }
-  body.imprimir-hoja .mezcla-tramo.merma      { background: #000000; color: #fff; }
+  body.imprimir-hoja .mezcla-tramo.cascara     { background: #5a5a5a; color: #fff; }
+  body.imprimir-hoja .mezcla-tramo.contaminada { background: #444444; color: #fff; }
+  body.imprimir-hoja .mezcla-tramo.aguada      { background: #2b2b2b; color: #fff; }
+  body.imprimir-hoja .mezcla-tramo.otro        { background: #171717; color: #fff; }
+  body.imprimir-hoja .mezcla-tramo.merma       { background: #000000; color: #fff; }
   body.imprimir-hoja .mezcla-parte {
     color: #000; background: #fff; border-color: #000;
   }

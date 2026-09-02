@@ -45,7 +45,7 @@ const TEMAS = [
   {
     id: 'produccion',
     titulo: 'Producción: sacar el hielo de los tanques',
-    busca: 'producción tanque paño canasta molde sacar rellenar rotación intercalado merma agua purificada potable congelación quién lo sacó otro eventual nombre calidad sellada normal hueca cáscara condensadores destino cómo salió el hielo mezcla',
+    busca: 'producción tanque paño canasta molde sacar rellenar rotación intercalado merma agua purificada potable congelación quién lo sacó otro eventual nombre calidad sellada normal hueca cáscara aguada salada contaminada salmuera condensadores destino cómo salió el hielo mezcla ojo ficha historia última vez F2 atajo panel',
     cuerpo: `
       <h4>Cómo está armado un tanque</h4>
       <p>Un <b>tanque</b> tiene varios <b>paños</b>. Cada paño tiene
@@ -71,6 +71,7 @@ const TEMAS = [
       <p>Antes el sistema solo sabía tres cosas —salió, se rompió, salió
       hueca— y la fábrica distingue cinco. Ahora al sacar un paño se dice
       <b>cómo salió</b>, con un toque:</p>
+      <p>Los seis primeros hablan del <b>frío de esa noche</b>, de mejor a peor:</p>
       <ul>
         <li><b>100% selladas.</b> Bien congeladas, el centro cerrado a tope.
         Salen cuando llueve mucho, cuando no hay venta, o cuando las máquinas
@@ -84,6 +85,23 @@ const TEMAS = [
         lo hacen. La gente se queja pero por necesidad se la lleva.</li>
         <li><b>Cáscaras.</b> 30% de congelación o menos: el centro atraviesa y
         los laterales están delgados. Por lo general no se venden.</li>
+        <li><b>Aguadas.</b> No congeló nada: sale agua del molde. No es "muy
+        hueca", es que <b>no hay marqueta</b>. Por eso una aguada no cuenta
+        ni siquiera para el costo: no se puede repartir el gasto entre
+        marquetas que no existen.</li>
+      </ul>
+
+      <p>Y dos que <b>no son de frío</b>:</p>
+      <ul>
+        <li><b>Salada o contaminada.</b> Se rompió el molde y le entró
+        salmuera, se oxidó el fondo, o le cayó algo. <b>Puede estar
+        perfectamente congelada</b>: el problema no es el frío, es el molde.
+        No se toma; a veces se vende a quien solo quiere enfriar y no la va
+        a consumir.</li>
+        <li><b>Otra cosa.</b> Para lo que no está en la lista. Pide
+        <b>escribir qué pasó</b>, y sin eso no se guarda: un "otro" en blanco
+        no dice nada dentro de un año. Si resulta que ese "otro" se repite
+        treinta veces, ahí está la razón para volverlo un estado propio.</li>
       </ul>
 
       <p>Eso vale para <b>todo el paño</b>, que es lo que pasa de verdad: la
@@ -91,9 +109,10 @@ const TEMAS = [
       salió distinto del resto, se toca ese molde y se elige lo suyo. Los que
       no se tocan van como el paño.</p>
 
-      <h4>Qué se hace con las cáscaras</h4>
-      <p>Cuando el hielo sale en cáscaras, el sistema pregunta qué se hizo con
-      ellas, porque no todas acaban igual:</p>
+      <h4>Qué se hace con ese hielo</h4>
+      <p>Cuando el hielo sale en <b>cáscaras</b>, <b>contaminado</b> o marcado
+      como <b>otra cosa</b>, el sistema pregunta qué se hizo con él, porque no
+      todo acaba igual:</p>
       <ul>
         <li><b>A los condensadores</b> — lo normal. No se tiran del todo:
         trabajan enfriando.</li>
@@ -105,7 +124,9 @@ const TEMAS = [
       la misma agua, la misma luz, el mismo molde. Por eso cuenta para el
       costo por marqueta aunque se haya ido al condensador. Lo que <b>no</b>
       hace es contar como hielo del cuarto frío: si contara, el conteo no
-      cuadraría nunca y andarías buscando marquetas que no existen.</p>
+      cuadraría nunca y andarías buscando marquetas que no existen. La
+      <b>aguada</b> es el único caso que no pregunta destino: de ahí no salió
+      nada que mandar a ningún lado.</p>
 
       <h4>Por qué importa anotarlo</h4>
       <p>Una marqueta hueca <b>se cobra igual</b> que una sellada, así que en
@@ -127,6 +148,28 @@ const TEMAS = [
       esa noche y no marca a nadie; pero si un molde sale cáscara mientras sus
       vecinos salen normales, ese molde tiene algo —está chueco, gotea, le
       falta salmuera alrededor— y hay que ir a verlo.</p>
+      <p>La <b>contaminada</b> es la excepción: esa marca siempre, aunque el
+      paño entero esté salado. Salmuera dentro del molde es un molde roto, y
+      si están rotos varios hay que verlos todos.</p>
+
+      <h4>Mirar un paño sin tocarlo</h4>
+      <p>Cada paño tiene un <b>👁 al lado</b>. Ábrelo y verás la historia de
+      ese paño: cuándo se sacó la última vez, quién, cuántas horas llevaba
+      congelando, <b>cómo salió cada molde</b> y las veces anteriores. Es lo
+      que se hace al ver un molde en rojo y preguntarse qué le pasó.</p>
+      <p class="ayuda-tip">Eso <b>no pide permiso a nadie</b>, porque mirar no
+      cambia nada. El PIN se pide para SACAR el paño, y desde ahí mismo está
+      el botón de <b>Desbloquear</b> cuando de verdad se va a mover algo.</p>
+
+      <h4>Lo que se ve sin entrar</h4>
+      <p>En la lista, cada paño dice <b>cuándo se sacó la última vez, quién lo
+      sacó y cuántas horas llevaba</b>. Y a la derecha hay un panel con cómo
+      está el tanque ahora —listos, congelando, a medias, fuera—, cuántos
+      moldes vienen saliendo peor que sus vecinos, y cómo salió el hielo de
+      hoy en toda la fábrica.</p>
+      <p class="ayuda-tip">La tecla <b>F2</b> saca los <b>números a sacar</b>
+      sin buscar el botón. Con el obrero enfrente esperando, eso ahorra el
+      viaje del ratón.</p>
 
       <h4>Los números que siguen</h4>
       <p>El gerente y el administrador pueden imprimir <b>la lista de los

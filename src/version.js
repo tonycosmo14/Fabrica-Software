@@ -17,11 +17,34 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '2.10';
+const VERSION_ACTUAL = '3.1';
 
 const VERSIONES = [
   {
-    numero: '2.10',
+    numero: '3.1',
+    nombre: 'Lo que faltaba del hielo, y la pantalla ordenada',
+    fecha: '2026-09-02',
+    resumen:
+      'Dos estados más del hielo y una salida de emergencia para lo que no ' +
+      'está en la lista; cualquier paño se puede mirar sin pedirle permiso ' +
+      'a nadie; y las dos pantallas de producción reordenadas para que quepa ' +
+      'lo que hay que ver sin bajar.',
+    cambios: [
+      { tipo: 'importante', texto: 'ANTES QUE NADA, UN NÚMERO MAL PUESTO: la versión anterior salió como "2.10" y eso no existe. Después de la 2.9 viene la 3.0, igual que después de la 0.9 viene la 1.0. Ya quedó como 3.0, y esta es la 3.1. No cambia una sola línea del programa: solo el número.' },
+      { tipo: 'nuevo', texto: 'DOS ESTADOS MÁS DEL HIELO. AGUADA: no congeló nada, sale agua del molde. No es "muy hueca", es que NO HAY MARQUETA — y por eso una aguada no cuenta ni para el costo: no se puede repartir el gasto entre marquetas que no existen. SALADA O CONTAMINADA: se rompió el molde y le entró salmuera, se oxidó el fondo, o le cayó algo. Puede estar perfectamente congelada; el problema no es el frío, es el molde. No se toma, pero a veces se vende a quien solo quiere enfriar.' },
+      { tipo: 'nuevo', texto: 'Y "OTRA COSA", PARA LO QUE NO ESTÁ EN LA LISTA. Una lista cerrada, el día que pasa algo que no está en ella, obliga a mentir: se elige lo más parecido y la verdad se pierde. Ahora se escribe qué pasó, con tus palabras, y queda guardado con el paño. Sin ese texto no se guarda: un "otro" en blanco no dice nada dentro de un año. Y si resulta que ese "otro" se repite treinta veces, ahí estará la razón para volverlo un estado propio.' },
+      { tipo: 'mejora', texto: 'LAS QUE PIDEN DESTINO PASAN DE UNA A TRES: cáscara, contaminada y "otra cosa". De las tres depende que el conteo del cuarto frío cuadre. La aguada es la única que no lo pide: de ahí no salió nada que mandar a ningún lado.' },
+      { tipo: 'nuevo', texto: 'CUALQUIER PAÑO SE PUEDE MIRAR SIN PERMISO DE NADIE. Antes, tocar un paño que no era el que tocaba pedía el PIN antes de enseñar nada, y eso estaba mal para lo que más se hace: ver un molde en rojo y querer saber qué le pasó. Mirar no cambia nada. Ahora cada paño tiene un OJO al lado que abre su historia —cuándo se sacó la última vez, quién, cuántas horas llevaba, cómo salió cada molde y las veces anteriores— y el PIN se pide desde dentro, con el botón de Desbloquear, cuando de verdad se va a sacar.' },
+      { tipo: 'nuevo', texto: 'CADA PAÑO DICE SU HISTORIA EN EL RENGLÓN: cuándo se sacó la última vez, quién lo sacó (el nombre de pila, como se llaman en la fábrica) y cuántas horas llevaba congelando. Antes había que entrar paño por paño para saberlo, y era lo primero que uno pregunta.' },
+      { tipo: 'mejora', texto: 'LA PANTALLA DE PRODUCCIÓN, REORDENADA. "Números a sacar" pasa a primero y a la izquierda —es lo que más veces al día se aprieta— con "Registrar lo que se sacó" a su derecha, en el MISMO renglón: dos botones grandes uno encima del otro se comían media pantalla sin decir nada más. Y la tecla F2 saca los números sin buscar el botón.' },
+      { tipo: 'nuevo', texto: 'UN PANEL AL LADO DE LOS PAÑOS, donde antes había hueco vacío: cómo está el tanque ahora mismo (listos, congelando, a medias, fuera), cuántos moldes vienen saliendo peor que sus vecinos, y cómo salió el hielo de hoy en toda la fábrica con su barra de colores. En el celular se va abajo solo.' },
+      { tipo: 'mejora', texto: 'LA PANTALLA DEL PAÑO, APRETADA. El botón de volver, el número y los datos van ahora en UN renglón en vez de tres. "¿Quién lo sacó?" se angostó —los nombres son cortos— y al lado, en el hueco que dejó, está "¿Cómo salió el hielo?". Y el resultado y los botones de sacar comparten renglón, con el resultado más chico. Todo eso son renglones de canastas que se ven sin bajar la pantalla.' },
+      { tipo: 'mejora', texto: 'Los ocho estados salen de cuatro en cuatro y no de ocho en fila: seguidos salían tan angostos que "Saladas o contaminadas" se partía en tres renglones, y en una pantalla táctil el dedo agradece el ancho. Y "Corregir" quedó plegado: es lo raro, no lo de todos los días.' },
+      { tipo: 'arreglo', texto: 'El nombre de pila ya no se come los tratamientos: "Don Chema" es Chema, no "Don". Con la primera palabra a secas, media plantilla se llamaba igual.' }
+    ]
+  },
+  {
+    numero: '3.0',
     nombre: 'Cómo salió el hielo',
     fecha: '2026-09-02',
     resumen:

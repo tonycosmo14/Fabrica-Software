@@ -37,6 +37,21 @@ export function fecha(iso) {
   });
 }
 
+/**
+ * Corta: "2 sep · 5:26 p.m." — sin el año.
+ *
+ * Para las tarjetas y los renglones donde la fecha completa se parte en
+ * tres líneas y empuja todo lo demás. El año se quita a propósito: en una
+ * pantalla que habla de lo de hoy y lo de ayer, "2026" no informa de nada
+ * y ocupa lo mismo que la hora.
+ */
+export function fechaCorta(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return `${d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })} · ` +
+         `${d.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' })}`;
+}
+
 /** Solo la hora: "02:23 p.m." */
 export function soloHora(iso) {
   if (!iso) return '—';

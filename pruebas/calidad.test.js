@@ -88,7 +88,7 @@ test('la cáscara que se guarda sí entra al cuarto frío', async () => {
   assert.equal(r.json.datos.marquetas, 6, 'se van a vender más baratas, pero se venden');
   const d = await hoy();
   assert.equal(d.marquetas - antes.marquetas, 6);
-  assert.equal(d.mezcla.cascarasAlAlmacen, 6);
+  assert.equal(d.mezcla.guardadas, 6);
 });
 
 test('la existencia esperada solo cuenta el hielo que se puede vender', async () => {
@@ -205,6 +205,157 @@ test('el corte del día cuadra paño por paño', async () => {
   assert.equal(r.producidas, r.panos.reduce((n, p) => n + p.producidas, 0));
   assert.equal(r.cuantos, r.panos.length);
   assert.ok(r.producidas > 0, 'esta prueba no sirve de nada con el día vacío');
+});
+
+// ============================================================
+// LOS ESTADOS QUE NO SON DE FRÍO  (v3.1)
+// ============================================================
+
+test('una aguada no es hielo: no cuenta ni para el costo', async () => {
+  await entrarAdmin();
+  const antes = await hoy();
+  const { pano } = await elQueToca();
+
+  const r = await llamar(`/api/produccion/panos/${pano.id}/sacar`, {
+    method: 'POST', cuerpo: { tipoAgua: 'purificada', calidad: 'aguada' }
+  });
+
+  assert.equal(r.json.datos.marquetas, 0, 'no hay marqueta que vender');
+  assert.equal(r.json.datos.producidas, 0,
+    'y tampoco hay entre qué repartir el costo: de ahí no salió una sola marqueta');
+  assert.equal(r.json.datos.mezcla.aguada, 6);
+  assert.equal(r.json.datos.mezcla.salieron, 6, 'los seis moldes sí se abrieron');
+
+  const d = await hoy();
+  assert.equal(d.marquetas, antes.marquetas, 'el cuarto frío no creció');
+});
+
+test('la contaminada sí es hielo, aunque no se tome', async () => {
+  await entrarAdmin();
+  const { pano } = await elQueToca();
+
+  const r = await llamar(`/api/produccion/panos/${pano.id}/sacar`, {
+    method: 'POST',
+    cuerpo: { tipoAgua: 'purificada', calidad: 'contaminada', destino: 'almacen' }
+  });
+
+  assert.equal(r.json.datos.producidas, 6,
+    'costó la misma agua y la misma luz: cuenta para el costo por marqueta');
+  assert.equal(r.json.datos.marquetas, 6,
+    'se guardó para quien solo quiere enfriar, así que sí es existencia');
+});
+
+test('el molde contaminado se señala aunque el paño entero lo esté', async () => {
+  // La contaminación es la excepción a la regla del "peor que su paño": un
+  // molde roto por el que entra salmuera está roto, y si están rotos varios
+  // hay que verlos todos, no ninguno.
+  await entrarAdmin();
+  const { json } = await llamar(`/api/produccion/estado?tanque=${tanqueId}`);
+  const t = json.datos.tanque;
+  const suyos = t.panos.flatMap((p) => p.canastas.flatMap((c) => c.moldes))
+    .filter((m) => m.ultimoResultado === 'contaminada');
+
+  assert.ok(suyos.length, 'el paño anterior salió contaminado entero');
+  assert.ok(suyos.every((m) => m.ultimoFallo),
+    'salmuera dentro del molde es daño del molde, no frío de esa noche');
+});
+
+test('"otro" sin explicación no se guarda', async () => {
+  await entrarAdmin();
+  const { pano, moldes } = await elQueToca();
+
+  const a = await llamar(`/api/produccion/panos/${pano.id}/sacar`, {
+    method: 'POST', cuerpo: { tipoAgua: 'purificada', calidad: 'otro' }
+  });
+  assert.equal(a.estado, 400, 'un "otro" en blanco no dice nada dentro de un año');
+
+  const b = await llamar(`/api/produccion/panos/${pano.id}/sacar`, {
+    method: 'POST',
+    cuerpo: { tipoAgua: 'purificada',
+              resultados: [{ moldeId: moldes[0].id, resultado: 'otro', nota: '   ' }] }
+  });
+  assert.equal(b.estado, 400, 'ni escrito con puros espacios');
+});
+
+test('"otro" con su explicación queda guardado tal cual', async () => {
+  await entrarAdmin();
+  const { pano, moldes } = await elQueToca();
+
+  const r = await llamar(`/api/produccion/panos/${pano.id}/sacar`, {
+    method: 'POST',
+    cuerpo: {
+      tipoAgua: 'purificada',
+      resultados: [{ moldeId: moldes[0].id, resultado: 'otro',
+                     destino: 'botada', nota: 'Se cayó de la grúa' }]
+    }
+  });
+  assert.equal(r.estado, 201);
+  assert.equal(r.json.datos.mezcla.otro, 1);
+  assert.equal(r.json.datos.marquetas, 5, 'la que se cayó no llegó al cuarto frío');
+
+  const guardada = bd.prepare(
+    "SELECT nota, destino FROM sacadas_moldes WHERE resultado = 'otro'").get();
+  assert.equal(guardada.nota, 'Se cayó de la grúa');
+  assert.equal(guardada.destino, 'botada');
+});
+
+test('el molde suelto hereda el destino del paño si no dice otro', async () => {
+  await entrarAdmin();
+  const { pano, moldes } = await elQueToca();
+
+  await llamar(`/api/produccion/panos/${pano.id}/sacar`, {
+    method: 'POST',
+    cuerpo: {
+      tipoAgua: 'purificada', calidad: 'cascara', destino: 'almacen',
+      resultados: [{ moldeId: moldes[0].id, resultado: 'cascara' }]
+    }
+  });
+
+  const fila = bd.prepare(`
+    SELECT sm.destino FROM sacadas_moldes sm
+      JOIN sacadas s ON s.id = sm.sacada_id
+     WHERE sm.molde_id = ? ORDER BY s.fecha DESC LIMIT 1`).get(moldes[0].id);
+  assert.equal(fila.destino, 'almacen',
+    'si el paño se guardó, la cáscara de ese molde también: es lo que uno espera');
+});
+
+test('la ficha del paño se abre sin autorización de nadie', async () => {
+  await entrarAdmin();
+  const { json } = await llamar(`/api/produccion/estado?tanque=${tanqueId}`);
+  const t = json.datos.tanque;
+  // Uno que NO es el que toca: mirarlo no cambia nada, así que no pide PIN.
+  const otro = t.panos.find((p) => p.id !== t.siguiente.id);
+
+  const r = await llamar(`/api/produccion/panos/${otro.id}/ficha`);
+  assert.equal(r.estado, 200);
+  assert.ok(r.json.datos.pano.numero);
+  assert.ok(Array.isArray(r.json.datos.historial));
+});
+
+test('la ficha dice cuándo, quién y cómo salió cada molde', async () => {
+  await entrarAdmin();
+  const { json } = await llamar(`/api/produccion/estado?tanque=${tanqueId}`);
+  const conHistoria = json.datos.tanque.panos.find((p) => p.ultimaSacada);
+  assert.ok(conHistoria, 'a estas alturas ya se sacaron varios paños');
+
+  const r = await llamar(`/api/produccion/panos/${conHistoria.id}/ficha`);
+  const d = r.json.datos;
+  assert.ok(d.ultima, 'trae la última vez que se sacó');
+  assert.ok(d.ultima.fecha);
+  assert.ok(d.ultima.quienes.length, 'y quién lo sacó');
+  assert.equal(d.moldes.length, 6, 'molde por molde, como salió');
+  assert.ok(d.moldes.every((m) => m.resultado));
+});
+
+test('el renglón del paño trae su última sacada', async () => {
+  await entrarAdmin();
+  const { json } = await llamar(`/api/produccion/estado?tanque=${tanqueId}`);
+  const t = json.datos.tanque;
+  const u = t.panos.find((p) => p.ultimaSacada)?.ultimaSacada;
+
+  assert.ok(u.fecha, 'cuándo');
+  assert.ok(u.quienes.length, 'quién');
+  assert.ok(t.ultimaSalida, 'y el tanque dice cuándo salió hielo por última vez');
 });
 
 test('las marquetas de antes del cambio se leen como normales', async () => {

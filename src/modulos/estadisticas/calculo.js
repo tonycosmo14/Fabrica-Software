@@ -22,7 +22,7 @@
  *     marcado como incompleto en vez de salir más barato de lo que es.
  */
 const { bd } = require('../../db/conexion');
-const { alAlmacen, columnasMezcla, resumir } = require('../produccion/calidad');
+const { alAlmacen, columnasMezcla, columnaGuardadas, resumir } = require('../produccion/calidad');
 const { instantes } = require('../../lib/periodos');
 const { DIECISEISAVOS_POR_MARQUETA } = require('../../lib/fracciones');
 const { luzEnPeriodo, totalGastado, gastosParejos } = require('../empresa/calculo');
@@ -118,9 +118,7 @@ function produccion({ desde, hasta }) {
   const r = bd.prepare(`
     SELECT
       ${columnasMezcla('sm')},
-      COUNT(CASE WHEN sm.resultado = 'merma' THEN 1 END) AS merma,
-      COUNT(CASE WHEN sm.resultado = 'cascara'
-                  AND sm.destino = 'almacen' THEN 1 END) AS cascaras_guardadas
+      ${columnaGuardadas('sm')} AS guardadas
       FROM sacadas_moldes sm
       JOIN sacadas s       ON s.id = sm.sacada_id
       JOIN sacadas_pano sp ON sp.id = s.sacada_pano_id
@@ -128,7 +126,7 @@ function produccion({ desde, hasta }) {
        AND (sp.notas IS NULL OR sp.notas NOT LIKE 'ANULADA%')
   `).get(desde, hasta);
 
-  const m = resumir(r, r.cascaras_guardadas);
+  const m = resumir(r, r.guardadas);
 
   // DE CADA CIEN MARQUETAS, CUÁNTAS SALIERON SIN QUEJA. Selladas y normales
   // son las que nadie reclama en el mostrador; de las poco huecas para

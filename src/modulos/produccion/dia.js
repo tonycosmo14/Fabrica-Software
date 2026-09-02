@@ -27,11 +27,10 @@ function panosDelDia(dia = null) {
            COALESCE(u.nombre, sp.ejecutor_libre) AS quien,
            sp.terminada_en,
            sp.notas,
-           COUNT(*) FILTER (WHERE ${calidad.alAlmacen('sm')})   AS al_almacen,
-           COUNT(*) FILTER (WHERE sm.resultado <> 'merma')       AS producidas,
-           COUNT(*) FILTER (WHERE sm.resultado = 'merma')        AS rotas,
-           COUNT(*) FILTER (WHERE sm.resultado = 'cascara'
-                              AND sm.destino = 'almacen')        AS cascaras_guardadas,
+           COUNT(*) FILTER (WHERE ${calidad.alAlmacen('sm')})  AS al_almacen,
+           COUNT(*) FILTER (WHERE ${calidad.salioHielo('sm')}) AS producidas,
+           COUNT(*) FILTER (WHERE sm.resultado = 'merma')      AS rotas,
+           ${calidad.columnaGuardadas('sm')}                   AS guardadas,
            ${calidad.columnasMezcla('sm')}
       FROM sacadas_pano sp
       JOIN panos p          ON p.id = sp.pano_id
@@ -75,7 +74,7 @@ function resumenDelDia(dia = null) {
       ...Object.fromEntries(calidad.CLAVES_CALIDAD.map((c) => [c, suma(c)])),
       merma: suma('rotas')
     },
-    suma('cascaras_guardadas')
+    suma('guardadas')
   );
 
   return {
