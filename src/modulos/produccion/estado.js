@@ -14,6 +14,7 @@
  */
 const { bd } = require('../../db/conexion');
 const { siguientePano, explicar, ordenIntercalado } = require('./rotacion');
+const { esFallo, comoSalioLaMayoria } = require('./calidad');
 
 const ESTADOS = {
   CONGELANDO: 'congelando',
@@ -103,11 +104,16 @@ function estadoDeCanasta(ultimo, horasTanque) {
  * Último resultado conocido de cada molde de un tanque.
  * Sirve para pintar en la pantalla el molde que falló la última vez: si uno
  * aparece marcado siempre, hay un problema físico en ese molde concreto.
+ *
+ * QUÉ CUENTA COMO FALLO: que ese molde saliera PEOR QUE EL RESTO de los
+ * que salieron con él, en su mismo paño. La regla y el porqué están en
+ * calidad.js; lo que aquí importa es que por eso hace falta leer también a
+ * qué sacada perteneció cada renglón, para saber contra qué compararlo.
  */
 function ultimoResultadoPorMolde(tanqueId) {
   // Historial completo de cada molde, del más reciente al más antiguo.
   const filas = bd.prepare(`
-    SELECT sm.molde_id, sm.resultado, s.fecha
+    SELECT sm.molde_id, sm.resultado, s.fecha, s.sacada_pano_id
       FROM sacadas_moldes sm
       JOIN sacadas s   ON s.id = sm.sacada_id
       JOIN canastas c  ON c.id = s.canasta_id
@@ -115,6 +121,20 @@ function ultimoResultadoPorMolde(tanqueId) {
      WHERE p.tanque_id = ?
      ORDER BY sm.molde_id, s.fecha DESC
   `).all(tanqueId);
+
+  // Cómo salió la mayoría de cada paño: es la vara contra la que se mide
+  // cada molde. Se calcula una vez para todos y no molde por molde.
+  const porSacada = new Map();
+  for (const f of filas) {
+    const clave = f.sacada_pano_id || `suelta:${f.fecha}`;
+    if (!porSacada.has(clave)) porSacada.set(clave, []);
+    porSacada.get(clave).push(f.resultado);
+  }
+  const mayoria = new Map(
+    [...porSacada].map(([clave, lista]) => [clave, comoSalioLaMayoria(lista)]));
+
+  const vara = (f) => mayoria.get(f.sacada_pano_id || `suelta:${f.fecha}`);
+  const fallo = (f) => esFallo(f.resultado, vara(f));
 
   const mapa = new Map();
   for (const f of filas) {
@@ -124,8 +144,8 @@ function ultimoResultadoPorMolde(tanqueId) {
       // La primera fila de cada molde es su última salida.
       mapa.set(f.molde_id, {
         resultado: f.resultado,
-        racha: f.resultado === 'ok' ? 0 : 1,
-        contando: f.resultado !== 'ok'
+        racha: fallo(f) ? 1 : 0,
+        contando: fallo(f)
       });
       continue;
     }
@@ -133,7 +153,7 @@ function ultimoResultadoPorMolde(tanqueId) {
     // Cuántas veces SEGUIDAS ha fallado: en cuanto sale bien una vez, se
     // corta la cuenta. Un molde con racha alta tiene un problema físico;
     // uno con racha de 1 fue mala suerte de ese día.
-    if (previo.contando && f.resultado !== 'ok') previo.racha++;
+    if (previo.contando && fallo(f)) previo.racha++;
     else previo.contando = false;
   }
   return mapa;
@@ -184,6 +204,9 @@ function tanqueConEstado(tanqueId) {
         return {
           ...m,
           ultimoResultado: h?.resultado || null,
+          // Que la pantalla no tenga que saber cuáles resultados son un
+          // fallo: la regla vive en un solo sitio y viaja ya resuelta.
+          ultimoFallo: Boolean(h?.racha),
           rachaFallos: h?.racha || 0
         };
       });

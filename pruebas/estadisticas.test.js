@@ -142,15 +142,18 @@ test('la producción cuenta moldes, y separa los que salieron mal', async () => 
               resultados: [{ moldeId: moldes[0].id, resultado: 'merma' }] } });
 
   const p = (await hoy()).produccion;
-  assert.equal(p.buenas, 5);
+  assert.equal(p.alAlmacen, 5);
+  assert.equal(p.producidas, 5);
   assert.equal(p.rotas, 1);
   assert.equal(p.salieron, 6);
-  assert.ok(Math.abs(p.porCientoBuenas - 83.3) < 0.2, `83.3% (${p.porCientoBuenas})`);
+  assert.equal(p.normal, 5, 'sin decir nada, el hielo sale normal');
+  assert.equal(p.porCientoSinQueja, 100,
+    'cinco normales de cinco producidas: nadie se queja de ninguna');
 });
 
 test('los paños fijados en la puesta en marcha no son producción', async () => {
   await entrarAdmin();
-  const antes = (await hoy()).produccion.buenas;
+  const antes = (await hoy()).produccion.alAlmacen;
 
   const t = (await llamar('/api/produccion/estado')).json.datos.tanques[0];
   const est = (await llamar(`/api/produccion/estado?tanque=${t.id}`)).json.datos;
@@ -162,7 +165,7 @@ test('los paños fijados en la puesta en marcha no son producción', async () =>
     cuerpo: { panos: [{ panoId: virgen.id, situacion: 'congelando',
                         desde: new Date(Date.now() - 3600 * 1000).toISOString() }] } });
 
-  assert.equal((await hoy()).produccion.buenas, antes,
+  assert.equal((await hoy()).produccion.alAlmacen, antes,
                'sembrar no fabrica marquetas: si contara, el costo por marqueta mentiría');
 });
 
@@ -264,7 +267,7 @@ test('sin producción el costo por marqueta no se inventa: sale nulo', async () 
   await entrarAdmin();
   // Un mes viejo donde no hubo nada.
   const d = (await llamar('/api/estadisticas?periodo=2020-03')).json.datos;
-  assert.equal(d.produccion.buenas, 0);
+  assert.equal(d.produccion.producidas, 0);
   assert.equal(d.costo.centavos, null, 'repartir entre cero no significa nada');
   assert.equal(d.costo.porMarqueta, null);
 });
@@ -401,6 +404,6 @@ test('quién sacó cuánto cuadra con las marquetas del mes', async () => {
   await entrarAdmin();
   const d = await hoy();
   const suma = d.porObrero.reduce((n, o) => n + o.marquetas, 0);
-  assert.equal(suma, d.produccion.buenas,
+  assert.equal(suma, d.produccion.alAlmacen,
     'los dos números salen de la misma fecha: si no cuadraran, uno de los dos mentiría');
 });

@@ -17,9 +17,30 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '2.9.1';
+const VERSION_ACTUAL = '2.10';
 
 const VERSIONES = [
+  {
+    numero: '2.10',
+    nombre: 'Cómo salió el hielo',
+    fecha: '2026-09-02',
+    resumen:
+      'El sistema sabía tres cosas del hielo —salió, se rompió, salió ' +
+      'hueca— y la fábrica distingue cinco. Ahora al sacar un paño se dice ' +
+      'cómo salió, con un toque, y ese dato aparece en la pantalla del día, ' +
+      'en la hoja de los números y en el corte impreso.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'LOS CINCO ESTADOS DEL HIELO, con las palabras de la fábrica: 100% SELLADAS (bien congeladas, el centro cerrado a tope: salen cuando llueve mucho, cuando no hay venta, o cuando las máquinas están congelando muy bien), NORMALES (casi selladas o les falta poquito; con estas no hay quejas), UN POCO HUECAS (del 70% al 60%: con una noche más hubieran quedado mejor, y alguna gente se queja), HUECAS (el centro casi atraviesa, y algunas sí lo hacen: la gente se queja pero por necesidad se la lleva) y CÁSCARAS (30% de congelación o menos, con los laterales delgados).' },
+      { tipo: 'importante', texto: 'POR QUÉ IMPORTA ANOTARLO. Una marqueta hueca SE COBRA IGUAL que una sellada, así que en el dinero no se nota: se nota en las quejas del mostrador, y esa información se perdía el mismo día. Ahora queda escrita. Cuando la mezcla se corre hacia lo hueco varios días seguidos, algo está pasando —el amoniaco, un compresor, el calor de mayo— y se ve ANTES de que una máquina se pare.' },
+      { tipo: 'nuevo', texto: 'SE PREGUNTA UNA VEZ POR PAÑO, no doce veces. La fábrica congela bien o mal esa noche y el paño sale parejo, así que se dice cómo salió TODO el paño de un toque; si un molde salió distinto del resto, se toca ese molde y se elige lo suyo. Y como el sistema pone NORMALES solo, el día de siempre no cuesta ni un toque de más.' },
+      { tipo: 'importante', texto: 'LAS CÁSCARAS AHORA LLEVAN DESTINO: a los condensadores (lo normal, para enfriarlos), al cuarto frío (cuando hay demanda y se van a vender más baratas) o se botó. Una cáscara costó lo mismo que una sellada —la misma agua, la misma luz, el mismo molde— así que CUENTA para el costo por marqueta; lo que no hace es contar como hielo del cuarto frío. Si contara, el conteo no cuadraría nunca y andarías buscando marquetas que no existen.' },
+      { tipo: 'nuevo', texto: 'NINGUNA PANTALLA ENSEÑA EL TOTAL SOLO. Junto al número va siempre la MEZCLA, en una barra de colores: dos días con las mismas marquetas pueden ser un buen día y uno malo, y lo que los separa es el reparto. Sale en "Lo de hoy", en la hoja de "Los números" y en el corte de turno impreso. En papel la barra sale en grises, de claro (bien) a oscuro (mal), para que se lea igual en la impresora en blanco y negro.' },
+      { tipo: 'mejora', texto: 'CAMBIÓ LA REGLA DEL MOLDE QUE FALLA, y para bien. Antes se marcaba el molde que no saliera "bien"; ahora se marca el que salió PEOR QUE EL RESTO DE SU PROPIO PAÑO. La diferencia se ve en mayo: cuando calientan los tanques no sale una sola marqueta sellada en toda la fábrica, y con la regla vieja la pantalla se habría pintado entera de rojo señalando cien moldes que no tienen nada. Con la nueva, la noche mala no señala a nadie y el molde que sale cáscara mientras sus vecinos salen normales queda marcado al instante — que es justo el aviso que sirve para ir a revisarlo.' },
+      { tipo: 'mejora', texto: 'EN LA HOJA DE LOS NÚMEROS, "salieron buenas" se partió en dos números que antes se confundían: SALIERON DEL MOLDE (todo el hielo que se hizo, cáscaras incluidas: es lo que costó agua, luz y amoniaco) y SIN UNA SOLA QUEJA (el porcentaje que salió sellado o normal). El costo por marqueta ahora se divide entre lo producido, cáscaras incluidas, porque también costaron.' },
+      { tipo: 'arreglo', texto: 'De paso, en el papel del corte el total de marquetas ROTAS del día salía en cero aunque cada paño sí las enseñara en su renglón — la peor forma de estar mal, porque parece que cuadra. Ya suma, y hay una prueba que vigila que el papel cuadre consigo mismo.' },
+      { tipo: 'importante', texto: 'LO QUE YA ESTABA CAPTURADO NO SE PIERDE NI SE INVENTA. Lo que decía "salió bien" pasó a NORMAL, que es lo que quería decir, y lo que decía "hueco" pasó a HUECA. Lo que no se puede es adivinar hacia atrás qué fue sellada y qué cáscara, y no se adivina: nadie lo estaba anotando.' }
+    ]
+  },
   {
     numero: '2.9.1',
     nombre: 'Que los números cuadren',

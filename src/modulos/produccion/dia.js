@@ -14,6 +14,7 @@
  * la tarde, que es justo el que interesa.
  */
 const { bd } = require('../../db/conexion');
+const calidad = require('./calidad');
 
 /** Los paños sacados en un día, con lo que dio cada uno. */
 function panosDelDia(dia = null) {
@@ -26,9 +27,12 @@ function panosDelDia(dia = null) {
            COALESCE(u.nombre, sp.ejecutor_libre) AS quien,
            sp.terminada_en,
            sp.notas,
-           COUNT(*) FILTER (WHERE sm.resultado = 'ok')    AS buenas,
-           COUNT(*) FILTER (WHERE sm.resultado = 'merma') AS rotas,
-           COUNT(*) FILTER (WHERE sm.resultado = 'hueco') AS huecos
+           COUNT(*) FILTER (WHERE ${calidad.alAlmacen('sm')})   AS al_almacen,
+           COUNT(*) FILTER (WHERE sm.resultado <> 'merma')       AS producidas,
+           COUNT(*) FILTER (WHERE sm.resultado = 'merma')        AS rotas,
+           COUNT(*) FILTER (WHERE sm.resultado = 'cascara'
+                              AND sm.destino = 'almacen')        AS cascaras_guardadas,
+           ${calidad.columnasMezcla('sm')}
       FROM sacadas_pano sp
       JOIN panos p          ON p.id = sp.pano_id
       JOIN tanques t        ON t.id = p.tanque_id
@@ -43,19 +47,42 @@ function panosDelDia(dia = null) {
 
   return filas.map((f) => ({
     ...f,
+    alAlmacen: f.al_almacen,
     enProceso: !f.terminada_en
   }));
 }
 
-/** El resumen de un día: cuántos paños, cuántas marquetas, cuántas rotas. */
+/**
+ * El resumen de un día: cuántos paños, cuánto hielo entró al cuarto frío y
+ * CÓMO SALIÓ ESE HIELO.
+ *
+ * La mezcla va aquí y no solo el total a propósito: el total de un día malo
+ * y el de un día bueno se parecen —son los mismos moldes— y lo que los
+ * distingue es el reparto. Un corte que enseñara nada más el total estaría
+ * escondiendo justo el dato que sirve.
+ */
 function resumenDelDia(dia = null) {
   const panos = panosDelDia(dia);
+  const suma = (campo) => panos.reduce((n, p) => n + (p[campo] || 0), 0);
+
+  // OJO con el nombre de la merma: en el renglón de cada paño la columna se
+  // llama `rotas` —es la palabra que va impresa en el papel— y `resumir`
+  // espera la clave `merma`, que es como se llama en la base. Sin esta
+  // traducción el total de rotas del día salía en cero mientras cada paño
+  // sí las enseñaba, que es la peor forma de estar mal: parece que cuadra.
+  const mezcla = calidad.resumir(
+    {
+      ...Object.fromEntries(calidad.CLAVES_CALIDAD.map((c) => [c, suma(c)])),
+      merma: suma('rotas')
+    },
+    suma('cascaras_guardadas')
+  );
+
   return {
     panos,
     cuantos: panos.length,
-    buenas: panos.reduce((n, p) => n + p.buenas, 0),
-    rotas: panos.reduce((n, p) => n + p.rotas, 0),
-    huecos: panos.reduce((n, p) => n + p.huecos, 0),
+    ...mezcla,
+    rotas: mezcla.merma,
     enProceso: panos.filter((p) => p.enProceso).length
   };
 }

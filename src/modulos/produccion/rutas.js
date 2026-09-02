@@ -33,13 +33,13 @@ const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
 const { tanqueConEstado, canastasFuera, horasDesde } = require('./estado');
 const vales = require('./vales');
+const calidad = require('./calidad');
 
 const router = express.Router();
 
 const verProduccion = exigirPermiso('produccion.ver');
 const registrar = exigirPermiso('produccion.registrar');
 
-const RESULTADOS = ['ok', 'merma', 'hueco'];
 const TIPOS_AGUA = ['purificada', 'potable'];
 
 /**
@@ -95,7 +95,12 @@ router.get('/estado', verProduccion, (req, res) => {
     tanque,
     fuera: canastasFuera().length,
     puedeAutorizar: puede(req.usuario.rol, 'produccion.autorizar'),
-    responsables: responsables()
+    responsables: responsables(),
+    // Los estados del hielo viajan del servidor a la pantalla, no
+    // copiados a mano en el JavaScript de enfrente: así hay un solo
+    // lugar donde dicen cómo se llaman y qué significan (calidad.js).
+    calidades: calidad.CALIDADES,
+    destinos: calidad.DESTINOS
   });
 });
 
@@ -176,7 +181,10 @@ router.get('/obreros', verProduccion, (req, res) => {
  *   tipoAgua     'purificada' | 'potable'
  *   rellenar     false para dejarlo fuera (limpieza, se acabó el agua)
  *   canastas     ids concretos; si no se manda, todas las que falten
- *   resultados   [{ moldeId, resultado }] solo para la merma
+ *   calidad      cómo salió el paño en general (por omisión 'normal')
+ *   destino      qué se hizo con las cáscaras, si el paño salió en cáscaras
+ *   resultados   [{ moldeId, resultado, destino }] los moldes que salieron
+ *                distintos del resto del paño
  *   motivo       obligatorio si se saca un paño que no toca
  */
 router.post('/panos/:id/sacar', registrar, (req, res) => {
@@ -240,12 +248,41 @@ router.post('/panos/:id/sacar', registrar, (req, res) => {
     return error(res, 'Este paño ya está fuera del tanque. Lo que falta es rellenarlo.', 409);
   }
 
-  // --- Resultados por molde. Lo normal: todos bien ---
+  // --- CÓMO SALIÓ EL HIELO ---
+  //
+  // Primero cómo salió EL PAÑO, que es lo que de verdad pasa: la fábrica
+  // congela bien o mal esa noche y el paño entero sale parecido. Después,
+  // los moldes sueltos que salieron distintos.
+  const general = String(req.body?.calidad || calidad.CALIDAD_POR_OMISION);
+  if (!calidad.CLAVES_CALIDAD.includes(general)) {
+    return error(res, `No conozco ese estado del hielo: ${general}.`);
+  }
+
+  const destinoGeneral = String(req.body?.destino || calidad.DESTINO_POR_OMISION);
+  if (!calidad.CLAVES_DESTINO.includes(destinoGeneral)) {
+    return error(res, `No conozco ese destino: ${destinoGeneral}.`);
+  }
+
   const marcas = new Map();
   for (const r of req.body?.resultados || []) {
-    if (!RESULTADOS.includes(r.resultado)) return error(res, `Resultado inválido: ${r.resultado}.`);
-    marcas.set(r.moldeId, r.resultado);
+    if (!calidad.RESULTADOS.includes(r.resultado)) {
+      return error(res, `No conozco ese estado del hielo: ${r.resultado}.`);
+    }
+    // Sin destino escrito, la cáscara de un molde suelto sigue al del paño:
+    // si el paño entero se fue a los condensadores, esa también.
+    const d = r.destino ? String(r.destino) : destinoGeneral;
+    if (r.resultado === 'cascara' && !calidad.CLAVES_DESTINO.includes(d)) {
+      return error(res, `No conozco ese destino: ${r.destino}.`);
+    }
+    marcas.set(r.moldeId, { resultado: r.resultado, destino: d });
   }
+
+  // El destino solo existe para las cáscaras; en lo demás va vacío, porque
+  // una marqueta entera siempre entra al cuarto frío.
+  const porOmision = {
+    resultado: general,
+    destino: general === 'cascara' ? destinoGeneral : null
+  };
 
   const fecha = ahora();
   const quien = resolverQuien(req);
@@ -259,7 +296,8 @@ router.post('/panos/:id/sacar', registrar, (req, res) => {
     'SELECT * FROM sacadas_pano WHERE pano_id = ? AND terminada_en IS NULL ORDER BY iniciada_en LIMIT 1'
   ).get(pano.id);
 
-  const resumen = { ok: 0, merma: 0, hueco: 0 };
+  const mezcla = Object.fromEntries(calidad.RESULTADOS.map((c) => [c, 0]));
+  let cascarasGuardadas = 0;
 
   const guardar = bd.transaction(() => {
     if (!sacadaPano) {
@@ -279,7 +317,7 @@ router.post('/panos/:id/sacar', registrar, (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const insertarMolde = bd.prepare(
-      'INSERT INTO sacadas_moldes (id, sacada_id, molde_id, resultado) VALUES (?, ?, ?, ?)'
+      'INSERT INTO sacadas_moldes (id, sacada_id, molde_id, resultado, destino) VALUES (?, ?, ?, ?, ?)'
     );
     const insertarRellenado = bd.prepare(`
       INSERT INTO rellenados (id, canasta_id, fecha, ejecutor_id, capturista_id,
@@ -299,9 +337,12 @@ router.post('/panos/:id/sacar', registrar, (req, res) => {
                          previo?.id || null, horas, sacadaPano.id);
 
       for (const m of c.moldes) {
-        const r = marcas.get(m.id) || 'ok';
-        insertarMolde.run(nuevoId(), sacadaId, m.id, r);
-        resumen[r]++;
+        const marca = marcas.get(m.id) || porOmision;
+        const destino = marca.resultado === 'cascara'
+          ? (marca.destino || destinoGeneral) : null;
+        insertarMolde.run(nuevoId(), sacadaId, m.id, marca.resultado, destino);
+        mezcla[marca.resultado]++;
+        if (destino === 'almacen') cascarasGuardadas++;
       }
 
       // Los moldes se vuelven a llenar en el mismo movimiento, salvo que se
@@ -341,14 +382,22 @@ router.post('/panos/:id/sacar', registrar, (req, res) => {
     ejecutorId, capturistaId: req.usuario.id,
     detalle: {
       tanque: pano.tanque_nombre, pano: pano.numero, canastas: canastas.length,
-      resumen, rellenado: rellenar, tipoAgua: rellenar ? tipoAgua : null,
+      calidad: general, mezcla, rellenado: rellenar,
+      tipoAgua: rellenar ? tipoAgua : null,
       fueraDeOrden: !esElQueToca, motivo: motivo || null
     }
   });
 
+  const cuenta = calidad.resumir(mezcla, cascarasGuardadas);
+
   return ok(res, {
-    marquetas: resumen.ok,
-    merma: resumen.merma + resumen.hueco,
+    // "marquetas" siguió llamándose así, pero ahora quiere decir lo que de
+    // verdad entró al cuarto frío: las cáscaras que se fueron a los
+    // condensadores no están ahí, y contarlas descuadraría el conteo.
+    marquetas: cuenta.alAlmacen,
+    producidas: cuenta.producidas,
+    merma: cuenta.merma,
+    mezcla: cuenta,
     terminado: Boolean(terminada),
     canastas: canastas.length
   }, 201);
@@ -420,11 +469,26 @@ router.post('/lote', registrar, (req, res) => {
     return error(res, 'Indica si se rellenó con agua purificada o potable.');
   }
 
+  // Cómo salió el hielo de esa jornada. Aquí es UNA respuesta para toda la
+  // captura y no molde por molde a propósito: se está anotando algo que ya
+  // pasó, de memoria, y pedir detalle que nadie apuntó solo produciría
+  // datos inventados. El detalle fino se marca cuando se saca el paño en
+  // el momento, en la pantalla del paño.
+  const general = String(req.body?.calidad || calidad.CALIDAD_POR_OMISION);
+  if (!calidad.CLAVES_CALIDAD.includes(general)) {
+    return error(res, `No conozco ese estado del hielo: ${general}.`);
+  }
+  const destinoLote = general === 'cascara'
+    ? String(req.body?.destino || calidad.DESTINO_POR_OMISION) : null;
+  if (destinoLote && !calidad.CLAVES_DESTINO.includes(destinoLote)) {
+    return error(res, `No conozco ese destino: ${destinoLote}.`);
+  }
+
   const quien = resolverQuien(req);
   const ejecutorId = quien.id || req.usuario.id;
   const fecha = ahora();
   const hechos = [];
-  let marquetas = 0;
+  let producidas = 0;
 
   // Los paños que se marcaron fuera de la rotación traen su vale.
   const autorizados = new Map();
@@ -468,9 +532,10 @@ router.post('/lote', registrar, (req, res) => {
                previo ? horasDesde(previo.fecha, new Date(fecha)) : null, sacadaPanoId);
 
         for (const m of c.moldes) {
-          bd.prepare('INSERT INTO sacadas_moldes (id, sacada_id, molde_id, resultado) VALUES (?, ?, ?, ?)')
-            .run(nuevoId(), sacadaId, m.id, 'ok');
-          marquetas++;
+          bd.prepare(`INSERT INTO sacadas_moldes (id, sacada_id, molde_id, resultado, destino)
+                      VALUES (?, ?, ?, ?, ?)`)
+            .run(nuevoId(), sacadaId, m.id, general, destinoLote);
+          producidas++;
         }
 
         bd.prepare(`
@@ -491,10 +556,13 @@ router.post('/lote', registrar, (req, res) => {
   bitacora.registrar({
     accion: 'produccion.captura_lote', entidad: 'usuario', entidadId: ejecutorId,
     ejecutorId, capturistaId: req.usuario.id,
-    detalle: { panos: hechos, marquetas, tipoAgua }
+    detalle: { panos: hechos, producidas, calidad: general, destino: destinoLote, tipoAgua }
   });
 
-  return ok(res, { panos: hechos, marquetas }, 201);
+  // Si el hielo salió en cáscaras y no se guardó, no entró nada al cuarto frío.
+  const alAlmacen = general !== 'cascara' || destinoLote === 'almacen' ? producidas : 0;
+
+  return ok(res, { panos: hechos, marquetas: alAlmacen, producidas, calidad: general }, 201);
 });
 
 // ============================================================
@@ -567,17 +635,21 @@ function anularSacadaPano(req, res) {
 router.get('/hoy', verProduccion, (req, res) => {
   const desde = req.query.desde || new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
 
-  const marquetas = bd.prepare(`
-    SELECT COUNT(*) n FROM sacadas_moldes sm
+  // La mezcla del día en una sola pasada: cuántas de cada estado, y
+  // cuántas cáscaras se guardaron en vez de irse a los condensadores.
+  const cuenta = bd.prepare(`
+    SELECT ${calidad.columnasMezcla('sm')},
+           COUNT(CASE WHEN sm.resultado = 'merma' THEN 1 END) AS merma,
+           COUNT(CASE WHEN sm.resultado = 'cascara'
+                       AND sm.destino = 'almacen' THEN 1 END) AS cascaras_guardadas
+      FROM sacadas_moldes sm
       JOIN sacadas s ON s.id = sm.sacada_id
-     WHERE s.fecha >= ? AND sm.resultado = 'ok'
-  `).get(desde).n;
+     WHERE s.fecha >= ?
+  `).get(desde);
 
-  const merma = bd.prepare(`
-    SELECT COUNT(*) n FROM sacadas_moldes sm
-      JOIN sacadas s ON s.id = sm.sacada_id
-     WHERE s.fecha >= ? AND sm.resultado IN ('merma','hueco')
-  `).get(desde).n;
+  const mezcla = calidad.resumir(cuenta, cuenta.cascaras_guardadas);
+  const marquetas = mezcla.alAlmacen;
+  const merma = mezcla.merma;
 
   // Los de nombre escrito ("Otro") también cuentan aquí, agrupados por su
   // nombre: si Juan el eventual sacó tres paños, sus tres paños son suyos,
@@ -591,7 +663,7 @@ router.get('/hoy', verProduccion, (req, res) => {
              WHERE COALESCE(sp2.ejecutor_id, 'L:' || sp2.ejecutor_libre)
                    = COALESCE(sp.ejecutor_id, 'L:' || sp.ejecutor_libre)
                AND sp2.iniciada_en >= ?
-               AND sm.resultado = 'ok') AS marquetas
+               AND ${calidad.alAlmacen('sm')}) AS marquetas
       FROM sacadas_pano sp
       LEFT JOIN usuarios u ON u.id = sp.ejecutor_id
      WHERE sp.iniciada_en >= ?
@@ -606,7 +678,12 @@ router.get('/hoy', verProduccion, (req, res) => {
            sp.autorizada_por, sp.motivo_orden,
            (SELECT COUNT(*) FROM sacadas_moldes sm
               JOIN sacadas s ON s.id = sm.sacada_id
-             WHERE s.sacada_pano_id = sp.id AND sm.resultado = 'ok') AS marquetas
+             WHERE s.sacada_pano_id = sp.id
+               AND ${calidad.alAlmacen('sm')}) AS marquetas,
+           (SELECT COUNT(*) FROM sacadas_moldes sm
+              JOIN sacadas s ON s.id = sm.sacada_id
+             WHERE s.sacada_pano_id = sp.id
+               AND sm.resultado <> 'merma') AS producidas
       FROM sacadas_pano sp
       JOIN panos p   ON p.id = sp.pano_id
       JOIN tanques t ON t.id = p.tanque_id
@@ -615,7 +692,11 @@ router.get('/hoy', verProduccion, (req, res) => {
      ORDER BY sp.iniciada_en DESC
   `).all(desde);
 
-  return ok(res, { desde, marquetas, merma, porObrero, panos, fuera: canastasFuera().length });
+  return ok(res, {
+    desde, marquetas, merma, mezcla, porObrero, panos,
+    calidades: calidad.CALIDADES,
+    fuera: canastasFuera().length
+  });
 });
 
 module.exports = router;

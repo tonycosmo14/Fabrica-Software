@@ -45,7 +45,7 @@ const TEMAS = [
   {
     id: 'produccion',
     titulo: 'Producción: sacar el hielo de los tanques',
-    busca: 'producción tanque paño canasta molde sacar rellenar rotación intercalado merma agua purificada potable congelación quién lo sacó otro eventual nombre',
+    busca: 'producción tanque paño canasta molde sacar rellenar rotación intercalado merma agua purificada potable congelación quién lo sacó otro eventual nombre calidad sellada normal hueca cáscara condensadores destino cómo salió el hielo mezcla',
     cuerpo: `
       <h4>Cómo está armado un tanque</h4>
       <p>Un <b>tanque</b> tiene varios <b>paños</b>. Cada paño tiene
@@ -64,13 +64,69 @@ const TEMAS = [
 
       <h4>Sacar es una sola cosa</h4>
       <p>Cuando se saca un paño, <b>se saca completo</b> y se vuelve a llenar
-      en el mismo momento. Por eso el sistema lo pide junto: marcas qué moldes
-      salieron bien y cuáles fueron merma, dices con qué agua se rellenó, y
-      listo. Un solo registro.</p>
+      en el mismo momento. Por eso el sistema lo pide junto: dices cómo salió
+      el hielo, con qué agua se rellenó, y listo. Un solo registro.</p>
 
-      <p>Los moldes que fallan quedan <b>marcados en rojo</b> hasta que ese
-      paño dé la vuelta otra vez. Si un molde falla varias veces seguidas, el
-      sistema lo señala: probablemente está roto.</p>
+      <h4>Cómo salió el hielo</h4>
+      <p>Antes el sistema solo sabía tres cosas —salió, se rompió, salió
+      hueca— y la fábrica distingue cinco. Ahora al sacar un paño se dice
+      <b>cómo salió</b>, con un toque:</p>
+      <ul>
+        <li><b>100% selladas.</b> Bien congeladas, el centro cerrado a tope.
+        Salen cuando llueve mucho, cuando no hay venta, o cuando las máquinas
+        están congelando muy bien.</li>
+        <li><b>Normales.</b> Casi selladas, o les falta poquito. Es lo de
+        siempre: con estas no hay quejas. <b>Es lo que el sistema pone solo</b>,
+        así que el día normal no cuesta ni un toque de más.</li>
+        <li><b>Un poco huecas.</b> Del 70% al 60% selladas. Con una noche más
+        hubieran quedado mejor. Alguna gente se queja.</li>
+        <li><b>Huecas.</b> El centro casi atraviesa la marqueta, y algunas sí
+        lo hacen. La gente se queja pero por necesidad se la lleva.</li>
+        <li><b>Cáscaras.</b> 30% de congelación o menos: el centro atraviesa y
+        los laterales están delgados. Por lo general no se venden.</li>
+      </ul>
+
+      <p>Eso vale para <b>todo el paño</b>, que es lo que pasa de verdad: la
+      fábrica congela bien o mal esa noche y el paño sale parejo. Si UN molde
+      salió distinto del resto, se toca ese molde y se elige lo suyo. Los que
+      no se tocan van como el paño.</p>
+
+      <h4>Qué se hace con las cáscaras</h4>
+      <p>Cuando el hielo sale en cáscaras, el sistema pregunta qué se hizo con
+      ellas, porque no todas acaban igual:</p>
+      <ul>
+        <li><b>A los condensadores</b> — lo normal. No se tiran del todo:
+        trabajan enfriando.</li>
+        <li><b>Al cuarto frío</b> — cuando hay demanda y se van a vender más
+        baratas. Entran a la existencia como una marqueta más.</li>
+        <li><b>Se botó</b> — no se aprovechó de ninguna manera.</li>
+      </ul>
+      <p class="ayuda-tip">Una cáscara <b>costó lo mismo</b> que una sellada:
+      la misma agua, la misma luz, el mismo molde. Por eso cuenta para el
+      costo por marqueta aunque se haya ido al condensador. Lo que <b>no</b>
+      hace es contar como hielo del cuarto frío: si contara, el conteo no
+      cuadraría nunca y andarías buscando marquetas que no existen.</p>
+
+      <h4>Por qué importa anotarlo</h4>
+      <p>Una marqueta hueca <b>se cobra igual</b> que una sellada, así que en
+      el dinero no se nota. Se nota en el mostrador, en las quejas — y esa
+      información se perdía el mismo día. Ahora queda escrita, y cuando la
+      mezcla se corre hacia lo hueco varios días seguidos, algo está pasando
+      (el amoniaco, un compresor, el calor de mayo) y se ve <b>antes</b> de
+      que una máquina se pare.</p>
+
+      <p>La mezcla del día sale en <b>Lo de hoy</b>, en la hoja de
+      <b>Los números</b> y en el <b>corte de turno</b> impreso. Nunca sale el
+      total solo: dos días con las mismas marquetas pueden ser un buen día y
+      uno malo, y lo que los separa es el reparto.</p>
+
+      <h4>El molde que falla</h4>
+      <p>Los moldes que fallan quedan <b>marcados en rojo</b>, con las veces
+      seguidas que han fallado. Falla el molde que salió <b>peor que el resto
+      de su propio paño</b>: si el paño entero salió hueco, eso es la fábrica
+      esa noche y no marca a nadie; pero si un molde sale cáscara mientras sus
+      vecinos salen normales, ese molde tiene algo —está chueco, gotea, le
+      falta salmuera alrededor— y hay que ir a verlo.</p>
 
       <h4>Los números que siguen</h4>
       <p>El gerente y el administrador pueden imprimir <b>la lista de los
@@ -1320,11 +1376,20 @@ EN REPARACION
       </ul>
 
       <h4>El hielo</h4>
-      <p><b>Salieron buenas</b> se cuenta molde por molde: un molde que
-      salió bien es una marqueta. Si el porcentaje empieza a bajar, hay
-      moldes o una máquina fallando. Lo producido y lo vendido <b>no tienen
-      por qué cuadrar</b>: entre los dos está lo que quedó en el cuarto frío
-      y lo que se derritió.</p>
+      <p><b>Salieron del molde</b> es todo el hielo que se hizo, cáscaras
+      incluidas: es lo que costó agua, luz y amoniaco. <b>Sin una sola
+      queja</b> es el porcentaje que salió sellado o normal — de las poco
+      huecas para abajo, alguien reclama en el mostrador.</p>
+      <p>Debajo va <b>la barra</b>, y es lo primero que hay que
+      mirar: una marqueta hueca se cobra igual que una sellada, así que en el
+      dinero no se nota. Cuando la barra se corre hacia la derecha varios días
+      seguidos, algo está fallando y se ve antes de que una máquina se pare.
+      En pantalla va en colores; en papel sale en grises, de claro (bien) a
+      oscuro (mal), para que se lea igual en la impresora en blanco y
+      negro.</p>
+      <p>Lo producido y lo vendido <b>no tienen por qué cuadrar</b>: entre
+      los dos está lo que quedó en el cuarto frío, lo que se derritió y las
+      cáscaras que se fueron a los condensadores.</p>
 
       <h4>Imprimirla o guardarla en PDF</h4>
       <p>El botón de arriba la saca en hoja carta como se ve: sin el menú,

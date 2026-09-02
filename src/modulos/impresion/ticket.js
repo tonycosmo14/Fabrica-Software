@@ -28,6 +28,7 @@
  * mes. Va lo mínimo, y lo que importa —cuánto hielo se llevó— en grande.
  */
 const { Ticket } = require('./escpos');
+const { CALIDADES } = require('../produccion/calidad');
 const { configuracion } = require('./impresora');
 const { aTexto, desglose } = require('../../lib/fracciones');
 const { formato } = require('../../lib/dinero');
@@ -451,7 +452,7 @@ function ticketResumenDia(datos, { negocio = '' } = {}) {
 
   // ---- LOS PAÑOS DEL DÍA ----
   t.separador();
-  const p = datos.produccion || { panos: [], cuantos: 0, buenas: 0, rotas: 0 };
+  const p = datos.produccion || { panos: [], cuantos: 0, alAlmacen: 0, rotas: 0 };
   t.negrita().linea('PANOS SACADOS HOY').negrita(false);
 
   if (!p.cuantos) {
@@ -462,14 +463,30 @@ function ticketResumenDia(datos, { negocio = '' } = {}) {
       // propósito, que de estos salen varios al día.
       const roto = uno.rotas ? ` -${uno.rotas}` : '';
       t.columnas2(`${uno.tanque} #${uno.pano}${uno.enProceso ? ' (a medias)' : ''}`,
-                  `${uno.buenas}${roto}`);
+                  `${uno.alAlmacen}${roto}`);
     }
     t.separador('.');
     t.bloqueDerecha([
       ['Panos', String(p.cuantos)],
-      ['Marquetas buenas', String(p.buenas)],
+      ['Al cuarto frio', String(p.alAlmacen)],
       p.rotas ? ['Rotas', String(p.rotas)] : null
     ]);
+
+    // ---- CÓMO SALIÓ EL HIELO ----
+    //
+    // Va en el corte y no solo en la pantalla porque este papel es el que
+    // se guarda y el que se compara de una semana a otra. Dos días con las
+    // mismas marquetas pueden ser un buen día y uno malo; lo que los
+    // separa es este reparto. Solo se imprimen los estados que salieron:
+    // renglones con cero gastan papel y no dicen nada.
+    const salieron = CALIDADES.filter((c) => p[c.clave] > 0);
+    if (salieron.length) {
+      t.separador('.');
+      t.negrita().linea('COMO SALIO').negrita(false);
+      for (const c of salieron) t.columnas2(`  ${c.corto}`, String(p[c.clave]));
+      const fuera = (p.cascara || 0) - (p.cascarasAlAlmacen || 0);
+      if (fuera > 0) t.linea(`  (${fuera} cáscaras no entraron al cuarto frío)`);
+    }
   }
 
   pie(t, negocio);

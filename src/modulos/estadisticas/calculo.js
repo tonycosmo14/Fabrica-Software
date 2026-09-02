@@ -22,6 +22,7 @@
  *     marcado como incompleto en vez de salir más barato de lo que es.
  */
 const { bd } = require('../../db/conexion');
+const { alAlmacen, columnasMezcla, resumir } = require('../produccion/calidad');
 const { instantes } = require('../../lib/periodos');
 const { DIECISEISAVOS_POR_MARQUETA } = require('../../lib/fracciones');
 const { luzEnPeriodo, totalGastado, gastosParejos } = require('../empresa/calculo');
@@ -96,19 +97,30 @@ function abonos({ desde, hasta }) {
 // ============================================================
 
 /**
- * Las marquetas del periodo, y las que se echaron a perder.
+ * Las marquetas del periodo, cómo salieron y las que se echaron a perder.
  *
- * Se cuentan MOLDES, que es donde está la verdad: un molde que salió bien
- * es una marqueta. Los paños anulados no cuentan —su nota empieza con
+ * Se cuentan MOLDES, que es donde está la verdad: un molde que dio hielo es
+ * una marqueta. Los paños anulados no cuentan —su nota empieza con
  * ANULADA—, y los paños fijados a mano en la puesta en marcha tampoco,
  * porque no tienen moldes: son inertes a propósito (v2.8).
+ *
+ * SALEN DOS TOTALES Y LA MEZCLA, y los tres hacen falta:
+ *
+ *   producidas  todo lo que salió hecho hielo, cáscaras incluidas. Es el
+ *               que sirve para el costo: una cáscara gastó la misma agua,
+ *               la misma luz y el mismo molde que una sellada.
+ *   alAlmacen   lo que de verdad quedó para vender. Las cáscaras que se
+ *               fueron a los condensadores no están aquí.
+ *   la mezcla   cuántas de cada estado. Sin ella, un mes malo y uno bueno
+ *               se ven idénticos, porque son los mismos moldes.
  */
 function produccion({ desde, hasta }) {
   const r = bd.prepare(`
     SELECT
-      COUNT(CASE WHEN sm.resultado = 'ok'    THEN 1 END) AS buenas,
-      COUNT(CASE WHEN sm.resultado = 'merma' THEN 1 END) AS rotas,
-      COUNT(CASE WHEN sm.resultado = 'hueco' THEN 1 END) AS huecos
+      ${columnasMezcla('sm')},
+      COUNT(CASE WHEN sm.resultado = 'merma' THEN 1 END) AS merma,
+      COUNT(CASE WHEN sm.resultado = 'cascara'
+                  AND sm.destino = 'almacen' THEN 1 END) AS cascaras_guardadas
       FROM sacadas_moldes sm
       JOIN sacadas s       ON s.id = sm.sacada_id
       JOIN sacadas_pano sp ON sp.id = s.sacada_pano_id
@@ -116,13 +128,20 @@ function produccion({ desde, hasta }) {
        AND (sp.notas IS NULL OR sp.notas NOT LIKE 'ANULADA%')
   `).get(desde, hasta);
 
-  const salieron = r.buenas + r.rotas + r.huecos;
+  const m = resumir(r, r.cascaras_guardadas);
+
+  // DE CADA CIEN MARQUETAS, CUÁNTAS SALIERON SIN QUEJA. Selladas y normales
+  // son las que nadie reclama en el mostrador; de las poco huecas para
+  // abajo, alguien se queja. Es el número que avisa antes de que una
+  // máquina se pare: baja días antes, con las mismas marquetas.
+  const sinQueja = m.sellada + m.normal;
+
   return {
-    ...r,
-    salieron,
-    // De cada cien moldes, cuántos salieron buenos. Es el número que dice
-    // si una máquina está fallando: baja antes de que se pare.
-    porCientoBuenas: salieron ? Math.round((r.buenas / salieron) * 1000) / 10 : null
+    ...m,
+    rotas: m.merma,
+    sinQueja,
+    porCientoSinQueja: m.producidas
+      ? Math.round((sinQueja / m.producidas) * 1000) / 10 : null
   };
 }
 
@@ -140,7 +159,7 @@ function porObrero({ desde, hasta }) {
   return bd.prepare(`
     SELECT COALESCE(u.nombre, sp.ejecutor_libre, '—') AS nombre,
            COUNT(DISTINCT sp.id) AS panos,
-           COUNT(CASE WHEN sm.resultado = 'ok' THEN 1 END) AS marquetas
+           COUNT(CASE WHEN ${alAlmacen('sm')} THEN 1 END) AS marquetas
       FROM sacadas s
       JOIN sacadas_pano sp   ON sp.id = s.sacada_pano_id
       JOIN sacadas_moldes sm ON sm.sacada_id = s.id
@@ -225,7 +244,11 @@ function gastosDelCajon({ desde, hasta }) {
  */
 function costoPorMarqueta(periodo) {
   const rango = instantes(periodo);
-  const marquetas = produccion(rango).buenas;
+  // Se divide entre lo PRODUCIDO, no entre lo que se vendió: la cáscara
+  // que se fue al condensador también costó luz, agua y amoniaco. Dividir
+  // solo entre lo vendible haría que un mes malo pareciera caro por partida
+  // doble.
+  const marquetas = produccion(rango).producidas;
   const dias = { desde: periodo.desde, hasta: periodo.hasta };
 
   const cajon = gastosDelCajon(rango).gastado;
@@ -297,7 +320,7 @@ function porDia(periodo) {
 
   const produccionPorDia = new Map(bd.prepare(`
     SELECT date(s.fecha, 'localtime') AS dia,
-           COUNT(CASE WHEN sm.resultado = 'ok' THEN 1 END) AS marquetas
+           COUNT(CASE WHEN ${alAlmacen('sm')} THEN 1 END) AS marquetas
       FROM sacadas_moldes sm
       JOIN sacadas s       ON s.id = sm.sacada_id
       JOIN sacadas_pano sp ON sp.id = s.sacada_pano_id
@@ -347,7 +370,9 @@ function porMes(periodos) {
       corto: `${p.nombre.slice(0, 3).toLowerCase()} ${String(p.desde).slice(2, 4)}`,
       vendido: v.centavos,
       tickets: v.tickets,
-      marquetas: prod.buenas,
+      marquetas: prod.alAlmacen,
+      producidas: prod.producidas,
+      porCientoSinQueja: prod.porCientoSinQueja,
       gastado: costo.total,
       costoPorMarqueta: costo.centavos,
       completo: costo.completo

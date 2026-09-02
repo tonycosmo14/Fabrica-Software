@@ -43,6 +43,16 @@
   --et-repartidor-f: #ffeccc; --et-repartidor-t: #91560a;
   --et-baja-f: #f7e0de; --et-baja-t: var(--rojo);
 
+  /* --- Cómo salió el hielo (v2.10). De mejor a peor, y se lee como un
+         semáforo: azul es hielo de lujo, verde el de siempre, y de ahí
+         para abajo va calentándose el color igual que se calienta el
+         problema. El orden de estas cinco líneas ES el orden real. --- */
+  --cal-sellada:    #1c75bc;  --cal-sellada-f:    #dcecf9;
+  --cal-normal:     #17864f;  --cal-normal-f:     #d9f0e5;
+  --cal-poco_hueca: #b87400;  --cal-poco_hueca-f: #fbf0d6;
+  --cal-hueca:      #d2621b;  --cal-hueca-f:      #fbe3d2;
+  --cal-cascara:    #c02a20;  --cal-cascara-f:    #f7e0de;
+
   --ancho: 1180px;              /* ancho útil en pantallas grandes */
   --sombra:      0 2px 10px rgba(16, 60, 90, .10);
   --sombra-alta: 0 10px 34px rgba(16, 60, 90, .14);
@@ -78,6 +88,12 @@
     --et-operario-f: #10344c; --et-operario-t: #7cc7f0;
     --et-repartidor-f: #3d2c10; --et-repartidor-t: #f2bb62;
     --et-baja-f: #40201e; --et-baja-t: #ff8b81;
+
+    --cal-sellada:    #6cc4f2;  --cal-sellada-f:    #10344c;
+    --cal-normal:     #35c47f;  --cal-normal-f:     #123a29;
+    --cal-poco_hueca: #e8b25a;  --cal-poco_hueca-f: #3d2c10;
+    --cal-hueca:      #f0913f;  --cal-hueca-f:      #46270f;
+    --cal-cascara:    #ff6b5f;  --cal-cascara-f:    #40201e;
 
     --sombra:      0 2px 10px rgba(0, 0, 0, .45);
     --sombra-alta: 0 10px 34px rgba(0, 0, 0, .55);
@@ -920,15 +936,85 @@ select { color-scheme: light dark; }
 }
 .molde-boton .molde-num { font-size: 17px; font-weight: 800; }
 .molde-boton .molde-estado { font-size: 10px; text-transform: uppercase; letter-spacing: .4px; }
-.molde-boton.ok { border-color: var(--verde); background: var(--et-cajero-f); color: var(--et-cajero-t); }
+.molde-boton.sellada    { border-color: var(--cal-sellada);    background: var(--cal-sellada-f);    color: var(--cal-sellada); }
+.molde-boton.normal     { border-color: var(--cal-normal);     background: var(--cal-normal-f);     color: var(--cal-normal); }
+.molde-boton.poco_hueca { border-color: var(--cal-poco_hueca); background: var(--cal-poco_hueca-f); color: var(--cal-poco_hueca); }
+.molde-boton.hueca      { border-color: var(--cal-hueca);      background: var(--cal-hueca-f);      color: var(--cal-hueca); }
+.molde-boton.cascara    { border-color: var(--cal-cascara);    background: var(--cal-cascara-f);    color: var(--cal-cascara); }
 .molde-boton.merma { border-color: var(--est-fuera); background: var(--est-fuera-f); color: var(--est-fuera); }
-.molde-boton.hueco { border-color: var(--rojo); background: var(--et-baja-f); color: var(--et-baja-t); }
+
+/* El molde que se marcó APARTE del resto del paño va con el borde cortado:
+   sin esto, un paño entero de huecas y un paño de normales con un molde
+   hueco se ven igual, y no son la misma noticia. */
+.molde-boton.aparte { border-style: dashed; border-width: 3px; }
+
 .molde-boton { position: relative; }
 .molde-aviso {
   position: absolute; top: -6px; right: -6px; width: 18px; height: 18px;
   border-radius: 50%; background: var(--rojo); color: #fff;
   font-size: 11px; font-weight: 800; display: grid; place-items: center;
 }
+
+/* ============================================================
+   CÓMO SALIÓ EL HIELO  (v2.10)
+   Los cinco estados se eligen de un renglón de botones, no de una lista
+   desplegable: es un toque en vez de tres, y con el hielo en la mano y los
+   guantes puestos eso importa. En PC caben los cinco a lo ancho; en el
+   celular se parten en dos renglones solos.
+   ============================================================ */
+.calidades {
+  display: grid; gap: 8px; margin-top: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+}
+.calidad-boton {
+  width: 100%; min-width: 0; min-height: 66px; padding: 8px 6px;
+  flex-direction: column; gap: 4px;
+  border: 2px solid var(--borde-fuerte); background: var(--superficie-alt);
+  color: var(--suave); font-weight: 700;
+}
+.calidad-boton .calidad-icono  { font-size: 19px; line-height: 1; }
+.calidad-boton .calidad-nombre { font-size: 11.5px; text-align: center; line-height: 1.15; }
+
+.calidad-boton.sellada.elegida    { border-color: var(--cal-sellada);    background: var(--cal-sellada-f);    color: var(--cal-sellada); }
+.calidad-boton.normal.elegida     { border-color: var(--cal-normal);     background: var(--cal-normal-f);     color: var(--cal-normal); }
+.calidad-boton.poco_hueca.elegida { border-color: var(--cal-poco_hueca); background: var(--cal-poco_hueca-f); color: var(--cal-poco_hueca); }
+.calidad-boton.hueca.elegida      { border-color: var(--cal-hueca);      background: var(--cal-hueca-f);      color: var(--cal-hueca); }
+.calidad-boton.cascara.elegida    { border-color: var(--cal-cascara);    background: var(--cal-cascara-f);    color: var(--cal-cascara); }
+.calidad-boton.elegida { box-shadow: inset 0 0 0 1px currentColor; }
+
+.calidad-nota { margin: 10px 0 0; min-height: 2.6em; }
+
+/* La mezcla del día, en una barra de proporciones. Se lee de un vistazo:
+   cuánto del hielo salió de cada clase. */
+.mezcla-barra {
+  display: flex; height: 26px; border-radius: 8px; overflow: hidden;
+  border: 1px solid var(--borde); background: var(--superficie-alt);
+}
+.mezcla-tramo {
+  display: grid; place-items: center; min-width: 0;
+  font-size: 11px; font-weight: 800; color: #fff;
+}
+.mezcla-tramo.sellada    { background: var(--cal-sellada); }
+.mezcla-tramo.normal     { background: var(--cal-normal); }
+.mezcla-tramo.poco_hueca { background: var(--cal-poco_hueca); }
+.mezcla-tramo.hueca      { background: var(--cal-hueca); }
+.mezcla-tramo.cascara    { background: var(--cal-cascara); }
+.mezcla-tramo.merma      { background: var(--suave); }
+
+.mezcla-lista, .mezcla-viva {
+  display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0;
+}
+.mezcla-viva { justify-content: center; }
+.mezcla-parte {
+  font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px;
+  border: 1px solid currentColor;
+}
+.mezcla-parte.sellada    { color: var(--cal-sellada);    background: var(--cal-sellada-f); }
+.mezcla-parte.normal     { color: var(--cal-normal);     background: var(--cal-normal-f); }
+.mezcla-parte.poco_hueca { color: var(--cal-poco_hueca); background: var(--cal-poco_hueca-f); }
+.mezcla-parte.hueca      { color: var(--cal-hueca);      background: var(--cal-hueca-f); }
+.mezcla-parte.cascara    { color: var(--cal-cascara);    background: var(--cal-cascara-f); }
+.mezcla-parte.merma      { color: var(--suave);          background: var(--superficie-alt); }
 
 /* Fichas de paño para la captura en lote */
 .rejilla-panos {
@@ -1056,8 +1142,12 @@ tr.anulada { opacity: .45; text-decoration: line-through; }
    de un tanque caben en la pantalla de un celular (seccion 6.2).
    ============================================================ */
 
+/* Se acomodan solas a los datos que haya. Con tres columnas fijas, el
+   cuarto dato de "Lo de hoy" (v2.10) se quedaba solo en un renglón, ancho
+   como una puerta y visualmente más importante que los otros tres. */
 .resumen-fabrica {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px;
+  display: grid; gap: 10px; margin-bottom: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 }
 .resumen-fabrica div {
   background: var(--superficie); border: 1px solid var(--borde); border-radius: var(--radio);
@@ -1628,6 +1718,28 @@ body.imprimir-hoja { page: hoja; }
   /* Una gráfica partida a la mitad entre dos hojas no se puede leer. */
   body.imprimir-hoja .evitar-corte { break-inside: avoid; page-break-inside: avoid; }
   body.imprimir-hoja .salto-hoja { break-before: page; page-break-before: always; }
+
+  /* LA BARRA DE CÓMO SALIÓ EL HIELO, EN PAPEL.
+     Las gráficas de la hoja son dibujos (SVG) y salen impresas solas; esta
+     barra son fondos de color, y el navegador NO imprime fondos salvo que
+     se le pida. Se le pide, pero en escala de grises de claro a oscuro:
+     así se lee igual en la impresora en blanco y negro de la oficina, y de
+     paso el orden del gris coincide con el del problema —cuanto más
+     oscuro, peor salió el hielo—. */
+  body.imprimir-hoja .mezcla-tramo {
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    color: #000; border-right: 1px solid #000;
+  }
+  body.imprimir-hoja .mezcla-barra { border-color: #000; }
+  body.imprimir-hoja .mezcla-tramo.sellada    { background: #ffffff; }
+  body.imprimir-hoja .mezcla-tramo.normal     { background: #d8d8d8; }
+  body.imprimir-hoja .mezcla-tramo.poco_hueca { background: #a8a8a8; }
+  body.imprimir-hoja .mezcla-tramo.hueca      { background: #737373; color: #fff; }
+  body.imprimir-hoja .mezcla-tramo.cascara    { background: #3f3f3f; color: #fff; }
+  body.imprimir-hoja .mezcla-tramo.merma      { background: #000000; color: #fff; }
+  body.imprimir-hoja .mezcla-parte {
+    color: #000; background: #fff; border-color: #000;
+  }
 }
 
 

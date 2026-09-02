@@ -12,6 +12,7 @@ const { exigirPermiso } = require('../../middleware/sesion');
 const periodos = require('../../lib/periodos');
 const calculo = require('./calculo');
 const empresa = require('../empresa/calculo');
+const { CALIDADES } = require('../produccion/calidad');
 
 const router = express.Router();
 const ver = exigirPermiso('estadisticas.ver');
@@ -51,6 +52,9 @@ router.get('/', ver, (req, res) => {
     luz: empresa.luzEnPeriodo({ desde: p.desde, hasta: p.hasta }),
     porObrero: calculo.porObrero(rango),
     porDia: calculo.porDia(p),
+    // Cómo se llama y qué significa cada estado del hielo. Viaja con los
+    // números para que la pantalla no tenga su propia copia de los nombres.
+    calidades: CALIDADES,
     // Los meses que se pueden elegir arriba.
     periodos: periodos.ultimos(25).map((x) => ({ clave: x.clave, nombre: x.nombre, fechas: x.fechas }))
   });

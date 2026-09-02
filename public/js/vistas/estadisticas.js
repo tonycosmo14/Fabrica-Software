@@ -109,7 +109,7 @@ export async function vistaEstadisticas(pantalla) {
     };
 
     const dv = dif(d.ventas.centavos, d.ventasAntes.centavos);
-    const dp = dif(d.produccion.buenas, d.produccionAntes.buenas);
+    const dp = dif(d.produccion.producidas, d.produccionAntes.producidas);
     // En el costo por marqueta, subir es MALO: se invierten los colores.
     const dc = d.costoAntes.centavos && d.costo.centavos
       ? (() => {
@@ -128,7 +128,7 @@ export async function vistaEstadisticas(pantalla) {
         </div>
         <div class="hist-dato">
           <small>Se produjo</small>
-          <strong>${d.produccion.buenas.toLocaleString('es-MX')}</strong>
+          <strong>${d.produccion.producidas.toLocaleString('es-MX')}</strong>
           <small class="${dp.clase}">marquetas · ${dp.texto}</small>
         </div>
         <div class="hist-dato">
@@ -332,7 +332,11 @@ export async function vistaEstadisticas(pantalla) {
 
   function elHielo(d) {
     const p = d.produccion;
-    const perdidas = p.rotas + p.huecos;
+    const cal = d.calidades || [];
+    const conAlgo = cal.filter((c) => p[c.clave] > 0);
+    const fuera = (p.cascara || 0) - (p.cascarasAlAlmacen || 0);
+    const total = p.salieron || 0;
+    const porCiento = (n) => (total ? Math.round((n / total) * 100) : 0);
 
     return `
       <div class="tarjeta est-bloque evitar-corte">
@@ -340,15 +344,16 @@ export async function vistaEstadisticas(pantalla) {
 
         <div class="hist-resumen">
           <div class="hist-dato">
-            <small>Salieron buenas</small>
-            <strong>${p.buenas.toLocaleString('es-MX')}</strong>
-            <small>${p.porCientoBuenas != null
-              ? `${p.porCientoBuenas}% de los moldes` : 'sin producción'}</small>
+            <small>Salieron del molde</small>
+            <strong>${p.producidas.toLocaleString('es-MX')}</strong>
+            <small>${p.rotas ? `${p.rotas} moldes no dieron nada` : 'ningún molde falló'}</small>
           </div>
           <div class="hist-dato">
-            <small>Se echaron a perder</small>
-            <strong class="${perdidas ? 'malo' : ''}">${perdidas.toLocaleString('es-MX')}</strong>
-            <small>${p.rotas} rotas · ${p.huecos} huecas</small>
+            <small>Sin una sola queja</small>
+            <strong class="${p.porCientoSinQueja != null && p.porCientoSinQueja < 70 ? 'malo' : ''}">
+              ${p.porCientoSinQueja != null ? `${p.porCientoSinQueja}%` : '—'}
+            </strong>
+            <small>${p.sinQueja.toLocaleString('es-MX')} selladas o normales</small>
           </div>
           <div class="hist-dato">
             <small>Se vendió</small>
@@ -356,6 +361,22 @@ export async function vistaEstadisticas(pantalla) {
             <small>marquetas, contando los pedazos</small>
           </div>
         </div>
+
+        ${conAlgo.length || p.rotas ? `
+          <div class="mezcla-barra" style="margin-top:16px">
+            ${conAlgo.map((c) => `
+              <span class="mezcla-tramo ${esc(c.clave)}" style="flex:${p[c.clave]}"
+                    title="${esc(c.plural)}: ${p[c.clave].toLocaleString('es-MX')}"
+                >${porCiento(p[c.clave]) >= 8 ? porCiento(p[c.clave]) + '%' : ''}</span>`).join('')}
+            ${p.rotas ? `<span class="mezcla-tramo merma" style="flex:${p.rotas}"
+                               title="Rotas: ${p.rotas}"></span>` : ''}
+          </div>
+          <div class="mezcla-lista">
+            ${conAlgo.map((c) => `
+              <span class="mezcla-parte ${esc(c.clave)}"
+                >${p[c.clave].toLocaleString('es-MX')} ${esc(c.corto)}</span>`).join('')}
+            ${p.rotas ? `<span class="mezcla-parte merma">${p.rotas} rotas</span>` : ''}
+          </div>` : ''}
 
         ${d.porObrero.length ? `
           <div class="hist-envoltura" style="margin-top:14px">
@@ -371,9 +392,19 @@ export async function vistaEstadisticas(pantalla) {
           </div>` : ''}
 
         <p class="est-nota">
-          <b>Salieron buenas</b> se cuenta molde por molde, que es donde
-          está la verdad: un molde que salió bien es una marqueta. Si el
-          porcentaje empieza a bajar, hay moldes o una máquina fallando.
+          <b>Cómo salió el hielo</b> es la barra de arriba, y es lo
+          primero que hay que mirar: una marqueta hueca se cobra igual que
+          una sellada, así que en el dinero NO se nota — se nota en las
+          quejas del mostrador. Cuando la barra se corre hacia la derecha
+          varios días seguidos, algo está pasando (el amoniaco, un
+          compresor, el calor de mayo) y se ve <b>antes</b> de que una
+          máquina se pare.
+          ${fuera > 0 ? `<br><br>De las cáscaras, ${fuera.toLocaleString('es-MX')}
+            no ${fuera === 1 ? 'entró' : 'entraron'} al cuarto frío: se ${fuera === 1
+            ? 'fue' : 'fueron'} a los condensadores o se ${fuera === 1 ? 'botó' : 'botaron'}.
+            Siguen contando para el costo por marqueta —gastaron la misma agua, la misma
+            luz y el mismo molde— pero no son hielo que se pueda vender.` : ''}
+          <br><br>
           Lo producido y lo vendido <b>no tienen por qué cuadrar</b>: entre
           los dos está lo que quedó en el cuarto frío y lo que se derritió.
         </p>

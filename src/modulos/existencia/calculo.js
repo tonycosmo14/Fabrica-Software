@@ -16,6 +16,7 @@
  * en marquetas.
  */
 const { bd } = require('../../db/conexion');
+const { alAlmacen } = require('../produccion/calidad');
 const { DIECISEISAVOS_POR_MARQUETA } = require('../../lib/fracciones');
 const { instantes } = require('../../lib/periodos');
 
@@ -80,7 +81,7 @@ function producidoPorRangos(rangos = []) {
       FROM sacadas_moldes sm
       JOIN sacadas s       ON s.id = sm.sacada_id
       JOIN sacadas_pano sp ON sp.id = s.sacada_pano_id
-     WHERE sm.resultado = 'ok'
+     WHERE ${alAlmacen('sm')}
        AND s.fecha >= ? AND s.fecha < ?
        AND (sp.notas IS NULL OR sp.notas NOT LIKE 'ANULADA%')
      GROUP BY dia
@@ -97,7 +98,7 @@ function producidoEntreDias(desde, hasta) {
       FROM sacadas_moldes sm
       JOIN sacadas s       ON s.id = sm.sacada_id
       JOIN sacadas_pano sp ON sp.id = s.sacada_pano_id
-     WHERE sm.resultado = 'ok'
+     WHERE ${alAlmacen('sm')}
        AND date(s.fecha, 'localtime') >= date(?)
        AND date(s.fecha, 'localtime') <= date(?)
        AND (sp.notas IS NULL OR sp.notas NOT LIKE 'ANULADA%')
@@ -110,7 +111,7 @@ function producidoDesde(desde) {
       FROM sacadas_moldes sm
       JOIN sacadas s      ON s.id = sm.sacada_id
       JOIN sacadas_pano sp ON sp.id = s.sacada_pano_id
-     WHERE sm.resultado = 'ok'
+     WHERE ${alAlmacen('sm')}
        AND s.fecha > ?
        AND (sp.notas IS NULL OR sp.notas NOT LIKE 'ANULADA%')
   `).get(desde || '');
