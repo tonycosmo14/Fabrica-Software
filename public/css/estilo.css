@@ -813,6 +813,19 @@ select { color-scheme: light dark; }
 /* Pestañas de tanque */
 /* Centradas. Si algún día hay más tanques de los que caben, se desplazan
    de lado en vez de amontonarse en varios renglones. */
+/* La fila de pestañas lleva la tuerca en la esquina: configurar los
+   tanques se hace una vez en la vida y no merecía un acceso permanente
+   en el inicio, pero tiene que estar a mano DONDE se usa. */
+.pestanas-fila { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.pestanas-fila .pestanas { flex: 1; min-width: 0; margin-bottom: 0; }
+.tuerca {
+  flex: 0 0 auto; width: 40px; height: 40px; padding: 0;
+  display: grid; place-items: center; font-size: 18px; line-height: 1;
+  background: var(--superficie); color: var(--suave); text-decoration: none;
+  border: 1px solid var(--borde); border-radius: 10px;
+}
+.tuerca:hover { border-color: var(--acento); color: var(--acento); }
+
 .pestanas {
   display: flex; gap: 8px; margin-bottom: 12px;
   justify-content: center; flex-wrap: nowrap;
@@ -1350,13 +1363,34 @@ tr.anulada { opacity: .45; text-decoration: line-through; }
 .resumen-fabrica small { color: var(--suave); font-size: 13px; }
 
 /* Cada tanque va con su botón de acciones rápidas al lado. */
-.tanque-fila { display: flex; align-items: stretch; gap: 8px; margin-bottom: 10px; }
+/* ============================================================
+   CONFIGURAR TANQUES  (v3.3)
+
+   La pantalla entera va centrada y con un ancho de lectura: se abre una
+   vez cada muchos años, no tiene por qué llenar un monitor.
+
+   Y EL TANQUE Y SUS "⋯" SON DOS COSAS, no una. Antes se veían pegados,
+   como si el botoncito fuera parte de la ficha del tanque, y eso
+   confundía: uno lleva a ver y configurar ese tanque, el otro abre la
+   lista de lo que se le puede hacer. Ahora hay aire entre los dos y el
+   de los puntos tiene su propio marco.
+   ============================================================ */
+.cfg-tanques { max-width: 640px; margin: 0 auto; text-align: center; }
+.cfg-tanques h2 { margin: 4px 0 6px; }
+.cfg-tanques .ayuda-bloque, .cfg-tanques .lista-tanques { text-align: left; }
+.cfg-tanques .nuevo-tanque { margin-top: 16px; width: auto; min-width: 220px; }
+.cfg-cabeza { text-align: left; margin-bottom: 10px; }
+.volver-produccion { display: inline-flex; width: auto; }
+
+.tanque-fila { display: flex; align-items: stretch; gap: 14px; margin-bottom: 12px; }
 .tanque-fila .tanque-tarjeta { margin-bottom: 0; flex: 1; min-width: 0; }
 .tanque-acciones {
-  width: 46px; min-width: 46px; padding: 0; font-size: 22px;
-  background: var(--superficie); color: var(--suave);
-  border: 1px solid var(--borde); border-radius: var(--radio);
+  align-self: center;
+  width: 52px; min-width: 52px; height: 52px; padding: 0; font-size: 22px;
+  background: var(--superficie-alt); color: var(--suave);
+  border: 1px solid var(--borde-fuerte); border-radius: 50%;
 }
+.tanque-acciones:hover { border-color: var(--acento); color: var(--acento); }
 
 .tanque-tarjeta {
   display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px;
@@ -1461,8 +1495,10 @@ tr.anulada { opacity: .45; text-decoration: line-through; }
 
   /* Los tanques en rejilla: en una pantalla ancha caben varios de frente
      en vez de uno debajo de otro. */
-  .lista-tanques { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-  .lista-tanques .tanque-fila { margin-bottom: 0; max-width: none; }
+  /* Un tanque por renglón: son dos o tres en toda la fábrica, y en dos
+     columnas la ficha y sus "⋯" quedaban tan apretadas que volvían a
+     verse como una sola cosa. */
+  .lista-tanques .tanque-fila { max-width: none; }
 }
 @media (min-width: 1240px) {
   .lista-tanques { grid-template-columns: repeat(3, 1fr); }

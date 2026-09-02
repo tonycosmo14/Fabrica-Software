@@ -63,6 +63,12 @@ export async function vistaProduccion(pantalla, estado) {
                           estado.permisos.includes('produccion.numeros');
   const puedeCorregir = estado.permisos.includes('*') ||
                         estado.permisos.includes('produccion.corregir');
+  // Configurar los tanques ya no vive en el inicio ni en el menú rápido: se
+  // hace una vez en la vida —en más de treinta años no ha habido un tanque
+  // nuevo— y estaba ocupando el sitio de lo que sí se usa a diario. Ahora
+  // está donde hace falta, en la tuerca de esta pantalla.
+  const puedeConfigurar = estado.permisos.includes('*') ||
+                          estado.permisos.includes('tanques.configurar');
 
   let agua = localStorage.getItem('tipo_agua') || 'purificada';
   let tanqueActivo = localStorage.getItem('tanque_activo') || null;
@@ -137,10 +143,15 @@ export async function vistaProduccion(pantalla, estado) {
           </button>` : ''}
       </div>
 
-      <div class="pestanas">
-        ${tanques.map((t) => `
-          <button class="pestana ${t.id === tanque.id ? 'activa' : ''}"
-                  data-tanque="${esc(t.id)}">${esc(t.nombre)}</button>`).join('')}
+      <div class="pestanas-fila">
+        <div class="pestanas">
+          ${tanques.map((t) => `
+            <button class="pestana ${t.id === tanque.id ? 'activa' : ''}"
+                    data-tanque="${esc(t.id)}">${esc(t.nombre)}</button>`).join('')}
+        </div>
+        ${puedeConfigurar ? `
+          <a class="tuerca" href="#/config-tanques"
+             title="Configurar los tanques, paños y canastas">⚙</a>` : ''}
       </div>
 
       <div class="barra-produccion">

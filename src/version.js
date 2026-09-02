@@ -17,9 +17,24 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '3.2';
+const VERSION_ACTUAL = '3.3';
 
 const VERSIONES = [
+  {
+    numero: '3.3',
+    nombre: 'Configurar tanques, donde le toca',
+    fecha: '2026-09-02',
+    resumen:
+      'Los tanques se dan de alta una vez y no se vuelven a tocar en años. ' +
+      'Ese acceso salió del inicio y del menú, y se fue a la tuerca de ' +
+      'Producción de hielo, que es donde hace falta.',
+    cambios: [
+      { tipo: 'mejora', texto: 'CONFIGURAR TANQUES SALIÓ DEL INICIO Y DEL MENÚ RÁPIDO. En más de treinta años no ha habido un tanque nuevo: un acceso permanente para algo que se usa una vez en la vida estaba ocupando el sitio de lo que sí se usa todos los días. Ahora se entra por la TUERCA ⚙ de arriba a la derecha, en Producción de hielo, junto a las pestañas de los tanques.' },
+      { tipo: 'mejora', texto: 'Y "Producción" pasa a llamarse PRODUCCIÓN DE HIELO, que es lo que es.' },
+      { tipo: 'mejora', texto: 'LA PANTALLA DE CONFIGURAR TANQUES, ORDENADA: todo centrado y con un ancho de lectura —se abre una vez cada muchos años, no tiene por qué llenar un monitor— y con su botón para volver a Producción de hielo.' },
+      { tipo: 'arreglo', texto: 'EL TANQUE Y SUS "⋯" YA SE VEN COMO DOS COSAS, que es lo que son. Antes iban pegados, como si el botoncito fuera parte de la ficha del tanque, y confundía: uno lleva a ver y configurar ese tanque, el otro abre la lista de lo que se le puede hacer. Ahora hay aire entre los dos y el de los puntos es un botón redondo aparte.' }
+    ]
+  },
   {
     numero: '3.2',
     nombre: 'Las canastas que quedaron pendientes',

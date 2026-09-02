@@ -93,46 +93,54 @@ export async function vistaTanques(pantalla, estado) {
     const { tanques, totalMoldes } = await api.obtener('/tanques');
 
     pantalla.innerHTML = `
-      <h2>Configurar tanques</h2>
-      <p class="ayuda">
-        La estructura física de la fábrica. Aquí se da de alta lo que existe;
-        el trabajo diario va en Producción.
-      </p>
+      <div class="cfg-tanques">
+        <div class="cfg-cabeza">
+          <a class="secundario chico boton volver-produccion" href="#/tanques">
+            ‹ Producción de hielo</a>
+        </div>
 
-      ${bloqueQueEsQue()}
+        <h2>Configurar tanques</h2>
+        <p class="ayuda">
+          La estructura física de la fábrica. Aquí se da de alta lo que existe;
+          el trabajo diario va en Producción de hielo.
+        </p>
 
-      ${tanques.length ? `
-        <div class="resumen-fabrica">
-          <div><strong>${tanques.length}</strong><small>${tanques.length === 1 ? 'tanque' : 'tanques'}</small></div>
-          <div><strong>${tanques.reduce((n, t) => n + t.total_panos, 0)}</strong><small>paños</small></div>
-          <div><strong>${totalMoldes}</strong><small>moldes</small></div>
-        </div>` : ''}
+        ${bloqueQueEsQue()}
 
-      <div class="lista-tanques" style="margin-top:14px">
-        ${tanques.map((t) => `
-          <div class="tanque-fila">
-            <button class="tanque-tarjeta" data-id="${esc(t.id)}">
-              <span class="tanque-nombre">${esc(t.nombre)}</span>
-              <span class="tanque-datos">
-                <span><strong>${t.total_panos}</strong> paños · <strong>${t.total_canastas}</strong> canastas</span>
-                <span class="tanque-moldes"><strong>${t.total_moldes}</strong> moldes</span>
-              </span>
-              <span class="tanque-flecha">›</span>
-            </button>
-            ${puedeConfigurar
-              ? `<button class="tanque-acciones" data-acciones="${esc(t.id)}"
-                         title="Acciones rápidas" aria-label="Acciones de ${esc(t.nombre)}">⋯</button>`
-              : ''}
-          </div>`).join('') || `
-          <div class="tarjeta plana" style="text-align:center;padding:34px 20px">
-            <div style="font-size:44px">🧊</div>
-            <p class="ayuda" style="margin:10px 0 0">
-              Todavía no hay tanques.<br>Crea el primero para empezar.
-            </p>
-          </div>`}
-      </div>
+        ${tanques.length ? `
+          <div class="resumen-fabrica">
+            <div><strong>${tanques.length}</strong><small>${tanques.length === 1 ? 'tanque' : 'tanques'}</small></div>
+            <div><strong>${tanques.reduce((n, t) => n + t.total_panos, 0)}</strong><small>paños</small></div>
+            <div><strong>${totalMoldes}</strong><small>moldes</small></div>
+          </div>` : ''}
 
-      ${puedeConfigurar ? '<button id="nuevo" style="margin-top:14px">＋ Nuevo tanque</button>' : ''}`;
+        <div class="lista-tanques">
+          ${tanques.map((t) => `
+            <div class="tanque-fila">
+              <button class="tanque-tarjeta" data-id="${esc(t.id)}">
+                <span class="tanque-nombre">${esc(t.nombre)}</span>
+                <span class="tanque-datos">
+                  <span><strong>${t.total_panos}</strong> paños · <strong>${t.total_canastas}</strong> canastas</span>
+                  <span class="tanque-moldes"><strong>${t.total_moldes}</strong> moldes</span>
+                </span>
+                <span class="tanque-flecha">›</span>
+              </button>
+              ${puedeConfigurar
+                ? `<button class="tanque-acciones" data-acciones="${esc(t.id)}"
+                           title="Más cosas que hacer con ${esc(t.nombre)}"
+                           aria-label="Más cosas que hacer con ${esc(t.nombre)}">⋯</button>`
+                : ''}
+            </div>`).join('') || `
+            <div class="tarjeta plana" style="text-align:center;padding:34px 20px">
+              <div style="font-size:44px">🧊</div>
+              <p class="ayuda" style="margin:10px 0 0">
+                Todavía no hay tanques.<br>Crea el primero para empezar.
+              </p>
+            </div>`}
+        </div>
+
+        ${puedeConfigurar ? '<button id="nuevo" class="nuevo-tanque">＋ Nuevo tanque</button>' : ''}
+      </div>`;
 
     if (puedeConfigurar) pantalla.querySelector('#nuevo').onclick = formularioTanque;
     pantalla.querySelectorAll('.tanque-tarjeta').forEach((b) => {

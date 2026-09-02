@@ -36,7 +36,7 @@ const estado = { usuario: null, permisos: [], configurado: true };
 
 const RUTAS = {
   '#/inicio':    { titulo: 'Inicio',            vista: vistaInicio },
-  '#/tanques':   { titulo: 'Producción',        vista: vistaProduccion, permiso: 'produccion.ver' },
+  '#/tanques':   { titulo: 'Producción de hielo', vista: vistaProduccion, permiso: 'produccion.ver' },
   // El punto de venta se queda con TODA la pantalla: arma su propio
   // encabezado adentro para no pagar dos veces por la misma franja.
   '#/venta':     { titulo: 'Punto de venta',    vista: vistaVenta,     permiso: 'venta.registrar',

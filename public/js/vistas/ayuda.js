@@ -44,13 +44,17 @@ const TEMAS = [
   // ==========================================================
   {
     id: 'produccion',
-    titulo: 'Producción: sacar el hielo de los tanques',
+    titulo: 'Producción de hielo: sacar el hielo de los tanques',
     busca: 'producción tanque paño canasta molde sacar rellenar rotación intercalado merma agua purificada potable congelación quién lo sacó otro eventual nombre calidad sellada normal hueca cáscara aguada salada contaminada salmuera condensadores destino cómo salió el hielo mezcla ojo ficha historia última vez F2 atajo panel canastas pendientes a medias turno canasta por canasta terminar',
     cuerpo: `
       <h4>Cómo está armado un tanque</h4>
       <p>Un <b>tanque</b> tiene varios <b>paños</b>. Cada paño tiene
       <b>canastas</b>, y cada canasta tiene <b>moldes</b>. Cada molde que sale
       bien es <b>una marqueta</b>.</p>
+      <p class="ayuda-tip">Los tanques se dan de alta en la <b>tuerca ⚙</b> que
+      está arriba a la derecha, junto a las pestañas. Ya no vive en el inicio
+      ni en el menú: eso se hace una vez y no se vuelve a tocar en años, y
+      estaba ocupando el sitio de lo que sí se usa a diario.</p>
 
       <h4>La regla de la rotación</h4>
       <p>Los paños <b>siempre se sacan intercalados</b>: si se sacó el 1,

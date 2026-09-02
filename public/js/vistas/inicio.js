@@ -6,8 +6,12 @@
 import { esc } from '../util.js';
 
 const ACCESOS = [
-  { emoji: '🏭', titulo: 'Producción',   ruta: '#/tanques',   permiso: 'produccion.ver',       desde: null   },
-  { emoji: '🧊', titulo: 'Configurar tanques', ruta: '#/config-tanques', permiso: 'tanques.configurar', desde: null },
+  // CONFIGURAR TANQUES NO ESTÁ AQUÍ, y es a propósito. Los tanques se dan
+  // de alta una vez y no se vuelven a tocar: en más de treinta años no ha
+  // habido un tanque nuevo. Un acceso permanente en el inicio para algo
+  // que se usa una vez en la vida ocupa el sitio de lo que sí se usa todos
+  // los días. Vive donde hace falta: en la tuerca de Producción de hielo.
+  { emoji: '🏭', titulo: 'Producción de hielo', ruta: '#/tanques', permiso: 'produccion.ver', desde: null },
   { emoji: '📦', titulo: 'Existencia',   ruta: '#/existencia', permiso: 'existencia.ver',      desde: null   },
   { emoji: '🛒', titulo: 'Vender',       ruta: '#/venta',     permiso: 'venta.registrar',      desde: null   },
   { emoji: '💵', titulo: 'Caja',         ruta: '#/caja',      permiso: 'caja.ver',             desde: null   },
