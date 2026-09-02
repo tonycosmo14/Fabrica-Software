@@ -986,7 +986,7 @@ debería haber − contado = FALTA</pre>
   {
     id: 'empresa',
     titulo: 'Las cuentas de la empresa: lo grande y la luz',
-    busca: 'empresa gastos grandes amoniaco sal aceite barril maquinaria refacciones mantenimiento proveedor proveedores directorio manual teléfono horario factura pdf recibo luz cfe kwh kilowatt medidor marqueta mes corte del 12 al 12 periodo traspaso caja fuerte cada cuánto se compra ritmo medido dar de baja lista mayoreo',
+    busca: 'empresa gastos grandes amoniaco sal aceite barril maquinaria refacciones mantenimiento proveedor proveedores directorio manual teléfono horario factura pdf recibo luz cfe kwh kilowatt medidor marqueta mes corte del 12 al 12 periodo traspaso caja fuerte cada cuánto se compra ritmo medido dar de baja lista mayoreo iva devolucion devoluciones sat hacienda acreditamiento recuperar gdmth franja franjas base intermedia punta demanda factor de potencia lectura multiplicador tarifa horaria',
     cuerpo: `
       <p>Aquí va el <b>dinero grande</b>: el que se paga con cheque, con
       transferencia o sacando efectivo aparte, y que <b>nunca pasa por el
@@ -1063,6 +1063,73 @@ debería haber − contado = FALTA</pre>
       renglón viejo queda anulado con la nota "corregido", para que siempre
       se pueda ver qué decía antes. Y el <b>🗑</b> anula con su motivo, si el
       recibo entero estaba de más.</p>
+
+      <h4>El recibo al detalle: el medidor y las franjas</h4>
+      <p>La fábrica está en <b>GDMTH</b> (Gran Demanda en Media Tensión
+      Horaria), y en esa tarifa el mismo kilowatt <b>cuesta distinto según
+      la hora</b> en que se gastó:</p>
+      <ul>
+        <li><b>Base</b> — la madrugada y la mañana temprano. La barata.</li>
+        <li><b>Intermedia</b> — casi todo el día.</li>
+        <li><b>Punta</b> — las horas de la tarde. La cara, y por mucho.</li>
+      </ul>
+      <p>Al capturar el recibo, abajo hay una sección <b>＋ El medidor y las
+      franjas horarias</b>. Todo lo de ahí es <b>opcional</b>: un recibo
+      capturado a medias vale más que uno no capturado. Pero llenarlo
+      contesta la pregunta que de verdad vale en una fábrica de hielo:
+      <b>¿conviene mover producción de horario?</b> Un tanque que congela de
+      madrugada usa el mismo amoniaco y cuesta menos luz, y eso solo se ve
+      con las franjas separadas.</p>
+      <ul>
+        <li><b>Los kWh de cada franja.</b> Mientras se escriben, la pantalla
+        dice si las tres suman los kilowatts del recibo. Si no suman, casi
+        siempre es un dedazo o una franja que se quedó sin capturar — y
+        decirlo con el papel todavía en la mano cuesta cero.</li>
+        <li><b>Los pesos de cada franja</b>, si el recibo los desglosa. Con
+        ellos sale <b>el precio del kilowatt de cada franja</b>, que es donde
+        se ve la diferencia de verdad.</li>
+        <li><b>La lectura del medidor</b>, la anterior y la de ahora, con su
+        <b>multiplicador</b> (los medidores de media tensión no cuentan de
+        uno en uno; la constante viene impresa). El sistema multiplica y
+        <b>compara con lo que cobraron</b>: si no cuadra, hay algo que
+        reclamar.</li>
+        <li><b>La demanda facturable</b> en kW y el <b>factor de
+        potencia</b>: los otros dos números que mueven el precio de un
+        recibo GDMTH.</li>
+      </ul>
+      <p class="ayuda-tip">En la tabla de recibos, el botón <b>⌄</b> de cada
+      renglón abre todo esto debajo, sin salir de la pantalla. No se pusieron
+      como columnas nuevas a propósito: la tabla contesta la pregunta de
+      todos los días —cuánta luz cuesta cada marqueta— y con ocho columnas
+      más dejaría de leerse de un vistazo.</p>
+
+      <h4>El IVA: lo que nos deben</h4>
+      <p>El IVA que la fábrica paga en la luz y en las compras grandes
+      <b>no es suyo</b>: se recupera. El problema es que se paga cada mes y
+      vuelve a destiempo, en cantidades que no coinciden con ningún recibo,
+      así que la cuenta se lleva de memoria y se pierde. La pestaña
+      <b>🧾 IVA</b> existe para eso.</p>
+      <ul>
+        <li>El <b>IVA de cada recibo de luz</b> se anota al capturarlo.</li>
+        <li>El <b>IVA de cada gasto grande</b>, igual, en su formulario. Se
+        escribe <b>tal como lo dice la factura</b>, no calculado: hay
+        compras con partidas exentas donde no es el 16 %.</li>
+        <li>Cada vez que Hacienda devuelve algo, se anota con
+        <b>＋ Anotar una devolución</b>: el día en que entró el dinero,
+        cuánto, de qué periodo y su folio. Se le puede pegar el papel.</li>
+      </ul>
+      <p>Arriba sale la resta: <b>lo pagado − lo devuelto = lo que falta por
+      recuperar</b>. Ese número no se guarda en ningún lado — se saca al
+      momento de los papeles, así que corregir un recibo lo corrige solo.</p>
+      <p class="ayuda-tip">Si hay recibos o gastos <b>sin su IVA anotado</b>,
+      la pantalla lo dice y advierte que lo que falta por recuperar es
+      <b>cuando menos eso</b>, no exactamente eso. Vale más un número honesto
+      con su advertencia que uno redondo que miente.</p>
+      <p>Abajo, el <b>año por año</b>. Ahí la diferencia de cada año se lee
+      con cuidado: las devoluciones llegan tarde y casi siempre caen en el
+      año siguiente al del gasto, así que un año puede verse en rojo y el
+      siguiente en verde sin que falte ni sobre nada. <b>El número que vale
+      es el acumulado de arriba.</b></p>
 
       <h4>La luz dentro del mes</h4>
       <p>Arriba, junto a lo gastado, sale la luz que le toca al mes. Como el

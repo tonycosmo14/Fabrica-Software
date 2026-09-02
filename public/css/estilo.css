@@ -3309,11 +3309,19 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 }
 .emp-titulo { flex: 1 1 320px; min-width: 0; }
 .emp-titulo h2 { margin-top: 0; }
-.emp-cabecera .emp-pestanas { flex: 0 0 auto; margin: 4px 0 0; }
+/* Sin encoger, pero SIN PASARSE DEL ANCHO: con `flex: 0 0 auto` la fila de
+   pestañas se quedaba con su ancho de contenido —los cuatro botones en
+   línea— y su propio `flex-wrap` no llegaba a actuar nunca, así que en el
+   celular la página entera se iba de lado. */
+.emp-cabecera .emp-pestanas { flex: 0 1 auto; max-width: 100%; margin: 4px 0 0; }
 @media (min-width: 900px) {
-  /* Los tres, uno debajo del otro y del mismo ancho: se leen como una
-     lista de secciones y no como tres botones sueltos. */
-  .emp-cabecera .emp-pestanas { flex-direction: column; min-width: 210px; }
+  /* En dos columnas y del mismo ancho: se leen como una lista de secciones
+     y no como botones sueltos. En una sola columna, con cuatro apartados,
+     la torre queda mucho más alta que el título de al lado y deja un hueco
+     grande antes de que empiece el contenido. */
+  .emp-cabecera .emp-pestanas {
+    display: grid; grid-template-columns: 1fr 1fr; min-width: 380px;
+  }
   .emp-cabecera .emp-pestanas button { width: 100%; justify-content: flex-start; }
 }
 
@@ -3369,7 +3377,7 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 .luz-c-marq     { width: 124px; font-variant-numeric: tabular-nums; }
 .luz-c-marq small { display: block; font-size: 11px; color: var(--suave); }
 .luz-c-dif      { width: 92px; font-variant-numeric: tabular-nums; font-weight: 700; }
-.luz-c-acciones { width: 156px; white-space: nowrap; }
+.luz-c-acciones { width: 196px; white-space: nowrap; }
 .luz-c-acciones > div { display: flex; gap: 6px; justify-content: flex-end; }
 .luz-c-acciones .chico { flex: 0 0 auto; }
 
@@ -3388,6 +3396,78 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 .emp-tabla tr.anulada td:not(.emp-c-acciones),
 .emp-tabla-luz tr.anulada td:not(.luz-c-acciones) { text-decoration: line-through; }
 .emp-tabla td, .emp-tabla-luz td { height: auto; white-space: normal; }
+
+/* ============================================================
+   EL RECIBO DE LUZ AL DETALLE, Y EL IVA  (v3.7)
+   ============================================================ */
+
+/* Los números buenos en verde y los malos en rojo, en las fichas de
+   arriba. Ya venían marcados en el HTML desde la v2.7; les faltaba el
+   color. */
+.hist-dato strong.malo  { color: var(--rojo); }
+.hist-dato strong.bueno { color: var(--verde); }
+/* La ficha que contesta la pregunta de la pantalla se ve distinta. */
+.hist-dato.destacado { border-color: var(--primario); border-width: 2px; }
+
+.emp-sub {
+  margin: 18px 0 10px; font-size: 15px; font-weight: 800;
+}
+.emp-sub small { font-weight: 500; color: var(--suave); font-size: 12.5px; }
+.tarjeta > .emp-sub:first-child { margin-top: 0; }
+
+/* Lo fino del recibo va plegado: la captura de todos los días son cuatro
+   datos, y ver doce casillas al abrir haría pensar que hacen falta. */
+.emp-mas {
+  margin-top: 16px; border: 1px solid var(--borde);
+  border-radius: var(--radio); padding: 12px 14px;
+}
+.emp-mas > summary {
+  cursor: pointer; font-weight: 800; list-style: none;
+  display: flex; gap: 8px; align-items: baseline;
+}
+.emp-mas > summary::-webkit-details-marker { display: none; }
+.emp-mas > summary::before { content: '＋'; color: var(--primario); }
+.emp-mas[open] > summary::before { content: '−'; }
+.emp-mas > summary small { font-weight: 500; color: var(--suave); }
+
+.aviso-suave {
+  margin: 12px 0; padding: 12px 14px; border-radius: var(--radio);
+  background: var(--superficie); border-left: 4px solid var(--ambar);
+  font-size: 14px; line-height: 1.5;
+}
+
+/* El renglón que se abre debajo de un recibo. */
+.luz-fila-detalle > td { background: var(--fondo); padding: 0; }
+.luz-detalle {
+  display: flex; gap: 24px; flex-wrap: wrap;
+  padding: 14px 16px;
+}
+.luz-detalle-vacio { padding: 14px 16px; color: var(--suave); font-size: 13.5px; }
+.luz-bloque { min-width: 200px; }
+.luz-bloque.crece { flex: 1 1 340px; }
+.luz-bloque h5 {
+  margin: 0 0 6px; font-size: 12px; text-transform: uppercase;
+  letter-spacing: .5px; color: var(--suave);
+}
+.luz-bloque p { margin: 3px 0; font-size: 13.5px; line-height: 1.45; }
+.luz-bloque p.bueno { color: var(--verde); font-weight: 700; }
+.luz-bloque p.malo  { color: var(--rojo);  font-weight: 700; }
+.luz-bloque p.ayuda { color: var(--suave); font-weight: 400; }
+
+/* De ancho de contenido, no del bloque: estirada al 100 % los kilowatts y
+   los pesos quedan a un palmo unos de otros y dejan de leerse como una
+   fila. */
+.luz-franjas { border-collapse: collapse; width: auto; }
+.luz-franjas td {
+  padding: 3px 18px 3px 0; font-size: 13.5px; border: 0;
+  font-variant-numeric: tabular-nums; height: auto;
+}
+.luz-franjas td:first-child { font-weight: 700; }
+.luz-franjas .der { text-align: right; }
+
+/* El aviso de que las franjas no suman, mientras se escribe. */
+.ayuda.bueno { color: var(--verde); font-weight: 700; }
+.ayuda.malo  { color: var(--rojo);  font-weight: 700; }
 
 /* ============================================================
    EL TICKET EN PANTALLA  (v2.7.1)

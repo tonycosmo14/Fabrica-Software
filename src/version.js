@@ -17,9 +17,32 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '3.6';
+const VERSION_ACTUAL = '3.7';
 
 const VERSIONES = [
+  {
+    numero: '3.7',
+    nombre: 'El recibo de luz completo, y el IVA que nos deben',
+    fecha: '2026-09-02',
+    resumen:
+      'El recibo de la CFE deja de ser un total: se le anotan la lectura ' +
+      'del medidor, los kilowatts de base, intermedia y punta, la demanda ' +
+      'y el IVA. Y una pantalla nueva lleva la cuenta de cuánto IVA falta ' +
+      'por recuperar, que hasta hoy estaba en la memoria de alguien.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'EL RECIBO DE LUZ AL DETALLE. Como la fábrica es GDMTH peninsular, el mismo kilowatt cuesta distinto según la hora: base la madrugada (la barata), intermedia casi todo el día, y punta la tarde (la cara, y por mucho). Ahora se anotan los kWh de cada franja, y los pesos de cada una si el recibo los desglosa. Guardando solo el total, el recibo decía cuánto se pagó y nada más; con las franjas separadas se puede contestar lo que de verdad vale en una fábrica de hielo: si conviene mover producción de horario.' },
+      { tipo: 'nuevo', texto: 'LA LECTURA DEL MEDIDOR, la anterior y la de ahora, con su multiplicador. Es lo único que permite comprobar el recibo contra el aparato de la pared: el sistema multiplica y compara con lo que cobraron, y si no cuadra lo dice. Si la CFE dice cuarenta mil kilowatts y el medidor no los da, hay algo que reclamar — y ahora se ve en la pantalla, no después.' },
+      { tipo: 'mejora', texto: 'MIENTRAS SE ESCRIBEN LAS FRANJAS, la pantalla va diciendo si las tres suman los kilowatts del recibo. Cuando no suman casi siempre es un dedazo o una franja que se quedó sin capturar, y decirlo con el papel todavía en la mano no cuesta nada. Se puede guardar así de todos modos: un recibo capturado a medias vale más que uno no capturado.' },
+      { tipo: 'mejora', texto: 'TODO ESTO ES OPCIONAL Y VA PLEGADO, en una sección que se abre con ＋. La captura de siempre siguen siendo cuatro datos: si al abrir salieran doce casillas parecería que hacen falta las doce. En la tabla, el botón ⌄ de cada renglón abre el detalle debajo — no se pusieron como columnas nuevas porque esa tabla contesta la pregunta de todos los días, cuánta luz cuesta cada marqueta, y con ocho columnas más dejaría de leerse de un vistazo.' },
+      { tipo: 'nuevo', texto: 'EL IVA, EN SU PROPIA PANTALLA. Dijiste "a veces ya no se sabe qué IVA nos deben", y ese es exactamente el problema que resuelve. Se anota el IVA de cada recibo de luz y el de cada factura de gasto grande, y por otro lado lo que Hacienda devuelve —con su fecha, su periodo, su folio y su papel—. Arriba sale la resta: lo pagado menos lo devuelto es LO QUE FALTA POR RECUPERAR.' },
+      { tipo: 'importante', texto: 'ESE NÚMERO NO SE GUARDA EN NINGÚN LADO: se saca de los papeles cada vez que se abre la pantalla. Por eso corregir un recibo o anular una devolución lo corrige solo, sin que nadie tenga que acordarse de ajustar un saldo. Es la misma regla de siempre en este sistema: los totales se calculan, no se guardan.' },
+      { tipo: 'importante', texto: 'Y SI FALTAN PAPELES POR CAPTURAR, LA PANTALLA LO DICE. Mientras haya recibos o gastos sin su IVA anotado, avisa cuántos son y advierte que lo que falta por recuperar es CUANDO MENOS eso, no exactamente eso. Vale más un número honesto con su advertencia que uno redondo que miente.' },
+      { tipo: 'mejora', texto: 'EL IVA DE LOS GASTOS GRANDES SE ESCRIBE TAL COMO LO DICE LA FACTURA, no calculado como el 16 %: hay compras con partidas exentas o a tasa cero donde no lo es. Y no se acepta un IVA mayor que lo que se pagó.' },
+      { tipo: 'mejora', texto: 'AÑO POR AÑO, abajo. Ahí la diferencia de cada año se lee con cuidado y la pantalla lo explica: las devoluciones llegan tarde y casi siempre caen en el año siguiente al del gasto, así que un año puede verse en rojo y el siguiente en verde sin que falte ni sobre nada. El número que vale es el acumulado de arriba.' },
+      { tipo: 'mejora', texto: 'Cuando un dato del recibo viene mal escrito, el aviso dice CUÁL es —"el factor de potencia", "los kWh de punta"—. Con doce casillas, "algún número está mal" no ayuda a nadie.' },
+      { tipo: 'mejora', texto: 'Todo esto está explicado en el manual, en Las cuentas de la empresa: qué es cada franja, para qué sirve el multiplicador y cómo se lleva la cuenta del IVA.' }
+    ]
+  },
   {
     numero: '3.6',
     nombre: 'Las dos temperaturas',

@@ -45,9 +45,11 @@ export async function vistaEmpresa(pantalla, estadoApp) {
     try {
       datos = seccion === 'luz'
         ? { recibos: (await api.obtener('/empresa/cfe')).recibos }
-        : seccion === 'proveedores'
-          ? { proveedores: (await api.obtener('/empresa/proveedores?todos=1')).proveedores }
-          : await api.obtener(`/empresa/resumen?periodo=${encodeURIComponent(mes.clave)}`);
+        : seccion === 'iva'
+          ? await api.obtener('/empresa/iva')
+          : seccion === 'proveedores'
+            ? { proveedores: (await api.obtener('/empresa/proveedores?todos=1')).proveedores }
+            : await api.obtener(`/empresa/resumen?periodo=${encodeURIComponent(mes.clave)}`);
     } catch (e) { pantalla.innerHTML = `<p class="vacio">${esc(e.message)}</p>`; return; }
 
     pantalla.innerHTML = `
@@ -69,6 +71,9 @@ export async function vistaEmpresa(pantalla, estadoApp) {
             <button class="secundario ${seccion === 'luz' ? 'activo' : ''}" data-seccion="luz">
               ⚡ Recibos de luz
             </button>
+            <button class="secundario ${seccion === 'iva' ? 'activo' : ''}" data-seccion="iva">
+              🧾 IVA
+            </button>
             <button class="secundario ${seccion === 'proveedores' ? 'activo' : ''}" data-seccion="proveedores">
               📒 Proveedores
             </button>
@@ -76,6 +81,7 @@ export async function vistaEmpresa(pantalla, estadoApp) {
         </div>
 
         ${seccion === 'luz' ? panelLuz(datos.recibos)
+          : seccion === 'iva' ? panelIva(datos)
           : seccion === 'proveedores' ? panelProveedores(datos.proveedores)
           : panelGastos(datos)}
       </div>`;
@@ -324,6 +330,76 @@ export async function vistaEmpresa(pantalla, estadoApp) {
       </p>`;
   }
 
+  /**
+   * EL RENGLÓN DE ABAJO: el medidor, las franjas y el IVA.
+   *
+   * Va escondido y no en columnas nuevas a propósito. La tabla contesta la
+   * pregunta de todos los días —¿cuánto costó la luz de cada marqueta?— y
+   * meterle ocho columnas más la volvería ilegible justo donde más se usa.
+   * Esto se abre cuando hace falta mirar un recibo de cerca.
+   */
+  function detalleRecibo(r) {
+    if (!r.franjas?.length && r.avanceMedidor == null && r.iva_centavos == null) {
+      return `<td colspan="8" class="luz-detalle-vacio">
+        De este recibo solo se capturó el total. Con ✎ se le pueden agregar
+        las lecturas del medidor y las franjas horarias.
+      </td>`;
+    }
+
+    const franjas = { base: 'Base', intermedia: 'Intermedia', punta: 'Punta' };
+    return `<td colspan="8"><div class="luz-detalle">
+      ${r.avanceMedidor != null ? `
+        <div class="luz-bloque">
+          <h5>El medidor</h5>
+          <p>
+            De <b>${r.lectura_anterior.toLocaleString('es-MX')}</b> a
+            <b>${r.lectura_actual.toLocaleString('es-MX')}</b>
+            ${r.multiplicador ? ` × ${r.multiplicador}` : ''}
+            = <b>${r.kwhDelMedidor.toLocaleString('es-MX')} kWh</b>
+          </p>
+          <p class="${r.medidorCuadra ? 'bueno' : 'malo'}">
+            ${r.medidorCuadra
+              ? '✓ Cuadra con lo que cobraron.'
+              : `El recibo cobra ${r.kwh.toLocaleString('es-MX')} kWh: hay `
+                + `${Math.abs(r.kwhDelMedidor - r.kwh).toLocaleString('es-MX')} de diferencia.`}
+          </p>
+        </div>` : ''}
+
+      ${r.franjas?.length ? `
+        <div class="luz-bloque crece">
+          <h5>Las franjas horarias</h5>
+          <table class="luz-franjas">
+            ${r.franjas.map((f) => `
+              <tr>
+                <td>${franjas[f.franja]}</td>
+                <td class="der">${f.kwh != null ? `${f.kwh.toLocaleString('es-MX')} kWh` : '—'}</td>
+                <td class="der">${f.porCiento != null ? `${f.porCiento}%` : ''}</td>
+                <td class="der">${f.centavos != null ? pesos(f.centavos) : ''}</td>
+                <td class="der">${f.centavosPorKwh != null ? `${pesos(f.centavosPorKwh)}/kWh` : ''}</td>
+              </tr>`).join('')}
+          </table>
+          ${r.franjasCuadran === false ? `
+            <p class="malo">Las franjas suman ${r.kwhFranjas.toLocaleString('es-MX')} kWh
+               y el recibo dice ${r.kwh.toLocaleString('es-MX')}.</p>` : ''}
+          ${r.franjas.find((f) => f.franja === 'punta')?.porCiento != null ? `
+            <p class="ayuda">
+              El <b>${r.franjas.find((f) => f.franja === 'punta').porCiento}%</b> del
+              consumo cayó en punta, que es la franja cara. Bajarlo moviendo
+              producción a la madrugada es la manera más directa de bajar el recibo.
+            </p>` : ''}
+        </div>` : ''}
+
+      <div class="luz-bloque">
+        <h5>Lo demás</h5>
+        ${r.iva_centavos != null
+          ? `<p>IVA: <b>${pesos(r.iva_centavos)}</b> <small>(se recupera)</small></p>`
+          : '<p class="vacio-folio">Sin IVA capturado</p>'}
+        ${r.demanda_kw != null ? `<p>Demanda: <b>${r.demanda_kw} kW</b></p>` : ''}
+        ${r.factor_potencia != null ? `<p>Factor de potencia: <b>${r.factor_potencia}%</b></p>` : ''}
+      </div>
+    </div></td>`;
+  }
+
   function renglonRecibo(r) {
     const d = r.contraElAnterior;
     return `
@@ -344,6 +420,8 @@ export async function vistaEmpresa(pantalla, estadoApp) {
           ${d ? `${d.centavos > 0 ? '+' : ''}${d.porCiento ?? 0}%` : '—'}
         </td>
         <td class="luz-c-acciones"><div>
+          <button class="secundario chico" data-ver-detalle="${esc(r.id)}"
+                  title="El medidor, las franjas y el IVA">⌄</button>
           ${r.archivo
             ? `<a class="secundario chico boton-enlace" target="_blank"
                   href="/api/empresa/cfe/${esc(r.id)}/archivo">📄 Ver</a>`
@@ -354,6 +432,9 @@ export async function vistaEmpresa(pantalla, estadoApp) {
                <button class="secundario chico" data-anular-recibo="${esc(r.id)}"
                        title="Anular este recibo">🗑</button>` : ''}
         </div></td>
+      </tr>
+      <tr class="luz-fila-detalle" data-detalle-de="${esc(r.id)}" hidden>
+        ${detalleRecibo(r)}
       </tr>`;
   }
 
@@ -383,6 +464,12 @@ export async function vistaEmpresa(pantalla, estadoApp) {
     const nuevoRecibo = q('#nuevo-recibo');
     if (nuevoRecibo) nuevoRecibo.onclick = () => formularioRecibo();
 
+    const nuevaDev = q('#nueva-devolucion');
+    if (nuevaDev) nuevaDev.onclick = () => formularioDevolucion();
+    pantalla.querySelectorAll('[data-anular-iva]').forEach((b) => {
+      b.onclick = () => anularDevolucion(b.dataset.anularIva);
+    });
+
     const nuevoProv = q('#nuevo-proveedor');
     if (nuevoProv) nuevoProv.onclick = () => formularioProveedor();
     pantalla.querySelectorAll('[data-editar-proveedor]').forEach((b) => {
@@ -407,6 +494,14 @@ export async function vistaEmpresa(pantalla, estadoApp) {
     });
     pantalla.querySelectorAll('[data-anular-recibo]').forEach((b) => {
       b.onclick = () => anularRecibo(b.dataset.anularRecibo);
+    });
+    pantalla.querySelectorAll('[data-ver-detalle]').forEach((b) => {
+      b.onclick = () => {
+        const fila = pantalla.querySelector(`[data-detalle-de="${b.dataset.verDetalle}"]`);
+        if (!fila) return;
+        fila.hidden = !fila.hidden;
+        b.textContent = fila.hidden ? '⌄' : '⌃';
+      };
     });
   }
 
@@ -689,7 +784,17 @@ export async function vistaEmpresa(pantalla, estadoApp) {
                 <span class="etiqueta-chica">Número de factura</span>
                 <input id="factura" maxlength="40" placeholder="A-1234">
               </label>
+              <label>
+                <span class="etiqueta-chica">IVA de la factura<small>opcional, se recupera</small></span>
+                <input id="iva" inputmode="decimal" placeholder="1920">
+              </label>
             </div>
+
+            <p class="ayuda" style="margin:10px 0 0;font-size:13.5px">
+              El <b>IVA</b> se escribe tal como lo dice la factura, no calculado:
+              hay compras con partidas exentas donde no es el 16 %. Lo que se
+              anote aquí suma en la pantalla del IVA, junto con el de la luz.
+            </p>
 
             <label>
               <span class="etiqueta-chica">Notas</span>
@@ -745,6 +850,7 @@ export async function vistaEmpresa(pantalla, estadoApp) {
         proveedor: q('#proveedor').value,
         formaPago: q('#forma').value,
         factura: q('#factura').value,
+        iva: q('#iva').value,
         notas: q('#notas').value,
         ...(archivo ? { archivo } : {})
       };
@@ -757,6 +863,241 @@ export async function vistaEmpresa(pantalla, estadoApp) {
         await pintar();
       } catch (e) { avisar(e.message, 'error'); }
     };
+  }
+
+  // ==========================================================
+  // EL IVA — lo que nos deben
+  //
+  // "A veces ya no se sabe qué IVA nos deben." Toda esta pantalla existe
+  // para que ese número deje de estar en la cabeza de alguien. Se suma lo
+  // que se pagó de IVA —el de la luz y el de las compras grandes—, se
+  // resta lo que Hacienda ha devuelto, y lo que queda es lo que falta por
+  // recuperar. La cuenta no se guarda en ningún lado: se hace al vuelo, así
+  // que corregir un recibo la corrige sola (regla 3.2).
+  // ==========================================================
+  function panelIva(d) {
+    const b = d.balance;
+    const faltan = b.faltanRecibos + b.faltanGastos;
+
+    const TIPOS = {
+      devolucion: 'Devolución',
+      acreditamiento: 'Acreditado',
+      otro: 'Otro'
+    };
+
+    return `
+      <div class="emp-cabeza">
+        <div class="crece">
+          <p class="ayuda" style="margin:0">
+            El IVA que la fábrica <b>paga</b> en la luz y en las compras grandes
+            no es suyo: se recupera. Aquí se anota lo que Hacienda devuelve, y
+            la resta dice <b>cuánto falta por recuperar</b>.
+          </p>
+        </div>
+        ${puedeCapturar ? '<button id="nueva-devolucion">＋ Anotar una devolución</button>' : ''}
+      </div>
+
+      <div class="hist-resumen">
+        <div class="hist-dato">
+          <small>IVA pagado</small>
+          <strong>${pesos(b.pagado)}</strong>
+          <small>de todo lo capturado</small>
+        </div>
+        <div class="hist-dato">
+          <small>De la luz</small>
+          <strong>${pesos(b.luz)}</strong>
+          <small>el más caro de todos</small>
+        </div>
+        <div class="hist-dato">
+          <small>Devuelto</small>
+          <strong class="bueno">${pesos(b.devuelto)}</strong>
+          <small>${(() => { const n = b.anios.reduce((t, a) => t + a.devoluciones, 0);
+            return `${n} ${n === 1 ? 'devolución' : 'devoluciones'}`; })()}</small>
+        </div>
+        <div class="hist-dato destacado">
+          <small>Falta por recuperar</small>
+          <strong class="${b.pendiente > 0 ? 'malo' : 'bueno'}">${pesos(b.pendiente)}</strong>
+          <small>${b.completo ? 'con todo capturado' : 'cuando menos'}</small>
+        </div>
+      </div>
+
+      ${faltan ? `
+        <p class="aviso-suave">
+          Hay ${faltan} ${faltan === 1 ? 'papel' : 'papeles'} sin el IVA anotado
+          ${b.faltanRecibos ? `(${b.faltanRecibos} de luz` : ''}${b.faltanRecibos && b.faltanGastos ? ', ' : ''}${b.faltanGastos ? `${b.faltanRecibos ? '' : '('}${b.faltanGastos} de compras` : ''}${b.faltanRecibos || b.faltanGastos ? ')' : ''}.
+          Mientras falten, <b>lo que falta por recuperar es cuando menos eso</b>,
+          no exactamente eso. Se agrega con ✎ en cada recibo o anotando el gasto
+          con su IVA.
+        </p>` : ''}
+
+      <div class="tarjeta plana">
+        <h3 class="emp-sub">Año por año</h3>
+        <div class="hist-envoltura">
+          <table class="tabla hist-tabla emp-tabla">
+            <tr>
+              <th>Año</th>
+              <th class="der">IVA de la luz</th>
+              <th class="der">IVA de compras</th>
+              <th class="der">Pagado</th>
+              <th class="der">Devuelto</th>
+              <th class="der">Diferencia</th>
+            </tr>
+            ${b.anios.map((a) => `
+              <tr>
+                <td><strong>${esc(a.anio)}</strong>
+                    <small>${a.recibos} ${a.recibos === 1 ? 'recibo' : 'recibos'}
+                           · ${a.gastos} ${a.gastos === 1 ? 'compra' : 'compras'}</small></td>
+                <td class="der">${pesos(a.luz)}</td>
+                <td class="der">${pesos(a.compras)}</td>
+                <td class="der"><strong>${pesos(a.pagado)}</strong></td>
+                <td class="der bueno">${a.devuelto ? pesos(a.devuelto) : '—'}</td>
+                <td class="der ${a.pendiente > 0 ? 'malo' : 'bueno'}">${pesos(a.pendiente)}</td>
+              </tr>`).join('')
+              || '<tr><td colspan="6">Todavía no hay ningún IVA capturado.</td></tr>'}
+          </table>
+        </div>
+        <p class="ayuda" style="margin:12px 0 0">
+          La <b>diferencia</b> de cada año se lee con cuidado: las devoluciones
+          de Hacienda llegan tarde y casi siempre caen en el año siguiente al
+          del gasto. El número que vale es el de arriba, el acumulado.
+        </p>
+      </div>
+
+      <div class="tarjeta plana" style="margin-top:16px">
+        <h3 class="emp-sub">Lo que han devuelto</h3>
+        <div class="hist-envoltura">
+          <table class="tabla hist-tabla emp-tabla">
+            <tr>
+              <th>Cuándo</th>
+              <th>Qué fue</th>
+              <th>Periodo</th>
+              <th>Folio</th>
+              <th class="der">Cuánto</th>
+              <th></th>
+            </tr>
+            ${(d.devoluciones || []).map((x) => `
+              <tr class="${x.anulado_en ? 'anulada' : ''}">
+                <td><strong>${esc(dia(x.fecha))}</strong>
+                    <small>anotó ${esc(x.capturista_nombre || '—')}</small></td>
+                <td>${esc(TIPOS[x.tipo] || x.tipo)}
+                    ${x.notas ? `<small>${esc(x.notas)}</small>` : ''}</td>
+                <td>${esc(x.periodo || '—')}</td>
+                <td>${x.folio ? esc(x.folio) : '<small class="vacio-folio">—</small>'}</td>
+                <td class="der"><strong class="bueno">${pesos(x.centavos)}</strong></td>
+                <td><div>
+                  ${x.archivo
+                    ? `<a class="secundario chico boton-enlace" target="_blank"
+                          href="/api/empresa/iva/${esc(x.id)}/archivo">📄</a>` : ''}
+                  ${puedeCapturar && !x.anulado_en
+                    ? `<button class="secundario chico" data-anular-iva="${esc(x.id)}"
+                               title="Anular">🗑</button>` : ''}
+                </div></td>
+              </tr>`).join('')
+              || '<tr><td colspan="6">Todavía no se ha anotado ninguna devolución.</td></tr>'}
+          </table>
+        </div>
+      </div>`;
+  }
+
+  async function formularioDevolucion() {
+    pantalla.innerHTML = `
+      <div class="ancho-completo">
+        <button class="secundario chico" id="volver">‹ Las cuentas</button>
+        <h2 style="margin-top:14px">Anotar una devolución de IVA</h2>
+        <p class="ayuda">
+          Lo que Hacienda regresó, tal como llegó. El día es el que <b>entró el
+          dinero</b> o se acreditó, no el del trámite. Con esto la pantalla del
+          IVA sabe qué sigue faltando.
+        </p>
+
+        <div class="tarjeta">
+          <form id="f">
+            <div class="emp-campos">
+              <label>
+                <span class="etiqueta-chica">Día<small>cuando entró</small></span>
+                <input id="fecha" type="date" required value="${hoy()}">
+              </label>
+              <label>
+                <span class="etiqueta-chica">Cuánto devolvieron</span>
+                <input id="monto" inputmode="decimal" required placeholder="24500">
+              </label>
+              <label>
+                <span class="etiqueta-chica">Qué fue</span>
+                <select id="tipo">
+                  <option value="devolucion">Devolución — llegó el dinero</option>
+                  <option value="acreditamiento">Acreditamiento — contra otro impuesto</option>
+                  <option value="otro">Otro</option>
+                </select>
+              </label>
+              <label>
+                <span class="etiqueta-chica">De qué periodo<small>como lo diga el papel</small></span>
+                <input id="periodo" maxlength="40" placeholder="Marzo 2026">
+              </label>
+              <label>
+                <span class="etiqueta-chica">Folio del trámite</span>
+                <input id="folio" maxlength="60" placeholder="Para poder buscarlo">
+              </label>
+            </div>
+
+            <label>
+              <span class="etiqueta-chica">Notas</span>
+              <input id="notas" maxlength="300" placeholder="Lo que haga falta recordar">
+            </label>
+
+            <label class="subir" for="archivo" style="margin-top:14px">
+              📄 Adjuntar el papel <small id="nombre-archivo"></small>
+              <input type="file" id="archivo" accept="application/pdf,image/*" hidden>
+            </label>
+
+            <button type="submit" style="margin-top:20px">Anotar la devolución</button>
+          </form>
+        </div>
+      </div>`;
+
+    const q = (sel) => pantalla.querySelector(sel);
+    q('#volver').onclick = pintar;
+
+    let archivo = null;
+    q('#archivo').onchange = async (ev) => {
+      const f = ev.target.files?.[0];
+      if (!f) return;
+      if (f.size > 8 * 1024 * 1024) {
+        ev.target.value = '';
+        return avisar(`Ese archivo pesa ${Math.round(f.size / 1024 / 1024)} MB y el máximo son 8 MB.`, 'error');
+      }
+      archivo = await comoTexto(f);
+      q('#nombre-archivo').textContent = `· ${f.name}`;
+    };
+
+    q('#f').onsubmit = async (ev) => {
+      ev.preventDefault();
+      try {
+        await api.enviar('/empresa/iva', {
+          fecha: q('#fecha').value, monto: q('#monto').value,
+          tipo: q('#tipo').value, periodo: q('#periodo').value,
+          folio: q('#folio').value, notas: q('#notas').value,
+          ...(archivo ? { archivo } : {})
+        });
+        avisar('Devolución anotada', 'bien');
+        seccion = 'iva';
+        await pintar();
+      } catch (e) { avisar(e.message, 'error'); }
+    };
+  }
+
+  async function anularDevolucion(id) {
+    const motivo = await pedirTexto({
+      titulo: 'Anular esta devolución',
+      texto: 'No se borra: queda tachada con tu nombre y el motivo. ' +
+             'Vuelve a subir lo que falta por recuperar.',
+      marcador: 'Se anotó dos veces, la cantidad estaba mal…', ok: 'Anular'
+    });
+    if (!motivo) return;
+    try {
+      await api.enviar(`/empresa/iva/${id}/anular`, { motivo });
+      avisar('Devolución anulada', 'bien');
+      await pintar();
+    } catch (e) { avisar(e.message, 'error'); }
   }
 
   // ==========================================================
@@ -954,11 +1295,104 @@ export async function vistaEmpresa(pantalla, estadoApp) {
                        value="${corregir ? (corregir.centavos / 100) : ''}">
               </label>
               <label>
+                <span class="etiqueta-chica">IVA del recibo<small>se recupera</small></span>
+                <input id="iva" inputmode="decimal" placeholder="6776"
+                       value="${corregir?.iva_centavos != null ? (corregir.iva_centavos / 100) : ''}">
+              </label>
+              <label>
                 <span class="etiqueta-chica">Número de servicio o recibo</span>
                 <input id="numero" maxlength="40" placeholder="Para buscarlo con la CFE"
                        value="${esc(corregir?.numero || '')}">
               </label>
             </div>
+
+            <details class="emp-mas" ${corregir && tieneDetalle(corregir) ? 'open' : ''}>
+              <summary>El medidor y las franjas horarias <small>de la tarifa GDMTH</small></summary>
+
+              <p class="ayuda" style="margin:10px 0">
+                Todo esto es <b>opcional</b>: un recibo capturado a medias vale
+                más que uno no capturado. Pero con las franjas llenas el
+                sistema puede contestar si conviene mover producción de
+                horario, y con las lecturas puede comprobar el recibo contra
+                el aparato de la pared.
+              </p>
+
+              <h4 class="emp-sub">El medidor</h4>
+              <div class="emp-campos">
+                <label>
+                  <span class="etiqueta-chica">Lectura anterior</span>
+                  <input id="lecturaAnterior" inputmode="decimal" placeholder="14 820"
+                         value="${valor(corregir?.lectura_anterior)}">
+                </label>
+                <label>
+                  <span class="etiqueta-chica">Lectura actual</span>
+                  <input id="lecturaActual" inputmode="decimal" placeholder="15 240"
+                         value="${valor(corregir?.lectura_actual)}">
+                </label>
+                <label>
+                  <span class="etiqueta-chica">Multiplicador<small>viene impreso</small></span>
+                  <input id="multiplicador" inputmode="decimal" placeholder="80"
+                         value="${valor(corregir?.multiplicador)}">
+                </label>
+              </div>
+
+              <h4 class="emp-sub">Los kilowatts de cada franja</h4>
+              <div class="emp-campos">
+                <label>
+                  <span class="etiqueta-chica">Base (kWh)<small>la madrugada, la barata</small></span>
+                  <input id="kwhBase" inputmode="numeric" placeholder="18000"
+                         value="${valor(corregir?.kwh_base)}">
+                </label>
+                <label>
+                  <span class="etiqueta-chica">Intermedia (kWh)<small>casi todo el día</small></span>
+                  <input id="kwhIntermedia" inputmode="numeric" placeholder="19500"
+                         value="${valor(corregir?.kwh_intermedia)}">
+                </label>
+                <label>
+                  <span class="etiqueta-chica">Punta (kWh)<small>la tarde, la cara</small></span>
+                  <input id="kwhPunta" inputmode="numeric" placeholder="2500"
+                         value="${valor(corregir?.kwh_punta)}">
+                </label>
+              </div>
+
+              <h4 class="emp-sub">
+                Y lo que costó cada franja
+                <small>solo si el recibo lo desglosa en pesos</small>
+              </h4>
+              <div class="emp-campos">
+                <label>
+                  <span class="etiqueta-chica">Base ($)</span>
+                  <input id="montoBase" inputmode="decimal" placeholder="—"
+                         value="${centavos(corregir?.centavos_base)}">
+                </label>
+                <label>
+                  <span class="etiqueta-chica">Intermedia ($)</span>
+                  <input id="montoIntermedia" inputmode="decimal" placeholder="—"
+                         value="${centavos(corregir?.centavos_intermedia)}">
+                </label>
+                <label>
+                  <span class="etiqueta-chica">Punta ($)</span>
+                  <input id="montoPunta" inputmode="decimal" placeholder="—"
+                         value="${centavos(corregir?.centavos_punta)}">
+                </label>
+              </div>
+
+              <h4 class="emp-sub">La demanda</h4>
+              <div class="emp-campos">
+                <label>
+                  <span class="etiqueta-chica">Demanda facturable (kW)</span>
+                  <input id="demandaKw" inputmode="decimal" placeholder="180"
+                         value="${valor(corregir?.demanda_kw)}">
+                </label>
+                <label>
+                  <span class="etiqueta-chica">Factor de potencia (%)</span>
+                  <input id="factorPotencia" inputmode="decimal" placeholder="94"
+                         value="${valor(corregir?.factor_potencia)}">
+                </label>
+              </div>
+
+              <p id="aviso-franjas" class="ayuda" style="margin:10px 0 0"></p>
+            </details>
 
             <label>
               <span class="etiqueta-chica">Notas</span>
@@ -984,6 +1418,32 @@ export async function vistaEmpresa(pantalla, estadoApp) {
     const q = (s) => pantalla.querySelector(s);
     q('#volver').onclick = pintar;
 
+    // AVISAR MIENTRAS SE ESCRIBE, no al guardar. Las tres franjas tienen
+    // que sumar los kilowatts del recibo; si no suman, casi siempre es un
+    // dedazo o una franja que se quedó sin capturar, y decirlo con el papel
+    // todavía en la mano cuesta cero.
+    const revisarFranjas = () => {
+      const aviso = q('#aviso-franjas');
+      const n = (id) => Number(String(q(`#${id}`).value).replace(/[,\s]/g, '')) || 0;
+      const suma = n('kwhBase') + n('kwhIntermedia') + n('kwhPunta');
+      const total = n('kwh');
+      if (!suma || !total) { aviso.textContent = ''; aviso.className = 'ayuda'; return; }
+      const dif = suma - total;
+      if (Math.abs(dif) <= Math.max(10, total * 0.02)) {
+        aviso.className = 'ayuda bueno';
+        aviso.textContent = `✓ Las tres franjas suman ${suma.toLocaleString('es-MX')} kWh, `
+          + 'lo mismo que el recibo.';
+      } else {
+        aviso.className = 'ayuda malo';
+        aviso.textContent = `Las franjas suman ${suma.toLocaleString('es-MX')} kWh y el recibo `
+          + `dice ${total.toLocaleString('es-MX')}: ${dif > 0 ? 'sobran' : 'faltan'} `
+          + `${Math.abs(dif).toLocaleString('es-MX')}. Se puede guardar así, pero revísalo.`;
+      }
+    };
+    ['kwh', 'kwhBase', 'kwhIntermedia', 'kwhPunta']
+      .forEach((id) => { q(`#${id}`).oninput = revisarFranjas; });
+    revisarFranjas();
+
     let archivo = null;
     q('#archivo').onchange = async (ev) => {
       const f = ev.target.files?.[0];
@@ -1002,6 +1462,7 @@ export async function vistaEmpresa(pantalla, estadoApp) {
         desde: q('#desde').value, hasta: q('#hasta').value,
         kwh: q('#kwh').value, monto: q('#monto').value,
         numero: q('#numero').value, notas: q('#notas').value,
+        ...Object.fromEntries(CAMPOS_FINOS.map((c) => [c, q(`#${c}`).value])),
         ...(archivo ? { archivo } : {})
       };
       try {
@@ -1012,6 +1473,38 @@ export async function vistaEmpresa(pantalla, estadoApp) {
         await pintar();
       } catch (e) { avisar(e.message, 'error'); }
     };
+  }
+
+  /**
+   * LOS DATOS FINOS DEL RECIBO, los que van sueltos y opcionales.
+   *
+   * La lista está en un solo lugar porque el `id` de cada casilla es
+   * también el nombre que espera el servidor: así se mandan todas de una
+   * pasada y añadir una mañana es tocar un renglón.
+   */
+  const CAMPOS_FINOS = [
+    'iva', 'lecturaAnterior', 'lecturaActual', 'multiplicador',
+    'kwhBase', 'kwhIntermedia', 'kwhPunta',
+    'montoBase', 'montoIntermedia', 'montoPunta',
+    'demandaKw', 'factorPotencia'
+  ];
+
+  /** Un número guardado, listo para meterlo en una casilla vacía si no hay. */
+  function valor(n) {
+    return n === null || n === undefined ? '' : String(n);
+  }
+
+  /** Lo mismo, pero de centavos a pesos. */
+  function centavos(c) {
+    return c === null || c === undefined ? '' : String(c / 100);
+  }
+
+  /** ¿Este recibo trae algo del detalle capturado? Para abrir la sección. */
+  function tieneDetalle(r) {
+    return ['lectura_anterior', 'lectura_actual', 'multiplicador',
+            'kwh_base', 'kwh_intermedia', 'kwh_punta',
+            'centavos_base', 'centavos_intermedia', 'centavos_punta',
+            'demanda_kw', 'factor_potencia'].some((c) => r[c] != null);
   }
 
   function hoy() {

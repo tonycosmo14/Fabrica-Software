@@ -56,6 +56,93 @@ function leerCentavos(valor) {
   return Math.round(n * 100);
 }
 
+/**
+ * Un importe que puede venir vacío: null cuando no se escribió, NaN cuando
+ * se escribió algo que no es dinero. Los dos casos son distintos: el hueco
+ * se guarda, el garabato se devuelve para que lo corrijan.
+ */
+function centavosOpcionales(valor) {
+  if (valor === '' || valor === null || valor === undefined) return null;
+  const c = leerCentavos(valor);
+  return c === null ? NaN : c;
+}
+
+/** Un número que puede venir vacío. `NaN` cuando viene mal escrito. */
+function numeroOpcional(valor, { min = 0, max = 100000000, decimales = 0 } = {}) {
+  if (valor === '' || valor === null || valor === undefined) return null;
+  const n = Number(String(valor).replace(/[,\s]/g, ''));
+  if (!Number.isFinite(n) || n < min || n > max) return NaN;
+  return decimales ? Math.round(n * 10 ** decimales) / 10 ** decimales : Math.round(n);
+}
+
+/**
+ * LOS DATOS FINOS DEL RECIBO, todos opcionales.
+ *
+ * La fábrica está en GDMTH y ahí el mismo kilowatt cuesta distinto según
+ * la hora: base (la madrugada, barata), intermedia (casi todo el día) y
+ * punta (la tarde, cara). Separarlas es lo que permite contestar si
+ * conviene mover producción de horario.
+ *
+ * Van sueltos y opcionales porque no todos los recibos traen lo mismo, y
+ * un recibo capturado a medias vale más que uno no capturado. Devuelve un
+ * texto con el problema, o el objeto listo para guardar.
+ */
+/** Cómo se llama cada dato en el recibo de papel, para poder señalarlo. */
+const NOMBRES_DETALLE = {
+  lectura_anterior: 'la lectura anterior del medidor',
+  lectura_actual: 'la lectura actual del medidor',
+  multiplicador: 'el multiplicador',
+  kwh_base: 'los kWh de base',
+  kwh_intermedia: 'los kWh intermedios',
+  kwh_punta: 'los kWh de punta',
+  centavos_base: 'el importe de base',
+  centavos_intermedia: 'el importe intermedio',
+  centavos_punta: 'el importe de punta',
+  demanda_kw: 'la demanda máxima',
+  factor_potencia: 'el factor de potencia',
+  iva_centavos: 'el IVA'
+};
+
+function leerDetalleCfe(cuerpo = {}) {
+  const d = {
+    lectura_anterior: numeroOpcional(cuerpo.lecturaAnterior, { decimales: 2 }),
+    lectura_actual: numeroOpcional(cuerpo.lecturaActual, { decimales: 2 }),
+    multiplicador: numeroOpcional(cuerpo.multiplicador, { min: 0, max: 100000, decimales: 4 }),
+    kwh_base: numeroOpcional(cuerpo.kwhBase),
+    kwh_intermedia: numeroOpcional(cuerpo.kwhIntermedia),
+    kwh_punta: numeroOpcional(cuerpo.kwhPunta),
+    centavos_base: centavosOpcionales(cuerpo.montoBase),
+    centavos_intermedia: centavosOpcionales(cuerpo.montoIntermedia),
+    centavos_punta: centavosOpcionales(cuerpo.montoPunta),
+    demanda_kw: numeroOpcional(cuerpo.demandaKw, { min: 0, max: 1000000, decimales: 2 }),
+    factor_potencia: numeroOpcional(cuerpo.factorPotencia, { min: 0, max: 100, decimales: 2 }),
+    iva_centavos: centavosOpcionales(cuerpo.iva)
+  };
+
+  // `numeroOpcional` devuelve NaN cuando el dato viene mal escrito, para
+  // poder distinguirlo del hueco legítimo (null). Se dice cuál falla: con
+  // doce casillas, "algún número está mal" no ayuda a nadie.
+  const mal = Object.entries(d).find(([, v]) => Number.isNaN(v));
+  if (mal) return { error: `Ese dato del recibo no se entiende: ${NOMBRES_DETALLE[mal[0]] || mal[0]}.` };
+
+  // La lectura de hoy no puede ser menor que la de ayer, salvo que el
+  // medidor haya dado la vuelta — y eso pasa tan poco que vale más avisar.
+  if (d.lectura_anterior !== null && d.lectura_actual !== null
+      && d.lectura_actual < d.lectura_anterior) {
+    return { error: 'La lectura de este recibo es menor que la anterior. Revísala.' };
+  }
+
+  return { detalle: d };
+}
+
+/** Los nombres de las columnas nuevas, para no repetirlos en cada INSERT. */
+const COLUMNAS_DETALLE = [
+  'lectura_anterior', 'lectura_actual', 'multiplicador',
+  'kwh_base', 'kwh_intermedia', 'kwh_punta',
+  'centavos_base', 'centavos_intermedia', 'centavos_punta',
+  'demanda_kw', 'factor_potencia', 'iva_centavos'
+];
+
 
 // ============================================================
 // EL MES DEL NEGOCIO
@@ -350,6 +437,18 @@ router.post('/gastos', administrar, (req, res) => {
     }
   }
 
+  // EL IVA DE LA COMPRA, aparte del total.
+  //
+  // Va suelto y opcional en vez de calcularse como el 16 % del monto:
+  // muchas compras grandes de la fábrica llevan partidas exentas o tasa
+  // cero, y el papel trae el número exacto. Se captura lo que dice la
+  // factura, no lo que debería decir.
+  const ivaCentavos = centavosOpcionales(req.body?.iva);
+  if (Number.isNaN(ivaCentavos)) return error(res, 'El IVA de la factura no se entiende.');
+  if (ivaCentavos !== null && ivaCentavos > centavos) {
+    return error(res, 'El IVA no puede ser mayor que lo que se pagó.');
+  }
+
   const id = nuevoId();
 
   // El archivo se guarda ANTES de tocar la base: si falla, no queda un
@@ -364,20 +463,22 @@ router.post('/gastos', administrar, (req, res) => {
   bd.prepare(`
     INSERT INTO gastos_empresa
       (id, fecha, concepto_id, concepto, proveedor, cantidad, unidad, centavos,
-       forma_pago, factura, archivo, notas, ejecutor_id, capturista_id, fecha_captura)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       forma_pago, factura, archivo, notas, iva_centavos,
+       ejecutor_id, capturista_id, fecha_captura)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(id, fecha, conceptoId, concepto,
          String(req.body?.proveedor || '').trim().slice(0, 60) || null,
          cantidad, unidad, centavos, formaPago,
          String(req.body?.factura || '').trim().slice(0, 40) || null,
          archivo,
          String(req.body?.notas || '').trim().slice(0, 300) || null,
+         ivaCentavos,
          req.body?.ejecutorId || req.usuario.id, req.usuario.id, ahora());
 
   bitacora.registrar({
     accion: 'empresa.gasto', entidad: 'gasto_empresa', entidadId: id,
     ejecutorId: req.body?.ejecutorId || req.usuario.id, capturistaId: req.usuario.id,
-    detalle: { concepto, centavos, fecha, cantidad, unidad, conArchivo: Boolean(archivo) }
+    detalle: { concepto, centavos, fecha, cantidad, unidad, iva: ivaCentavos, conArchivo: Boolean(archivo) }
   });
 
   return ok(res, {
@@ -448,6 +549,9 @@ router.post('/cfe', administrar, (req, res) => {
   const centavos = leerCentavos(req.body?.monto);
   if (centavos === null || centavos === 0) return error(res, 'Escribe cuánto cobraron.');
 
+  const fino = leerDetalleCfe(req.body);
+  if (fino.error) return error(res, fino.error);
+
   // El mismo recibo dos veces duplicaría el gasto del año y partiría a la
   // mitad los kilowatts por marqueta. Se dice antes de guardar, con el
   // renglón que ya está, para que se entienda qué pasó.
@@ -469,13 +573,15 @@ router.post('/cfe', administrar, (req, res) => {
 
   bd.prepare(`
     INSERT INTO recibos_cfe
-      (id, desde, hasta, kwh, centavos, numero, archivo, notas, capturista_id, fecha_captura)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, desde, hasta, kwh, centavos, numero, archivo, notas, capturista_id, fecha_captura,
+       ${COLUMNAS_DETALLE.join(', ')})
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${COLUMNAS_DETALLE.map(() => '?').join(', ')})
   `).run(id, desde, hasta, kwh, centavos,
          String(req.body?.numero || '').trim().slice(0, 40) || null,
          archivo,
          String(req.body?.notas || '').trim().slice(0, 300) || null,
-         req.usuario.id, ahora());
+         req.usuario.id, ahora(),
+         ...COLUMNAS_DETALLE.map((c) => fino.detalle[c]));
 
   bitacora.registrar({
     accion: 'empresa.cfe', entidad: 'recibo_cfe', entidadId: id,
@@ -518,6 +624,9 @@ router.put('/cfe/:id', administrar, (req, res) => {
   const centavos = leerCentavos(req.body?.monto);
   if (centavos === null || centavos === 0) return error(res, 'Escribe cuánto cobraron.');
 
+  const fino = leerDetalleCfe(req.body);
+  if (fino.error) return error(res, fino.error);
+
   // El periodo nuevo no puede chocar con OTRO recibo vivo (el propio no
   // cuenta: es el que se está corrigiendo).
   const choca = bd.prepare(`
@@ -543,13 +652,15 @@ router.put('/cfe/:id', administrar, (req, res) => {
 
     bd.prepare(`
       INSERT INTO recibos_cfe
-        (id, desde, hasta, kwh, centavos, numero, archivo, notas, capturista_id, fecha_captura)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (id, desde, hasta, kwh, centavos, numero, archivo, notas, capturista_id, fecha_captura,
+         ${COLUMNAS_DETALLE.join(', ')})
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${COLUMNAS_DETALLE.map(() => '?').join(', ')})
     `).run(id, desde, hasta, kwh, centavos,
            String(req.body?.numero || '').trim().slice(0, 40) || null,
            archivo,
            String(req.body?.notas || '').trim().slice(0, 300) || null,
-           req.usuario.id, ahora());
+           req.usuario.id, ahora(),
+           ...COLUMNAS_DETALLE.map((c) => fino.detalle[c]));
   })();
 
   bitacora.registrar({
@@ -581,6 +692,107 @@ router.post('/cfe/:id/anular', administrar, (req, res) => {
 
   return ok(res, { anulado: true });
 });
+
+// ============================================================
+// EL IVA — lo que se paga y lo que devuelven
+//
+// "A veces ya no se sabe qué IVA nos deben." El IVA de la luz y el de las
+// compras grandes se anota en su propio papel; aquí se anota lo que
+// Hacienda regresa, y la resta dice lo que falta por recuperar.
+// ============================================================
+
+const TIPOS_IVA = ['devolucion', 'acreditamiento', 'otro'];
+
+/** El balance completo: pagado, devuelto y pendiente. */
+router.get('/iva', ver, (req, res) => {
+  return ok(res, {
+    balance: calculo.balanceIva(),
+    devoluciones: calculo.devolucionesIva({
+      limite: req.query.limite,
+      incluirAnuladas: req.query.todos === '1'
+    })
+  });
+});
+
+/** De dónde salió el IVA pagado, papel por papel. */
+router.get('/iva/detalle', ver, (req, res) => {
+  const anio = /^\d{4}$/.test(String(req.query.anio || '')) ? String(req.query.anio) : null;
+  return ok(res, { anio, papeles: calculo.ivaPagadoDetalle({ anio, limite: req.query.limite }) });
+});
+
+router.post('/iva', administrar, (req, res) => {
+  const fecha = leerDia(req.body?.fecha);
+  if (!fecha) return error(res, 'Escribe el día en que lo devolvieron, como 2026-08-26.');
+
+  const centavos = leerCentavos(req.body?.monto);
+  if (centavos === null || centavos === 0) return error(res, 'Escribe cuánto devolvieron.');
+
+  const tipo = String(req.body?.tipo || 'devolucion');
+  if (!TIPOS_IVA.includes(tipo)) return error(res, 'Ese tipo no existe.');
+
+  const id = nuevoId();
+
+  // El papel primero: si falla, no queda una devolución apuntando a un
+  // archivo que no está.
+  let archivo = null;
+  if (req.body?.archivo) {
+    const r = archivos.guardar(req.body.archivo, `iva-${id}`);
+    if (r.error) return error(res, r.error);
+    archivo = r.archivo;
+  }
+
+  bd.prepare(`
+    INSERT INTO iva_devoluciones
+      (id, fecha, centavos, tipo, periodo, folio, archivo, notas, capturista_id, fecha_captura)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, fecha, centavos, tipo,
+         String(req.body?.periodo || '').trim().slice(0, 40) || null,
+         String(req.body?.folio || '').trim().slice(0, 60) || null,
+         archivo,
+         String(req.body?.notas || '').trim().slice(0, 300) || null,
+         req.usuario.id, ahora());
+
+  bitacora.registrar({
+    accion: 'empresa.iva', entidad: 'iva_devolucion', entidadId: id,
+    ejecutorId: req.usuario.id, detalle: { fecha, centavos, tipo, conArchivo: Boolean(archivo) }
+  });
+
+  return ok(res, {
+    devolucion: bd.prepare('SELECT * FROM iva_devoluciones WHERE id = ?').get(id),
+    balance: calculo.balanceIva()
+  }, 201);
+});
+
+/** Anular una devolución mal capturada. No se borra: se marca (regla 3.4). */
+router.post('/iva/:id/anular', administrar, (req, res) => {
+  const d = bd.prepare('SELECT * FROM iva_devoluciones WHERE id = ?').get(req.params.id);
+  if (!d) return error(res, 'Esa devolución no existe.', 404);
+  if (d.anulado_en) return error(res, 'Esa devolución ya está anulada.');
+
+  const motivo = String(req.body?.motivo || '').trim();
+  if (!motivo) return error(res, 'Escribe por qué se anula.');
+
+  bd.prepare(`
+    UPDATE iva_devoluciones SET anulado_en = ?, anulado_por = ?, motivo_anulacion = ?
+     WHERE id = ?
+  `).run(ahora(), req.usuario.id, motivo.slice(0, 200), d.id);
+
+  bitacora.registrar({
+    accion: 'empresa.iva_anulada', entidad: 'iva_devolucion', entidadId: d.id,
+    ejecutorId: req.usuario.id, detalle: { motivo, centavos: d.centavos, fecha: d.fecha }
+  });
+
+  return ok(res, { anulado: true, balance: calculo.balanceIva() });
+});
+
+/** El papel de la devolución. */
+router.get('/iva/:id/archivo', ver, (req, res) => {
+  const d = bd.prepare('SELECT archivo, fecha FROM iva_devoluciones WHERE id = ?')
+    .get(req.params.id);
+  if (!d) return res.status(404).end();
+  return archivos.servir(res, d.archivo, `iva-${d.fecha}`);
+});
+
 
 // ============================================================
 // LOS PROVEEDORES — el manual de la fábrica

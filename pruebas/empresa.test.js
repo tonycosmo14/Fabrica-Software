@@ -626,3 +626,205 @@ test('un cajero no entra aquí', async () => {
   }
   await entrarAdmin();
 });
+
+
+// ============================================================
+// EL RECIBO AL DETALLE Y EL IVA  (v3.7)
+// ============================================================
+
+test('el recibo guarda las tres franjas de la tarifa GDMTH', async () => {
+  await entrarAdmin();
+  const r = await llamar('/api/empresa/cfe', {
+    method: 'POST',
+    cuerpo: {
+      desde: '2027-04-12', hasta: '2027-05-11', kwh: 40000, monto: 180000,
+      kwhBase: 18000, kwhIntermedia: 19500, kwhPunta: 2500,
+      montoBase: 54000, montoIntermedia: 97500, montoPunta: 28500,
+      iva: 28800
+    }
+  });
+  assert.equal(r.estado, 201);
+
+  const rec = r.json.datos.recibo;
+  assert.equal(rec.kwhFranjas, 40000);
+  assert.equal(rec.franjasCuadran, true, 'las tres suman lo que dice el recibo');
+
+  const punta = rec.franjas.find((f) => f.franja === 'punta');
+  assert.equal(punta.porCiento, 6.3, 'y se dice qué tanto del consumo fue en la franja cara');
+  // La punta cuesta 11.40 el kilowatt contra 3.00 de la base: ese es el
+  // número que contesta si conviene mover producción de horario.
+  assert.equal(punta.centavosPorKwh, Math.round(2850000 / 2500));
+  assert.equal(rec.franjas.find((f) => f.franja === 'base').centavosPorKwh, Math.round(5400000 / 18000));
+});
+
+test('el medidor se comprueba contra los kilowatts cobrados', async () => {
+  await entrarAdmin();
+  const bueno = await llamar('/api/empresa/cfe', {
+    method: 'POST',
+    cuerpo: { desde: '2027-05-12', hasta: '2027-06-11', kwh: 40000, monto: 180000,
+              lecturaAnterior: 14820, lecturaActual: 15320, multiplicador: 80 }
+  });
+  // 500 de avance × 80 del multiplicador = 40 000 kWh: cuadra.
+  assert.equal(bueno.json.datos.recibo.avanceMedidor, 500);
+  assert.equal(bueno.json.datos.recibo.kwhDelMedidor, 40000);
+  assert.equal(bueno.json.datos.recibo.medidorCuadra, true);
+
+  const raro = await llamar('/api/empresa/cfe', {
+    method: 'POST',
+    cuerpo: { desde: '2027-06-12', hasta: '2027-07-11', kwh: 40000, monto: 180000,
+              lecturaAnterior: 15320, lecturaActual: 15520, multiplicador: 80 }
+  });
+  assert.equal(raro.json.datos.recibo.kwhDelMedidor, 16000);
+  assert.equal(raro.json.datos.recibo.medidorCuadra, false,
+    'si el aparato no da lo que cobran, hay algo que reclamar');
+});
+
+test('una lectura menor que la anterior se avisa antes de guardarla', async () => {
+  await entrarAdmin();
+  const r = await llamar('/api/empresa/cfe', {
+    method: 'POST',
+    cuerpo: { desde: '2027-01-12', hasta: '2027-02-11', kwh: 100, monto: 100,
+              lecturaAnterior: 15520, lecturaActual: 14000 }
+  });
+  assert.equal(r.estado, 400);
+  assert.match(r.json.error, /menor que la anterior/);
+});
+
+test('un dato fino mal escrito dice CUÁL es', async () => {
+  await entrarAdmin();
+  const r = await llamar('/api/empresa/cfe', {
+    method: 'POST',
+    cuerpo: { desde: '2027-02-12', hasta: '2027-03-11', kwh: 100, monto: 100,
+              factorPotencia: 'noventa y cuatro' }
+  });
+  assert.equal(r.estado, 400);
+  assert.match(r.json.error, /factor de potencia/i, 'con doce casillas, "algo está mal" no ayuda');
+});
+
+test('el detalle es opcional: un recibo a medias se guarda igual', async () => {
+  await entrarAdmin();
+  const r = await llamar('/api/empresa/cfe', {
+    method: 'POST',
+    cuerpo: { desde: '2027-03-12', hasta: '2027-04-11', kwh: 100, monto: 100 }
+  });
+  assert.equal(r.estado, 201, 'un recibo capturado a medias vale más que uno no capturado');
+  assert.equal(r.json.datos.recibo.franjas.length, 0);
+  assert.equal(r.json.datos.recibo.avanceMedidor, null);
+  assert.equal(r.json.datos.recibo.franjasCuadran, null);
+});
+
+test('al corregir un recibo el detalle se conserva y se puede cambiar', async () => {
+  await entrarAdmin();
+  const { recibos } = (await llamar('/api/empresa/cfe')).json.datos;
+  const viejo = recibos.find((x) => x.desde === '2027-04-12');
+
+  const r = await llamar(`/api/empresa/cfe/${viejo.id}`, {
+    method: 'PUT',
+    cuerpo: { desde: '2027-04-12', hasta: '2027-05-11', kwh: 40000, monto: 180000,
+              kwhBase: 18000, kwhIntermedia: 19500, kwhPunta: 2500, iva: 30000 }
+  });
+  assert.equal(r.estado, 200);
+  assert.equal(r.json.datos.recibo.iva_centavos, 3000000, 'el IVA corregido');
+  assert.equal(r.json.datos.recibo.kwh_punta, 2500, 'y lo que no se tocó sigue ahí');
+});
+
+test('el IVA de la luz y el de las compras suman lo que falta por recuperar', async () => {
+  await entrarAdmin();
+
+  const antes = (await llamar('/api/empresa/iva')).json.datos.balance;
+
+  await llamar('/api/empresa/gastos', {
+    method: 'POST',
+    cuerpo: { conceptoId: amoniaco.id, fecha: '2026-09-20', monto: 12000, iva: 1920 }
+  });
+
+  const conGasto = (await llamar('/api/empresa/iva')).json.datos.balance;
+  assert.equal(conGasto.compras, antes.compras + 192000);
+  assert.equal(conGasto.pagado, conGasto.luz + conGasto.compras);
+  assert.equal(conGasto.pendiente, conGasto.pagado - conGasto.devuelto);
+
+  // Y llega lo que Hacienda devolvió.
+  const dev = await llamar('/api/empresa/iva', {
+    method: 'POST',
+    cuerpo: { fecha: '2026-11-05', monto: 1000, periodo: 'Septiembre 2026', folio: 'DEV-1' }
+  });
+  assert.equal(dev.estado, 201);
+
+  const despues = dev.json.datos.balance;
+  assert.equal(despues.devuelto, conGasto.devuelto + 100000);
+  assert.equal(despues.pendiente, conGasto.pendiente - 100000,
+    'lo que falta por recuperar baja exactamente lo que devolvieron');
+});
+
+test('el pendiente se dice incompleto mientras haya papeles sin IVA', async () => {
+  await entrarAdmin();
+  const b = (await llamar('/api/empresa/iva')).json.datos.balance;
+  assert.ok(b.faltanRecibos > 0, 'hay recibos capturados sin su IVA');
+  assert.equal(b.completo, false,
+    'con papeles sin IVA el pendiente es un mínimo, no el dato');
+});
+
+test('el IVA no se guarda en ningún lado: se saca de los papeles', async () => {
+  await entrarAdmin();
+  const antes = (await llamar('/api/empresa/iva')).json.datos.balance;
+
+  const { recibos } = (await llamar('/api/empresa/cfe')).json.datos;
+  const conIva = recibos.find((r) => r.iva_centavos);
+  await llamar(`/api/empresa/cfe/${conIva.id}/anular`, {
+    method: 'POST', cuerpo: { motivo: 'Se capturó dos veces' } });
+
+  const despues = (await llamar('/api/empresa/iva')).json.datos.balance;
+  assert.equal(despues.luz, antes.luz - conIva.iva_centavos,
+    'anular un recibo corrige la cuenta sola (regla 3.2)');
+});
+
+test('una devolución anulada deja de restar', async () => {
+  await entrarAdmin();
+  const { devoluciones } = (await llamar('/api/empresa/iva')).json.datos;
+  const d = devoluciones.find((x) => !x.anulado_en);
+
+  const sinMotivo = await llamar(`/api/empresa/iva/${d.id}/anular`, {
+    method: 'POST', cuerpo: {} });
+  assert.equal(sinMotivo.estado, 400, 'sin motivo no se anula nada');
+
+  const r = await llamar(`/api/empresa/iva/${d.id}/anular`, {
+    method: 'POST', cuerpo: { motivo: 'Se anotó dos veces' } });
+  assert.equal(r.estado, 200);
+  assert.equal(r.json.datos.balance.devuelto, 0);
+
+  // Y sigue estando, tachada (regla 3.4).
+  const todas = (await llamar('/api/empresa/iva?todos=1')).json.datos.devoluciones;
+  assert.ok(todas.find((x) => x.id === d.id && x.anulado_en), 'no se borró, se marcó');
+});
+
+test('el IVA de una factura no puede ser mayor que lo que se pagó', async () => {
+  await entrarAdmin();
+  const r = await llamar('/api/empresa/gastos', {
+    method: 'POST',
+    cuerpo: { conceptoId: amoniaco.id, fecha: '2026-09-21', monto: 1000, iva: 1200 }
+  });
+  assert.equal(r.estado, 400);
+});
+
+test('el detalle del IVA dice de qué papel salió cada peso', async () => {
+  await entrarAdmin();
+  const { papeles } = (await llamar('/api/empresa/iva/detalle')).json.datos;
+  assert.ok(papeles.length > 0);
+  for (const p of papeles) {
+    assert.ok(p.centavos > 0);
+    assert.ok(p.de === 'luz' || p.de === 'compra');
+    assert.ok(p.fecha, 'con su fecha, para poder buscarlo en la carpeta');
+  }
+});
+
+test('solo el administrador anota devoluciones de IVA', async () => {
+  await entrarAdmin();
+  await crearUsuario('Lupe', 'gerente', '9292');
+  await entrarPorNombre('Lupe', '9292');
+
+  assert.equal((await llamar('/api/empresa/iva')).estado, 200, 'las ve');
+  const r = await llamar('/api/empresa/iva', {
+    method: 'POST', cuerpo: { fecha: '2026-11-05', monto: 100 } });
+  assert.equal(r.estado, 403);
+  await entrarAdmin();
+});

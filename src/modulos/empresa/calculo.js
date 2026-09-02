@@ -285,12 +285,51 @@ function conCuentas(r, marquetasYaContadas = null) {
     ? marquetasYaContadas
     : producidoEntreDias(r.desde, r.hasta);
 
+  // LO QUE SE PUEDE DECIR DEL DETALLE, cuando viene capturado.
+  //
+  // En GDMTH el mismo kilowatt cuesta distinto según la hora, y lo que
+  // decide si conviene mover producción de horario no es cuántos kWh de
+  // punta hubo, sino QUÉ TANTO DEL RECIBO son. Por eso se saca el
+  // porcentaje: 8 % de punta y 30 % de punta son dos fábricas distintas.
+  const franjas = ['base', 'intermedia', 'punta']
+    .map((f) => ({ franja: f, kwh: r[`kwh_${f}`], centavos: r[`centavos_${f}`] }))
+    .filter((f) => f.kwh != null || f.centavos != null);
+  const kwhFranjas = franjas.reduce((n, f) => n + (f.kwh || 0), 0);
+
+  // El medidor: lo que avanzó por su cuenta, y por el multiplicador que
+  // trae el recibo cuando lo hay. Sirve para cachar un recibo mal
+  // capturado —o mal facturado— antes de pagarlo.
+  const avance = r.lectura_actual != null && r.lectura_anterior != null
+    ? Math.round((r.lectura_actual - r.lectura_anterior) * 100) / 100
+    : null;
+  const kwhDelMedidor = avance != null
+    ? Math.round(avance * (r.multiplicador || 1))
+    : null;
+
   return {
     ...r,
     dias,
     // Cuánto cuesta el kilowatt, en centavos. Sube con las tarifas y con el
     // consumo, porque la CFE cobra por escalones.
     centavosPorKwh: r.kwh > 0 ? Math.round(r.centavos / r.kwh) : null,
+    avanceMedidor: avance,
+    kwhDelMedidor,
+    // Si el medidor y los kWh cobrados no coinciden, se dice. Se admite un
+    // 2 % de diferencia por el redondeo del propio recibo.
+    medidorCuadra: kwhDelMedidor == null ? null
+      : Math.abs(kwhDelMedidor - r.kwh) <= Math.max(10, r.kwh * 0.02),
+    franjas: franjas.map((f) => ({
+      ...f,
+      porCiento: kwhFranjas > 0 && f.kwh != null
+        ? Math.round((f.kwh / kwhFranjas) * 1000) / 10 : null,
+      centavosPorKwh: f.kwh > 0 && f.centavos != null
+        ? Math.round(f.centavos / f.kwh) : null
+    })),
+    kwhFranjas,
+    // Las franjas capturadas deberían sumar los kWh del recibo. Si no
+    // suman, falta capturar una o hay un dedazo.
+    franjasCuadran: kwhFranjas > 0
+      ? Math.abs(kwhFranjas - r.kwh) <= Math.max(10, r.kwh * 0.02) : null,
     kwhPorDia: Math.round(r.kwh / dias),
     centavosPorDia: Math.round(r.centavos / dias),
     // Las marquetas de ese periodo, y lo que costó de luz cada una.
@@ -414,7 +453,166 @@ function recibo(id) {
   `).get(id));
 }
 
+// ============================================================
+// EL IVA QUE SE PUEDE RECUPERAR
+//
+// La fábrica paga IVA en todo lo que compra —y sobre todo en la luz, que
+// es su gasto más caro— y ese IVA no es suyo: se acredita o se pide de
+// vuelta. El problema que resuelve esto es exactamente el que dijo el
+// dueño: "a veces ya no se sabe qué IVA nos deben".
+//
+// La cuenta es de las que no se guardan (regla 3.2). Se saca de tres
+// lugares —el IVA de los recibos de luz, el de las compras grandes, y lo
+// que Hacienda ha devuelto— y la resta se hace al momento. Si mañana se
+// corrige un recibo, el pendiente se corrige solo.
+// ============================================================
+
+/** El año de un día "2026-08-26". */
+function anioDe(dia) {
+  return String(dia || '').slice(0, 4);
+}
+
+/**
+ * EL IVA AÑO POR AÑO.
+ *
+ * Un recibo de luz que va del 12 de diciembre al 12 de enero se cuenta en
+ * el año de su fecha de FIN, que es cuando se facturó y cuando se puede
+ * acreditar. Partirlo por días complicaría la cuenta sin ganar nada: lo
+ * que se declara es el recibo entero.
+ */
+function ivaPorAnio() {
+  const luz = bd.prepare(`
+    SELECT substr(hasta, 1, 4) anio,
+           COALESCE(SUM(iva_centavos), 0) centavos,
+           COUNT(iva_centavos) cuantos
+      FROM recibos_cfe
+     WHERE anulado_en IS NULL AND iva_centavos IS NOT NULL
+     GROUP BY anio
+  `).all();
+
+  const compras = bd.prepare(`
+    SELECT substr(fecha, 1, 4) anio,
+           COALESCE(SUM(iva_centavos), 0) centavos,
+           COUNT(iva_centavos) cuantos
+      FROM gastos_empresa
+     WHERE anulado_en IS NULL AND iva_centavos IS NOT NULL
+     GROUP BY anio
+  `).all();
+
+  const devuelto = bd.prepare(`
+    SELECT substr(fecha, 1, 4) anio,
+           COALESCE(SUM(centavos), 0) centavos,
+           COUNT(*) cuantos
+      FROM iva_devoluciones
+     WHERE anulado_en IS NULL
+     GROUP BY anio
+  `).all();
+
+  const anios = new Map();
+  const meter = (filas, campo) => {
+    for (const f of filas) {
+      if (!anios.has(f.anio)) {
+        anios.set(f.anio, {
+          anio: f.anio, luz: 0, compras: 0, devuelto: 0,
+          recibos: 0, gastos: 0, devoluciones: 0
+        });
+      }
+      const a = anios.get(f.anio);
+      a[campo] = f.centavos;
+      a[{ luz: 'recibos', compras: 'gastos', devuelto: 'devoluciones' }[campo]] = f.cuantos;
+    }
+  };
+  meter(luz, 'luz');
+  meter(compras, 'compras');
+  meter(devuelto, 'devuelto');
+
+  return [...anios.values()]
+    .map((a) => ({ ...a, pagado: a.luz + a.compras, pendiente: a.luz + a.compras - a.devuelto }))
+    .sort((a, b) => b.anio.localeCompare(a.anio));
+}
+
+/**
+ * EL BALANCE COMPLETO: lo pagado, lo devuelto y lo que falta.
+ *
+ * El pendiente se lleva ACUMULADO, no año por año, porque las devoluciones
+ * de Hacienda llegan tarde y con frecuencia caen en el año siguiente al
+ * del gasto. Restarlas dentro del mismo año dejaría un año en rojo y el
+ * otro en verde sin que falte ni sobre nada.
+ */
+function balanceIva() {
+  const anios = ivaPorAnio();
+  const luz = anios.reduce((n, a) => n + a.luz, 0);
+  const compras = anios.reduce((n, a) => n + a.compras, 0);
+  const devuelto = anios.reduce((n, a) => n + a.devuelto, 0);
+
+  // Cuántos papeles van SIN el IVA anotado. Es lo que hace que el
+  // pendiente se quede corto, y hay que decirlo junto al número.
+  const faltanRecibos = bd.prepare(
+    'SELECT COUNT(*) n FROM recibos_cfe WHERE anulado_en IS NULL AND iva_centavos IS NULL'
+  ).get().n;
+  const faltanGastos = bd.prepare(
+    'SELECT COUNT(*) n FROM gastos_empresa WHERE anulado_en IS NULL AND iva_centavos IS NULL'
+  ).get().n;
+
+  return {
+    luz,
+    compras,
+    pagado: luz + compras,
+    devuelto,
+    pendiente: luz + compras - devuelto,
+    anios,
+    faltanRecibos,
+    faltanGastos,
+    // Con papeles sin IVA capturado, el pendiente es un mínimo, no el dato.
+    completo: faltanRecibos === 0 && faltanGastos === 0
+  };
+}
+
+/** Las devoluciones capturadas, de la más nueva a la más vieja. */
+function devolucionesIva({ limite = 100, incluirAnuladas = false } = {}) {
+  return bd.prepare(`
+    SELECT d.*, u.nombre AS capturista_nombre, a.nombre AS anulado_por_nombre
+      FROM iva_devoluciones d
+      LEFT JOIN usuarios u ON u.id = d.capturista_id
+      LEFT JOIN usuarios a ON a.id = d.anulado_por
+     ${incluirAnuladas ? '' : 'WHERE d.anulado_en IS NULL'}
+     ORDER BY d.fecha DESC, d.fecha_captura DESC
+     LIMIT ?
+  `).all(Math.min(Math.max(Number(limite) || 100, 1), 500));
+}
+
+/**
+ * DE DÓNDE SALIÓ EL IVA PAGADO, papel por papel.
+ *
+ * Sin esto el balance es un número sin respaldo: al reclamar en el SAT
+ * hace falta poder decir de qué recibo y de qué factura salió cada peso.
+ */
+function ivaPagadoDetalle({ anio = null, limite = 200 } = {}) {
+  const tope = Math.min(Math.max(Number(limite) || 200, 1), 1000);
+  const luz = bd.prepare(`
+    SELECT id, hasta AS fecha, numero AS folio, iva_centavos AS centavos, archivo
+      FROM recibos_cfe
+     WHERE anulado_en IS NULL AND iva_centavos IS NOT NULL
+       ${anio ? "AND substr(hasta, 1, 4) = ?" : ''}
+     ORDER BY hasta DESC LIMIT ?
+  `).all(...(anio ? [anio, tope] : [tope]))
+    .map((f) => ({ ...f, de: 'luz', concepto: 'Recibo de luz' }));
+
+  const compras = bd.prepare(`
+    SELECT id, fecha, factura AS folio, iva_centavos AS centavos, archivo, concepto, proveedor
+      FROM gastos_empresa
+     WHERE anulado_en IS NULL AND iva_centavos IS NOT NULL
+       ${anio ? "AND substr(fecha, 1, 4) = ?" : ''}
+     ORDER BY fecha DESC LIMIT ?
+  `).all(...(anio ? [anio, tope] : [tope]))
+    .map((f) => ({ ...f, de: 'compra' }));
+
+  return [...luz, ...compras].sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, tope);
+}
+
+
 module.exports = {
   diasEntre, diasDesde, porConcepto, totalGastado, recibos, recibo, conCuentas,
-  luzEnPeriodo, gastosParejos
+  luzEnPeriodo, gastosParejos,
+  ivaPorAnio, balanceIva, devolucionesIva, ivaPagadoDetalle
 };
