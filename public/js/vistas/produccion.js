@@ -29,7 +29,6 @@
 import { api } from '../api.js';
 import { esc, avisar, fecha as formatoFecha, fechaCorta } from '../util.js';
 import { confirmar, menu, pedirTexto, pedirAutorizacion } from '../dialogo.js';
-import { capturaDePanos } from '../captura-panos.js';
 
 /**
  * EL NOMBRE DE PILA, que es como se llaman entre ellos en la fábrica.
@@ -132,14 +131,6 @@ export async function vistaProduccion(pantalla, estado) {
             </span>
           </button>` : ''}
 
-        ${puedeRegistrar ? `
-          <button id="registrar" class="accion-principal suave">
-            <span class="accion-icono">📋</span>
-            <span class="accion-texto">
-              <strong>Registrar lo que se sacó</strong>
-              <small>Marca los paños que te dijeron</small>
-            </span>
-          </button>` : ''}
       </div>
 
       <div class="pestanas-fila">
@@ -212,8 +203,6 @@ export async function vistaProduccion(pantalla, estado) {
 
     if (puedeVerNumeros) pantalla.querySelector('#siguientes').onclick = numerosASacar;
     if (!puedeRegistrar) return;
-
-    pantalla.querySelector('#registrar').onclick = capturaEnLote;
 
     pantalla.querySelector('#agua').onclick = () => {
       agua = agua === 'purificada' ? 'potable' : 'purificada';
@@ -887,8 +876,12 @@ export async function vistaProduccion(pantalla, estado) {
 
     return `
       <div class="pano-cabeza">
-        <button class="secundario chico" id="volver">‹ ${esc(datos.tanque.nombre)}</button>
-        <h2>Paño ${pano.numero}</h2>
+        <button class="secundario chico" id="volver">‹ Volver</button>
+        <!-- EL TANQUE VA EN EL TÍTULO, con el mismo peso que el paño.
+             Aquí es donde de verdad se anota, y anotar en el tanque que no
+             es cuesta un paño entero que no se descubre hasta el día
+             siguiente. -->
+        <h2><span class="pano-tanque">${esc(datos.tanque.nombre)}</span> · Paño ${pano.numero}</h2>
         <span class="pano-cabeza-datos">
           ${pano.canastas.length} canastas ·
           ${pano.horas != null ? `${Math.floor(pano.horas)} h congelando`
@@ -1260,7 +1253,8 @@ export async function vistaProduccion(pantalla, estado) {
 
       <p class="ayuda no-imprimir" style="margin-top:18px">
         Imprime este papel y dáselo al obrero. Cuando regrese te dice qué sacó
-        de verdad y lo capturas con <strong>Registrar lo que se sacó</strong>.
+        de verdad y lo capturas <strong>tocando cada paño</strong> en la lista
+        del tanque.
       </p>
 
       <button id="imprimir" class="no-imprimir">🖨️ Imprimir</button>`;
@@ -1281,21 +1275,6 @@ export async function vistaProduccion(pantalla, estado) {
       } catch (e) { avisar(e.message, 'error'); }
       boton.disabled = false;
     };
-  }
-
-  // ==========================================================
-  // REGISTRAR LO QUE SE SACÓ
-  //
-  // La pantalla vive en `captura-panos.js` porque la piden dos sitios:
-  // aquí y el primer paso de anotar la existencia. Copiada dos veces sería
-  // una pantalla que tarde o temprano se comporta de dos maneras.
-  // ==========================================================
-  function capturaEnLote() {
-    return capturaDePanos(pantalla, estado, {
-      agua,
-      alVolver: pintar,
-      alGuardar: pintar
-    });
   }
 
   /**

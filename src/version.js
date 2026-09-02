@@ -17,9 +17,26 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '3.9';
+const VERSION_ACTUAL = '4.0';
 
 const VERSIONES = [
+  {
+    numero: '4.0',
+    nombre: 'Una sola manera de anotar el hielo',
+    fecha: '2026-09-02',
+    resumen:
+      'Fuera el botón de "Registrar lo que se sacó": hacía lo mismo que ' +
+      'tocar el paño pero peor. Los nombres de los tanques, grandes. Y a ' +
+      'los gastos ya se les puede sacar otra copia.',
+    cambios: [
+      { tipo: 'importante', texto: 'SE QUITÓ EL BOTÓN DE "REGISTRAR LO QUE SE SACÓ". Tenías razón: hacía prácticamente lo mismo que tocar el paño, pero peor — no dejaba escoger canasta por canasta, ni decir qué le pasó a un molde suelto, ni mandar una cáscara al condensador. Tener dos maneras de anotar lo mismo solo servía para que la mitad de las veces se anotara por la que menos cuenta. Ahora hay UNA: se toca el paño y ahí está todo.' },
+      { tipo: 'mejora', texto: 'LOS NOMBRES DE LOS TANQUES, GRANDES, y el del tanque en el que estás más grande todavía y en azul. Anotar en el tanque que no es cuesta un paño entero y no se descubre hasta el día siguiente: el nombre tiene que verse desde donde estás parado, no leerse de cerca.' },
+      { tipo: 'mejora', texto: 'Y AL ABRIR UN PAÑO, el nombre del tanque va en el título junto al número —"N(A) · Paño 3"—, que es donde de verdad se está anotando.' },
+      { tipo: 'nuevo', texto: 'A LOS GASTOS Y A LAS ENTRADAS SE LES PUEDE SACAR OTRA COPIA, con el 🖨 de su renglón en la caja, o con el botón Copia en el historial. El papel se pierde, se moja, o hace falta uno para quien se llevó el dinero y otro para la carpeta.' },
+      { tipo: 'importante', texto: 'La copia sale marcada ** COPIA ** hasta arriba, igual que la de un ticket: un comprobante sin marcar puede pasar dos veces por la misma carpeta y contarse dos veces al cuadrar el mes. Y NO vuelve a abrir el cajón — el dinero ya se movió cuando se anotó el gasto.' },
+      { tipo: 'mejora', texto: 'En el historial, el botón de Copia ya no es solo de las ventas: sale en todo lo que tenga papel. En un abono por transferencia no sale, porque ese no pasó por el cajón y no imprimió nada — un botón que siempre falla es peor que no tenerlo.' }
+    ]
+  },
   {
     numero: '3.9',
     nombre: 'Corregir un corte, y el historial de un vistazo',

@@ -666,3 +666,63 @@ test('una cotización vacía o con producto inexistente se rechaza', async () =>
   assert.equal((await llamar('/api/impresion/cotizacion', {
     method: 'POST', cuerpo: { lineas: [{ productoId: 'nope', cantidad: 1 }] } })).estado, 409);
 });
+
+
+// ============================================================
+// OTRA COPIA DEL COMPROBANTE DE UN GASTO  (v4.0)
+//
+// "A los gastos se les puede sacar copias." El papel se pierde, se moja, o
+// hace falta uno para quien se llevó el dinero y otro para la carpeta.
+// ============================================================
+
+test('al gasto se le puede sacar otra copia, marcada', async () => {
+  await llamar('/api/auth/yo');
+  await llamar('/api/caja/movimientos', {
+    method: 'POST', cuerpo: { tipo: 'salida', concepto: 'Refaccion', monto: 350 }
+  });
+  const mov = (await llamar('/api/caja')).json.datos.movimientos[0];
+
+  limpiarPapel();
+  const r = await llamar(`/api/impresion/movimiento/${mov.id}`, {
+    method: 'POST', cuerpo: { copia: true } });
+  assert.equal(r.estado, 200);
+  assert.equal(r.json.datos.copia, true);
+
+  const papel = loImpreso();
+  assert.match(papel, /\*\* COPIA \*\*/, 'una reimpresión se marca');
+  assert.match(papel, /REFACCION/, 'y sigue siendo el mismo papel');
+  // La marca va antes que nada, igual que en el ticket de venta: debajo
+  // del concepto no la ve nadie.
+  assert.ok(papel.indexOf('COPIA') < papel.indexOf('Atendio'),
+            'la marca va hasta arriba');
+});
+
+test('una copia NO vuelve a abrir el cajón', async () => {
+  await llamar('/api/auth/yo');
+  await llamar('/api/impresion/config', { method: 'PUT', cuerpo: { abrirCajon: true } });
+  await llamar('/api/caja/movimientos', {
+    method: 'POST', cuerpo: { tipo: 'salida', concepto: 'Gasolina', monto: 100 }
+  });
+  const mov = (await llamar('/api/caja')).json.datos.movimientos[0];
+
+  const original = await llamar(`/api/impresion/movimiento/${mov.id}`, {
+    method: 'POST', cuerpo: {} });
+  assert.equal(original.json.datos.cajon, true, 'el original sí: de ahí salen los billetes');
+
+  const copia = await llamar(`/api/impresion/movimiento/${mov.id}`, {
+    method: 'POST', cuerpo: { copia: true } });
+  assert.equal(copia.json.datos.cajon, false,
+    'el dinero ya se movió; abrirlo otra vez es abrirlo por nada');
+});
+
+test('el historial dice qué renglones tienen papel que reimprimir', async () => {
+  await llamar('/api/auth/yo');
+  const { movimientos } = (await llamar('/api/historial')).json.datos;
+
+  const gasto = movimientos.find((m) => m.tipo === 'gasto');
+  assert.ok(gasto, 'hay gastos capturados');
+  assert.equal(gasto.movimiento_id, gasto.id, 'un gasto es su propio renglón del cajón');
+
+  const venta = movimientos.find((m) => m.tipo === 'venta');
+  assert.equal(venta.movimiento_id, null, 'una venta no deja renglón en el cajón');
+});

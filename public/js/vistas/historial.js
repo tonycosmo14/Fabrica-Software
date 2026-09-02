@@ -407,12 +407,12 @@ export async function vistaHistorial(pantalla, estadoApp) {
         <td class="hist-c-acciones">
           <button class="secundario chico" data-ver="${esc(m.id)}"
                   title="Ver este movimiento completo">👁</button>
-          ${esVenta ? `
+          ${tienePapel(m) ? `
             <button class="secundario chico" data-copia="${esc(m.id)}"
-                    title="Volver a imprimirlo marcado como copia">Copia</button>
-            ${esAdmin && !cancelado
-              ? `<button class="secundario chico" data-mas="${esc(m.id)}"
-                         title="Cancelar o eliminar">⋯</button>` : ''}` : ''}
+                    title="Volver a imprimirlo marcado como copia">Copia</button>` : ''}
+          ${esVenta && esAdmin && !cancelado
+            ? `<button class="secundario chico" data-mas="${esc(m.id)}"
+                       title="Cancelar o eliminar">⋯</button>` : ''}
         </td>
       </tr>`;
   }
@@ -453,7 +453,7 @@ export async function vistaHistorial(pantalla, estadoApp) {
     try {
       const ruta = m.tipo === 'venta'
         ? `/impresion/venta/${m.id}/previa`
-        : `/impresion/movimiento/${m.id}/previa`;
+        : `/impresion/movimiento/${m.movimiento_id}/previa`;
       const { renglones, ancho } = await api.obtener(ruta);
 
       const notas = [
@@ -461,12 +461,16 @@ export async function vistaHistorial(pantalla, estadoApp) {
         m.cancelada_en ? `✕ Cancelado: ${m.motivo_cancelacion || 'sin motivo'}` : ''
       ].filter(Boolean);
 
+      // LA COPIA VALE PARA TODO LO QUE TIENE PAPEL, no solo para las
+      // ventas: el comprobante de un gasto se pierde o se moja igual que
+      // un ticket, y hace falta uno para quien se llevó el dinero y otro
+      // para la carpeta.
       const accion = await verTicket({
         titulo: m.numero ? `Ticket ${m.numero}` : q.texto || 'Movimiento',
         renglones, ancho, notas,
-        acciones: m.tipo === 'venta' ? [{ valor: 'copia', texto: '🖨 Copia' }] : []
+        acciones: tienePapel(m) ? [{ valor: 'copia', texto: '🖨 Copia' }] : []
       });
-      if (accion === 'copia') sacarCopia(m.id);
+      if (accion === 'copia') sacarCopia(m);
       return;
     } catch {
       // Si no hay ticket que enseñar (un abono, un registro muy viejo), se
@@ -492,9 +496,32 @@ export async function vistaHistorial(pantalla, estadoApp) {
   // ==========================================================
   // LO QUE SE PUEDE HACER CON UN TICKET
   // ==========================================================
-  async function sacarCopia(id) {
+  /**
+   * ¿ESTE RENGLÓN TIENE PAPEL QUE REIMPRIMIR?
+   *
+   * Una venta tiene su ticket y un gasto su comprobante. Un abono POR
+   * TRANSFERENCIA no pasa por el cajón y no imprimió nada, así que ahí el
+   * botón sobra: un botón que siempre falla es peor que no tenerlo.
+   */
+  function tienePapel(m) {
+    return m.tipo === 'venta' || Boolean(m.movimiento_id);
+  }
+
+  /**
+   * OTRA COPIA DEL PAPEL, sea del tipo que sea.
+   *
+   * La ruta cambia según lo que sea —las ventas y los renglones del cajón
+   * se imprimen por sitios distintos— y un abono se imprime por el renglón
+   * que dejó en el cajón, no por sí mismo.
+   */
+  async function sacarCopia(mov) {
+    const m = typeof mov === 'string' ? movimientos.find((x) => x.id === mov) : mov;
+    if (!m || !tienePapel(m)) return;
+    const ruta = m.tipo === 'venta'
+      ? `/impresion/venta/${m.id}`
+      : `/impresion/movimiento/${m.movimiento_id}`;
     try {
-      const r = await api.enviar(`/impresion/venta/${id}`, { copia: true });
+      const r = await api.enviar(ruta, { copia: true });
       avisar(r.impreso ? 'Copia impresa' : 'No hay impresora configurada', r.impreso ? 'bien' : '');
     } catch (e) { avisar(e.message, 'error'); }
   }

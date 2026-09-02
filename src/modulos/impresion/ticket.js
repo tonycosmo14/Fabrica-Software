@@ -335,10 +335,15 @@ function soloDia(iso) {
  * el papel de nombres. Los dos siguen guardados en la bitácora (regla 3.6),
  * que es donde se buscan cuando de verdad hacen falta.
  */
-function ticketMovimiento(mov, { negocio = '' } = {}) {
+function ticketMovimiento(mov, { copia = false, negocio = '' } = {}) {
   const cfg = configuracion();
   const t = new Ticket(cfg.anchoMm, cfg.codigoPagina);
   const salida = mov.tipo === 'salida';
+
+  // Igual que en la venta: una reimpresión se marca. Un comprobante de
+  // gasto sin marcar puede pasar dos veces por la misma carpeta y contarse
+  // dos veces al cuadrar el mes.
+  if (copia) marcaCopia(t);
 
   encabezado(t, {
     titulo: salida ? 'Gasto' : 'Entrada',

@@ -71,6 +71,23 @@ const TEMAS = [
       en el mismo momento. Por eso el sistema lo pide junto: dices cómo salió
       el hielo, con qué agua se rellenó, y listo. Un solo registro.</p>
 
+      <h4>Todo se anota tocando el paño</h4>
+      <p>Se toca el paño en la lista de su tanque y ahí está <b>todo</b>: quién
+      lo sacó, cómo salió el hielo, qué se hizo con lo que salió mal, molde
+      por molde si hace falta, y canasta por canasta cuando no sale de un
+      jalón.</p>
+      <p class="ayuda-tip">Hasta la v3.9 había además un botón de
+      <b>«Registrar lo que se sacó»</b> que marcaba varios paños de golpe.
+      <b>Se quitó.</b> Hacía lo mismo pero peor —no dejaba escoger canastas,
+      ni decir qué le pasó a un molde, ni mandar una cáscara al condensador—
+      y tener dos maneras de anotar lo mismo solo servía para que la mitad de
+      las veces se anotara por la que menos cuenta.</p>
+      <p>Arriba, las <b>pestañas de los tanques</b> van grandes y la del
+      tanque en el que estás, más grande todavía y en azul. Y al abrir un
+      paño, el nombre del tanque va en el título junto al número: anotar en
+      el tanque equivocado cuesta un paño entero y no se descubre hasta el
+      día siguiente.</p>
+
       <h4>Cómo salió el hielo</h4>
       <p>Antes el sistema solo sabía tres cosas —salió, se rompió, salió
       hueca— y la fábrica distingue cinco. Ahora al sacar un paño se dice
@@ -563,7 +580,7 @@ debería quedar − contado = FALTA</pre>
   {
     id: 'caja',
     titulo: 'Caja: el turno y el corte',
-    busca: 'caja turno fondo corte arqueo gasto retiro efectivo cerrar cuadrar sobra falta corregir corte firmado olvidó gasto agregar quitar administrador motivo',
+    busca: 'caja turno fondo corte arqueo gasto retiro efectivo cerrar cuadrar sobra falta corregir corte firmado olvidó gasto agregar quitar administrador motivo copia comprobante reimprimir volver a imprimir papel',
     cuerpo: `
       <h4>El turno se abre solo</h4>
       <p>No hay que ir a ninguna pantalla a abrir la caja: <b>lo hace tu
@@ -646,6 +663,17 @@ debería haber − contado = DIFERENCIA</pre>
       chat.</p>
       <p class="ayuda-tip">La imagen se arma <b>en el aparato</b>: no se sube
       a ningún lado ni pasa por internet hasta que tú la mandas.</p>
+
+      <h4>Otra copia del comprobante</h4>
+      <p>Cada gasto y cada entrada imprimen su comprobante al anotarse. El
+      papel se pierde, se moja, o hace falta <b>uno para quien se llevó el
+      dinero y otro para la carpeta</b>: con el <b>🖨</b> del renglón sale
+      otra vez.</p>
+      <p class="ayuda-tip">La copia sale marcada <b>** COPIA **</b> hasta
+      arriba, para que no se cuente dos veces el mismo gasto al cuadrar el
+      mes. Y <b>no vuelve a abrir el cajón</b>: el dinero ya se movió cuando
+      se anotó. Desde el <b>Historial</b> también, con el botón
+      <b>Copia</b>.</p>
 
       <h4>Corregir un corte ya firmado</h4>
       <p>Pasa: a la cajera <b>se le olvidó anotar un gasto</b>. Cerró su

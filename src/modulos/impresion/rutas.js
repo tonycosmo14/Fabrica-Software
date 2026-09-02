@@ -558,16 +558,17 @@ router.post('/movimiento/:id', puedeImprimir, async (req, res) => {
   const cfg = configuracion();
   if (!cfg.directa) return ok(res, { impreso: false, motivo: 'sin-destino' });
 
-  // El cajón también, y por la razón más obvia de todas: de ahí hay que
-  // sacar los billetes del gasto, o meter los que entran. Va con el papel
-  // en el mismo viaje, igual que en la venta.
-  const pulso = cfg.abrirCajon ? pulsoCajon(cfg.salidaCajon) : null;
-  const papel = ticketMovimiento(mov, { negocio: nombreNegocio() });
+  // UNA COPIA NO ABRE EL CAJÓN. El dinero ya se movió cuando se anotó el
+  // gasto; volver a abrirlo por un papel de más es abrirlo por nada, y el
+  // cajón abierto sin motivo es justo lo que no se quiere en el mostrador.
+  const copia = req.body?.copia === true;
+  const pulso = cfg.abrirCajon && !copia ? pulsoCajon(cfg.salidaCajon) : null;
+  const papel = ticketMovimiento(mov, { copia, negocio: nombreNegocio() });
 
   const r = await imprimirCrudo(pulso ? Buffer.concat([pulso, papel]) : papel,
                                 { seccion: 'gasto' });
   if (!r.impreso) return error(res, `No se pudo imprimir: ${r.motivo}`, 502);
-  return ok(res, { impreso: true, cajon: Boolean(pulso) });
+  return ok(res, { impreso: true, copia, cajon: Boolean(pulso) });
 });
 
 module.exports = router;

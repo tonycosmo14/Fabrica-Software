@@ -202,15 +202,21 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
                   <td class="importe ${m.tipo === 'salida' ? 'malo' : 'bueno'}">
                     ${m.tipo === 'salida' ? '−' : '+'}${pesos(m.centavos)}
                   </td>
-                  ${puedeCorregir ? `
-                    <td class="quitar">
-                      <button class="tachita" data-anular="${esc(m.id)}"
-                              aria-label="Anular este movimiento">×</button>
-                      ${esAdmin ? `
-                        <button class="tachita borrar" data-borrar="${esc(m.id)}"
-                                title="Borrarlo de verdad"
-                                aria-label="Borrar este movimiento">🗑</button>` : ''}
-                    </td>` : ''}
+                  <td class="quitar">
+                    <div class="fila-tachitas">
+                      <button class="tachita papel" data-copia="${esc(m.id)}"
+                              title="Sacarle otra copia al comprobante"
+                              aria-label="Imprimir otra copia">🖨️</button>
+                      ${puedeCorregir ? `
+                        <button class="tachita" data-anular="${esc(m.id)}"
+                                title="Anularlo"
+                                aria-label="Anular este movimiento">×</button>
+                        ${esAdmin ? `
+                          <button class="tachita borrar" data-borrar="${esc(m.id)}"
+                                  title="Borrarlo de verdad"
+                                  aria-label="Borrar este movimiento">🗑</button>` : ''}` : ''}
+                    </div>
+                  </td>
                 </tr>`).join('')}
             </table>`
           : '<p class="vacio" style="margin:0;padding:22px 0">Todavía no hay movimientos.</p>'}
@@ -227,6 +233,23 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
       pantalla.querySelector('#entrada').onclick = () => nuevoMovimiento('entrada');
       pantalla.querySelector('#cerrar').onclick = () => terminarTurno(e, sinDueno);
     }
+
+    // OTRA COPIA DEL COMPROBANTE  (v4.0)
+    //
+    // El comprobante de un gasto sale solo al anotarlo, pero se pierde, se
+    // moja o hace falta uno para el que se llevó el dinero y otro para la
+    // carpeta. Sacarlo otra vez no cambia nada: es el mismo papel.
+    pantalla.querySelectorAll('[data-copia]').forEach((b) => {
+      b.onclick = async () => {
+        b.disabled = true;
+        try {
+          const r = await api.enviar(`/impresion/movimiento/${b.dataset.copia}`, { copia: true });
+          avisar(r.impreso ? 'Copia impresa' : 'No hay impresora configurada',
+                 r.impreso ? 'bien' : '');
+        } catch (e) { avisar(e.message, 'error'); }
+        b.disabled = false;
+      };
+    });
 
     pantalla.querySelectorAll('[data-anular]').forEach((b) => {
       b.onclick = async () => {

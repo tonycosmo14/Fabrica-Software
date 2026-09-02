@@ -834,15 +834,23 @@ select { color-scheme: light dark; }
 }
 .pestanas::-webkit-scrollbar { display: none; }
 .pestana { flex: 0 0 auto; text-align: center; }
+/* LOS NOMBRES DE LOS TANQUES, GRANDES  (v4.0)
+   Anotar en el tanque que no es cuesta un paño entero y no se descubre
+   hasta el día siguiente. El nombre tiene que verse desde donde se está
+   parado, no leerse de cerca. */
 .pestana {
-  width: auto; min-width: 62px; min-height: 44px; padding: 8px 18px;
-  font-size: 16px; font-weight: 700;
+  width: auto; min-width: 96px; min-height: 56px; padding: 10px 22px;
+  font-size: 24px; font-weight: 800; letter-spacing: .5px;
   background: transparent; color: var(--suave);
-  border: 2px solid transparent; border-radius: 10px;
+  border: 2px solid transparent; border-radius: 12px;
 }
+/* Y EL ACTIVO, MÁS GRANDE QUE LOS DEMÁS. Que sea distinto no basta:
+   tiene que cantar cuál es, porque es donde se está anotando. */
 .pestana.activa {
-  background: var(--superficie); color: var(--texto);
-  border-color: var(--borde-fuerte);
+  background: var(--superficie); color: var(--primario);
+  border-color: var(--primario);
+  font-size: 30px; padding: 10px 26px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .08);
 }
 
 /* Barra: qué paño toca y con qué agua se está rellenando */
@@ -1098,7 +1106,9 @@ select { color-scheme: light dark; }
 }
 .prod-panel { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .prod-panel .tarjeta { margin-bottom: 0; max-width: none; }
-.panel-titulo { margin: 0 0 10px; font-size: 14px; }
+/* "N(A) ahora" — el mismo nombre otra vez, y grande: el panel de la
+   derecha es lo que se mira de reojo mientras se trabaja. */
+.panel-titulo { margin: 0 0 10px; font-size: 19px; font-weight: 800; }
 .panel-cuentas { display: flex; flex-wrap: wrap; gap: 10px 16px; }
 .panel-cuentas span { display: flex; flex-direction: column; line-height: 1.15; }
 .panel-cuentas strong { font-size: 20px; color: var(--acento); }
@@ -1131,6 +1141,9 @@ select { color-scheme: light dark; }
   margin: 4px 0 16px;
 }
 .pano-cabeza h2 { margin: 0; }
+/* El nombre del tanque, en el color de la marca: se lee antes que el
+   número del paño, que es el orden en que hace falta. */
+.pano-tanque { color: var(--primario); }
 .pano-cabeza-datos, .pano-cabeza-ultima { font-size: 13px; color: var(--suave); }
 .pano-cabeza-ultima {
   margin-left: auto; padding: 4px 10px; border-radius: 999px;
@@ -2565,7 +2578,9 @@ body.imprimir-hoja { page: hoja; }
 .hist-c-quien    { width: 122px; }
 .hist-c-detalle  { width: auto; color: var(--texto); }
 .hist-c-importe  { width: 96px; font-weight: 800; font-variant-numeric: tabular-nums; }
-.hist-c-acciones { width: 136px; text-align: right; }
+/* Tres botones caben: mirar, sacar copia y el ⋯. Desde la v4.0 la copia
+   sale también en los gastos, así que la columna dejó de ser de dos. */
+.hist-c-acciones { width: 186px; text-align: right; white-space: nowrap; }
 .hist-c-acciones .chico { margin-left: 4px; }
 /* El "⋯" es un botón, no un recorte de texto: se ve cuadrado y del alto de
    su vecino para que se entienda que se puede tocar. */
@@ -2597,6 +2612,13 @@ body.imprimir-hoja { page: hoja; }
 /* La papelera vive junto a la tachita de anular; se ve que es otra cosa. */
 .tachita.borrar { background: transparent; border-color: var(--borde); font-size: 13px; }
 .tachita.borrar:hover { border-color: var(--rojo); }
+
+/* Sacar otra copia NO es peligroso: no puede ir en rojo al lado de las dos
+   cosas que sí lo son. Va neutra, y en la misma fila para que las tres no
+   se apilen y estiren el renglón. */
+.tachita.papel { background: transparent; border-color: var(--borde); font-size: 13px; }
+.tachita.papel:hover { border-color: var(--primario); }
+.fila-tachitas { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: nowrap; }
 
 /* ---------- Ajustes de la v1.7 ---------- */
 
@@ -3204,7 +3226,7 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 .hist-c-quien    { width: 146px; }
 .hist-c-importe  { width: 104px; }
 .hist-c-detalle  { width: auto; min-width: 120px; color: var(--suave); font-size: 14px; }
-.hist-c-acciones { width: 168px; }
+.hist-c-acciones { width: 200px; }
 
 /* QUÉ PASÓ AQUÍ. Una etiqueta por renglón y de un color por clase: venta,
    mayoreo, cambio, devolución, gasto... Antes había que deducirlo leyendo

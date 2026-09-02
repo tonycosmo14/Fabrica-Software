@@ -146,7 +146,10 @@ function historial(opciones = {}) {
              (SELECT group_concat(
                        CASE WHEN vl.cantidad > 1 THEN vl.cantidad || ' × ' || vl.concepto
                             ELSE vl.concepto END, ', ')
-                FROM venta_lineas vl WHERE vl.venta_id = v.id) AS detalle
+                FROM venta_lineas vl WHERE vl.venta_id = v.id) AS detalle,
+             -- Una venta no deja renglón en el cajón: su papel es el
+             -- ticket, y ese se reimprime por otro lado.
+             NULL AS movimiento_id
         FROM ventas v
         LEFT JOIN usuarios u  ON u.id = v.capturista_id
         LEFT JOIN usuarios cj ON cj.id = v.cajero_id
@@ -180,7 +183,11 @@ function historial(opciones = {}) {
              NULL AS cambio_de, NULL AS cambiado_por,
              NULL AS cambio_de_serie, NULL AS cambio_de_anual,
              NULL AS cambiado_por_serie, NULL AS cambiado_por_anual,
-             NULL AS lista_tipo, NULL AS lista_nombre, m.concepto AS detalle
+             NULL AS lista_tipo, NULL AS lista_nombre, m.concepto AS detalle,
+             -- SU PROPIO PAPEL. La pantalla necesita saber si hay
+             -- comprobante que reimprimir y con qué id pedirlo: un gasto
+             -- es su propio renglón del cajón.
+             m.id AS movimiento_id
         FROM movimientos_caja m
         LEFT JOIN usuarios u ON u.id = m.capturista_id
         LEFT JOIN usuarios e ON e.id = m.ejecutor_id
@@ -203,7 +210,11 @@ function historial(opciones = {}) {
              NULL AS cambio_de_serie, NULL AS cambio_de_anual,
              NULL AS cambiado_por_serie, NULL AS cambiado_por_anual,
              NULL AS lista_tipo, NULL AS lista_nombre,
-             'Abono a su cuenta' AS detalle
+             'Abono a su cuenta' AS detalle,
+             -- El renglón que ese abono dejó en el cajón, si lo dejó: un
+             -- abono por transferencia no pasa por el cajón y no tiene
+             -- papel que reimprimir.
+             a.movimiento_id
         FROM abonos a
         LEFT JOIN usuarios u  ON u.id = a.capturista_id
         LEFT JOIN usuarios e  ON e.id = a.ejecutor_id
