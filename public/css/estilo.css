@@ -3709,3 +3709,145 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
   display: block; margin-top: 8px; font-size: 13px; color: var(--suave);
   line-height: 1.4;
 }
+
+/* ============================================================
+   LA GENTE DE LA FÁBRICA  (v3.8)
+
+   Partida por rol y en un renglón por persona. Los roles no son cinco
+   categorías equivalentes: son cinco trabajos distintos, y quien abre
+   esta pantalla viene casi siempre a buscar a alguien de uno de ellos.
+   ============================================================ */
+
+.usr-acciones { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+.usr-acciones button { width: auto; }
+.usr-interruptor {
+  display: flex; align-items: center; gap: 10px; font-weight: 500;
+  font-size: 14px; color: var(--suave); cursor: pointer;
+}
+.usr-interruptor input { width: auto; margin: 0; }
+
+.usr-grupo { margin-top: 22px; }
+.usr-titulo-grupo {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  margin: 0 0 10px; font-size: 16px; font-weight: 800;
+}
+.usr-titulo-grupo small {
+  font-weight: 400; font-size: 13px; color: var(--suave);
+}
+.usr-icono { font-size: 18px; }
+.usr-cuantos {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 24px; height: 24px; padding: 0 7px; border-radius: 12px;
+  background: var(--superficie-alt); border: 1px solid var(--borde);
+  font-size: 12.5px; font-weight: 700; color: var(--suave);
+}
+
+/* UN RENGLÓN POR PERSONA. Con la ficha alta de antes, seis empleados
+   llenaban la pantalla y no se podía comparar a dos de un vistazo. */
+.usr-ficha {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 12px 16px; margin-bottom: 8px;
+  background: var(--superficie); border: 1px solid var(--borde);
+  border-radius: var(--radio);
+}
+.usr-ficha.inactivo { opacity: .55; }
+.usr-ficha .inicial { flex: 0 0 auto; }
+.usr-quien { flex: 1 1 180px; min-width: 0; }
+.usr-quien strong { display: block; font-size: 16px; }
+.usr-quien small { display: block; font-size: 12.5px; color: var(--suave); }
+
+.usr-datos { display: flex; gap: 22px; flex-wrap: wrap; }
+.usr-dato { display: flex; flex-direction: column; line-height: 1.25; }
+.usr-dato b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.usr-dato small { font-size: 11px; color: var(--suave); }
+
+.usr-cuando {
+  flex: 0 0 auto; text-align: right; min-width: 130px;
+  display: flex; flex-direction: column; line-height: 1.3;
+}
+.usr-cuando small { font-size: 12px; color: var(--suave); }
+.usr-ficha > button { flex: 0 0 auto; }
+
+.usr-botones { display: flex; gap: 10px; flex-wrap: wrap; }
+.usr-botones button { width: auto; flex: 0 0 auto; }
+
+/* En el celular la ficha se apila, pero los datos siguen en su renglón:
+   son tres números cortos y apilarlos haría una torre por persona. */
+@media (max-width: 620px) {
+  .usr-cuando { text-align: left; min-width: 0; flex: 1 1 100%; }
+  .usr-ficha > button { margin-left: auto; }
+}
+
+/* ============================================================
+   LOS CLIENTES, CON CARA  (v3.8)
+
+   Su logo si lo tiene, y si no la inicial en un círculo de color sacado
+   del propio nombre. Veinte renglones de texto se leen todos igual: con
+   la cara al lado, se reconoce sin leer.
+   ============================================================ */
+
+.cli-cara {
+  width: 40px; height: 40px; flex: 0 0 40px; border-radius: 10px;
+  object-fit: cover; background: var(--superficie-alt);
+}
+.cli-inicial {
+  display: grid; place-items: center;
+  color: #fff; font-weight: 800; font-size: 18px; line-height: 1;
+}
+.cli-cara.grande {
+  width: 84px; height: 84px; flex: 0 0 84px; border-radius: 16px;
+  font-size: 36px;
+}
+
+.cli-cabeza {
+  display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.cli-retrato { position: relative; flex: 0 0 auto; }
+
+/* El botón de la cámara se posa sobre la esquina del retrato: es donde se
+   busca, y así no ocupa un renglón propio en una ficha que ya es larga. */
+.cli-cambiar-foto, .cli-quitar-foto {
+  position: absolute; width: 28px; height: 28px; border-radius: 50%;
+  display: grid; place-items: center; cursor: pointer;
+  background: var(--superficie); border: 1px solid var(--borde);
+  font-size: 14px; line-height: 1; padding: 0; color: var(--texto);
+}
+.cli-cambiar-foto { right: -8px; bottom: -6px; }
+.cli-quitar-foto  { right: -8px; top: -6px; color: var(--rojo); font-weight: 700; }
+.cli-cambiar-foto:hover, .cli-quitar-foto:hover { border-color: var(--primario); }
+
+.cli-quien { flex: 1 1 220px; min-width: 0; }
+.cli-quien h3 { margin: 0; font-size: 21px; line-height: 1.2; }
+.cli-segundo {
+  margin: 3px 0 0; font-size: 13.5px; color: var(--suave);
+  display: flex; align-items: center; gap: 8px;
+}
+.cli-etiquetas { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.etiqueta.mayoreo { background: var(--et-operario-f); color: var(--primario); }
+
+/* Marcar de un toque desde la tablet: es lo primero que se busca aquí
+   cuando alguien debe. */
+.cli-telefono {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 10px;
+  font-size: 16px; font-weight: 700; color: var(--primario);
+  text-decoration: none;
+}
+.cli-telefono:hover { text-decoration: underline; }
+.cli-direccion { margin: 6px 0 0; font-size: 13.5px; color: var(--suave); }
+
+/* El saldo se va a la derecha de la cabeza y solo baja cuando ya no cabe:
+   quién es y cuánto debe son la misma pregunta y se miran juntas. */
+.cli-cabeza .saldo-grande { flex: 0 1 auto; min-width: 190px; margin: 0; }
+
+/* Los datos en dos columnas: son ocho campos cortos y en una sola columna
+   la ficha se volvía una tira que había que recorrer entera. */
+.cli-rejilla {
+  display: grid; gap: 0 22px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+.cli-rejilla .cuadre-linea { border-bottom: 1px solid var(--borde); }
+
+@media (max-width: 620px) {
+  .cli-cabeza .saldo-grande { flex: 1 1 100%; }
+}

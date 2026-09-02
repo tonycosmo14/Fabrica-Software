@@ -22,13 +22,89 @@ const CAMPOS_PUBLICOS = `
   (contrasena_hash IS NOT NULL) AS tiene_contrasena
 `;
 
+/**
+ * LO QUE CADA QUIEN HA HECHO  (v3.8)
+ *
+ * La pantalla de usuarios enseñaba nombre, rol y nada más, y con eso no se
+ * puede contestar ninguna de las preguntas que uno se hace mirándola:
+ * ¿quién entró esta semana?, ¿este cajero sigue trabajando aquí?, ¿cuánto
+ * lleva Chuy en la fábrica? Aquí se juntan esos datos.
+ *
+ * Va en consultas aparte y agrupadas —no una por usuario— porque con
+ * quince empleados serían sesenta consultas para pintar una lista.
+ *
+ * Se cuenta el ÚLTIMO MES CORRIDO (treinta días hacia atrás), no el mes
+ * del negocio: la pregunta es "¿está trabajando?", no "¿cuánto lleva este
+ * periodo?", y un día 2 del mes todos aparecerían en cero.
+ */
+function actividadDeTodos() {
+  const treintaDias = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const porUsuario = new Map();
+  const meter = (id, campo, valor) => {
+    if (!id) return;
+    if (!porUsuario.has(id)) porUsuario.set(id, {});
+    porUsuario.get(id)[campo] = valor;
+  };
+
+  // La última vez que entró al sistema. Es el dato que contesta "¿este
+  // usuario sigue sirviendo para algo o quedó de un empleado que se fue?".
+  for (const f of bd.prepare(`
+    SELECT usuario_id, MAX(creada_en) ultima
+      FROM sesiones_dispositivo GROUP BY usuario_id
+  `).all()) meter(f.usuario_id, 'ultimaEntrada', f.ultima);
+
+  // Lo que vendió, como cajero del turno (no como capturista): es de quien
+  // era el turno, que es lo que se mira.
+  for (const f of bd.prepare(`
+    SELECT cajero_id, COUNT(*) cuantas, COALESCE(SUM(total_centavos), 0) centavos,
+           MAX(fecha) ultima
+      FROM ventas
+     WHERE cancelada_en IS NULL AND fecha >= ?
+     GROUP BY cajero_id
+  `).all(treintaDias)) {
+    meter(f.cajero_id, 'ventas', f.cuantas);
+    meter(f.cajero_id, 'vendidoCentavos', f.centavos);
+    meter(f.cajero_id, 'ultimaVenta', f.ultima);
+  }
+
+  // Los turnos de caja que abrió.
+  for (const f of bd.prepare(`
+    SELECT cajero_id, COUNT(*) cuantos FROM cajas
+     WHERE abierta_en >= ? GROUP BY cajero_id
+  `).all(treintaDias)) meter(f.cajero_id, 'turnos', f.cuantos);
+
+  // Los paños que sacó. Cuenta el EJECUTOR: el que metió las manos al
+  // tanque, no el que lo capturó desde la caja (regla 3.6).
+  for (const f of bd.prepare(`
+    SELECT ejecutor_id, COUNT(*) cuantos, MAX(iniciada_en) ultima
+      FROM sacadas_pano
+     WHERE iniciada_en >= ? AND (notas IS NULL OR notas NOT LIKE 'ANULADA%')
+     GROUP BY ejecutor_id
+  `).all(treintaDias)) {
+    meter(f.ejecutor_id, 'panos', f.cuantos);
+    meter(f.ejecutor_id, 'ultimoPano', f.ultima);
+  }
+
+  return porUsuario;
+}
+
 /** Listar. Por defecto solo activos; ?incluirInactivos=1 muestra el historico. */
 router.get('/', (req, res) => {
   const incluirInactivos = req.query.incluirInactivos === '1';
   const sql = `SELECT ${CAMPOS_PUBLICOS} FROM usuarios
                ${incluirInactivos ? '' : 'WHERE activo = 1'}
                ORDER BY activo DESC, nombre`;
-  return ok(res, { usuarios: bd.prepare(sql).all() });
+  const usuarios = bd.prepare(sql).all();
+
+  // La actividad solo se calcula si la piden: la pantalla de usuarios la
+  // quiere, pero hay otras que solo necesitan la lista de nombres.
+  if (req.query.actividad !== '1') return ok(res, { usuarios });
+
+  const actividad = actividadDeTodos();
+  return ok(res, {
+    desdeCuando: 30,
+    usuarios: usuarios.map((u) => ({ ...u, actividad: actividad.get(u.id) || {} }))
+  });
 });
 
 /** Alta. */

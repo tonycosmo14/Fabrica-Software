@@ -455,3 +455,64 @@ test('cada venta a crédito deja su renglón en la bitácora', async () => {
   ).get().n;
   assert.equal(enBitacora, enVentas);
 });
+
+
+// ============================================================
+// SU LOGO  (v3.8)
+//
+// Un mayorista es una tienda con rótulo. Con su logo al lado se reconoce
+// en la lista sin leer, que es la misma razón por la que los productos
+// llevan foto. Lo que se prueba es que no se cuele cualquier archivo.
+// ============================================================
+
+/** Un PNG de verdad de un pixel: lo que se comprueba es su firma. */
+const PNG = 'data:image/png;base64,'
+  + 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+test('el cliente puede llevar su logo', async () => {
+  await entrarAdmin();
+  const r = await llamar(`/api/clientes/${mary.id}/foto`, {
+    method: 'POST', cuerpo: { archivo: PNG } });
+  assert.equal(r.estado, 200);
+  assert.match(r.json.datos.cliente.foto, /\.png$/);
+
+  // Y sale en la lista, que es donde sirve.
+  const lista = (await llamar('/api/clientes')).json.datos.clientes;
+  assert.ok(lista.find((c) => c.id === mary.id).foto, 'la lista la trae');
+});
+
+test('un archivo que no es imagen no se guarda', async () => {
+  await entrarAdmin();
+  for (const archivo of [
+    'data:application/pdf;base64,JVBERi0xLjQK',            // un PDF de verdad
+    'data:image/png;base64,QUJD',                          // dice PNG y no lo es
+    'no es una url de datos',
+    ''
+  ]) {
+    const r = await llamar(`/api/clientes/${mary.id}/foto`, {
+      method: 'POST', cuerpo: { archivo } });
+    assert.equal(r.estado, 400, JSON.stringify(archivo).slice(0, 40));
+  }
+});
+
+test('quitarle el logo lo deja con su inicial', async () => {
+  await entrarAdmin();
+  const r = await llamar(`/api/clientes/${mary.id}/foto`, { method: 'DELETE' });
+  assert.equal(r.estado, 200);
+  assert.equal(r.json.datos.cliente.foto, null);
+});
+
+test('el logo es cosa de quien administra clientes', async () => {
+  await entrarPorNombre('Mari', '7777');    // cajera: ve clientes, no los administra
+  const r = await llamar(`/api/clientes/${mary.id}/foto`, {
+    method: 'POST', cuerpo: { archivo: PNG } });
+  assert.equal(r.estado, 403);
+  await entrarAdmin();
+});
+
+test('poner el logo de un cliente que no existe da 404', async () => {
+  await entrarAdmin();
+  const r = await llamar('/api/clientes/no-existe/foto', {
+    method: 'POST', cuerpo: { archivo: PNG } });
+  assert.equal(r.estado, 404);
+});

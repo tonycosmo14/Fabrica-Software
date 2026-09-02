@@ -17,9 +17,30 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '3.7';
+const VERSION_ACTUAL = '3.8';
 
 const VERSIONES = [
+  {
+    numero: '3.8',
+    nombre: 'La gente y los clientes, con cara',
+    fecha: '2026-09-02',
+    resumen:
+      'Los empleados salen agrupados por trabajo y cada ficha dice lo que ' +
+      'esa persona ha hecho en el mes. Y los clientes pueden llevar su ' +
+      'logo, con la ficha rediseñada alrededor de quién es y cuánto debe.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'LA PANTALLA DE USUARIOS AHORA SE LLAMA LA GENTE DE LA FÁBRICA Y VA PARTIDA POR TRABAJOS: operarios, cajeros, repartidores, gerentes y administradores, cada apartado con cuántos hay y qué hace ese trabajo. Los roles no son cinco categorías iguales, son cinco trabajos distintos, y quien abre esta pantalla casi siempre viene a buscar a alguien de UNO de ellos: con una lista alfabética esa pregunta se contestaba leyéndola entera.' },
+      { tipo: 'nuevo', texto: 'Y CADA FICHA DICE LO QUE ESA PERSONA HA HECHO en los últimos treinta días: los paños que sacó y cuándo fue el último, lo que vendió y en cuántos tickets, los turnos de caja que abrió, la última vez que entró al sistema y desde cuándo está en la fábrica. Antes decía nombre y rol, y con eso no se contestaba ninguna de las preguntas que uno se hace mirando esa lista.' },
+      { tipo: 'mejora', texto: 'A CADA QUIEN LO SUYO: a un operario no se le enseña cuánto vendió, porque no vende, ni a un repartidor cuántos paños sacó. Las mismas cinco casillas para todos, con tres en cero, es peor que no enseñar ninguna: los ceros se leen como si algo estuviera mal.' },
+      { tipo: 'mejora', texto: 'UN RENGLÓN POR PERSONA, con su inicial en un círculo de color. Con la ficha alta de antes, seis empleados llenaban la pantalla y no se podían comparar dos de un vistazo.' },
+      { tipo: 'mejora', texto: 'Al elegir el rol de alguien, debajo se dice QUÉ VA A PODER HACER. "Gerente de turno" no le dice a nadie qué va a poder tocar esa persona.' },
+      { tipo: 'nuevo', texto: 'LOS CLIENTES PUEDEN LLEVAR SU LOGO O SU FOTO. Un mayorista es una tienda con rótulo. Se le pone con el botón de la cámara en la esquina de su retrato, y desde entonces aparece con él en la lista. Es opcional: quien no tenga logo se queda con la inicial de su nombre en un círculo de color, y el color sale del propio nombre, así que es siempre el mismo para el mismo cliente — que es justo lo que lo hace útil para reconocerlo de reojo.' },
+      { tipo: 'importante', texto: 'EL LOGO SE GUARDA EN LA CARPETA DATOS, igual que las fotos de los productos y el recibo de la luz: actualizar el sistema no se lo lleva. Y no se acepta cualquier archivo con nombre de imagen: se mira la firma de los primeros bytes, que es lo que de verdad distingue una foto de otra cosa.' },
+      { tipo: 'mejora', texto: 'LA FICHA DEL CLIENTE, REDISEÑADA. Arriba, juntos y grandes, QUIÉN ES Y CUÁNTO DEBE: son la misma pregunta y se miran a la vez. Debajo su teléfono, que desde la tablet se toca para marcarle — es lo primero que uno busca cuando alguien debe. Y sus datos en dos bloques en vez de una tira: quién es y dónde está por un lado, su crédito y su precio por otro. Son dos cosas distintas y se tocan en momentos distintos.' },
+      { tipo: 'mejora', texto: 'En la lista, el nombre grande es el DEL NEGOCIO cuando lo tiene, y abajo el de la persona. Al mayorista se le busca por su tienda, no por su apellido.' },
+      { tipo: 'mejora', texto: 'Las dos pantallas están explicadas en el manual, con un apartado nuevo para la gente de la fábrica.' }
+    ]
+  },
   {
     numero: '3.7',
     nombre: 'El recibo de luz completo, y el IVA que nos deben',

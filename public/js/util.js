@@ -86,3 +86,20 @@ export const ETIQUETAS_ROL = {
   gerente: 'Gerente de turno',
   admin: 'Administrador'
 };
+
+/**
+ * UN COLOR ESTABLE A PARTIR DE UN NOMBRE  (v3.8)
+ *
+ * Para las iniciales de clientes y de empleados cuando no hay foto. El
+ * color sale de las letras del propio nombre, así que el mismo nombre da
+ * siempre el mismo color — y eso es justo lo que lo hace útil para
+ * reconocer a alguien de reojo. Al azar cambiaría en cada pintada.
+ */
+const COLORES_INICIAL = ['#1f6f9c', '#8a4bbd', '#0f8a6a', '#c06a12', '#b03a52',
+                         '#3a6ab0', '#6a8a12', '#9c5a1f', '#5a4bbd', '#0f7a8a'];
+
+export function colorDe(texto) {
+  let n = 0;
+  for (const c of String(texto || '')) n = (n * 31 + c.codePointAt(0)) % 100000;
+  return COLORES_INICIAL[n % COLORES_INICIAL.length];
+}

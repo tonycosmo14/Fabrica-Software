@@ -25,6 +25,11 @@ const { listasDeMayoreo, listaPorOmision } = require('../ventas/mayoreo');
 const {
   estadoCliente, cuentaCorriente, clientesConEstado, resumenCartera
 } = require('./calculo');
+// Las mismas fotos que las de los productos: misma carpeta, mismas
+// comprobaciones y el mismo sitio para servirlas. Un logo de tienda no
+// tiene nada de secreto —está pintado en la fachada— así que no hace
+// falta el trato de los papeles de la empresa.
+const fotos = require('../catalogo/fotos');
 
 const router = express.Router();
 
@@ -95,6 +100,41 @@ router.get('/:id', verClientes, (req, res) => {
   const c = clientePorId(req.params.id);
   if (!c) return error(res, 'Ese cliente no existe.', 404);
   return ok(res, { cliente: conEstado(c), cuenta: cuentaCorriente(c.id) });
+});
+
+/**
+ * LA FOTO O EL LOGO  (v3.8)
+ *
+ * Sube la que sea y reemplaza la anterior: `fotos.guardar` borra la vieja
+ * antes de escribir la nueva, y el nombre lleva la hora para que el
+ * navegador no siga enseñando la de antes desde su caché.
+ */
+router.post('/:id/foto', administrar, (req, res) => {
+  const c = clientePorId(req.params.id);
+  if (!c) return error(res, 'Ese cliente no existe.', 404);
+
+  const r = fotos.guardar(c.id, req.body?.archivo);
+  if (r.error) return error(res, r.error);
+
+  bd.prepare('UPDATE clientes SET foto = ? WHERE id = ?').run(r.archivo, c.id);
+  bitacora.registrar({
+    accion: 'cliente.foto', entidad: 'cliente', entidadId: c.id,
+    ejecutorId: req.usuario.id, detalle: { nombre: c.nombre }
+  });
+  return ok(res, { cliente: conEstado(clientePorId(c.id)) });
+});
+
+router.delete('/:id/foto', administrar, (req, res) => {
+  const c = clientePorId(req.params.id);
+  if (!c) return error(res, 'Ese cliente no existe.', 404);
+
+  fotos.quitar(c.id);
+  bd.prepare('UPDATE clientes SET foto = NULL WHERE id = ?').run(c.id);
+  bitacora.registrar({
+    accion: 'cliente.foto_quitada', entidad: 'cliente', entidadId: c.id,
+    ejecutorId: req.usuario.id, detalle: { nombre: c.nombre }
+  });
+  return ok(res, { cliente: conEstado(clientePorId(c.id)) });
 });
 
 // ============================================================

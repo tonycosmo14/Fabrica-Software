@@ -1,5 +1,5 @@
 /**
- * CLIENTES Y CRÉDITO  (v1.6)
+ * CLIENTES Y CRÉDITO  (v1.6, rediseñada en la v3.8)
  *
  * Dos columnas a lo ancho de la pantalla, como Productos: la lista a la
  * izquierda y la ficha completa a la derecha. No se desplaza la página.
@@ -10,9 +10,24 @@
  * La cuenta se lee de arriba abajo como se la explicaría uno al cliente:
  *
  *     se llevó  −  ha pagado  =  DEBE
+ *
+ * QUÉ CAMBIÓ EN LA v3.8. La pantalla decía todo lo que hace falta, pero lo
+ * decía en veinte renglones iguales de texto: para encontrar a alguien
+ * había que ir deletreando nombres.
+ *
+ *  · CADA CLIENTE TIENE CARA. Su logo si lo tiene —un mayorista es una
+ *    tienda con rótulo—, y si no, la inicial de su nombre en un círculo de
+ *    color sacado del propio nombre, que siempre es el mismo para el mismo
+ *    cliente. Es la misma razón por la que los productos llevan foto: se
+ *    reconoce sin leer.
+ *  · LA FICHA ARRANCA CON QUIÉN ES Y CUÁNTO DEBE, juntos y grandes, con
+ *    su teléfono para marcarlo de un toque desde la tablet.
+ *  · SUS DATOS EN REJILLA, no en una columna de renglones sueltos, y el
+ *    crédito —límite, plazo, su lista de precios— aparte de los datos de
+ *    contacto: son dos cosas distintas y se tocan en momentos distintos.
  */
 import { api } from '../api.js';
-import { esc, avisar, fecha as formatoFecha } from '../util.js';
+import { esc, avisar, fecha as formatoFecha, colorDe } from '../util.js';
 import { pedirTexto, pedirImporte, confirmar, menu, pedirContrasena } from '../dialogo.js';
 import { pesos, paraEditar } from '../fracciones.js';
 
@@ -112,21 +127,40 @@ export async function vistaClientes(pantalla, estadoApp) {
     enganchar();
   }
 
+  /**
+   * LA CARA DEL CLIENTE.
+   *
+   * Su logo si lo subió; si no, la inicial en un círculo de color. El
+   * color NO es al azar: sale de las letras del propio nombre, así que
+   * "Abarrotes Doña Mary" es siempre del mismo color y eso es justo lo
+   * que la hace útil para reconocerla de reojo. El cálculo vive en util
+   * porque la pantalla de la gente hace lo mismo con sus iniciales.
+   */
+  function avatar(c, clase = '') {
+    if (c.foto) {
+      return `<img class="cli-cara ${clase}" src="/fotos/${esc(c.foto)}"
+                   alt="${esc(c.nombre)}">`;
+    }
+    const inicial = (c.negocio || c.nombre || '?').trim().charAt(0).toUpperCase();
+    return `<span class="cli-cara cli-inicial ${clase}"
+                  style="background:${colorDe(c.negocio || c.nombre)}">${esc(inicial)}</span>`;
+  }
+
   function fila(c) {
     const e = c.estado;
     return `
       <button class="cfg-item cfg-cliente ${seleccionado === c.id ? 'activo' : ''}
                      ${c.activo ? '' : 'de-baja'}"
               data-cliente="${esc(c.id)}">
-        <span class="cliente-num">#${c.numero ?? '—'}</span>
+        ${avatar(c)}
         <span class="crece">
-          <strong>${esc(c.nombre)}</strong>
+          <strong>${esc(c.negocio || c.nombre)}</strong>
           <small>
-            ${c.negocio ? esc(c.negocio) : c.telefono ? esc(c.telefono) : 'sin negocio'}
+            ${c.negocio ? esc(c.nombre) : c.telefono ? esc(c.telefono) : 'sin negocio'}
             ${c.activo ? '' : ' · dado de baja'}
           </small>
         </span>
-        ${c.lista_id ? '<span class="etiqueta-mayoreo">🏷️</span>' : ''}
+        ${c.lista_id ? '<span class="etiqueta-mayoreo" title="Tiene su propio precio">🏷️</span>' : ''}
         <span class="cliente-saldo ${e.vencido ? 'vencido' : e.saldo > 0 ? 'debe' : ''}">
           ${e.saldo > 0 ? pesos(e.saldo) : e.saldo < 0 ? 'a favor' : '—'}
         </span>
@@ -173,23 +207,48 @@ export async function vistaClientes(pantalla, estadoApp) {
   function panelCliente(c, cuenta) {
     const e = c.estado;
 
-    return `
-      <div class="cfg-detalle-cabeza">
-        <div class="crece">
-          <h3 style="margin:0">
-            <span class="cliente-num">#${c.numero ?? '—'}</span> ${esc(c.nombre)}
-          </h3>
-          ${c.negocio ? `<p class="ayuda" style="margin:2px 0 0">${esc(c.negocio)}</p>` : ''}
-          ${c.activo ? '' : '<span class="etiqueta baja">Dado de baja</span>'}
-        </div>
-      </div>
+    // El teléfono, listo para marcarlo de un toque desde la tablet: es lo
+    // primero que uno busca en esta pantalla cuando alguien debe.
+    const tel = String(c.telefono || '').replace(/[^\d+]/g, '');
 
-      <div class="saldo-grande ${e.vencido ? 'vencido' : e.saldo > 0 ? 'debe' : 'al-corriente'}">
-        <span>${e.saldo > 0 ? 'Debe' : e.saldo < 0 ? 'Tiene a favor' : 'No debe nada'}</span>
-        <strong>${pesos(Math.abs(e.saldo))}</strong>
-        ${e.saldo > 0 && e.diasDebiendo
-          ? `<small>desde hace ${e.diasDebiendo} día${e.diasDebiendo === 1 ? '' : 's'}</small>`
-          : ''}
+    return `
+      <div class="cli-cabeza">
+        <div class="cli-retrato">
+          ${avatar(c, 'grande')}
+          ${administra ? `
+            <label class="cli-cambiar-foto" for="foto-cliente"
+                   title="${c.foto ? 'Cambiar el logo' : 'Ponerle su logo o su foto'}">
+              📷
+              <input type="file" id="foto-cliente" accept="image/*" hidden>
+            </label>
+            ${c.foto ? '<button class="cli-quitar-foto" id="quitar-foto" title="Quitar el logo">×</button>' : ''}
+          ` : ''}
+        </div>
+
+        <div class="cli-quien">
+          <h3>${esc(c.negocio || c.nombre)}</h3>
+          <p class="cli-segundo">
+            <span class="cliente-num">#${c.numero ?? '—'}</span>
+            ${c.negocio ? esc(c.nombre) : ''}
+          </p>
+          <div class="cli-etiquetas">
+            ${c.activo ? '' : '<span class="etiqueta baja">Dado de baja</span>'}
+            ${c.lista
+              ? `<span class="etiqueta mayoreo">🏷️ ${esc(c.lista.nombre)}</span>` : ''}
+            ${e.vencido ? '<span class="etiqueta-mal">Se le pasó el plazo</span>' : ''}
+          </div>
+          ${tel ? `
+            <a class="cli-telefono" href="tel:${esc(tel)}">📞 ${esc(c.telefono)}</a>` : ''}
+          ${c.direccion ? `<p class="cli-direccion">📍 ${esc(c.direccion)}</p>` : ''}
+        </div>
+
+        <div class="saldo-grande ${e.vencido ? 'vencido' : e.saldo > 0 ? 'debe' : 'al-corriente'}">
+          <span>${e.saldo > 0 ? 'Debe' : e.saldo < 0 ? 'Tiene a favor' : 'No debe nada'}</span>
+          <strong>${pesos(Math.abs(e.saldo))}</strong>
+          ${e.saldo > 0 && e.diasDebiendo
+            ? `<small>desde hace ${e.diasDebiendo} día${e.diasDebiendo === 1 ? '' : 's'}</small>`
+            : ''}
+        </div>
       </div>
 
       ${e.vencido ? `
@@ -218,12 +277,16 @@ export async function vistaClientes(pantalla, estadoApp) {
           <button class="secundario chico" id="abonar-transf">Abono por transferencia</button>
         </div>` : ''}
 
-      <h4 class="cfg-subtitulo">Sus datos</h4>
-      <div class="cuadre cfg-cliente-datos">
+      <h4 class="cfg-subtitulo">Quién es y dónde está</h4>
+      <div class="cuadre cfg-cliente-datos cli-rejilla">
         ${campo('Nombre', 'nombre', c.nombre)}
         ${campo('Negocio', 'negocio', c.negocio, { marcador: 'Abarrotes Doña Mary' })}
         ${campo('Teléfono', 'telefono', c.telefono, { marcador: '999 123 4567' })}
         ${campo('Dirección', 'direccion', c.direccion)}
+      </div>
+
+      <h4 class="cfg-subtitulo">Su crédito y su precio</h4>
+      <div class="cuadre cfg-cliente-datos cli-rejilla">
         ${campo('Límite de crédito', 'limite',
                 paraEditar(c.limite_centavos),
                 { ayuda: 'vacío = sin límite', marcador: 'sin límite' })}
@@ -361,6 +424,11 @@ export async function vistaClientes(pantalla, estadoApp) {
       } catch (e) { avisar(e.message, 'error'); await abrir(ficha.cliente.id); }
     };
 
+    const subirFoto = q('#foto-cliente');
+    if (subirFoto) subirFoto.onchange = (ev) => ponerFoto(ev.target);
+    const quitarFoto = q('#quitar-foto');
+    if (quitarFoto) quitarFoto.onclick = borrarFoto;
+
     const abonar = q('#abonar');
     if (abonar) abonar.onclick = () => recibirAbono('efectivo');
     const transf = q('#abonar-transf');
@@ -396,6 +464,50 @@ export async function vistaClientes(pantalla, estadoApp) {
       await cargar();
       // El resto de sus datos se llenan tocándolos en la ficha: pedirlos
       // todos por adelantado sería un formulario, y casi nunca se saben.
+    } catch (e) { avisar(e.message, 'error'); }
+  }
+
+  /**
+   * PONERLE SU LOGO.
+   *
+   * El tope se comprueba aquí antes de mandarla: una foto de celular de
+   * hoy pesa cinco megas, y esperar a que suba para que el servidor la
+   * rechace es esperar por nada.
+   */
+  async function ponerFoto(entrada) {
+    const f = entrada.files?.[0];
+    if (!f || !ficha) return;
+    if (f.size > 2 * 1024 * 1024) {
+      entrada.value = '';
+      return avisar(`Esa imagen pesa ${Math.round(f.size / 1024)} KB y el máximo son 2 MB. `
+        + 'Con una foto más chica basta: se ve en un círculo.', 'error');
+    }
+    try {
+      const archivo = await new Promise((resolver, rechazar) => {
+        const lector = new FileReader();
+        lector.onload = () => resolver(lector.result);
+        lector.onerror = () => rechazar(new Error('No se pudo leer la imagen.'));
+        lector.readAsDataURL(f);
+      });
+      await api.enviar(`/clientes/${ficha.cliente.id}/foto`, { archivo });
+      avisar('Logo guardado', 'bien');
+      await abrir(ficha.cliente.id);
+      await cargar();
+    } catch (e) { avisar(e.message, 'error'); }
+  }
+
+  async function borrarFoto() {
+    if (!ficha) return;
+    if (!await confirmar({
+      titulo: 'Quitar el logo',
+      texto: `${ficha.cliente.negocio || ficha.cliente.nombre} se queda con la `
+             + 'inicial de su nombre. Se le puede volver a poner cuando sea.',
+      ok: 'Quitar'
+    })) return;
+    try {
+      await api.borrar(`/clientes/${ficha.cliente.id}/foto`);
+      await abrir(ficha.cliente.id);
+      await cargar();
     } catch (e) { avisar(e.message, 'error'); }
   }
 

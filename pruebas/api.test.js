@@ -110,3 +110,33 @@ test('la bitacora guarda quien ejecuto cada movimiento', async () => {
   assert.ok(alta.ejecutor_id);
   assert.equal(alta.ejecutor_id, alta.capturista_id);
 });
+
+
+// ============================================================
+// LO QUE HA HECHO CADA QUIEN  (v3.8)
+//
+// La pantalla de la gente enseña, en cada ficha, lo de los últimos treinta
+// días: la última vez que entró, lo que vendió, los paños que sacó. Un
+// nombre y un rol no contestan ninguna de las preguntas que uno se hace
+// mirando esa lista.
+// ============================================================
+
+test('la lista de la gente puede venir con lo que ha hecho cada quien', async () => {
+  await llamar('/api/auth/entrar-contrasena', {
+    method: 'POST', cuerpo: { usuario: admin.usuario, contrasena: admin.contrasena }
+  });
+
+  const sinPedirla = (await llamar('/api/usuarios')).json.datos;
+  assert.equal(sinPedirla.usuarios[0].actividad, undefined,
+    'se calcula solo si la piden: hay pantallas que solo quieren los nombres');
+
+  const r = (await llamar('/api/usuarios?actividad=1')).json.datos;
+  assert.equal(r.desdeCuando, 30, 'y se dice de cuántos días se está hablando');
+  for (const u of r.usuarios) {
+    assert.ok(u.actividad, `${u.nombre} trae su actividad, aunque venga vacía`);
+  }
+
+  // El administrador entró con contraseña hace un momento: eso se ve.
+  const yo = r.usuarios.find((u) => u.usuario === admin.usuario);
+  assert.ok(yo.actividad.ultimaEntrada, 'la última vez que entró al sistema');
+});

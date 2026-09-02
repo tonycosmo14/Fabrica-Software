@@ -814,7 +814,7 @@ debería haber − contado = FALTA</pre>
   {
     id: 'clientes',
     titulo: 'Clientes y crédito: a quién se le fía',
-    busca: 'clientes crédito fiar fiado deuda debe abono abonar cobranza límite plazo vencido saldo cuenta a favor cartera calle',
+    busca: 'clientes crédito fiar fiado deuda debe abono abonar cobranza límite plazo vencido saldo cuenta a favor cartera calle logo foto imagen retrato telefono marcar llamar',
     cuerpo: `
       <p>La regla de la fábrica es que <b>se le fía solo a los clientes que
       damos de alta</b>. Al público en general no. Por eso en la caja el
@@ -825,6 +825,35 @@ debería haber − contado = FALTA</pre>
       <p>En <b>Clientes</b>, botón <b>＋ Cliente</b>. Solo se pide el nombre;
       lo demás —negocio, teléfono, límite, plazo— se llena tocándolo en su
       ficha, y casi nunca se sabe todo el primer día.</p>
+
+      <h4>Su logo o su foto</h4>
+      <p>Un mayorista es una tienda con rótulo. En su ficha, el botón
+      <b>📷</b> de la esquina del retrato le pone <b>su logo o una foto</b>,
+      y desde entonces aparece con ella en la lista.</p>
+      <p>No es adorno: veinte renglones de texto se leen todos igual y hay
+      que ir deletreando nombres para encontrar a alguien; con la cara al
+      lado se reconoce sin leer. Es la misma razón por la que los productos
+      llevan foto.</p>
+      <ul>
+        <li>Es <b>opcional</b>. A quien no tenga logo se le pone la
+        <b>inicial de su nombre</b> en un círculo de color — y el color sale
+        del propio nombre, así que es siempre el mismo para el mismo
+        cliente, que es lo que lo hace útil para reconocerlo de reojo.</li>
+        <li>PNG, JPG o WEBP, hasta 2 MB. Se guarda en la carpeta de
+        <b>datos</b>: actualizar el sistema no se la lleva.</li>
+        <li>El <b>×</b> de la esquina de arriba se lo quita, y vuelve a su
+        inicial.</li>
+      </ul>
+
+      <h4>Su ficha</h4>
+      <p>Arriba, juntos, <b>quién es y cuánto debe</b>: son la misma
+      pregunta y se miran a la vez. Debajo, su <b>teléfono</b>, que desde la
+      tablet o el celular se toca para marcarle — es lo primero que uno
+      busca cuando alguien debe.</p>
+      <p>Y sus datos en dos bloques, porque son dos cosas distintas y se
+      tocan en momentos distintos: <b>quién es y dónde está</b> (nombre,
+      negocio, teléfono, dirección) y <b>su crédito y su precio</b> (el
+      límite, el plazo y qué lista de mayoreo se le cobra).</p>
 
       <h4>Fiar en la caja</h4>
       <ol class="instrucciones">
@@ -1431,6 +1460,62 @@ EN REPARACION
       anotó, aunque el sistema lo guarde. Casi siempre es la misma persona y
       llenaba el ticket de nombres. Cuando de verdad haga falta saberlo, está
       en la <b>bitácora</b>, en Sistema.</p>`
+  },
+
+  // ==========================================================
+  {
+    id: 'gente',
+    titulo: 'La gente de la fábrica: altas, bajas y PIN',
+    busca: 'usuarios gente empleados trabajadores alta baja pin contraseña rol operario cajero repartidor gerente administrador quién entró actividad paños vendió turnos reactivar',
+    cuerpo: `
+      <p>Cada quien entra con <b>su propio PIN</b>. No es burocracia: es lo
+      que hace que cada paño, cada ticket y cada corte lleven el nombre de
+      quien lo hizo, y eso es la mitad de para qué sirve este sistema.</p>
+
+      <p class="ayuda-tip"><b>Nadie se borra.</b> Un empleado que se va se
+      <b>da de baja</b>: desaparece de las pantallas, pero sus registros se
+      quedan enteros — las ventas que hizo siguen siendo suyas y los paños
+      que sacó siguen diciendo su nombre. Si vuelve, se reactiva y sigue
+      siendo el mismo.</p>
+
+      <h4>Partida por trabajos</h4>
+      <p>La pantalla está dividida por rol y no en una lista sola, porque
+      los roles de una fábrica no son cinco categorías iguales: son
+      <b>cinco trabajos distintos</b>, y quien abre esta pantalla casi
+      siempre viene a buscar a alguien de uno de ellos. Cada apartado dice
+      cuántos hay y qué hace ese trabajo.</p>
+
+      <h4>Lo que dice cada ficha</h4>
+      <p>De los <b>últimos treinta días</b>, y solo lo que le toca a cada
+      quien — a un operario no le sirve saber cuánto vendió, porque no
+      vende:</p>
+      <ul>
+        <li><b>Paños</b> que sacó, y cuándo fue el último.</li>
+        <li><b>Lo que vendió</b> y en cuántos tickets.</li>
+        <li><b>Turnos</b> de caja que abrió.</li>
+        <li><b>La última vez que entró al sistema</b>, y desde cuándo está
+        en la fábrica.</li>
+        <li><b>Cómo entra</b>: con PIN, o también con usuario y contraseña
+        desde la PC.</li>
+      </ul>
+      <p>Son treinta días corridos hacia atrás, no el mes del negocio: la
+      pregunta que contestan es "¿está trabajando?", y un día 2 del mes
+      todos aparecerían en cero.</p>
+
+      <h4>El PIN y la contraseña</h4>
+      <ul>
+        <li>El <b>PIN</b> (4 a 6 dígitos) lo lleva todo el mundo. Con él se
+        entra desde el celular, la tablet o tocando la cara en la pantalla
+        de entrada.</li>
+        <li>La <b>contraseña</b> es solo de administradores y gerentes, que
+        son los que entran desde la PC. A un operario pedírsela es estorbo
+        puro.</li>
+        <li>Los dos se cambian desde <b>Editar</b>, sin tener que saber el
+        anterior: quien administra la gente puede reponer un PIN olvidado.</li>
+      </ul>
+
+      <p class="ayuda-tip">Esta pantalla es <b>solo del administrador</b>.
+      Dar de alta a alguien es decidir qué va a poder tocar en la fábrica.</p>`
   },
 
   // ==========================================================
