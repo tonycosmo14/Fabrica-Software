@@ -17,6 +17,7 @@
  */
 const { bd } = require('../../db/conexion');
 const { DIECISEISAVOS_POR_MARQUETA } = require('../../lib/fracciones');
+const { instantes } = require('../../lib/periodos');
 
 /** El último conteo válido de un almacén. Los anulados no cuentan. */
 function ultimoConteo(almacenId) {
@@ -64,17 +65,26 @@ function producidoPorRangos(rangos = []) {
   const desde = rangos.reduce((a, r) => (r.desde < a ? r.desde : a), rangos[0].desde);
   const hasta = rangos.reduce((a, r) => (r.hasta > a ? r.hasta : a), rangos[0].hasta);
 
+  // POR INSTANTES EN EL *WHERE*, POR DÍA EN EL *GROUP BY*.
+  //
+  // Con date(s.fecha,'localtime') en el WHERE, SQLite tiene que convertir
+  // la fecha de CADA renglón antes de compararla y el índice no sirve: se
+  // leen todos los moldes de la historia para quedarse con los de un mes.
+  // Medido: con date() en el WHERE hace SCAN de sacadas_moldes; con los
+  // instantes, SEARCH por idx_sacadas_fecha. Agrupar por día sí puede usar
+  // date(), porque a esas alturas ya solo quedan los renglones del rango.
+  const { desde: iDesde, hasta: iHasta } = instantes({ desde, hasta });
+
   const porDia = bd.prepare(`
     SELECT date(s.fecha, 'localtime') AS dia, COUNT(*) AS n
       FROM sacadas_moldes sm
       JOIN sacadas s       ON s.id = sm.sacada_id
       JOIN sacadas_pano sp ON sp.id = s.sacada_pano_id
      WHERE sm.resultado = 'ok'
-       AND date(s.fecha, 'localtime') >= date(?)
-       AND date(s.fecha, 'localtime') <= date(?)
+       AND s.fecha >= ? AND s.fecha < ?
        AND (sp.notas IS NULL OR sp.notas NOT LIKE 'ANULADA%')
      GROUP BY dia
-  `).all(desde, hasta);
+  `).all(iDesde, iHasta);
 
   return rangos.map((r) => porDia
     .filter((f) => f.dia >= r.desde && f.dia <= r.hasta)

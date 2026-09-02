@@ -124,6 +124,34 @@ function navegadorDeWindows() {
  * Si no hay ninguno de los dos, se abre el navegador que haya. Todo funciona
  * igual; solo volverá a aparecer el cuadro de imprimir.
  */
+/**
+ * ¿Se abrió la ventana de impresión directa?
+ *
+ * Importa fuera de aquí: en esa ventana `window.print()` NO enseña el
+ * cuadro de imprimir —manda el papel directo a la impresora de siempre—,
+ * que es justo lo que se quiere para los tickets y justo lo que estorba
+ * para sacar un reporte en hoja o guardarlo en PDF. La pantalla de los
+ * números lo pregunta para ofrecer el otro camino.
+ */
+let ventanaDirecta = false;
+function esVentanaDirecta() { return ventanaDirecta; }
+
+/** Abre una dirección en el navegador de siempre, SIN impresión directa. */
+function abrirEnNavegadorNormal(url) {
+  const comandos = {
+    win32:  ['cmd', ['/c', 'start', '""', url]],
+    darwin: ['open', [url]],
+    linux:  ['xdg-open', [url]]
+  };
+  const elegido = comandos[process.platform] || comandos.linux;
+  try {
+    const p = spawn(elegido[0], elegido[1], { detached: true, stdio: 'ignore' });
+    p.on('error', () => {});
+    p.unref();
+    return true;
+  } catch { return false; }
+}
+
 function abrirNavegador(url) {
   try {
     if (process.platform === 'win32') {
@@ -140,6 +168,7 @@ function abrirNavegador(url) {
         ], { detached: true, stdio: 'ignore' });
         p.on('error', () => {});
         p.unref();
+        ventanaDirecta = true;
         return;
       }
     }
@@ -268,7 +297,7 @@ async function arrancar() {
   });
 }
 
-module.exports = { crearApp, arrancar };
+module.exports = { crearApp, arrancar, esVentanaDirecta, abrirEnNavegadorNormal };
 
 if (require.main === module) {
   arrancar().catch((e) => {

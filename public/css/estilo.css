@@ -1581,7 +1581,6 @@ body.pantalla-fija main {
   body:not(.imprimir-hoja) > *:not(#area-impresion) { display: none !important; }
   body.pantalla-fija { height: auto; overflow: visible; display: block; }
   body:not(.imprimir-hoja) #area-impresion { display: block !important; }
-  body:not(.imprimir-hoja) { --papel: ticket; }
   @page { margin: 0; }
 }
 
@@ -1609,12 +1608,17 @@ body.pantalla-fija main {
   body.imprimir-hoja main {
     max-width: none; padding: 0; margin: 0; overflow: visible;
   }
-
-  /* Hoja carta con márgenes de verdad: sin esto el navegador recorta. */
-  body.imprimir-hoja { --margen-hoja: 14mm; }
 }
 
+/* LA HOJA CARTA DE VERDAD.
+   `@page hoja` describe la hoja, pero por sí sola no se aplica a nada: la
+   página con nombre solo entra donde algo diga `page: hoja`, y eso era
+   justo lo que faltaba. Sin la declaración de abajo, el reporte heredaba
+   el `margin: 0` de la térmica y el navegador le recortaba las orillas.
+   Con nombre —y no cambiando el `@page` de siempre— el ticket sigue
+   saliendo a sangre, que es como tiene que salir. */
 @page hoja { size: letter portrait; margin: 14mm; }
+body.imprimir-hoja { page: hoja; }
 
 @media print {
   /* Nada de sombras ni fondos de color: gastan tinta y se ven sucios. */
@@ -3113,9 +3117,10 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 .est-grafica { margin-top: 6px; }
 .grafica { display: block; width: 100%; height: 150px; overflow: visible; }
 .grafica-linea { height: 130px; }
-.grafica-etiquetas { display: block; width: 100%; height: 14px; }
 
-.g-piso { stroke: var(--borde); stroke-width: .3; }
+/* El grosor lo fija el navegador y no el viewBox: sin esto la raya de
+   piso se adelgaza hasta desaparecer cuando el dibujo se estira. */
+.g-piso { stroke: var(--borde); stroke-width: 1px; vector-effect: non-scaling-stroke; }
 .g-barra { fill: var(--g-color, var(--acento)); }
 .g-resaltada { fill: var(--suave); }
 .g-linea { fill: none; stroke: var(--g-color, var(--acento)); stroke-width: 2px; }

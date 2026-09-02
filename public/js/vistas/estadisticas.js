@@ -18,6 +18,7 @@
  */
 import { api } from '../api.js';
 import { esc, avisar } from '../util.js';
+import { confirmar } from '../dialogo.js';
 import { pesos } from '../fracciones.js';
 import { barras, barrasAcostadas, linea } from '../graficas.js';
 import { imprimirHoja } from '../imprimir.js';
@@ -25,6 +26,18 @@ import { imprimirHoja } from '../imprimir.js';
 export async function vistaEstadisticas(pantalla) {
   let mes = null;
   let meses = null;          // la tendencia: se pide aparte y solo una vez
+
+  // EN LA VENTANA DE LOS TICKETS NO SE PUEDE SACAR UNA HOJA.
+  //
+  // El programa se abre con impresión directa para que los tickets salgan
+  // sin preguntar nada: ahí Ctrl+P no enseña el cuadro de imprimir, manda
+  // el papel a la impresora de siempre —la térmica— y no deja elegir
+  // "Guardar como PDF". Un reporte en hoja carta necesita justo ese cuadro,
+  // así que en esa ventana el botón hace otra cosa: abre el sistema en el
+  // navegador normal, donde sí pregunta.
+  let ventanaDirecta = false;
+  try { ventanaDirecta = (await api.obtener('/impresion/config')).ventanaDirecta; }
+  catch { ventanaDirecta = false; }
 
   await pintar();
 
@@ -70,7 +83,9 @@ export async function vistaEstadisticas(pantalla) {
               </option>`).join('')}
           </select>
         </label>
-        <button class="secundario" id="imprimir">🖨 Imprimir esta hoja</button>
+        <button class="secundario" id="imprimir">
+          ${ventanaDirecta ? '🖨 Sacar esta hoja / PDF' : '🖨 Imprimir esta hoja'}
+        </button>
       </div>
 
       <div class="hoja-titulo">
@@ -124,8 +139,8 @@ export async function vistaEstadisticas(pantalla) {
           <small class="${dc.clase}">${dc.texto}</small>
         </div>
         <div class="hist-dato">
-          <small>Se fue en gastos</small>
-          <strong class="malo">${pesos(d.costo.total)}</strong>
+          <small>Salió de la caja</small>
+          <strong class="malo">${pesos(d.costo.delMes.total)}</strong>
           <small>cajón + compras grandes + luz</small>
         </div>
       </div>
@@ -139,6 +154,10 @@ export async function vistaEstadisticas(pantalla) {
             : ''}.
         Fueron <b>${d.ventas.tickets}</b> ${d.ventas.tickets === 1 ? 'ticket' : 'tickets'},
         de <b>${pesos(d.ventas.porTicket)}</b> cada uno en promedio.
+        ${d.abonos.cuantos ? `<br>Aparte entraron <b>${pesos(d.abonos.centavos)}</b>
+          en ${d.abonos.cuantos} ${d.abonos.cuantos === 1 ? 'abono' : 'abonos'}:
+          eso es dinero de ventas fiadas de <b>otros meses</b>, así que no
+          suma aquí — pero sí entró al cajón.` : ''}
       </p>`;
   }
 
@@ -265,10 +284,23 @@ export async function vistaEstadisticas(pantalla) {
   // ==========================================================
 
   function enQueSeFue(d) {
+    // DE DÓNDE SALIÓ CADA PESO, dicho en la etiqueta. "Mantenimiento"
+    // existe en las dos bolsas —el cajero puede pagarle al plomero del
+    // cajón y el administrador capturar la factura del mismo trabajo—, y
+    // dos barras con el mismo nombre no se entienden. Diciendo de dónde
+    // viene cada una, si un trabajo se apuntó dos veces se ve solo.
+    const nombresDeCaja = new Set(d.gastos.porConcepto.map((g) => g.nombre.toLowerCase()));
+    const marca = (nombre, donde) =>
+      (nombresDeCaja.has(nombre.toLowerCase()) ? `${nombre} (${donde})` : nombre);
+
     const todo = [
       ...(d.luz.centavos ? [{ etiqueta: 'Luz (CFE)', valor: d.luz.centavos }] : []),
-      ...d.grandes.map((g) => ({ etiqueta: g.nombre, valor: g.centavos })),
-      ...d.gastos.porConcepto.map((g) => ({ etiqueta: g.nombre, valor: g.centavos }))
+      ...d.grandes.map((g) => ({ etiqueta: marca(g.nombre, 'con factura'), valor: g.centavos })),
+      ...d.gastos.porConcepto.map((g) => ({
+        etiqueta: d.grandes.some((x) => x.nombre.toLowerCase() === g.nombre.toLowerCase())
+          ? `${g.nombre} (del cajón)` : g.nombre,
+        valor: g.centavos
+      }))
     ].sort((a, b) => b.valor - a.valor);
 
     return `
@@ -277,7 +309,13 @@ export async function vistaEstadisticas(pantalla) {
         ${barrasAcostadas(todo, { formato: pesos })}
         <p class="est-nota">
           Todo junto: la luz, las compras grandes de la empresa y los gastos
-          chicos del cajón, del más caro al más barato.
+          chicos del cajón, del más caro al más barato. Estas barras suman
+          exactamente <b>${pesos(d.costo.delMes.total)}</b>, que es lo que
+          dice arriba <b>«salió de la caja»</b>: es el dinero que de verdad
+          se pagó este mes.
+          ${d.costo.hayReparto ? ` Ojo, no es lo mismo que el costo por
+            marqueta de arriba: ese reparte las compras que duran meses a su
+            ritmo, y por eso da ${pesos(d.costo.total)}.` : ''}
           ${d.gastos.traspasado ? `
             <b>No incluye ${pesos(d.gastos.traspasado)} de traspasos</b>
             —el dinero que solo cambió de sitio, como un retiro a la caja
@@ -391,19 +429,43 @@ export async function vistaEstadisticas(pantalla) {
       </p>`;
   }
 
+  /**
+   * Sacar la hoja: en papel o en PDF, que en el navegador son la misma
+   * cosa —se elige en el cuadro de imprimir—. Lo único que cambia es de
+   * qué ventana se hace.
+   */
+  async function sacarLaHoja() {
+    if (!ventanaDirecta) {
+      avisar('Para guardarla en PDF, elige "Guardar como PDF" en vez de la impresora', '');
+      return imprimirHoja();
+    }
+
+    // En la ventana de los tickets, imprimir aquí mandaría la hoja a la
+    // térmica sin preguntar. Se abre el sistema en el navegador normal.
+    const seguir = await confirmar({
+      titulo: 'Sacar la hoja en papel o en PDF',
+      texto: 'Esta ventana está puesta para que los tickets salgan solos, sin ' +
+             'preguntar, y por eso no puede elegir impresora ni guardar un PDF. ' +
+             'Se va a abrir el sistema en tu navegador de siempre, ya en esta ' +
+             'misma pantalla: ahí le das al mismo botón y te deja elegir.',
+      ok: 'Abrir el navegador'
+    });
+    if (!seguir) return;
+
+    try {
+      const r = await api.enviar('/impresion/abrir-en-navegador',
+                                 { donde: `#/estadisticas` });
+      avisar(r.abrio
+        ? 'Se abrió el navegador. Ahí dale a "Imprimir esta hoja".'
+        : 'No se pudo abrir el navegador solo; ábrelo a mano en localhost.', r.abrio ? 'bien' : '');
+    } catch (e) { avisar(e.message, 'error'); }
+  }
+
   function enganchar() {
     const sel = pantalla.querySelector('#mes');
     if (sel) sel.onchange = () => pintar(sel.value);
 
     const btn = pantalla.querySelector('#imprimir');
-    if (btn) {
-      btn.onclick = () => {
-        // Para guardar como PDF se usa el mismo cuadro de impresión del
-        // navegador y se elige "Guardar como PDF": no hace falta ninguna
-        // librería y sale igual que en papel.
-        avisar('Para guardarla como PDF, elige "Guardar como PDF" en el cuadro de impresión', '');
-        imprimirHoja();
-      };
-    }
+    if (btn) btn.onclick = sacarLaHoja;
   }
 }

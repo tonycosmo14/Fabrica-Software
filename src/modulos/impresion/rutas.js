@@ -79,7 +79,37 @@ function ventaCompleta(id) {
 // ============================================================
 
 router.get('/config', puedeImprimir, (req, res) => {
-  return ok(res, { impresion: configuracion() });
+  return ok(res, {
+    impresion: configuracion(),
+    // La pantalla necesita saber si está corriendo dentro de la ventana de
+    // impresión directa: ahí Ctrl+P no pregunta nada y manda el papel a la
+    // impresora de siempre, así que un reporte en hoja carta necesita el
+    // otro camino. Se pide en caliente para no cargar el servidor arriba.
+    ventanaDirecta: require('../../servidor').esVentanaDirecta()
+  });
+});
+
+/**
+ * ABRIR EL SISTEMA EN EL NAVEGADOR DE SIEMPRE.
+ *
+ * El programa se abre en una ventana con impresión directa, que es lo que
+ * hace que los tickets salgan sin preguntar nada. Pero esa misma ventana no
+ * puede sacar una hoja carta ni guardar un PDF: no enseña el cuadro de
+ * imprimir donde se elige la impresora o "Guardar como PDF".
+ *
+ * Esto abre la misma dirección en el navegador normal, donde Ctrl+P sí
+ * pregunta. No se abre nada de fuera: solo una ruta de este mismo sistema.
+ */
+router.post('/abrir-en-navegador', puedeImprimir, (req, res) => {
+  const donde = String(req.body?.donde || '');
+  // Solo rutas internas: nada de direcciones que vengan de fuera.
+  if (donde && !/^#\/[a-z0-9\-/?=&.]*$/i.test(donde)) {
+    return error(res, 'Esa dirección no se entiende.');
+  }
+  const { abrirEnNavegadorNormal } = require('../../servidor');
+  const puerto = require('../../config').PUERTO;
+  const abrio = abrirEnNavegadorNormal(`http://localhost:${puerto}/${donde}`);
+  return ok(res, { abrio });
 });
 
 /**

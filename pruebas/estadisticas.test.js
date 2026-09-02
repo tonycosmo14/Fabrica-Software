@@ -346,3 +346,61 @@ test('no se pueden pedir cien años de un golpe', async () => {
   const r = (await llamar('/api/estadisticas/meses?cuantos=500')).json.datos;
   assert.equal(r.meses.length, 24, 'se topa en 24: es una pantalla, no un reporte anual');
 });
+
+
+// ============================================================
+// QUE NINGÚN PESO SE CUENTE DOS VECES  (v2.9.1)
+// ============================================================
+
+test('una factura pagada del cajón no cuenta en las dos bolsas', async () => {
+  await entrarAdmin();
+  const cs = (await llamar('/api/caja/conceptos')).json.datos.conceptos;
+  const mantCaja = cs.find((c) => /mantenimiento/i.test(c.nombre));
+  assert.ok(mantCaja, '"Mantenimiento" existe en la caja…');
+  const ce = (await llamar('/api/empresa/conceptos')).json.datos.conceptos;
+  const mantEmp = ce.find((c) => /mantenimiento/i.test(c.nombre));
+  assert.ok(mantEmp, '…y también en las cuentas de la empresa: ahí está el riesgo');
+
+  // El electricista cobra $3,000 en efectivo: el cajero lo anota.
+  const mov = await llamar('/api/caja/movimientos', {
+    method: 'POST', cuerpo: { tipo: 'salida', conceptoId: mantCaja.id, monto: 3000 } });
+  const movId = mov.json.datos.movimientoId;
+
+  const conDoble = (await hoy()).gastos.gastado;
+
+  // Y el administrador captura la factura del MISMO trabajo, diciendo de
+  // qué salida del cajón salió.
+  const p = require('../src/lib/periodos').periodoDe();
+  await llamar('/api/empresa/gastos', {
+    method: 'POST',
+    cuerpo: { conceptoId: mantEmp.id, fecha: p.desde, monto: 3000, formaPago: 'efectivo' } });
+  bd.prepare('UPDATE gastos_empresa SET movimiento_caja_id = ? WHERE movimiento_caja_id IS NULL AND centavos = 300000')
+    .run(movId);
+
+  const d = await hoy();
+  assert.equal(d.gastos.gastado, conDoble - 300000,
+    'la salida del cajón deja de contarse: manda la factura, que trae el papel');
+  assert.ok(!d.gastos.porConcepto.some((g) => g.centavos === 300000 && /mantenimiento/i.test(g.nombre)),
+    'y desaparece de "en qué se fue", para no salir dos veces con el mismo nombre');
+});
+
+test('sin amarrar, las dos siguen contando — y eso también se prueba', async () => {
+  await entrarAdmin();
+  const cs = (await llamar('/api/caja/conceptos')).json.datos.conceptos;
+  const gasolina = cs.find((c) => /gasolina/i.test(c.nombre));
+
+  const antes = (await hoy()).gastos.gastado;
+  await llamar('/api/caja/movimientos', {
+    method: 'POST', cuerpo: { tipo: 'salida', conceptoId: gasolina.id, monto: 450 } });
+
+  assert.equal((await hoy()).gastos.gastado, antes + 45000,
+    'un gasto normal del cajón cuenta entero: el descuento es SOLO cuando hay factura amarrada');
+});
+
+test('quién sacó cuánto cuadra con las marquetas del mes', async () => {
+  await entrarAdmin();
+  const d = await hoy();
+  const suma = d.porObrero.reduce((n, o) => n + o.marquetas, 0);
+  assert.equal(suma, d.produccion.buenas,
+    'los dos números salen de la misma fecha: si no cuadraran, uno de los dos mentiría');
+});

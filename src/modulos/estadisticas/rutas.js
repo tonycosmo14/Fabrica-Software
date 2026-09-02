@@ -51,7 +51,7 @@ router.get('/', ver, (req, res) => {
     luz: empresa.luzEnPeriodo({ desde: p.desde, hasta: p.hasta }),
     porObrero: calculo.porObrero(rango),
     porDia: calculo.porDia(p),
-    // Cuántas listas de precios: si hay mayoreo, la pantalla lo dice.
+    // Los meses que se pueden elegir arriba.
     periodos: periodos.ultimos(25).map((x) => ({ clave: x.clave, nombre: x.nombre, fechas: x.fechas }))
   });
 });

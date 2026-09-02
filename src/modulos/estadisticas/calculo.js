@@ -43,8 +43,7 @@ function ventas({ desde, hasta }) {
     SELECT COUNT(*)                                            AS tickets,
            COALESCE(SUM(total_centavos), 0)                    AS centavos,
            COALESCE(SUM(CASE WHEN forma_pago = 'credito'
-                             THEN total_centavos ELSE 0 END), 0) AS fiado,
-           COUNT(CASE WHEN cliente_id IS NOT NULL THEN 1 END)  AS conNombre
+                             THEN total_centavos ELSE 0 END), 0) AS fiado
       FROM ventas
      WHERE cancelada_en IS NULL AND fecha >= ? AND fecha < ?
   `).get(desde, hasta);
@@ -127,17 +126,26 @@ function produccion({ desde, hasta }) {
   };
 }
 
-/** Cuántos paños se sacaron y quién los sacó. */
+/**
+ * Cuántos paños se sacaron y quién los sacó.
+ *
+ * Se filtra por `s.fecha` —cuándo salió cada canasta— y no por cuándo se
+ * abrió el paño, por dos razones. La de fondo: así cuenta igual que el
+ * número de marquetas de arriba, y dos números de la misma hoja que se
+ * contradicen no sirven. La de máquina: `sacadas.fecha` sí tiene índice,
+ * y por `sacadas_pano.iniciada_en` SQLite acababa leyendo todos los moldes
+ * de la historia aunque el índice existiera (medido con EXPLAIN).
+ */
 function porObrero({ desde, hasta }) {
   return bd.prepare(`
     SELECT COALESCE(u.nombre, sp.ejecutor_libre, '—') AS nombre,
            COUNT(DISTINCT sp.id) AS panos,
            COUNT(CASE WHEN sm.resultado = 'ok' THEN 1 END) AS marquetas
-      FROM sacadas_pano sp
-      LEFT JOIN usuarios u ON u.id = sp.ejecutor_id
-      JOIN sacadas s        ON s.sacada_pano_id = sp.id
+      FROM sacadas s
+      JOIN sacadas_pano sp   ON sp.id = s.sacada_pano_id
       JOIN sacadas_moldes sm ON sm.sacada_id = s.id
-     WHERE sp.iniciada_en >= ? AND sp.iniciada_en < ?
+      LEFT JOIN usuarios u   ON u.id = sp.ejecutor_id
+     WHERE s.fecha >= ? AND s.fecha < ?
        AND (sp.notas IS NULL OR sp.notas NOT LIKE 'ANULADA%')
      GROUP BY COALESCE(sp.ejecutor_id, 'L:' || sp.ejecutor_libre)
      ORDER BY marquetas DESC
@@ -166,6 +174,13 @@ function gastosDelCajon({ desde, hasta }) {
       LEFT JOIN conceptos_gasto c ON c.id = m.concepto_id
      WHERE m.tipo = 'salida' AND m.anulado_en IS NULL
        AND m.fecha >= ? AND m.fecha < ?
+       -- EL MISMO PESO, UNA SOLA VEZ. Si el electricista cobró en efectivo,
+       -- el cajero lo anotó en la caja Y el administrador capturó su
+       -- factura como gasto grande, es el mismo dinero apuntado dos veces.
+       -- Cuando la factura dice de qué salida del cajón salió, esa salida
+       -- deja de contarse aquí: manda la factura, que trae el papel.
+       AND NOT EXISTS (SELECT 1 FROM gastos_empresa g
+                        WHERE g.movimiento_caja_id = m.id AND g.anulado_en IS NULL)
      GROUP BY COALESCE(m.concepto_id, 'libre:' || lower(m.concepto))
      ORDER BY SUM(m.centavos) DESC
   `).all(desde, hasta);

@@ -46,13 +46,18 @@ export function barras(datos = [], { alto = 120, formato = (n) => n,
   const anchoBarra = Math.max(paso - hueco, 0.6);
   const altoUtil = alto;                   // las etiquetas van fuera del dibujo
 
+  // Sin esquinas redondeadas a propósito: el dibujo se estira al ancho de
+  // la pantalla, y un radio en unidades del viewBox se estira con él —en
+  // un monitor ancho las esquinas salían ovaladas y de distinto tamaño en
+  // cada barra—. Cuadradas se ven igual en todas partes.
+  //
   // Sin ningún valor, se dibuja la línea de piso y ya: una gráfica vacía
   // que dice "no hubo nada" es más honesta que no dibujar nada.
   const barra = (d, i) => {
     const h = tope > 0 ? (d.valor / tope) * altoUtil : 0;
     const x = i * paso + hueco / 2;
     return `<rect x="${r2(x)}" y="${r2(altoUtil - h)}" width="${r2(anchoBarra)}"
-                  height="${r2(Math.max(h, d.valor > 0 ? 0.4 : 0))}" rx="0.3"
+                  height="${r2(Math.max(h, d.valor > 0 ? 0.4 : 0))}"
                   class="g-barra ${d.resaltar ? 'g-resaltada' : ''}"
             ><title>${esc(d.titulo || `${d.etiqueta}: ${formato(d.valor)}`)}</title></rect>`;
   };

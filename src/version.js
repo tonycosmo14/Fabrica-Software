@@ -17,9 +17,27 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '2.9';
+const VERSION_ACTUAL = '2.9.1';
 
 const VERSIONES = [
+  {
+    numero: '2.9.1',
+    nombre: 'Que los números cuadren',
+    fecha: '2026-09-02',
+    resumen:
+      'Seis cosas que estaban mal en la pantalla de los números recién ' +
+      'estrenada: la más grave, que el botón de imprimir la hoja mandaba el ' +
+      'reporte a la impresora de tickets sin preguntar, y que dos números de ' +
+      'la misma hoja no cuadraban entre sí.',
+    cambios: [
+      { tipo: 'arreglo', texto: 'IMPRIMIR LA HOJA NO FUNCIONABA EN LA VENTANA DEL PROGRAMA. El sistema se abre con la impresión directa puesta —eso es lo que hace que los tickets salgan solos, sin preguntar nada— y por eso el reporte se iba a la impresora de tickets sin dar oportunidad de elegir ni de guardar el PDF. Ahora, en esa ventana, el botón abre el sistema en el navegador de siempre y desde ahí sí deja elegir impresora o "Guardar como PDF".' },
+      { tipo: 'arreglo', texto: 'LA TARJETA DE ARRIBA NO CUADRABA CON LAS BARRAS DE ABAJO. Decía "se fue en gastos" y enseñaba el número repartido, mientras que las barras de "en qué se fue el dinero" sumaban lo que de verdad se pagó: sumando las barras con el dedo no daba. Ahora la tarjeta dice "Salió de la caja" y es exactamente la suma de las barras; el número repartido sigue donde le toca, en el costo por marqueta.' },
+      { tipo: 'importante', texto: 'EL MISMO GASTO YA NO SE CUENTA DOS VECES. "Mantenimiento" existe en la caja y en las cuentas de la empresa: si el plomero cobra en efectivo, el cajero lo anota y el administrador captura la factura del mismo trabajo, eran dos gastos. Ahora, cuando la factura dice de qué salida del cajón salió, esa salida deja de contarse — manda la factura, que trae el papel. Y en la gráfica, dos gastos con el mismo nombre salen marcados con de dónde vienen.' },
+      { tipo: 'arreglo', texto: 'La hoja carta no estaba tomando sus márgenes: heredaba los del ticket, que son cero, y el navegador le recortaba las orillas al imprimir.' },
+      { tipo: 'mejora', texto: 'En la nota de las ventas ahora también sale cuánto entró de ABONOS: dinero de ventas fiadas de otros meses, que no suma en lo vendido de este pero sí entró al cajón.' },
+      { tipo: 'mejora', texto: 'Por dentro: la función que se había escrito para acelerar los recibos de luz tenía el mismo error que venía a arreglar y leía la producción entera; "quién sacó cuántos paños" también. Los dos ya usan su índice, y de paso ese número quedó contando por la misma fecha que las marquetas del mes — antes eran dos fechas distintas y podían no cuadrar.' }
+    ]
+  },
   {
     numero: '2.9',
     nombre: 'Los números',

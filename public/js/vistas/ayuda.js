@@ -1307,8 +1307,12 @@ EN REPARACION
         vendió; los domingos van marcados. Un día sin barra es un día sin
         ventas capturadas. Dejando el ratón encima sale el detalle.</li>
         <li><b>En qué se fue el dinero</b>: del más caro al más barato, todo
-        junto. No incluye los <b>traspasos</b> —un retiro a la caja fuerte
-        no es un gasto: el dinero cambió de sitio.</li>
+        junto, y suma exactamente lo que dice arriba <b>«salió de la
+        caja»</b>. No incluye los <b>traspasos</b> —un retiro a la caja
+        fuerte no es un gasto: el dinero cambió de sitio—. Si un gasto sale
+        marcado <b>(con factura)</b> o <b>(del cajón)</b> es porque el mismo
+        nombre existe en las dos bolsas, y así se ve de dónde viene cada
+        uno.</li>
         <li><b>Los últimos doce meses</b>: la de arriba es lo vendido; la de
         abajo, lo que costó cada marqueta. Esa línea <b>no empieza en
         cero</b> a propósito: lo que hay que leer es la <b>inclinación</b>,
@@ -1323,12 +1327,19 @@ EN REPARACION
       y lo que se derritió.</p>
 
       <h4>Imprimirla o guardarla en PDF</h4>
-      <p>El botón <b>🖨 Imprimir esta hoja</b> la saca en hoja carta como se
-      ve: sin el menú, sin los botones y en blanco y negro para no gastar
-      tinta. Ninguna gráfica se parte a la mitad entre dos hojas.</p>
-      <p class="ayuda-tip">Para guardarla como <b>PDF</b> se usa el mismo
-      botón y en el cuadro de impresión se elige <b>Guardar como PDF</b> en
-      vez de la impresora. Sale idéntica.</p>
+      <p>El botón de arriba la saca en hoja carta como se ve: sin el menú,
+      sin los botones y en blanco y negro para no gastar tinta. Ninguna
+      gráfica se parte a la mitad entre dos hojas.</p>
+      <p class="ayuda-tip">Para guardarla como <b>PDF</b> es el mismo botón:
+      en el cuadro de impresión se elige <b>Guardar como PDF</b> en vez de la
+      impresora. Sale idéntica.</p>
+      <p class="ayuda-tip"><b>Por qué a veces pide abrir el navegador.</b> El
+      sistema se abre en una ventana puesta para que los <b>tickets salgan
+      solos</b>, sin preguntar qué impresora ni nada — eso es lo que se
+      quiere en el mostrador. Pero esa misma ventana no puede enseñar el
+      cuadro donde se elige impresora o se guarda un PDF, así que para sacar
+      la hoja abre el sistema en tu navegador de siempre, ya en esta misma
+      pantalla. Ahí le das al mismo botón y te deja elegir.</p>
 
       <h4>Quién los ve</h4>
       <p>El <b>administrador</b> y el <b>gerente</b>. El gerente es quien
