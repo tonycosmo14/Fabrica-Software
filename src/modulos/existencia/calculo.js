@@ -45,6 +45,42 @@ function ultimoConteo(almacenId) {
  * guarda con la fecha del día siguiente, y sin convertir se contaría en el
  * mes que no es.
  */
+/**
+ * LO PRODUCIDO EN VARIOS RANGOS, DE UNA SOLA PASADA  (v2.9)
+ *
+ * La pantalla de recibos de luz pide las marquetas de cada recibo para
+ * sacar el costo de luz por marqueta. Preguntándolas de una en una, con
+ * veinticuatro recibos se recorre la producción veinticuatro veces; con
+ * tres años de historia eso es medio minuto de espera para pintar una
+ * tabla. Así se recorre UNA vez y se reparten los moldes en su rango.
+ *
+ * @param rangos  [{ desde, hasta }] días de calendario
+ * @returns array de números, en el mismo orden que los rangos
+ */
+function producidoPorRangos(rangos = []) {
+  if (!rangos.length) return [];
+
+  // El pedazo de tiempo que abarca todo, para no leer más de lo necesario.
+  const desde = rangos.reduce((a, r) => (r.desde < a ? r.desde : a), rangos[0].desde);
+  const hasta = rangos.reduce((a, r) => (r.hasta > a ? r.hasta : a), rangos[0].hasta);
+
+  const porDia = bd.prepare(`
+    SELECT date(s.fecha, 'localtime') AS dia, COUNT(*) AS n
+      FROM sacadas_moldes sm
+      JOIN sacadas s       ON s.id = sm.sacada_id
+      JOIN sacadas_pano sp ON sp.id = s.sacada_pano_id
+     WHERE sm.resultado = 'ok'
+       AND date(s.fecha, 'localtime') >= date(?)
+       AND date(s.fecha, 'localtime') <= date(?)
+       AND (sp.notas IS NULL OR sp.notas NOT LIKE 'ANULADA%')
+     GROUP BY dia
+  `).all(desde, hasta);
+
+  return rangos.map((r) => porDia
+    .filter((f) => f.dia >= r.desde && f.dia <= r.hasta)
+    .reduce((n, f) => n + f.n, 0));
+}
+
 function producidoEntreDias(desde, hasta) {
   return bd.prepare(`
     SELECT COUNT(*) n
@@ -175,7 +211,7 @@ function aMarquetas(dieciseisavos) {
 }
 
 module.exports = {
-  ultimoConteo, producidoDesde, producidoEntreDias, vendidoDesde, partidoPorLista,
+  ultimoConteo, producidoDesde, producidoEntreDias, producidoPorRangos, vendidoDesde, partidoPorLista,
   mermaDesde, mermasDesde, estadoAlmacen,
   deMarquetas, aMarquetas, DIECISEISAVOS_POR_MARQUETA
 };

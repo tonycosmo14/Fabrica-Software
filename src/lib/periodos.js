@@ -122,6 +122,33 @@ function ultimos(cuantos = 12, corte = diaDeCorte()) {
   return lista;
 }
 
+/**
+ * DE DÍAS DE CALENDARIO A INSTANTES, para poder usar los índices.
+ *
+ * Las fechas se guardan como instantes UTC ("2026-08-26T18:30:00.000Z") y
+ * los periodos se piensan como días de pared ("del 12 al 11"). Juntar las
+ * dos cosas con  date(fecha,'localtime') >= date(?)  funciona, pero le pide
+ * a SQLite que convierta CADA renglón de la tabla antes de compararlo: el
+ * índice por fecha no sirve y se leen los cientos de miles de renglones
+ * completos. En el corte del turno da igual; en una pantalla que suma un
+ * año de ventas, no.
+ *
+ * Esto traduce el periodo UNA vez a los dos instantes que lo encierran, y
+ * entonces  fecha >= ? AND fecha < ?  sí usa el índice. El final es
+ * ABIERTO —el primer instante del día siguiente— porque el último día
+ * también cuenta entero, hasta las 23:59:59.999.
+ *
+ * @returns {{ desde: string, hasta: string }} los dos instantes en ISO.
+ */
+function instantes({ desde, hasta }) {
+  // new Date('2026-08-12T00:00:00') sin la Z se lee en la hora de esta
+  // máquina, que es la de la fábrica: exactamente lo que se quiere.
+  const inicio = new Date(`${desde}T00:00:00`);
+  const fin = new Date(`${hasta}T00:00:00`);
+  fin.setDate(fin.getDate() + 1);
+  return { desde: inicio.toISOString(), hasta: fin.toISOString() };
+}
+
 /** El periodo de una clave como "2026-08". Null si no se entiende. */
 function porClave(clave, corte = diaDeCorte()) {
   const m = /^(\d{4})-(\d{2})$/.exec(String(clave || '').trim());
@@ -136,4 +163,5 @@ function porClave(clave, corte = diaDeCorte()) {
   return armar(desde, hasta, corte);
 }
 
-module.exports = { diaDeCorte, periodoDe, anterior, ultimos, porClave, MINIMO, MAXIMO, MESES };
+module.exports = { diaDeCorte, periodoDe, anterior, ultimos, porClave, instantes,
+                   MINIMO, MAXIMO, MESES };

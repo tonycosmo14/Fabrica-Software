@@ -53,6 +53,8 @@ const ACCIONES = [
   { grupo: 'Empresa',    permiso: 'empresa.ver',          texto: 'Ver los gastos grandes de la empresa y los recibos de luz' },
   { grupo: 'Empresa',    permiso: 'empresa.administrar',   texto: 'Capturar gastos grandes, recibos de luz y el mes del negocio' },
 
+  { grupo: 'Empresa',    permiso: 'estadisticas.ver',     texto: 'Ver los números del negocio y sus gráficas' },
+
   { grupo: 'Sistema',    permiso: 'usuarios.administrar', texto: 'Dar de alta y de baja usuarios' },
   { grupo: 'Sistema',    permiso: 'sistema.configurar',   texto: 'Configurar tanques, cuartos fríos, logo y respaldos' },
   { grupo: 'Sistema',    permiso: 'precios.configurar',   texto: 'Cambiar los precios' },

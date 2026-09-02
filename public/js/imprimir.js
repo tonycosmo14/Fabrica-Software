@@ -26,3 +26,28 @@ export function limpiarImpresion() {
   const area = document.getElementById('area-impresion');
   if (area) area.innerHTML = '';
 }
+
+/**
+ * IMPRIMIR LA PANTALLA EN HOJA CARTA  (v2.9)
+ *
+ * Lo de arriba es para la térmica: esconde la pantalla y saca el ticket.
+ * Esto es al revés — un reporte se imprime en la impresora de hojas y lo
+ * que hay que sacar es la pantalla—, así que se marca el <body> para que
+ * el CSS cambie de modo, se imprime, y se desmarca al terminar.
+ *
+ * `window.print()` es bloqueante en los navegadores de escritorio, pero
+ * `afterprint` es lo único que garantiza que la clase se quita también si
+ * el usuario cancela el cuadro de impresión.
+ */
+export function imprimirHoja() {
+  document.body.classList.add('imprimir-hoja');
+  const limpiar = () => {
+    document.body.classList.remove('imprimir-hoja');
+    window.removeEventListener('afterprint', limpiar);
+  };
+  window.addEventListener('afterprint', limpiar);
+  window.print();
+  // Red de seguridad: si el navegador no manda afterprint (pasa en algunos
+  // móviles), la clase se quita sola al poco rato.
+  setTimeout(limpiar, 1500);
+}

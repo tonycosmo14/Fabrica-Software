@@ -6,7 +6,7 @@
  * una factura, y entonces la pantalla diría una cosa y los renglones otra.
  */
 const { bd } = require('../../db/conexion');
-const { producidoEntreDias } = require('../existencia/calculo');
+const { producidoEntreDias, producidoPorRangos } = require('../existencia/calculo');
 
 /** Cuántos días hay entre dos días del calendario, contando los dos. */
 function diasEntre(desde, hasta) {
@@ -131,6 +131,82 @@ function totalGastado({ desde = null, hasta = null } = {}) {
 }
 
 
+/**
+ * LOS GASTOS GRANDES, REPARTIDOS A SU RITMO  (v2.9)
+ *
+ * EL PROBLEMA QUE ESTO ARREGLA. Un cilindro de amoniaco cuesta $38,500 y
+ * dura noventa días. Cargándolo entero al mes en que se compró, ese mes se
+ * ve carísimo y los dos siguientes baratísimos —sin que en la fábrica haya
+ * pasado absolutamente nada distinto—. El costo por marqueta salta al
+ * cuádruple y vuelve a bajar, y entonces el número deja de servir para lo
+ * único que sirve: comparar un mes contra otro.
+ *
+ * Así que se reparte. Cada compra se estira sobre los días que dura —los
+ * que ya dice `conceptos_empresa.cada_dias` desde la v2.7— y a cada
+ * periodo le toca solo el pedazo de esos días que cae dentro. Una compra
+ * de julio sigue costando en agosto, que es la verdad: el amoniaco de
+ * julio es el que está enfriando en agosto.
+ *
+ * Lo que NO tiene ritmo —una compostura, unas refacciones— va entero al
+ * mes en que pasó, porque no se repite: repartirlo sería inventar.
+ *
+ * Los dos números se devuelven y la pantalla enseña los dos. El repartido
+ * dice cuánto cuesta un mes normal; el del mes dice cuánto dinero salió
+ * de verdad. Ninguno de los dos sobra y ninguno de los dos es "el bueno".
+ */
+function gastosParejos({ desde, hasta }) {
+  const dias = diasEntre(desde, hasta);
+
+  // Solo las compras cuyo periodo de vida se cruza con el que se mira:
+  // empezaron antes de que acabara, y todavía no se habían acabado cuando
+  // empezó. Las de hace dos años no se leen siquiera.
+  const filas = bd.prepare(`
+    SELECT g.fecha, g.centavos, g.concepto, g.concepto_id,
+           COALESCE(c.cada_dias, 1) AS dura
+      FROM gastos_empresa g
+      LEFT JOIN conceptos_empresa c ON c.id = g.concepto_id
+     WHERE g.anulado_en IS NULL
+       AND g.fecha <= ?
+       AND date(g.fecha, '+' || COALESCE(c.cada_dias, 1) || ' days') > ?
+  `).all(hasta, desde);
+
+  let centavos = 0;
+  const porConcepto = new Map();
+
+  for (const f of filas) {
+    // Los días de esta compra que caen dentro del periodo.
+    const cruceDesde = f.fecha > desde ? f.fecha : desde;
+    const finCompra = new Date(`${f.fecha}T12:00:00`);
+    finCompra.setDate(finCompra.getDate() + f.dura - 1);
+    const ultimoDeLaCompra = comoDia(finCompra);
+    const cruceHasta = ultimoDeLaCompra < hasta ? ultimoDeLaCompra : hasta;
+    if (cruceHasta < cruceDesde) continue;
+
+    const diasCruce = diasEntre(cruceDesde, cruceHasta);
+    const parte = Math.round((f.centavos / f.dura) * diasCruce);
+    centavos += parte;
+
+    const clave = f.concepto_id || `libre:${f.concepto}`;
+    const previo = porConcepto.get(clave) || { nombre: f.concepto, centavos: 0, repartido: false };
+    previo.centavos += parte;
+    if (f.dura > 1) previo.repartido = true;
+    porConcepto.set(clave, previo);
+  }
+
+  return {
+    centavos,
+    dias,
+    porConcepto: [...porConcepto.values()].sort((a, b) => b.centavos - a.centavos)
+  };
+}
+
+/** Una fecha como 2026-08-26, sin hora y sin zona que la mueva. */
+function comoDia(d) {
+  const dd = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}`;
+}
+
+
 // ============================================================
 // LA LUZ
 // ============================================================
@@ -146,10 +222,14 @@ function totalGastado({ desde = null, hasta = null } = {}) {
  * cuesta cada marqueta. Es lo que dice si una máquina se está echando a
  * perder mucho antes de que se pare.
  */
-function conCuentas(r) {
+function conCuentas(r, marquetasYaContadas = null) {
   if (!r) return null;
   const dias = diasEntre(r.desde, r.hasta);
-  const marquetas = producidoEntreDias(r.desde, r.hasta);
+  // Las marquetas pueden venir ya contadas: al pintar la tabla entera se
+  // cuentan todas de una pasada en vez de una vez por recibo (v2.9).
+  const marquetas = marquetasYaContadas != null
+    ? marquetasYaContadas
+    : producidoEntreDias(r.desde, r.hasta);
 
   return {
     ...r,
@@ -178,7 +258,11 @@ function recibos({ limite = 24, incluirAnulados = false } = {}) {
      LIMIT ?
   `).all(Math.min(Math.max(Number(limite) || 24, 1), 200));
 
-  const conSusCuentas = filas.map(conCuentas);
+  // UNA sola pasada por la producción para todos los recibos: preguntando
+  // de uno en uno, veinticuatro recibos recorrían la producción entera
+  // veinticuatro veces.
+  const marquetas = producidoPorRangos(filas.map((f) => ({ desde: f.desde, hasta: f.hasta })));
+  const conSusCuentas = filas.map((f, i) => conCuentas(f, marquetas[i]));
 
   // Contra el recibo anterior: es la comparación que se hace de verdad al
   // abrir el sobre. Va aquí y no en la pantalla para que la haga uno solo.
@@ -278,5 +362,5 @@ function recibo(id) {
 
 module.exports = {
   diasEntre, diasDesde, porConcepto, totalGastado, recibos, recibo, conCuentas,
-  luzEnPeriodo
+  luzEnPeriodo, gastosParejos
 };

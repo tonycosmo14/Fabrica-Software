@@ -66,7 +66,11 @@ const PERMISOS_POR_ROL = {
     // paro de máquina ya se pagó o no— pero solo el administrador los
     // captura: es dinero que no pasa por ningún cajón y no lo cuadra nadie
     // al final del turno.
-    'empresa.ver'
+    'empresa.ver',
+    // Los números del negocio. El gerente es quien puede hacer algo con
+    // ellos: si el hielo se está echando a perder o una máquina empezó a
+    // gastar de más, él lo ve en su turno y lo atiende el mismo día.
+    'estadisticas.ver'
   ],
   admin: ['*'] // el comodin abre todo
 };

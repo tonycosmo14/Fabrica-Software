@@ -1578,10 +1578,52 @@ body.pantalla-fija main {
 
 @media print {
   /* Todo lo de la pantalla desaparece; queda el ticket */
-  body > *:not(#area-impresion) { display: none !important; }
+  body:not(.imprimir-hoja) > *:not(#area-impresion) { display: none !important; }
   body.pantalla-fija { height: auto; overflow: visible; display: block; }
-  #area-impresion { display: block !important; }
+  body:not(.imprimir-hoja) #area-impresion { display: block !important; }
+  body:not(.imprimir-hoja) { --papel: ticket; }
   @page { margin: 0; }
+}
+
+/* ============================================================
+   IMPRIMIR EN HOJA CARTA  (v2.9)
+
+   Lo de arriba es para la TÉRMICA: esconde la pantalla entera y deja
+   solo el ticket. Pero un reporte de estadísticas se imprime en la
+   impresora de hojas, y ahí lo que hay que sacar es justamente la
+   pantalla. La clase `imprimir-hoja` en el <body> cambia de un modo al
+   otro; la pone y la quita la propia vista antes y después de imprimir.
+   ============================================================ */
+
+@media print {
+  body.imprimir-hoja {
+    background: #fff; color: #000;
+    height: auto; overflow: visible; display: block;
+  }
+  body.imprimir-hoja #area-impresion,
+  body.imprimir-hoja header,
+  body.imprimir-hoja #menu,
+  body.imprimir-hoja #aviso,
+  body.imprimir-hoja .no-imprimir { display: none !important; }
+
+  body.imprimir-hoja main {
+    max-width: none; padding: 0; margin: 0; overflow: visible;
+  }
+
+  /* Hoja carta con márgenes de verdad: sin esto el navegador recorta. */
+  body.imprimir-hoja { --margen-hoja: 14mm; }
+}
+
+@page hoja { size: letter portrait; margin: 14mm; }
+
+@media print {
+  /* Nada de sombras ni fondos de color: gastan tinta y se ven sucios. */
+  body.imprimir-hoja .tarjeta {
+    box-shadow: none; border: 1px solid #bbb; break-inside: avoid;
+  }
+  /* Una gráfica partida a la mitad entre dos hojas no se puede leer. */
+  body.imprimir-hoja .evitar-corte { break-inside: avoid; page-break-inside: avoid; }
+  body.imprimir-hoja .salto-hoja { break-before: page; page-break-before: always; }
 }
 
 
@@ -3009,3 +3051,148 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 .arr-tabla select { padding: 6px 8px; font-size: 14px; }
 .arr-tabla td { vertical-align: middle; }
 .arranque-acceso { display: flex; align-items: center; gap: 12px; }
+
+/* ============================================================
+   LOS NÚMEROS DEL NEGOCIO  (v2.9)
+
+   Es una HOJA, no un tablero: se lee de arriba abajo y sale igual en
+   la pantalla que en la impresora de hojas.
+   ============================================================ */
+
+.est-cabeza {
+  display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.est-cabeza select { min-width: 260px; }
+.est-cabeza button { margin-left: auto; }
+
+.hoja-titulo h2 { margin-bottom: 4px; }
+.hoja-pie {
+  margin-top: 22px; text-align: center; font-size: 12.5px; color: var(--suave);
+  border-top: 1px solid var(--borde); padding-top: 10px;
+}
+
+.est-bloque { max-width: none; margin-top: 16px; }
+.est-bloque h3 { margin-top: 0; }
+.est-subtitulo {
+  font-size: 13px; font-weight: 700; color: var(--suave);
+  text-transform: uppercase; letter-spacing: .04em;
+  margin: 18px 0 8px;
+}
+
+/* La explicación de cada número: es la mitad del valor de esta pantalla,
+   así que se lee cómoda, no como letra chica de contrato. */
+.est-nota {
+  margin: 12px 0 0; font-size: 14px; line-height: 1.55; color: var(--suave);
+  max-width: 78ch;
+}
+.est-nota b { color: var(--texto); }
+.est-aviso {
+  background: var(--ambar-f, rgba(220, 160, 0, .10));
+  border-left: 3px solid var(--ambar, #d79a00);
+  padding: 10px 12px; border-radius: 0 8px 8px 0;
+}
+
+.est-grandes .hist-dato strong.incompleto { opacity: .7; }
+
+/* El costo por marqueta: el número gigante a la izquierda y de qué está
+   hecho a la derecha. En celular se apilan. */
+.est-costo { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: center; }
+.est-costo-numero { text-align: center; }
+.est-costo-numero strong {
+  display: block; font-size: 44px; font-weight: 800; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.est-costo-numero small { color: var(--suave); font-size: 13px; }
+@media (min-width: 760px) {
+  .est-costo { grid-template-columns: 220px 1fr; gap: 24px; }
+}
+
+/* ---------- Las gráficas ---------- */
+
+.est-grafica { margin-top: 6px; }
+.grafica { display: block; width: 100%; height: 150px; overflow: visible; }
+.grafica-linea { height: 130px; }
+.grafica-etiquetas { display: block; width: 100%; height: 14px; }
+
+.g-piso { stroke: var(--borde); stroke-width: .3; }
+.g-barra { fill: var(--g-color, var(--acento)); }
+.g-resaltada { fill: var(--suave); }
+.g-linea { fill: none; stroke: var(--g-color, var(--acento)); stroke-width: 2px; }
+.g-punto { stroke: var(--g-color, var(--acento)); stroke-width: 2px; }
+.g-ultimo { stroke-width: 3.5px; }
+
+/* Las etiquetas de las gráficas van en HTML y no dentro del SVG: el
+   dibujo se estira al ancho que haya, y eso deformaría las letras. */
+.g-marcas {
+  display: flex; margin-top: 4px;
+  font-size: 11px; color: var(--suave); font-variant-numeric: tabular-nums;
+}
+.g-marca {
+  flex: 1; min-width: 0; text-align: center;
+  overflow: hidden; white-space: nowrap;
+}
+.grafica-linea + .g-marcas .g-marca:first-child { text-align: left; }
+.grafica-linea + .g-marcas .g-marca:last-child  { text-align: right; }
+
+/* En el celular no caben todas: se esconde una sí y una no. Se esconden
+   con visibility y no con display para que las que quedan no se corran de
+   sitio — cada marca tiene que seguir cayendo debajo de SU barra. */
+@media (max-width: 620px) {
+  .g-marcas { font-size: 10px; }
+  .g-marcas .g-marca:nth-child(2n) { visibility: hidden; }
+}
+@media (max-width: 420px) {
+  .g-marcas .g-marca:nth-child(4n+3) { visibility: hidden; }
+}
+/* La última nunca se esconde: es el mes que se está viviendo, el que se
+   busca con la vista al abrir la pantalla. */
+.g-marcas .g-marca:last-child { visibility: visible; }
+
+/* Barras acostadas: nombre, riel, importe y por ciento en cuatro columnas
+   que se alinean solas de renglón a renglón. */
+.g-acostadas { display: grid; gap: 7px; }
+.g-fila {
+  display: grid; grid-template-columns: minmax(90px, 1.4fr) 3fr auto 40px;
+  gap: 10px; align-items: center; font-size: 14px;
+}
+.g-nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g-riel { background: var(--superficie-alt); border-radius: 999px; height: 14px; }
+.g-relleno {
+  display: block; height: 100%; border-radius: 999px;
+  background: var(--acento); min-width: 2px;
+}
+.g-valor { font-variant-numeric: tabular-nums; font-weight: 700; text-align: right; }
+.g-porciento {
+  font-variant-numeric: tabular-nums; color: var(--suave);
+  font-size: 12.5px; text-align: right;
+}
+
+@media (max-width: 560px) {
+  .g-fila { grid-template-columns: 1fr auto; grid-template-areas: 'nombre valor' 'riel riel'; }
+  .g-nombre { grid-area: nombre; white-space: normal; }
+  .g-valor { grid-area: valor; }
+  .g-riel { grid-area: riel; }
+  .g-porciento { display: none; }
+  .est-cabeza button { margin-left: 0; }
+}
+
+/* ---------- En la hoja ---------- */
+
+@media print {
+  body.imprimir-hoja .grafica { height: 120px; }
+  body.imprimir-hoja .g-barra { fill: #444; }
+  body.imprimir-hoja .g-resaltada { fill: #999; }
+  body.imprimir-hoja .g-linea { stroke: #333; }
+  body.imprimir-hoja .g-punto { stroke: #333; }
+  body.imprimir-hoja .g-marcas { color: #555; }
+  body.imprimir-hoja .g-relleno { background: #555; }
+  body.imprimir-hoja .g-riel { background: #e8e8e8; }
+  body.imprimir-hoja .est-nota { color: #333; }
+  body.imprimir-hoja .est-aviso { background: #f4f4f4; border-left-color: #888; }
+  body.imprimir-hoja .hist-dato { border: 1px solid #ccc; }
+}
+.est-costo-otro {
+  display: block; margin-top: 8px; font-size: 13px; color: var(--suave);
+  line-height: 1.4;
+}

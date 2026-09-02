@@ -175,3 +175,41 @@ test('un día de corte fuera de rango no rompe el cálculo', () => {
   poner('12');
   assert.equal(p.diaDeCorte(), 12);
 });
+
+
+// ============================================================
+// DE DÍAS DE CALENDARIO A INSTANTES  (v2.9)
+// ============================================================
+
+test('los instantes encierran el periodo completo, con el final abierto', () => {
+  const { instantes } = p;
+  const i = instantes({ desde: '2026-08-12', hasta: '2026-09-11' });
+
+  // El principio es la medianoche local del primer día.
+  assert.equal(i.desde, new Date('2026-08-12T00:00:00').toISOString());
+  // El final es la medianoche del día SIGUIENTE al último: así el 11 de
+  // septiembre cuenta entero, hasta las 23:59:59.999.
+  assert.equal(i.hasta, new Date('2026-09-12T00:00:00').toISOString());
+  assert.ok(i.desde < i.hasta);
+});
+
+test('un movimiento del último día a las 11 de la noche SÍ entra', () => {
+  const { instantes } = p;
+  const i = instantes({ desde: '2026-08-01', hasta: '2026-08-31' });
+
+  const casi = new Date('2026-08-31T23:59:59').toISOString();
+  assert.ok(casi >= i.desde && casi < i.hasta, 'la última noche del mes cuenta');
+
+  const yaNo = new Date('2026-09-01T00:00:00').toISOString();
+  assert.ok(!(yaNo < i.hasta), 'y el primer instante del mes que sigue, no');
+
+  const antes = new Date('2026-07-31T23:59:59').toISOString();
+  assert.ok(!(antes >= i.desde), 'ni la noche anterior al primer día');
+});
+
+test('un periodo de un solo día dura exactamente 24 horas', () => {
+  const { instantes } = p;
+  const i = instantes({ desde: '2026-08-15', hasta: '2026-08-15' });
+  const horas = (new Date(i.hasta) - new Date(i.desde)) / 3600000;
+  assert.equal(horas, 24);
+});

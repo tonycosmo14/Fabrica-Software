@@ -17,9 +17,30 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '2.8';
+const VERSION_ACTUAL = '2.9';
 
 const VERSIONES = [
+  {
+    numero: '2.9',
+    nombre: 'Los números',
+    fecha: '2026-09-02',
+    resumen:
+      'Una hoja que contesta las preguntas del dueño —cómo nos fue, en qué ' +
+      'se fue el dinero, cuánto cuesta una marqueta, vamos mejor o peor— ' +
+      'con la explicación de cada número al lado, y que se imprime en hoja ' +
+      'carta tal como se ve.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'PANTALLA NUEVA: LOS NÚMEROS (📊). No es un tablero de esos con lucecitas: es una HOJA que se lee de arriba abajo, en el orden en que uno se hace las preguntas. Cómo nos fue este mes, qué días se vendió, cuánto cuesta una marqueta, en qué se fue el dinero, cuánto hielo se hizo y quién, y si vamos mejor o peor que antes.' },
+      { tipo: 'nuevo', texto: 'CADA NÚMERO LLEVA SU EXPLICACIÓN debajo, en castellano de todos los días: qué es, de dónde sale y para qué sirve. Un número que hay que preguntarle a alguien qué significa no sirve para decidir nada.' },
+      { tipo: 'importante', texto: 'CUÁNTO CUESTA UNA MARQUETA, y salen DOS números a propósito. Un cilindro de amoniaco cuesta $38,500 y enfría tres meses: cargárselo entero al mes que se pagó hace que ese mes se vea carísimo y los dos siguientes baratísimos, sin que en la fábrica haya pasado nada. Así que cada compra se reparte sobre los días que dura —los que ya dice su ficha— y sale el costo de un MES NORMAL, que es el que sirve para comparar. Al lado sale lo que de verdad se pagó ese mes, que es el que dice si alcanzó.' },
+      { tipo: 'importante', texto: 'Y SE DICE LO QUE EL NÚMERO NO TRAE: la raya no está en el sistema, así que lo que de verdad cuesta una marqueta es más. Sirve para comparar meses y para vigilar, no para sacar el precio de venta. Un mes al que le falte el recibo de la luz sale marcado como incompleto, en vez de salir falsamente barato.' },
+      { tipo: 'nuevo', texto: 'SE IMPRIME EN HOJA CARTA con el botón de arriba, y sale como se ve: sin el menú, sin los botones, en blanco y negro para no gastar tinta, y sin que una gráfica se parta a la mitad entre dos hojas. Para guardarla en PDF se elige "Guardar como PDF" en el mismo cuadro de impresión — no hace falta nada más.' },
+      { tipo: 'arreglo', texto: 'De paso se arregló que imprimir cualquier pantalla normal sacaba una hoja EN BLANCO: el sistema estaba puesto para que al imprimir saliera solo el ticket de la térmica, y eso se comía todo lo demás.' },
+      { tipo: 'nuevo', texto: 'TRES GRÁFICAS, dibujadas por el propio sistema sin librerías de fuera: las ventas día por día (con los domingos marcados), en qué se fue el dinero de mayor a menor, y los últimos doce meses. La del costo por marqueta es una línea porque lo que hay que leer ahí es la inclinación, no la altura — y la pantalla lo dice, porque esa línea no empieza en cero a propósito.' },
+      { tipo: 'mejora', texto: 'EL GERENTE TAMBIÉN LOS VE. Es quien puede hacer algo con ellos en su turno: si el hielo se está echando a perder o una máquina empezó a gastar de más, lo atiende el mismo día.' },
+      { tipo: 'mejora', texto: 'POR DENTRO: la pantalla se abrirá igual de rápido dentro de tres años con medio millón de renglones. Los periodos se traducen una vez a instantes para que los índices sirvan, se agregaron cuatro índices por fecha, y la tabla de recibos de luz dejó de recorrer la producción entera una vez POR RECIBO — ahora la recorre una sola vez para todos.' }
+    ]
+  },
   {
     numero: '2.8',
     nombre: 'El día del arranque',

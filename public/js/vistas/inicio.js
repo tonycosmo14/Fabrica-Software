@@ -16,6 +16,7 @@ const ACCESOS = [
   { emoji: '🧾', titulo: 'Clientes',      ruta: '#/clientes',  permiso: 'clientes.ver',         desde: null   },
   { emoji: '🔎', titulo: 'Historial',     ruta: '#/historial', permiso: 'historial.ver',        desde: null   },
   { emoji: '🏦', titulo: 'Cuentas de la empresa', ruta: '#/empresa', permiso: 'empresa.ver',    desde: null   },
+  { emoji: '📊', titulo: 'Los números',   ruta: '#/estadisticas', permiso: 'estadisticas.ver', desde: null },
   { emoji: '🎨', titulo: 'Personalizar', ruta: '#/personalizar', permiso: 'sistema.configurar', desde: null },
   { emoji: '⚙️', titulo: 'Sistema',      ruta: '#/sistema',   permiso: 'sistema.ver',          desde: null   },
   { emoji: '❓', titulo: 'Ayuda',        ruta: '#/ayuda',     permiso: null,                   desde: null   },

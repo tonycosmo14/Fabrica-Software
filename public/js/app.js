@@ -22,6 +22,7 @@ import { vistaAyuda } from './vistas/ayuda.js';
 import { vistaPersonalizar } from './vistas/personalizar.js';
 import { vistaEmpresa } from './vistas/empresa.js';
 import { vistaArranque } from './vistas/arranque.js';
+import { vistaEstadisticas } from './vistas/estadisticas.js';
 import { vistaProductos } from './vistas/productos.js';
 import { vistaClientes } from './vistas/clientes.js';
 import { vistaHistorial } from './vistas/historial.js';
@@ -52,6 +53,7 @@ const RUTAS = {
   // historial: NO lleva 'fija', porque esa deja la pantalla sin rodar y los
   // últimos renglones de la tabla no se podrían alcanzar.
   '#/empresa':   { titulo: 'Cuentas de la empresa', vista: vistaEmpresa, permiso: 'empresa.ver' },
+  '#/estadisticas': { titulo: 'Los números',     vista: vistaEstadisticas, permiso: 'estadisticas.ver' },
   '#/personalizar': { titulo: 'Personalizar',   vista: vistaPersonalizar, permiso: 'sistema.configurar' },
   '#/sistema':   { titulo: 'Sistema',           vista: vistaSistema,   permiso: 'sistema.ver' },
   // La puesta en marcha: el permiso no lo lista ningún rol, así que solo lo

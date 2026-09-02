@@ -312,3 +312,42 @@ test('un conteo que no existe no imprime nada', async () => {
   const r = await llamar('/api/impresion/conteo/no-existe', { method: 'POST', cuerpo: {} });
   assert.equal(r.estado, 404);
 });
+
+
+// ============================================================
+// CONTAR LA PRODUCCIÓN DE VARIOS RANGOS DE UNA PASADA  (v2.9)
+// ============================================================
+
+test('contar por rangos da exactamente lo mismo que contar uno por uno', async () => {
+  await entrarAdmin();
+  const { producidoEntreDias, producidoPorRangos } = require('../src/modulos/existencia/calculo');
+
+  const rangos = [
+    { desde: '2026-01-01', hasta: '2026-12-31' },
+    { desde: '2020-01-01', hasta: '2020-01-31' },   // sin nada
+    { desde: '2026-08-01', hasta: '2026-08-31' },
+    { desde: '2026-08-15', hasta: '2026-08-15' }    // un solo día
+  ];
+
+  const juntos = producidoPorRangos(rangos);
+  const unoPorUno = rangos.map((r) => producidoEntreDias(r.desde, r.hasta));
+
+  assert.deepEqual(juntos, unoPorUno,
+    'la versión rápida y la lenta tienen que dar el mismo número, siempre');
+});
+
+test('sin rangos no se pregunta nada', () => {
+  const { producidoPorRangos } = require('../src/modulos/existencia/calculo');
+  assert.deepEqual(producidoPorRangos([]), []);
+  assert.deepEqual(producidoPorRangos(), []);
+});
+
+test('los rangos que se encima cuentan cada uno lo suyo, sin restarse', async () => {
+  await entrarAdmin();
+  const { producidoPorRangos } = require('../src/modulos/existencia/calculo');
+  const [ancho, angosto] = producidoPorRangos([
+    { desde: '2026-01-01', hasta: '2026-12-31' },
+    { desde: '2026-06-01', hasta: '2026-06-30' }
+  ]);
+  assert.ok(ancho >= angosto, 'el año no puede tener menos que uno de sus meses');
+});

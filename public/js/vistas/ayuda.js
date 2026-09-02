@@ -1263,6 +1263,86 @@ EN REPARACION
 
   // ==========================================================
   {
+    id: 'numeros',
+    titulo: 'Los números: qué significa cada uno',
+    busca: 'estadísticas números gráficas costo por marqueta imprimir hoja carta pdf tendencia día por día en qué se fue el dinero raya sueldos reparto amoniaco',
+    cuerpo: `
+      <p>La pantalla <b>📊 Los números</b> no es un tablero: es una
+      <b>hoja</b> que se lee de arriba abajo y se imprime tal cual. Está en
+      el orden en que uno se hace las preguntas.</p>
+
+      <h4>Se vendió</h4>
+      <p>El precio de todo lo que salió en el mes, <b>esté cobrado o
+      fiado</b>. Lo fiado se dice aparte, porque es dinero que se vendió
+      pero todavía no está. Los tickets cancelados y las devoluciones
+      <b>no cuentan</b> —pero se dice cuántos hubo—, y un <b>cambio</b>
+      tampoco cuenta dos veces: por dentro el ticket viejo queda cancelado
+      y solo suma el nuevo.</p>
+
+      <h4>Cuánto cuesta una marqueta — y por qué salen dos números</h4>
+      <p>Es el número que junta todo: la luz, las compras grandes y los
+      gastos del cajón, repartidos entre las marquetas que se produjeron.</p>
+      <p>Salen dos porque las cosas que se compran de tanto en tanto
+      <b>no se gastan el día que se pagan</b>: un cilindro de amoniaco
+      cuesta mucho una vez y enfría durante tres meses. Cargándoselo entero
+      al mes que tocó comprarlo, ese mes se vería carísimo y los dos
+      siguientes baratísimos, sin que en la fábrica hubiera pasado nada.</p>
+      <ul>
+        <li><b>El grande</b> reparte cada compra sobre los días que dura
+        —los que dice su ficha en las cuentas de la empresa— y es el que
+        sirve para <b>comparar un mes contra otro</b>.</li>
+        <li><b>El de al lado</b> es el dinero que de verdad salió ese mes,
+        y es el que dice <b>si alcanzó</b>.</li>
+      </ul>
+      <p class="ayuda-tip"><b>Ojo: en ninguno de los dos está la raya.</b>
+      Los sueldos no se llevan en el sistema, así que lo que de verdad
+      cuesta una marqueta es más. Estos números sirven para comparar y
+      vigilar — <b>no para sacar el precio de venta</b>. Y si al mes le
+      falta el recibo de la luz, sale marcado como incompleto: en una
+      fábrica de hielo la luz es la mitad del costo.</p>
+
+      <h4>Las gráficas</h4>
+      <ul>
+        <li><b>Día por día</b>: cada barra es un día y su alto es lo que se
+        vendió; los domingos van marcados. Un día sin barra es un día sin
+        ventas capturadas. Dejando el ratón encima sale el detalle.</li>
+        <li><b>En qué se fue el dinero</b>: del más caro al más barato, todo
+        junto. No incluye los <b>traspasos</b> —un retiro a la caja fuerte
+        no es un gasto: el dinero cambió de sitio.</li>
+        <li><b>Los últimos doce meses</b>: la de arriba es lo vendido; la de
+        abajo, lo que costó cada marqueta. Esa línea <b>no empieza en
+        cero</b> a propósito: lo que hay que leer es la <b>inclinación</b>,
+        no la altura, y con el eje desde cero se vería una raya plana.</li>
+      </ul>
+
+      <h4>El hielo</h4>
+      <p><b>Salieron buenas</b> se cuenta molde por molde: un molde que
+      salió bien es una marqueta. Si el porcentaje empieza a bajar, hay
+      moldes o una máquina fallando. Lo producido y lo vendido <b>no tienen
+      por qué cuadrar</b>: entre los dos está lo que quedó en el cuarto frío
+      y lo que se derritió.</p>
+
+      <h4>Imprimirla o guardarla en PDF</h4>
+      <p>El botón <b>🖨 Imprimir esta hoja</b> la saca en hoja carta como se
+      ve: sin el menú, sin los botones y en blanco y negro para no gastar
+      tinta. Ninguna gráfica se parte a la mitad entre dos hojas.</p>
+      <p class="ayuda-tip">Para guardarla como <b>PDF</b> se usa el mismo
+      botón y en el cuadro de impresión se elige <b>Guardar como PDF</b> en
+      vez de la impresora. Sale idéntica.</p>
+
+      <h4>Quién los ve</h4>
+      <p>El <b>administrador</b> y el <b>gerente</b>. El gerente es quien
+      puede hacer algo con ellos en su turno.</p>
+
+      <h4>De dónde salen</h4>
+      <p>De los renglones capturados, cada vez que se abre la pantalla.
+      <b>No hay ningún total guardado</b> que se pueda desincronizar: si
+      mañana se anula una venta de la semana pasada, todos los números de
+      esta hoja se corrigen solos.</p>`
+  },
+
+  // ==========================================================
+  {
     id: 'arranque',
     titulo: 'La puesta en marcha y el cuadre',
     busca: 'puesta en marcha arranque empezar producción real borrar pruebas cuadrar realidad rotación paños congelando fondo inicial primer conteo apagón',
