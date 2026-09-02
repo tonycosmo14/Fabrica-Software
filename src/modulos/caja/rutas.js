@@ -32,6 +32,15 @@ const verCaja = exigirPermiso('caja.ver');
 const operarCaja = exigirPermiso('caja.operar');
 const corregir = exigirPermiso('venta.cancelar');   // gerente y administrador
 
+// DAR DE ALTA UN CONCEPTO RECURRENTE ES COSA DEL ADMINISTRADOR.
+//
+// No es capturar un gasto —eso lo hace el cajero todos los días— sino
+// decidir CÓMO se va a sumar el mes. Un concepto de más ("Desayunos" y
+// "Desayuno muchachos") parte la estadística en dos y ya no se junta:
+// justo lo que estos conceptos vinieron a evitar. Ningún rol lista este
+// permiso, así que solo lo alcanza el comodín del administrador.
+const conceptos = exigirPermiso('caja.conceptos');
+
 /**
  * Lee un importe tecleado. Vive en lib/dinero porque el mismo error
  * —limpiar la cadena a la brava y quedarse con un 0 que nadie escribió—
@@ -275,7 +284,7 @@ router.get('/conceptos', verCaja, (req, res) => {
  * anotaron con él siguen en el historial y siguen sumando. Solo puede el
  * gerente o el administrador, y queda en la bitácora quién fue.
  */
-router.post('/conceptos/:id/eliminar', corregir, (req, res) => {
+router.post('/conceptos/:id/eliminar', conceptos, (req, res) => {
   const c = bd.prepare('SELECT * FROM conceptos_gasto WHERE id = ? AND oculto = 0')
     .get(req.params.id);
   if (!c) return error(res, 'Ese concepto no existe.', 404);
@@ -359,7 +368,7 @@ function leerDia(valor) {
 }
 
 /** Dar de alta uno nuevo. Del gerente para arriba: es catálogo, no caja. */
-router.post('/conceptos', corregir, (req, res) => {
+router.post('/conceptos', conceptos, (req, res) => {
   const nombre = String(req.body?.nombre || '').trim();
   if (!nombre) return error(res, 'Escribe cómo se llama el gasto.');
   if (nombre.length > 40) return error(res, 'El nombre es demasiado largo.');
@@ -399,7 +408,7 @@ router.post('/conceptos', corregir, (req, res) => {
  * colgando del mismo id, y sus comprobantes siguen diciendo "Desayuno"
  * porque el texto se copió al movimiento (regla 3.5).
  */
-router.put('/conceptos/:id', corregir, (req, res) => {
+router.put('/conceptos/:id', conceptos, (req, res) => {
   const c = bd.prepare('SELECT * FROM conceptos_gasto WHERE id = ?').get(req.params.id);
   if (!c) return error(res, 'Ese concepto no existe.', 404);
 

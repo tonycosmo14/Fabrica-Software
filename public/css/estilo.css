@@ -1229,6 +1229,15 @@ select { color-scheme: light dark; }
   letter-spacing: .8px; text-transform: uppercase; color: var(--acento);
 }
 
+/* Un botón que quita algo pero no destruye nada: la lista se da de baja y
+   su historia queda entera. Rojo del texto, no del fondo — el fondo rojo
+   se guarda para lo que de verdad no tiene vuelta. */
+.peligro-suave {
+  background: transparent; color: var(--rojo);
+  border: 1px solid var(--rojo);
+}
+.peligro-suave:hover { background: var(--et-baja-f); }
+
 /* Fichas de paño para la captura en lote */
 .rejilla-panos {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
@@ -3259,6 +3268,24 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
    LAS CUENTAS DE LA EMPRESA  (v2.7)
    ===================================================================== */
 
+/* EL TÍTULO A LA IZQUIERDA Y LOS TRES BOTONES A LA DERECHA.
+   Uno debajo del otro, el título y su explicación empujaban las pestañas
+   media pantalla hacia abajo, y en un monitor sobraba todo el hueco de la
+   derecha. En el celular se apilan solos. */
+.emp-cabecera {
+  display: flex; gap: 16px 24px; align-items: flex-start;
+  flex-wrap: wrap; justify-content: space-between; margin-bottom: 6px;
+}
+.emp-titulo { flex: 1 1 320px; min-width: 0; }
+.emp-titulo h2 { margin-top: 0; }
+.emp-cabecera .emp-pestanas { flex: 0 0 auto; margin: 4px 0 0; }
+@media (min-width: 900px) {
+  /* Los tres, uno debajo del otro y del mismo ancho: se leen como una
+     lista de secciones y no como tres botones sueltos. */
+  .emp-cabecera .emp-pestanas { flex-direction: column; min-width: 210px; }
+  .emp-cabecera .emp-pestanas button { width: 100%; justify-content: flex-start; }
+}
+
 .emp-pestanas { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
 .emp-pestanas button { width: auto; }
 .emp-pestanas button.activo {
@@ -3388,13 +3415,32 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 .prov-cabeza { display: flex; align-items: center; gap: 8px; }
 .prov-cabeza strong { font-size: 16.5px; }
 .prov-acciones { margin-left: auto; display: flex; gap: 6px; }
-.prov-que { margin: 0; color: var(--texto); line-height: 1.45; }
+/* QUÉ HACE Y SUS MAÑAS son lo que de verdad vale de este directorio: lo
+   que uno sabe de tratar con alguien y nadie más tiene apuntado. Van con
+   su etiqueta y su propio bloque, no como dos párrafos sueltos. */
+.prov-bloque {
+  background: var(--superficie-alt); border: 1px solid var(--borde);
+  border-radius: 10px; padding: 10px 12px;
+}
+.prov-bloque-notas { border-style: dashed; }
+.prov-etiqueta {
+  display: block; font-size: 10.5px; font-weight: 800; letter-spacing: .7px;
+  text-transform: uppercase; color: var(--suave); margin-bottom: 4px;
+}
+.prov-que { margin: 0; color: var(--texto); line-height: 1.5; white-space: pre-wrap; }
+
+/* En el formulario, los dos textos largos lado a lado y con aire. */
+.prov-textos { display: grid; gap: 12px; margin-top: 4px; }
+@media (min-width: 780px) { .prov-textos { grid-template-columns: 1fr 1fr; } }
+.prov-textos textarea { min-height: 150px; resize: vertical; }
 .prov-datos { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 14px; color: var(--suave); }
 .prov-datos a { color: var(--acento); }
 .prov-notas {
   margin: 0; font-size: 13.5px; color: var(--suave);
-  border-top: 1px dashed var(--borde); padding-top: 8px;
+  line-height: 1.5; white-space: pre-wrap;
 }
+/* Fichas más anchas: con 330px, "qué hace" salía en columna de periódico. */
+.prov-lista { grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); }
 
 /* El botón de "solo cotización": abajo del de cobrar, discreto a propósito
    —se usa una o dos veces al mes— pero a la mano cuando lo piden. */

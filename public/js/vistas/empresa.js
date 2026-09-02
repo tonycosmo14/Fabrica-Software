@@ -52,23 +52,27 @@ export async function vistaEmpresa(pantalla, estadoApp) {
 
     pantalla.innerHTML = `
       <div class="ancho-completo">
-        <h2>Las cuentas de la empresa</h2>
-        <p class="ayuda">
-          El dinero que <b>no pasa por el cajón</b>: el amoniaco, la sal, los
-          barriles de aceite, una compostura, y la luz. Se captura cuando
-          llega la factura, no cuando se compra.
-        </p>
+        <div class="emp-cabecera">
+          <div class="emp-titulo">
+            <h2>Las cuentas de la empresa</h2>
+            <p class="ayuda">
+              El dinero que <b>no pasa por el cajón</b>: el amoniaco, la sal, los
+              barriles de aceite, una compostura, y la luz. Se captura cuando
+              llega la factura, no cuando se compra.
+            </p>
+          </div>
 
-        <div class="emp-pestanas">
-          <button class="secundario ${seccion === 'gastos' ? 'activo' : ''}" data-seccion="gastos">
-            📦 Gastos grandes
-          </button>
-          <button class="secundario ${seccion === 'luz' ? 'activo' : ''}" data-seccion="luz">
-            ⚡ Recibos de luz
-          </button>
-          <button class="secundario ${seccion === 'proveedores' ? 'activo' : ''}" data-seccion="proveedores">
-            📒 Proveedores
-          </button>
+          <div class="emp-pestanas">
+            <button class="secundario ${seccion === 'gastos' ? 'activo' : ''}" data-seccion="gastos">
+              📦 Gastos grandes
+            </button>
+            <button class="secundario ${seccion === 'luz' ? 'activo' : ''}" data-seccion="luz">
+              ⚡ Recibos de luz
+            </button>
+            <button class="secundario ${seccion === 'proveedores' ? 'activo' : ''}" data-seccion="proveedores">
+              📒 Proveedores
+            </button>
+          </div>
         </div>
 
         ${seccion === 'luz' ? panelLuz(datos.recibos)
@@ -169,6 +173,13 @@ export async function vistaEmpresa(pantalla, estadoApp) {
         subiendo el precio: $12,000 puede ser una ganga o un robo según
         cuántos barriles vinieran.
       </p>
+      <p class="ayuda">
+        <b>Suele ser cada tantos días</b> no se escribe a mano: sale de las
+        compras que ya están anotadas, y se corrige solo con cada una nueva.
+        Con eso el sistema reparte lo que dura meses —el amoniaco de julio
+        es el que está enfriando en agosto— en vez de cargárselo todo al mes
+        que se pagó. Toca el <b>👁</b> para ver las fechas de cada compra.
+      </p>
 
       <div id="zona-gastos"></div>`;
   }
@@ -191,6 +202,7 @@ export async function vistaEmpresa(pantalla, estadoApp) {
             ${esc(dia(c.ultima))}
             <small>${c.diasDesdeLaUltima === 0 ? 'hoy'
               : `hace ${c.diasDesdeLaUltima} día${c.diasDesdeLaUltima === 1 ? '' : 's'}`}${
+              c.ritmoReal ? ` · suele ser cada ${c.ritmoReal}` : ''}${
               c.tocaPronto ? ' · toca pronto' : ''}</small>`}
         </td>
         <td class="emp-c-acciones">
@@ -514,16 +526,12 @@ export async function vistaEmpresa(pantalla, estadoApp) {
     });
     if (unidad === null) return;
 
-    const cadaDias = await pedirTexto({
-      titulo: nombre,
-      texto: 'Cada cuántos días se suele comprar, para avisar cuando toque. ' +
-             'Si no tiene ritmo, se deja vacío y el sistema lo aprende solo.',
-      marcador: '90', ok: 'Crear', largo: 4, unaLinea: true, opcional: true
-    });
-    if (cadaDias === null) return;
-
+    // NO SE PREGUNTA CADA CUÁNTO SE COMPRA. Entre un cilindro de amoniaco y
+    // el siguiente pueden pasar quince días o dos años: preguntarlo era
+    // pedir una adivinanza y después creérsela para repartir el costo. El
+    // sistema lo MIDE de las compras que se van anotando, y se corrige solo.
     try {
-      await api.enviar('/empresa/conceptos', { nombre, unidad, cadaDias });
+      await api.enviar('/empresa/conceptos', { nombre, unidad });
       avisar(`"${nombre}" ya se puede capturar`, 'bien');
       await pintar();
     } catch (e) { avisar(e.message, 'error'); }
@@ -539,8 +547,6 @@ export async function vistaEmpresa(pantalla, estadoApp) {
           detalle: 'Las compras viejas siguen contando aquí' },
         { valor: 'unidad', texto: '📏 En qué se compra',
           detalle: c.unidad ? `Ahora: ${c.unidad}` : 'Barril, saco, cilindro…' },
-        { valor: 'ritmo', texto: '📅 Cada cuánto se compra',
-          detalle: c.cadaDias ? `Ahora: cada ${c.cadaDias} días` : 'Para saber cuándo toca' },
         { valor: 'baja', texto: c.activo ? '🗑 Dejar de usarlo' : '↩ Volver a usarlo',
           detalle: 'No borra nada de lo ya comprado' },
         { valor: 'eliminar', texto: '✕ Borrarlo de esta lista',
@@ -564,16 +570,6 @@ export async function vistaEmpresa(pantalla, estadoApp) {
         });
         if (unidad === null) return;
         await api.actualizar(`/empresa/conceptos/${c.id}`, { unidad });
-      } else if (que === 'ritmo') {
-        const dias = await pedirTexto({
-          titulo: c.nombre,
-          texto: 'Cada cuántos días se suele comprar. Sirve para avisar que toca. ' +
-                 'Déjalo vacío si no tiene ritmo.',
-          valor: c.cadaDias ? String(c.cadaDias) : '', marcador: '90',
-          ok: 'Guardar', largo: 4, unaLinea: true
-        });
-        if (dias === null) return;
-        await api.actualizar(`/empresa/conceptos/${c.id}`, { cadaDias: dias });
       } else if (que === 'baja') {
         if (c.activo && !await confirmar({
           titulo: `¿Dejar de usar "${c.nombre}"?`,
@@ -697,8 +693,7 @@ export async function vistaEmpresa(pantalla, estadoApp) {
 
             <label>
               <span class="etiqueta-chica">Notas</span>
-              <input id="notas" maxlength="300" placeholder="Lo que haga falta recordar"
-                     value="${esc(corregir?.notas || '')}">
+              <input id="notas" maxlength="300" placeholder="Lo que haga falta recordar">
             </label>
 
             <label class="subir" for="archivo" style="margin-top:14px">
@@ -798,7 +793,11 @@ export async function vistaEmpresa(pantalla, estadoApp) {
                           title="Borrarlo del directorio">🗑</button>
                 </span>` : ''}
             </div>
-            ${pr.que_hace ? `<p class="prov-que">${esc(pr.que_hace)}</p>` : ''}
+            ${pr.que_hace ? `
+              <div class="prov-bloque">
+                <span class="prov-etiqueta">Qué hace</span>
+                <p class="prov-que">${esc(pr.que_hace)}</p>
+              </div>` : ''}
             <div class="prov-datos">
               ${pr.telefono ? `<span>📞 <a href="tel:${esc(pr.telefono.replace(/[^+0-9]/g, ''))}">${esc(pr.telefono)}</a></span>` : ''}
               ${pr.horarios ? `<span>🕐 ${esc(pr.horarios)}</span>` : ''}
@@ -807,7 +806,11 @@ export async function vistaEmpresa(pantalla, estadoApp) {
                 ? `<span>🗺 <a href="${esc(pr.ubicacion)}" target="_blank" rel="noopener">Cómo llegar</a></span>`
                 : `<span>🗺 ${esc(pr.ubicacion)}</span>`) : ''}
             </div>
-            ${pr.notas ? `<p class="prov-notas">${esc(pr.notas)}</p>` : ''}
+            ${pr.notas ? `
+              <div class="prov-bloque prov-bloque-notas">
+                <span class="prov-etiqueta">Sus mañas</span>
+                <p class="prov-notas">${esc(pr.notas)}</p>
+              </div>` : ''}
           </div>`).join('')
           || `<p class="vacio">Todavía no hay proveedores. Con ＋ se anota el
               primero: el del amoniaco, el de la sal, el mecánico…</p>`}
@@ -855,16 +858,22 @@ export async function vistaEmpresa(pantalla, estadoApp) {
               </label>
             </div>
 
-            <label>
-              <span class="etiqueta-chica">Qué hace<small>y para qué le sirve a la fábrica</small></span>
-              <textarea id="p-que" maxlength="600" rows="3"
-                        placeholder="Surte el amoniaco de los compresores. Se le pide con una semana; trae el cilindro y se lleva el vacío.">${esc(pr?.que_hace || '')}</textarea>
-            </label>
-            <label>
-              <span class="etiqueta-chica">Notas</span>
-              <textarea id="p-notas" maxlength="600" rows="2"
-                        placeholder="Solo acepta transferencia. En diciembre cierra dos semanas.">${esc(pr?.notas || '')}</textarea>
-            </label>
+            <!-- Los dos textos largos, grandes y lado a lado. Son la parte
+                 que de verdad vale de este directorio —lo que se le queda a
+                 uno en la cabeza y nadie más sabe— y estaban metidos en dos
+                 cuadritos de tres renglones mientras sobraba media pantalla. -->
+            <div class="prov-textos">
+              <label>
+                <span class="etiqueta-chica">Qué hace<small>y para qué le sirve a la fábrica</small></span>
+                <textarea id="p-que" maxlength="600" rows="7"
+                          placeholder="Surte el amoniaco de los compresores. Se le pide con una semana; trae el cilindro y se lleva el vacío.">${esc(pr?.que_hace || '')}</textarea>
+              </label>
+              <label>
+                <span class="etiqueta-chica">Sus mañas<small>lo que hay que saber al tratar con él</small></span>
+                <textarea id="p-notas" maxlength="600" rows="7"
+                          placeholder="Solo acepta transferencia. En diciembre cierra dos semanas. Si contesta la señora, es más fácil.">${esc(pr?.notas || '')}</textarea>
+              </label>
+            </div>
 
             <button type="submit" style="margin-top:20px">${pr ? 'Guardar' : 'Anotarlo'}</button>
           </form>

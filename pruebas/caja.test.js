@@ -890,3 +890,25 @@ test('un cajero no puede eliminar conceptos', async () => {
   assert.equal(r.estado, 403, 'eliminar es del gerente o del administrador');
   await entrarAdmin();
 });
+
+test('un concepto que se repite solo lo da de alta el administrador', async () => {
+  // No es capturar un gasto —eso lo hace el cajero todos los días— sino
+  // decidir CÓMO se suma el mes. Un concepto de más ("Desayunos" y
+  // "Desayuno muchachos") parte la estadística en dos y ya no se junta:
+  // justo lo que estos conceptos vinieron a evitar.
+  await entrarPorNombre('Mari', '7777');        // gerente
+  const g = await llamar('/api/caja/conceptos', {
+    method: 'POST', cuerpo: { nombre: 'Desayunos', tipo: 'salida' } });
+  assert.equal(g.estado, 403, 'ni el gerente');
+
+  await entrarAdmin();
+  const a = await llamar('/api/caja/conceptos', {
+    method: 'POST', cuerpo: { nombre: 'Desayunos', tipo: 'salida' } });
+  assert.equal(a.estado, 201, 'el administrador sí');
+
+  // Y el gerente sigue pudiendo CAPTURAR un gasto con ese concepto: lo que
+  // se le quitó es crear conceptos, no trabajar.
+  await entrarPorNombre('Mari', '7777');
+  const lista = await llamar('/api/caja/conceptos');
+  assert.equal(lista.estado, 200, 'los ve para poder usarlos');
+});

@@ -963,7 +963,7 @@ debería haber − contado = FALTA</pre>
   {
     id: 'empresa',
     titulo: 'Las cuentas de la empresa: lo grande y la luz',
-    busca: 'empresa gastos grandes amoniaco sal aceite barril maquinaria refacciones mantenimiento proveedor proveedores directorio manual teléfono horario factura pdf recibo luz cfe kwh kilowatt medidor marqueta mes corte del 12 al 12 periodo traspaso caja fuerte',
+    busca: 'empresa gastos grandes amoniaco sal aceite barril maquinaria refacciones mantenimiento proveedor proveedores directorio manual teléfono horario factura pdf recibo luz cfe kwh kilowatt medidor marqueta mes corte del 12 al 12 periodo traspaso caja fuerte cada cuánto se compra ritmo medido dar de baja lista mayoreo',
     cuerpo: `
       <p>Aquí va el <b>dinero grande</b>: el que se paga con cheque, con
       transferencia o sacando efectivo aparte, y que <b>nunca pasa por el

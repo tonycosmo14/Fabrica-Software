@@ -549,6 +549,10 @@ export async function vistaProductos(pantalla, estadoApp) {
             <button class="secundario chico" data-guardar-lista="${esc(l.id)}">
               Guardar ${esc(l.nombre)}
             </button>
+            ${administra && deMayoreo.length > 1
+              ? `<button class="secundario chico peligro-suave" data-baja-lista="${esc(l.id)}">
+                   Dar de baja
+                 </button>` : ''}
           </div>
         </div>`).join('')
         || '<p class="ayuda">Todavía no hay ninguna lista de mayoreo.</p>'}
@@ -690,6 +694,9 @@ export async function vistaProductos(pantalla, estadoApp) {
     if (nuevaLista) nuevaLista.onclick = crearListaMayoreo;
     pantalla.querySelectorAll('[data-normal]').forEach((b) => {
       b.onclick = () => hacerlaNormal(b.dataset.normal);
+    });
+    pantalla.querySelectorAll('[data-baja-lista]').forEach((b) => {
+      b.onclick = () => darDeBajaLista(b.dataset.bajaLista);
     });
     const sug = q('#sugerir');
     if (sug) sug.onclick = sugerir;
@@ -1225,6 +1232,44 @@ export async function vistaProductos(pantalla, estadoApp) {
     try {
       const r = await api.actualizar(`/ventas/precios/listas/${listaId}/predeterminada`, {});
       avisar(`${r.lista.nombre} es ahora el precio de mayoreo normal`, 'bien');
+      await cargar();
+    } catch (e) { avisar(e.message, 'error'); }
+  }
+
+  /**
+   * DAR DE BAJA UNA LISTA DE MAYOREO.
+   *
+   * Se crean listas para probar precios de temporada y luego estorban en la
+   * caja, donde cada lista de más es un botón más que leer con gente
+   * esperando.
+   *
+   * Antes de confirmar se dice a cuántos clientes afecta: dar de baja una
+   * lista que usan seis clientes no es lo mismo que dar de baja una que
+   * nadie usa, y eso hay que saberlo ANTES de apretar.
+   */
+  async function darDeBajaLista(listaId) {
+    const lista = (listas?.listas || []).find((l) => l.id === listaId);
+    if (!lista) return;
+
+    const cuantos = lista.clientes || 0;
+    const sigue = await confirmar({
+      titulo: `¿Dar de baja ${lista.nombre}?`,
+      texto: (cuantos
+        ? `${cuantos} ${cuantos === 1 ? 'cliente la tiene' : 'clientes la tienen'} ` +
+          'asignada; ' + (cuantos === 1 ? 'pasa' : 'pasan') +
+          ' al precio de mayoreo normal. '
+        : '') +
+        'Las ventas viejas no cambian: el precio quedó copiado en cada ticket. ' +
+        'La lista deja de salir en la caja, pero su historia se conserva.',
+      ok: 'Dar de baja', peligro: true
+    });
+    if (!sigue) return;
+
+    try {
+      const r = await api.enviar(`/ventas/precios/listas/${listaId}/baja`, {});
+      avisar(`${lista.nombre} dada de baja` +
+             (r.clientesMovidos ? ` · ${r.clientesMovidos} clientes al mayoreo normal` : '') +
+             (r.nuevaPorOmision ? ` · ahora la normal es ${r.nuevaPorOmision.nombre}` : ''), 'bien');
       await cargar();
     } catch (e) { avisar(e.message, 'error'); }
   }

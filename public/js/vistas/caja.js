@@ -115,7 +115,7 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
         <h2>Caja</h2>
         <div class="venta-cabeza-datos">
           <span class="etiqueta-folio">turno #${c.folio}</span>
-          ${puedeCorregir
+          ${esAdmin
             ? '<button class="secundario chico" id="conceptos">Gastos que se repiten</button>'
             : ''}
           <button class="secundario chico" id="historial">Cortes</button>

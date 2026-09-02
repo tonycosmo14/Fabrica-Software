@@ -977,6 +977,72 @@ router.put('/precios/listas/:id/predeterminada', configurarPrecios, (req, res) =
   return ok(res, { lista: listaPorOmision() });
 });
 
+/**
+ * DAR DE BAJA UNA LISTA DE MAYOREO.
+ *
+ * Se crean listas para probar precios de temporada y luego estorban en la
+ * caja, donde cada lista de más es un botón más que leer con gente
+ * esperando. Faltaba poder quitarlas.
+ *
+ * NO SE BORRA NADA (regla 3.4): la lista se marca de baja y su historia
+ * queda entera. Las ventas viejas que se cobraron con ella no cambian una
+ * coma, porque el precio se COPIÓ al ticket cuando se hizo (regla 3.5):
+ * lo que se cobró es lo que dice el papel, no lo que diga hoy una tabla.
+ *
+ * Los clientes que la tenían asignada pasan a la lista de mayoreo normal.
+ * Dejarlos apuntando a una lista dada de baja los dejaría sin precio, y en
+ * el mostrador eso es un cliente parado sin saber qué cobrarle.
+ *
+ * La de PÚBLICO no se puede dar de baja: es la que se cobra cuando no hay
+ * cliente, y sin ella no se podría vender.
+ */
+router.post('/precios/listas/:id/baja', configurarPrecios, (req, res) => {
+  const lista = bd.prepare('SELECT * FROM listas_precios WHERE id = ? AND activo = 1')
+    .get(req.params.id);
+  if (!lista) return error(res, 'Esa lista no existe o ya está dada de baja.', 404);
+  if (lista.tipo !== 'mayoreo') {
+    return error(res, 'La lista de público no se puede dar de baja: es la que se ' +
+                      'cobra cuando no hay cliente.');
+  }
+
+  const otras = bd.prepare(
+    "SELECT * FROM listas_precios WHERE activo = 1 AND tipo = 'mayoreo' AND id <> ? ORDER BY nombre"
+  ).all(lista.id);
+  if (!otras.length) {
+    return error(res, 'Es la única lista de mayoreo que queda. Crea otra antes de ' +
+                      'dar esta de baja, o el mayoreo se quedaría sin precios.');
+  }
+
+  const clientes = bd.prepare(
+    'SELECT COUNT(*) n FROM clientes WHERE lista_id = ?').get(lista.id).n;
+
+  const dar = bd.transaction(() => {
+    bd.prepare('UPDATE listas_precios SET activo = 0, activa = 0, fecha_baja = ? WHERE id = ?')
+      .run(ahora(), lista.id);
+    // Los clientes que la tenían vuelven al mayoreo normal.
+    bd.prepare('UPDATE clientes SET lista_id = NULL WHERE lista_id = ?').run(lista.id);
+
+    // Si era la normal, alguien tiene que serlo: sin predeterminada, la
+    // caja no sabría qué cobrar a un mayorista sin lista propia.
+    if (lista.activa) {
+      bd.prepare('UPDATE listas_precios SET activa = 1 WHERE id = ?').run(otras[0].id);
+    }
+  });
+  dar();
+
+  bitacora.registrar({
+    accion: 'precios.lista-baja', entidad: 'lista_precios', entidadId: lista.id,
+    ejecutorId: req.usuario.id,
+    detalle: { nombre: lista.nombre, clientesMovidos: clientes,
+               nuevaPorOmision: lista.activa ? otras[0].nombre : null }
+  });
+
+  return ok(res, {
+    baja: true, clientesMovidos: clientes,
+    nuevaPorOmision: lista.activa ? otras[0] : null
+  });
+});
+
 router.put('/precios/:listaId', configurarPrecios, (req, res) => {
   const lista = bd.prepare('SELECT * FROM listas_precios WHERE id = ?').get(req.params.listaId);
   if (!lista) return error(res, 'Esa lista no existe.', 404);

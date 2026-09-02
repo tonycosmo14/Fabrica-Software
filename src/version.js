@@ -17,9 +17,27 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '3.4';
+const VERSION_ACTUAL = '3.5';
 
 const VERSIONES = [
+  {
+    numero: '3.5',
+    nombre: 'Lo que estaba roto y lo que estorbaba',
+    fecha: '2026-09-02',
+    resumen:
+      'El botón de anotar un gasto grande no funcionaba. Las listas de ' +
+      'mayoreo ya se pueden dar de baja. Y "cada cuánto se compra" deja de ' +
+      'preguntarse: el sistema lo mide de las compras que ya hay.',
+    cambios: [
+      { tipo: 'arreglo', texto: 'EL BOTÓN DE ANOTAR UN GASTO GRANDE NO ABRÍA NADA. Se quedaba muerto, sin aviso ni explicación. Era un renglón mal copiado del formulario de los recibos de luz que reventaba el formulario entero antes de pintarlo. Ya funciona. De paso quedó hecho un barrido que aprieta todos los botones de todas las pantallas buscando fallas de este tipo: esta era la única.' },
+      { tipo: 'nuevo', texto: 'LAS LISTAS DE MAYOREO YA SE PUEDEN DAR DE BAJA. Se crean para probar precios de temporada y luego estorban en la caja, donde cada lista de más es un botón más que leer con gente esperando. Antes de confirmar se dice a cuántos clientes afecta —esos pasan al mayoreo normal— y las ventas viejas no cambian una coma: el precio quedó copiado en cada ticket. La última que quede no se puede quitar, porque sin ninguna la caja no sabría qué cobrarle a un mayorista.' },
+      { tipo: 'importante', texto: 'YA NO SE PREGUNTA CADA CUÁNTO SE COMPRA CADA COSA. Tenías razón: entre un cilindro de amoniaco y el siguiente pueden pasar quince días o dos años, así que preguntarlo era pedir una adivinanza y después creérsela para repartir el costo por marqueta de todos los meses. Ahora se MIDE de las compras que se van anotando —dos bastan— y se corrige solo con cada una nueva. En la tabla sale "suele ser cada tantos días", y el 👁 enseña las fechas de cada compra.' },
+      { tipo: 'mejora', texto: 'LAS CUENTAS DE LA EMPRESA, ORDENADAS: el título y su explicación a la izquierda, y los tres botones —Gastos grandes, Recibos de luz, Proveedores— a la derecha, uno debajo del otro. Antes empujaban media pantalla hacia abajo mientras sobraba todo el hueco de la derecha.' },
+      { tipo: 'mejora', texto: 'EN PROVEEDORES, "QUÉ HACE" Y "SUS MAÑAS" DEJARON DE SER DOS CUADRITOS. Son la parte que de verdad vale de ese directorio —lo que uno sabe de tratar con alguien y nadie más tiene apuntado— y estaban metidos en tres renglones mientras sobraba media pantalla. Ahora se escriben en dos cuadros grandes, lado a lado, y en la ficha salen con su etiqueta y su propio recuadro.' },
+      { tipo: 'importante', texto: 'DAR DE ALTA UN GASTO QUE SE REPITE ES AHORA COSA DEL ADMINISTRADOR, no del gerente. No es capturar un gasto —eso lo sigue haciendo el cajero todos los días— sino decidir CÓMO se suma el mes: un concepto de más ("Desayunos" y "Desayuno muchachos") parte la estadística en dos y ya no se junta, que es justo lo que estos conceptos vinieron a evitar.' },
+      { tipo: 'arreglo', texto: 'Por dentro: el ritmo entre compras se contaba con un día de más. Comprando el 1 y el 91 pasaron 90 días, no 91.' }
+    ]
+  },
   {
     numero: '3.4',
     nombre: 'Anotar la existencia, en el orden en que se canta',

@@ -87,8 +87,11 @@ function porConcepto({ desde = null, hasta = null } = {}) {
     // CADA CUÁNTO SE COMPRA DE VERDAD, no cada cuánto dice el catálogo:
     // sale de repartir el tiempo entre la primera y la última compra entre
     // las veces que se compró. Con una sola compra no se puede saber.
+    // OJO CON EL UNO: `diasEntre` cuenta los dos extremos —del 1 al 3 son
+    // tres días— y aquí lo que se quiere es el hueco entre una compra y la
+    // siguiente. Comprando el día 1 y el día 91 pasaron 90 días, no 91.
     const ritmoReal = u && u.vecesTotal > 1
-      ? Math.round(diasEntre(u.primera, u.ultima) / (u.vecesTotal - 1))
+      ? Math.round((diasEntre(u.primera, u.ultima) - 1) / (u.vecesTotal - 1))
       : null;
 
     return {
@@ -111,8 +114,11 @@ function porConcepto({ desde = null, hasta = null } = {}) {
       // "Toca pronto": pasó más tiempo del que suele pasar. No es una
       // alarma —nadie sabe cuándo se acaba un cilindro de amoniaco— sino un
       // recordatorio de mirarlo.
-      tocaPronto: Boolean((c.cada_dias || ritmoReal) && dias !== null
-                          && dias >= (c.cada_dias || ritmoReal))
+      // "Toca pronto" sale del RITMO MEDIDO y ya no de un número escrito a
+      // mano. Estas compras no tienen periodo fijo —entre una y otra pueden
+      // pasar quince días o dos años— así que preguntarlo era pedir una
+      // adivinanza y después creérsela. Con dos compras ya hay ritmo.
+      tocaPronto: Boolean(ritmoReal && dias !== null && dias >= ritmoReal)
     };
   });
 }
@@ -132,6 +138,41 @@ function totalGastado({ desde = null, hasta = null } = {}) {
 
 
 /**
+ * CADA CUÁNTO SE COMPRA DE VERDAD CADA COSA.
+ *
+ * Se mide, no se pregunta: el tiempo entre la primera compra y la última,
+ * repartido entre las veces que se compró. Con una sola compra no hay
+ * ritmo que medir y se devuelve nulo.
+ *
+ * Antes esto era un campo que había que llenar a mano ("cada cuántos días
+ * se compra"), y era pedir una adivinanza: entre un cilindro de amoniaco y
+ * el siguiente pueden pasar quince días o dos años, según cómo se venda.
+ * Un número inventado ahí ensuciaba el costo por marqueta de todos los
+ * meses. Medido, se corrige solo con cada compra nueva.
+ */
+function ritmoPorConcepto() {
+  const filas = bd.prepare(`
+    SELECT concepto_id,
+           COUNT(*)   AS veces,
+           MIN(fecha) AS primera,
+           MAX(fecha) AS ultima
+      FROM gastos_empresa
+     WHERE anulado_en IS NULL AND concepto_id IS NOT NULL
+     GROUP BY concepto_id
+  `).all();
+
+  const mapa = new Map();
+  for (const f of filas) {
+    if (f.veces < 2) continue;
+    const dias = Math.round((diasEntre(f.primera, f.ultima) - 1) / (f.veces - 1));
+    // Un tope de dos años: más allá, repartir deja de decir nada útil y
+    // obligaría a leer la historia entera de la fábrica en cada consulta.
+    mapa.set(f.concepto_id, Math.max(1, Math.min(dias, 730)));
+  }
+  return mapa;
+}
+
+/**
  * LOS GASTOS GRANDES, REPARTIDOS A SU RITMO  (v2.9)
  *
  * EL PROBLEMA QUE ESTO ARREGLA. Un cilindro de amoniaco cuesta $38,500 y
@@ -141,14 +182,15 @@ function totalGastado({ desde = null, hasta = null } = {}) {
  * cuádruple y vuelve a bajar, y entonces el número deja de servir para lo
  * único que sirve: comparar un mes contra otro.
  *
- * Así que se reparte. Cada compra se estira sobre los días que dura —los
- * que ya dice `conceptos_empresa.cada_dias` desde la v2.7— y a cada
- * periodo le toca solo el pedazo de esos días que cae dentro. Una compra
- * de julio sigue costando en agosto, que es la verdad: el amoniaco de
- * julio es el que está enfriando en agosto.
+ * Así que se reparte. Cada compra se estira sobre los días que dura —y
+ * desde la v3.5 esos días se MIDEN de las compras anteriores en vez de
+ * preguntarse— y a cada periodo le toca solo el pedazo que cae dentro. Una
+ * compra de julio sigue costando en agosto, que es la verdad: el amoniaco
+ * de julio es el que está enfriando en agosto.
  *
- * Lo que NO tiene ritmo —una compostura, unas refacciones— va entero al
- * mes en que pasó, porque no se repite: repartirlo sería inventar.
+ * Lo que todavía NO tiene ritmo —una compostura, unas refacciones, o algo
+ * que solo se ha comprado una vez— va entero al mes en que pasó, porque no
+ * hay nada medido con qué repartirlo: hacerlo sería inventar.
  *
  * Los dos números se devuelven y la pantalla enseña los dos. El repartido
  * dice cuánto cuesta un mes normal; el del mes dice cuánto dinero salió
@@ -160,15 +202,27 @@ function gastosParejos({ desde, hasta }) {
   // Solo las compras cuyo periodo de vida se cruza con el que se mira:
   // empezaron antes de que acabara, y todavía no se habían acabado cuando
   // empezó. Las de hace dos años no se leen siquiera.
+  const ritmo = ritmoPorConcepto();
+
+  // El ritmo más largo que hay marca hasta dónde hay que mirar hacia atrás:
+  // una compra más vieja que eso ya se acabó y no toca este periodo.
+  const masLargo = Math.max(1, ...ritmo.values());
+  const arranque = new Date(`${desde}T12:00:00`);
+  arranque.setDate(arranque.getDate() - masLargo);
+
   const filas = bd.prepare(`
-    SELECT g.fecha, g.centavos, g.concepto, g.concepto_id,
-           COALESCE(c.cada_dias, 1) AS dura
+    SELECT g.fecha, g.centavos, g.concepto, g.concepto_id
       FROM gastos_empresa g
-      LEFT JOIN conceptos_empresa c ON c.id = g.concepto_id
      WHERE g.anulado_en IS NULL
-       AND g.fecha <= ?
-       AND date(g.fecha, '+' || COALESCE(c.cada_dias, 1) || ' days') > ?
-  `).all(hasta, desde);
+       AND g.fecha <= ? AND g.fecha >= ?
+  `).all(hasta, comoDia(arranque))
+    .map((f) => ({ ...f, dura: ritmo.get(f.concepto_id) || 1 }))
+    .filter((f) => {
+      // Las que ya se acabaron antes de que empezara el periodo, fuera.
+      const fin = new Date(`${f.fecha}T12:00:00`);
+      fin.setDate(fin.getDate() + f.dura - 1);
+      return comoDia(fin) >= desde;
+    });
 
   let centavos = 0;
   const porConcepto = new Map();

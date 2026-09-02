@@ -204,13 +204,27 @@ test('el costo por marqueta es todo lo que costó entre lo que se produjo', asyn
 });
 
 test('una compra que dura meses NO le carga todo al mes que se pagó', async () => {
+  // EL RITMO SE MIDE, NO SE PREGUNTA (v3.5). Entre un cilindro de amoniaco
+  // y el siguiente pueden pasar quince días o dos años, así que preguntar
+  // "cada cuántos días se compra" era pedir una adivinanza y después
+  // creérsela. Ahora sale de las compras que ya hay: con dos, el sistema
+  // sabe cuánto duró una.
   await entrarAdmin();
   const cs = (await llamar('/api/empresa/conceptos')).json.datos.conceptos;
   const amoniaco = cs.find((c) => /amoniaco/i.test(c.nombre));
-  assert.equal(amoniaco.cada_dias, 90, 'de fábrica el amoniaco dura 90 días');
 
-  // Un cilindro de $36,000 comprado el día 1 de este mes.
   const p = require('../src/lib/periodos').periodoDe();
+  const noventaAntes = new Date(`${p.desde}T12:00:00`);
+  noventaAntes.setDate(noventaAntes.getDate() - 90);
+  const comoDia = (d) => d.toISOString().slice(0, 10);
+
+  // La compra anterior, hace noventa días: es la que enseña el ritmo.
+  await llamar('/api/empresa/gastos', {
+    method: 'POST',
+    cuerpo: { conceptoId: amoniaco.id, fecha: comoDia(noventaAntes),
+              cantidad: 1, monto: 36000 } });
+
+  // Y la de este mes, el día 1.
   const r = await llamar('/api/empresa/gastos', {
     method: 'POST',
     cuerpo: { conceptoId: amoniaco.id, fecha: p.desde, cantidad: 1, monto: 36000 } });
@@ -224,12 +238,14 @@ test('una compra que dura meses NO le carga todo al mes que se pagó', async () 
   // el cilindro pasó enfriando DENTRO de este mes.
   assert.ok(c.total < c.delMes.total,
             'repartido cuesta menos que de golpe: eso es justo el arreglo');
-  const proporcion = c.grandes / 3600000;
-  assert.ok(proporcion > 0.2 && proporcion < 0.5,
-            `a un mes le toca ~un tercio de los 90 días (le tocó ${Math.round(proporcion * 100)}%)`);
   assert.equal(c.hayReparto, true);
-  assert.ok(c.grandesPorConcepto.some((g) => g.repartido),
-            'y se dice cuál se repartió, para poder explicarlo en la pantalla');
+
+  // Y el ritmo que usó es el MEDIDO, no uno escrito a mano.
+  const despues = (await llamar('/api/empresa/conceptos')).json.datos.conceptos;
+  const a2 = (await llamar(`/api/empresa/resumen?periodo=${p.clave}`)).json.datos
+    .conceptos.find((x) => x.id === amoniaco.id);
+  assert.equal(a2.ritmoReal, 90, 'noventa días entre una compra y la otra');
+  assert.ok(despues.length, 'y el catálogo sigue entero');
 });
 
 test('lo que no tiene ritmo va entero al mes en que pasó', async () => {
