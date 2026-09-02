@@ -34,6 +34,10 @@ const { exigirPermiso } = require('../../middleware/sesion');
 const { tanqueConEstado, canastasFuera, horasDesde } = require('./estado');
 const vales = require('./vales');
 const calidad = require('./calidad');
+// El cuarto frío se lee desde aquí para poder enseñarlo en Producción sin
+// pedir el permiso de existencia, que el obrero no tiene.
+const { hieloQueQueda } = require('../existencia/calculo');
+const { aTexto } = require('../../lib/fracciones');
 
 const router = express.Router();
 
@@ -100,9 +104,22 @@ router.get('/estado', verProduccion, (req, res) => {
     // copiados a mano en el JavaScript de enfrente: así hay un solo
     // lugar donde dicen cómo se llaman y qué significan (calidad.js).
     calidades: calidad.CALIDADES,
-    destinos: calidad.DESTINOS
+    destinos: calidad.DESTINOS,
+    // CUÁNTO HIELO QUEDA EN EL CUARTO FRÍO  (v4.1)
+    //
+    // Va aquí y no detrás del permiso de existencia a propósito: el obrero
+    // que saca el hielo es quien más falta le hace saber si el cuarto está
+    // vacío, y ese permiso no lo tiene. Es un número para mirar, no para
+    // tocar — contar sigue siendo del cajero y del gerente.
+    cuartoFrio: conTexto(hieloQueQueda())
   });
 });
+
+/** El mismo dato con su texto ya armado: "14 y 5/8". */
+function conTexto(h) {
+  return h ? { ...h, texto: aTexto(h.dieciseisavos) } : null;
+}
+
 
 /**
  * PEDIR AUTORIZACIÓN para un paño que no toca.

@@ -44,7 +44,16 @@ function nombreDePila(completo) {
   return util[0] || partes[0] || '';
 }
 
-export async function vistaProduccion(pantalla, estado) {
+/**
+ * @param opciones.enCorte    se está usando DENTRO del corte de caja: sale
+ *                            una barra arriba con el paso y el botón de
+ *                            seguir. La pantalla es la misma a propósito —
+ *                            tener dos maneras de anotar el hielo fue justo
+ *                            lo que se quitó en la v4.0.
+ * @param opciones.alSeguir   qué hacer cuando dice "ya anoté los paños".
+ */
+export async function vistaProduccion(pantalla, estado, opciones = {}) {
+  const enCorte = Boolean(opciones.enCorte);
   const puedeRegistrar = estado.permisos.includes('*') ||
                          estado.permisos.includes('produccion.registrar');
   const puedeAutorizar = estado.permisos.includes('*') ||
@@ -121,6 +130,20 @@ export async function vistaProduccion(pantalla, estado) {
     const toca = tanque.siguiente;
 
     pantalla.innerHTML = `
+      ${enCorte ? `
+        <div class="corte-paso">
+          <div class="crece">
+            <span class="corte-paso-num">Paso 1 de 4</span>
+            <strong>¿Qué paños se sacaron?</strong>
+            <small>
+              Toca cada paño que salió y anótalo como siempre: quién lo sacó,
+              cómo salió el hielo, canasta por canasta si hace falta. Cuando
+              termines, sigue.
+            </small>
+          </div>
+          <button id="seguir-corte">Ya anoté los paños →</button>
+        </div>` : ''}
+
       <div class="prod-acciones">
         ${puedeVerNumeros ? `
           <button id="siguientes" class="accion-principal">
@@ -182,6 +205,9 @@ export async function vistaProduccion(pantalla, estado) {
 
         ${panelTanque(tanque)}
       </div>`;
+
+    const seguir = pantalla.querySelector('#seguir-corte');
+    if (seguir) seguir.onclick = () => opciones.alSeguir?.();
 
     pantalla.querySelectorAll('[data-tanque]').forEach((b) => {
       b.onclick = () => { tanqueActivo = b.dataset.tanque; pintar(); };
@@ -247,6 +273,21 @@ export async function vistaProduccion(pantalla, estado) {
           ${salmueraHTML(tanque)}
         </div>
 
+        ${datos.cuartoFrio ? `
+          <div class="tarjeta plana cuarto-frio">
+            <h3 class="panel-titulo">En el cuarto frío</h3>
+            <strong class="cuarto-frio-numero ${datos.cuartoFrio.dieciseisavos < 0 ? 'malo' : ''}">
+              ${esc(datos.cuartoFrio.texto)}
+            </strong>
+            <small>
+              ${datos.cuartoFrio.dieciseisavos < 0
+                ? 'menos que cero: falta capturar producción'
+                : datos.cuartoFrio.desdeConteo
+                  ? `desde el último conteo, ${esc(fechaCorta(datos.cuartoFrio.contadoEn))}`
+                  : 'todavía no se ha contado nunca: es la suma de todo'}
+            </small>
+          </div>` : ''}
+
         ${hoy ? `
           <div class="tarjeta plana">
             <h3 class="panel-titulo">Hoy en la fábrica</h3>
@@ -272,6 +313,8 @@ export async function vistaProduccion(pantalla, estado) {
 
         <div class="panel-botones">
           <button class="secundario chico" id="ver-hoy">📅 Lo de hoy</button>
+          ${estado.permisos.includes('*') || estado.permisos.includes('existencia.ver')
+            ? '<a class="boton secundario chico" href="#/existencia">🧊 El cuarto frío</a>' : ''}
           ${estado.permisos.includes('*') || estado.permisos.includes('estadisticas.ver')
             ? '<a class="boton secundario chico" href="#/estadisticas">📊 Los números</a>' : ''}
         </div>

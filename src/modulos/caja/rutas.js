@@ -49,6 +49,11 @@ const conceptos = exigirPermiso('caja.conceptos');
 // permiso, así que solo lo alcanza el comodín del administrador.
 const corregirCorte = exigirPermiso('caja.corregir_corte');
 
+// RECIBIR EL DINERO DE UN TURNO. El cajero entrega el cajón y se va; quien
+// cuenta es el dueño o el gerente cuando llegan. No es del cajero: sería
+// firmarse a sí mismo la entrega.
+const recibirEntrega = exigirPermiso('caja.recibir');
+
 /**
  * Lee un importe tecleado. Vive en lib/dinero porque el mismo error
  * —limpiar la cadena a la brava y quedarse con un 0 que nadie escribió—
@@ -118,15 +123,34 @@ router.post('/abrir', operarCaja, (req, res) => {
  * Los números quedan CONGELADOS (regla 3.2): cancelar mañana una venta de
  * hoy no cambia un corte que ya se firmó.
  */
+/**
+ * CERRAR EL TURNO — SIN CONTAR EL DINERO  (v4.1)
+ *
+ * "Como los cortes son rápidos y se tiene que seguir atendiendo, no hay que
+ * anotar cuánto dinero hay físicamente, sino imprimir el ticket con el
+ * dinero que debería haber."
+ *
+ * Así que el corte se cierra sin contar: sale el papel con lo que DEBÍA
+ * haber, el cajero entrega el cajón y sigue vendiendo. Cuando el dueño o el
+ * gerente llegan, anotan cuánto les entregaron y esa es la diferencia
+ * (ver `POST /cortes/:id/entregado`).
+ *
+ * `contado` se sigue aceptando por si alguien tiene tiempo de contar en el
+ * momento, pero ya no hace falta. Sin ninguno de los dos, la diferencia se
+ * queda VACÍA en vez de en cero: decir "cuadró exacto" cuando nadie ha
+ * contado sería inventarse un dato.
+ */
 router.post('/cerrar', operarCaja, (req, res) => {
   const caja = sesionAbierta();
   if (!caja) return error(res, 'No hay ningún turno de caja abierto.', 409);
 
-  const contado = leerImporte(req.body?.contado);
-  if (contado === null) return error(res, 'Escribe cuánto dinero contaste.');
+  const seContó = req.body?.contado !== undefined && req.body?.contado !== null
+                  && String(req.body.contado).trim() !== '';
+  const contado = seContó ? leerImporte(req.body.contado) : null;
+  if (seContó && contado === null) return error(res, 'Ese importe no se entiende.');
 
   const estado = estadoCaja(caja);
-  const diferencia = contado - estado.esperado;
+  const diferencia = contado === null ? null : contado - estado.esperado;
 
   bd.prepare(`
     UPDATE cajas SET
@@ -166,11 +190,15 @@ router.post('/entregar', operarCaja, (req, res) => {
     return error(res, 'Ese turno todavía está esperando dueño. No se puede entregar dos veces.', 409);
   }
 
-  const contado = leerImporte(req.body?.contado);
-  if (contado === null) return error(res, 'Escribe cuánto dinero contaste.');
+  // Igual que al cerrar: contar es opcional desde la v4.1. En el relevo de
+  // las 2:30 hay todavía menos tiempo que al cierre.
+  const seContó = req.body?.contado !== undefined && req.body?.contado !== null
+                  && String(req.body.contado).trim() !== '';
+  const contado = seContó ? leerImporte(req.body.contado) : null;
+  if (seContó && contado === null) return error(res, 'Ese importe no se entiende.');
 
   const estado = estadoCaja(caja);
-  const diferencia = contado - estado.esperado;
+  const diferencia = contado === null ? null : contado - estado.esperado;
   const fecha = ahora();
   const nuevoId2 = nuevoId();
 
@@ -574,11 +602,12 @@ router.post('/movimientos/:id/anular', corregir, (req, res) => {
 function detalleCorte(id) {
   const caja = bd.prepare(`
     SELECT c.*, u.nombre AS cajero_nombre, v.nombre AS cerrada_por_nombre,
-           g.nombre AS corregido_por_nombre
+           g.nombre AS corregido_por_nombre, r.nombre AS recibido_por_nombre
       FROM cajas c
       LEFT JOIN usuarios u ON u.id = c.cajero_id
       LEFT JOIN usuarios v ON v.id = c.cerrada_por
       LEFT JOIN usuarios g ON g.id = c.corregido_por
+      LEFT JOIN usuarios r ON r.id = c.recibido_por
      WHERE c.id = ?
   `).get(id);
   if (!caja) return null;
@@ -616,7 +645,11 @@ function recalcularCorte(cajaId, { usuarioId, motivo }) {
   if (!caja) return null;
 
   const estado = estadoCaja(caja);
-  const diferencia = (caja.contado_centavos ?? 0) - estado.esperado;
+  // Manda lo ENTREGADO cuando lo hay: es el dinero que de verdad llegó a
+  // manos del dueño. Si nadie contó ni entregó todavía, no hay diferencia
+  // que enseñar — y eso es un dato, no un cero.
+  const referencia = caja.entregado_centavos ?? caja.contado_centavos ?? null;
+  const diferencia = referencia === null ? null : referencia - estado.esperado;
 
   // Solo la PRIMERA vez: si se corrige dos veces, lo original sigue siendo
   // lo del papel firmado, no lo de la corrección anterior.
@@ -642,6 +675,55 @@ function recalcularCorte(cajaId, { usuarioId, motivo }) {
 
   return { guardarOriginal, antes: caja, ahora: bd.prepare('SELECT * FROM cajas WHERE id = ?').get(caja.id) };
 }
+
+/**
+ * CUÁNTO DINERO ENTREGARON DE VERDAD  (v4.1)
+ *
+ * El turno se cierra sin contar: sale el papel con lo que debía haber, el
+ * cajero entrega el cajón y sigue vendiendo. Esto es la otra mitad — el
+ * momento en que el dueño o el gerente cuentan lo que les dieron.
+ *
+ * De aquí sale la diferencia de verdad, y por eso no se puede anotar dos
+ * veces sin querer: si ya había una entrega anotada, hay que decir que se
+ * está corrigiendo.
+ */
+router.post('/cortes/:id/entregado', recibirEntrega, (req, res) => {
+  const caja = bd.prepare('SELECT * FROM cajas WHERE id = ?').get(req.params.id);
+  if (!caja) return error(res, 'Ese corte no existe.', 404);
+  if (!caja.cerrada_en) return error(res, 'Ese turno todavía no se ha cerrado.', 409);
+
+  const centavos = leerImporte(req.body?.monto);
+  if (centavos === null) return error(res, 'Escribe cuánto dinero te entregaron.');
+
+  if (caja.entregado_centavos !== null && caja.entregado_centavos !== undefined
+      && req.body?.corregir !== true) {
+    return error(res,
+      `Ya se anotó una entrega de este turno (${(caja.entregado_centavos / 100).toFixed(2)}). ` +
+      'Para cambiarla hay que decir que se está corrigiendo.', 409);
+  }
+
+  const diferencia = centavos - (caja.esperado_centavos ?? 0);
+
+  bd.prepare(`
+    UPDATE cajas SET entregado_centavos = ?, recibido_por = ?, recibido_en = ?,
+                     notas_entrega = ?, diferencia_centavos = ?
+     WHERE id = ?
+  `).run(centavos, req.usuario.id, ahora(),
+         String(req.body?.notas || '').trim().slice(0, 300) || null,
+         diferencia, caja.id);
+
+  bitacora.registrar({
+    accion: 'caja.entrega_recibida', entidad: 'caja', entidadId: caja.id,
+    ejecutorId: req.usuario.id,
+    detalle: {
+      folio: caja.folio, cajero: caja.cajero_id,
+      esperado: caja.esperado_centavos, entregado: centavos, diferencia,
+      corregida: caja.entregado_centavos != null
+    }
+  });
+
+  return ok(res, { corte: detalleCorte(caja.id) });
+});
 
 /**
  * AGREGARLE A UN CORTE UN GASTO QUE SE OLVIDÓ.
@@ -773,10 +855,12 @@ router.post('/cortes/:id/movimientos/:movimiento/quitar', corregirCorte, (req, r
 router.get('/cortes', verCaja, (req, res) => {
   const limite = Math.min(Number(req.query.limite) || 30, 200);
   const cortes = bd.prepare(`
-    SELECT c.*, u.nombre AS cajero_nombre, g.nombre AS corregido_por_nombre
+    SELECT c.*, u.nombre AS cajero_nombre, g.nombre AS corregido_por_nombre,
+           r.nombre AS recibido_por_nombre
       FROM cajas c
       LEFT JOIN usuarios u ON u.id = c.cajero_id
       LEFT JOIN usuarios g ON g.id = c.corregido_por
+      LEFT JOIN usuarios r ON r.id = c.recibido_por
      WHERE c.cerrada_en IS NOT NULL
      ORDER BY c.cerrada_en DESC LIMIT ?
   `).all(limite);

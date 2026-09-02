@@ -42,7 +42,10 @@ const RUTAS = {
   '#/venta':     { titulo: 'Punto de venta',    vista: vistaVenta,     permiso: 'venta.registrar',
                    fija: true, sinBarra: true },
   '#/caja':      { titulo: 'Caja',              vista: vistaCaja,      permiso: 'caja.ver' },
-  '#/existencia': { titulo: 'Existencia',       vista: vistaExistencia, permiso: 'existencia.ver' },
+  // El cuarto frío ya no está en el inicio ni en el menú: contarlo se hace
+  // al terminar el turno (v4.1). La ruta sigue viva porque se entra desde
+  // Producción de hielo, para mirar lo que hay y anotar lo derretido.
+  '#/existencia': { titulo: 'El cuarto frío',   vista: vistaExistencia, permiso: 'existencia.ver' },
   '#/config-tanques': { titulo: 'Configurar tanques', vista: vistaTanques, permiso: 'tanques.configurar' },
   '#/usuarios':  { titulo: 'Usuarios',          vista: vistaUsuarios,  permiso: 'usuarios.administrar' },
   // El cajero entra con vista limitada: ve cuántas hay e imprime la hoja.

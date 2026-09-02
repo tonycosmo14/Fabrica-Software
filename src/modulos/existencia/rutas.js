@@ -31,6 +31,32 @@ const configurar = exigirPermiso('sistema.configurar');
 const MAX_DIECISEISAVOS = 100000 * DIECISEISAVOS_POR_MARQUETA;
 
 /**
+ * EL PRODUCTO AL QUE LE ENTRAN LAS BOLSAS  (v4.1)
+ *
+ * Cortar marquetas para hielo gourmet no es una pérdida: es una
+ * TRANSFORMACIÓN. Sale del cuarto frío y entra al inventario como bolsas,
+ * y desde ahí se vende como cualquier otra cosa. La bolsa viene sembrada
+ * con la migración 032; si alguien la borró, el corte se sigue anotando
+ * —el hielo salió igual— pero sin sumarle bolsas a nadie.
+ */
+const BOLSA_POR_OMISION = 'prod-bolsa-gourmet';
+
+function productoDeBolsas(idPedido) {
+  const id = idPedido || BOLSA_POR_OMISION;
+  // Sin filtrar por `activo`: la bolsa nace dada de baja y se da de alta
+  // sola con el primer corte que le meta bolsas (ver más abajo).
+  return bd.prepare(
+    "SELECT * FROM productos WHERE id = ? AND tipo = 'simple' AND lleva_inventario = 1"
+  ).get(id) || null;
+}
+
+/** Un turno de caja al que colgar esto, si viene y existe. */
+function cajaDe(id) {
+  if (!id) return null;
+  return bd.prepare('SELECT id FROM cajas WHERE id = ?').get(id)?.id || null;
+}
+
+/**
  * Lee la cantidad que mandó la pantalla.
  *
  * Se acepta en dieciseisavos (que es como los manda el teclado) y también
@@ -235,22 +261,65 @@ router.post('/cortes', contar, (req, res) => {
 
   const ejecutorId = req.body?.ejecutorId || req.usuario.id;
   const id = nuevoId();
-  bd.prepare(`
-    INSERT INTO cortes_hielo (id, fecha, almacen_id, dieciseisavos, bolsas, notas,
-                              ejecutor_id, capturista_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, ahora(), almacen.id, cantidad, bolsas,
-         String(req.body?.notas || '').trim().slice(0, 200) || null,
-         ejecutorId, req.usuario.id);
+  const fecha = ahora();
+  const cajaId = cajaDe(req.body?.cajaId);
+
+  // LAS BOLSAS ENTRAN AL INVENTARIO  (v4.1)
+  //
+  // Cortar marquetas no es perder hielo: es transformarlo. Sale del cuarto
+  // frío y entra como bolsas, y desde ahí se vende como cualquier otra
+  // cosa — con la misma cuenta de siempre, que no guarda ningún "cuántas
+  // hay" (regla 3.2). Sin bolsas contadas no se mueve nada: un cero que
+  // nadie contó parecería un dato dentro de un año.
+  const producto = bolsas ? productoDeBolsas(req.body?.productoId) : null;
+  const movimientoId = producto && bolsas > 0 ? nuevoId() : null;
+
+  bd.transaction(() => {
+    if (movimientoId) {
+      bd.prepare(`
+        INSERT INTO movimientos_inventario
+          (id, producto_id, fecha, tipo, cantidad, concepto, ejecutor_id, capturista_id)
+        VALUES (?, ?, ?, 'entrada', ?, ?, ?, ?)
+      `).run(movimientoId, producto.id, fecha, bolsas,
+             `Cortadas de ${aTexto(cantidad)} del cuarto frío`,
+             ejecutorId, req.usuario.id);
+
+      // LA BOLSA SE DA DE ALTA SOLA con el primer corte. Nace de baja
+      // porque un producto en cero sale como AGOTADO en la caja, y una
+      // fábrica que todavía no corta hielo tendría ese aviso puesto para
+      // siempre. En cuanto hay bolsas de verdad, existe.
+      if (!producto.activo) {
+        bd.prepare('UPDATE productos SET activo = 1, fecha_baja = NULL WHERE id = ?')
+          .run(producto.id);
+      }
+    }
+    bd.prepare(`
+      INSERT INTO cortes_hielo (id, fecha, almacen_id, dieciseisavos, bolsas, notas,
+                                ejecutor_id, capturista_id, caja_id,
+                                producto_id, movimiento_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, fecha, almacen.id, cantidad, bolsas,
+           String(req.body?.notas || '').trim().slice(0, 200) || null,
+           ejecutorId, req.usuario.id, cajaId,
+           producto?.id || null, movimientoId);
+  })();
 
   bitacora.registrar({
     accion: 'existencia.corte', entidad: 'corte', entidadId: id,
     ejecutorId, capturistaId: req.usuario.id,
     detalle: { almacen: almacen.nombre, dieciseisavos: cantidad,
-               texto: aTexto(cantidad), bolsas }
+               texto: aTexto(cantidad), bolsas,
+               producto: producto?.nombre || null, cajaId }
   });
 
-  return ok(res, { corte: bd.prepare('SELECT * FROM cortes_hielo WHERE id = ?').get(id) }, 201);
+  return ok(res, {
+    corte: bd.prepare('SELECT * FROM cortes_hielo WHERE id = ?').get(id),
+    // La pantalla avisa si la bolsa todavía no tiene precio: sin él no se
+    // puede vender, y es lo primero que hay que arreglar.
+    producto: producto ? { id: producto.id, nombre: producto.nombre,
+                           sinPrecio: !producto.precio_centavos,
+                           recienActivado: Boolean(movimientoId) && !producto.activo } : null
+  }, 201);
 });
 
 router.post('/cortes/:id/anular', exigirPermiso('existencia.corregir'), (req, res) => {
@@ -261,13 +330,28 @@ router.post('/cortes/:id/anular', exigirPermiso('existencia.corregir'), (req, re
   const motivo = String(req.body?.motivo || '').trim();
   if (!motivo) return error(res, 'Escribe por qué se anula.');
 
-  bd.prepare(`
-    UPDATE cortes_hielo SET anulado_en = ?, anulado_por = ?, motivo_anulacion = ? WHERE id = ?
-  `).run(ahora(), req.usuario.id, motivo, c.id);
+  const fecha = ahora();
+  bd.transaction(() => {
+    bd.prepare(`
+      UPDATE cortes_hielo SET anulado_en = ?, anulado_por = ?, motivo_anulacion = ? WHERE id = ?
+    `).run(fecha, req.usuario.id, motivo, c.id);
+
+    // Y las bolsas que le entraron al inventario se anulan con él: si no,
+    // el hielo volvería al cuarto frío y las bolsas se quedarían, que es
+    // tener el mismo hielo contado dos veces.
+    if (c.movimiento_id) {
+      bd.prepare(`
+        UPDATE movimientos_inventario
+           SET anulado_en = ?, anulado_por = ?, motivo_anulacion = ?
+         WHERE id = ? AND anulado_en IS NULL
+      `).run(fecha, req.usuario.id, `Se anuló el corte de hielo: ${motivo}`, c.movimiento_id);
+    }
+  })();
 
   bitacora.registrar({
     accion: 'existencia.corte-anulado', entidad: 'corte', entidadId: c.id,
-    ejecutorId: req.usuario.id, detalle: { dieciseisavos: c.dieciseisavos, motivo }
+    ejecutorId: req.usuario.id,
+    detalle: { dieciseisavos: c.dieciseisavos, motivo, bolsas: c.bolsas }
   });
 
   return ok(res, { anulado: true });
@@ -321,12 +405,12 @@ router.post('/conteos', contar, (req, res) => {
   bd.prepare(`
     INSERT INTO conteos (id, almacen_id, fecha, ejecutor_id, capturista_id, contado,
                          existencia_anterior, producido, vendido, merma, cortado,
-                         salidas, desde, notas)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         salidas, desde, notas, caja_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(id, almacen.id, fecha, ejecutorId, req.usuario.id, contado,
          estado.existenciaAnterior, estado.producido, estado.vendido,
          estado.merma, estado.cortado, salidas,
-         estado.desde, req.body?.notas || null);
+         estado.desde, req.body?.notas || null, cajaDe(req.body?.cajaId));
 
   bitacora.registrar({
     accion: 'existencia.conteo', entidad: 'almacen', entidadId: almacen.id,

@@ -19,7 +19,7 @@ const { listaDeMayoreo } = require('../ventas/mayoreo');
 const { configuracion, guardarAjuste, imprimirCrudo,
         tipoDeDestino, impresorasDeWindows, APARTADOS } = require('./impresora');
 const { ticketCotizacion, ticketVenta, ticketMovimiento, ticketPrueba, pulsoCajon, ticketProduccion,
-        ticketCorte, ticketCortePersona, ticketConteo,
+        ticketCorte, ticketCorteMovimientos, ticketCortePersona, ticketConteo,
         ticketResumenDia } = require('./ticket');
 
 const { aTexto } = require('../../lib/fracciones');
@@ -378,10 +378,12 @@ router.post('/venta/:id', puedeImprimir, async (req, res) => {
  */
 router.post('/corte/:id', exigirPermiso('caja.ver'), async (req, res) => {
   const caja = bd.prepare(`
-    SELECT c.*, u.nombre AS cajero_nombre, v.nombre AS cerrada_por_nombre
+    SELECT c.*, u.nombre AS cajero_nombre, v.nombre AS cerrada_por_nombre,
+           r.nombre AS recibido_por_nombre
       FROM cajas c
       LEFT JOIN usuarios u ON u.id = c.cajero_id
       LEFT JOIN usuarios v ON v.id = c.cerrada_por
+      LEFT JOIN usuarios r ON r.id = c.recibido_por
      WHERE c.id = ?
   `).get(req.params.id);
   if (!caja) return error(res, 'Ese corte no existe.', 404);
@@ -403,16 +405,22 @@ router.post('/corte/:id', exigirPermiso('caja.ver'), async (req, res) => {
 
   const negocio = nombreNegocio();
 
-  // LOS TRES PAPELES DEL CIERRE, en un solo tirón:
+  // LOS PAPELES DEL CIERRE, en un solo tirón:
   //
-  //   1. el corte del turno, que es el que se firma
-  //   2. uno por cajero, si el turno se relevó a media noche
-  //   3. el resumen del día: cuánto hielo queda y qué paños salieron
+  //   1. el corte del turno, con el dinero y SOLO EL TOTAL de gastos:
+  //      es el que se firma y se entrega con el cajón
+  //   2. el detalle: los gastos y las entradas, uno por uno (v4.1)
+  //   3. uno por cajero, si el turno se relevó a media noche
+  //   4. el resumen del día: cuánto hielo queda y qué paños salieron
   //
   // Van juntos porque juntos es como se leen: si el cajón cuadra pero
   // falta hielo, el problema no está en la caja. En papeles separados
-  // nadie los junta.
+  // nadie los junta. Pero cada uno sale con su corte de papel: el primero
+  // se entrega y el segundo se queda en la carpeta.
   const papeles = [ticketCorte(corte, { negocio })];
+
+  const detalle = ticketCorteMovimientos(corte, { negocio });
+  if (detalle) papeles.push(detalle);
 
   if (corte.porPersona.length > 1) {
     for (const p of corte.porPersona) {

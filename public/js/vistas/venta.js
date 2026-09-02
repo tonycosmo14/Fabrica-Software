@@ -1105,6 +1105,7 @@ export async function vistaVenta(pantalla, estadoApp) {
         <small id="pos-fecha"></small>
       </span>
       <span class="pos-clima" id="pos-clima" hidden></span>
+      ${hieloDelCuarto()}
       ${marca.nombreNegocio
         ? `<span class="pos-marca">${esc(marca.nombreNegocio)}</span>` : ''}
       <span class="pos-teclas">
@@ -1119,6 +1120,27 @@ export async function vistaVenta(pantalla, estadoApp) {
       </span>`;
     pintarHora();
     pintarClima();
+  }
+
+  /**
+   * CUÁNTO HIELO QUEDA, junto al reloj  (v4.1)
+   *
+   * SOLO PARA EL ADMINISTRADOR. Lo decide el servidor —la caja no sabe de
+   * permisos, y no es cosa suya saberlo—: si el contexto no lo trae, no se
+   * pinta. No es un secreto; es que en el mostrador, con gente esperando,
+   * un número más que leer es un número más que estorba, y el cajero ya
+   * tiene el suyo al terminar el turno.
+   *
+   * No se refresca solo: cambia con cada venta, y la pista se vuelve a
+   * pintar en cada venta.
+   */
+  function hieloDelCuarto() {
+    const h = ctx?.cuartoFrio;
+    if (!h) return '';
+    return `
+      <span class="pos-hielo" title="Lo que debería quedar en ${esc(h.almacen)}">
+        🧊 ${esc(h.texto)}
+      </span>`;
   }
 
   /**

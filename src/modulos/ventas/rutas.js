@@ -16,6 +16,8 @@ const { bd } = require('../../db/conexion');
 const { nuevoId, ahora } = require('../../lib/ids');
 const { ok, error } = require('../../lib/respuestas');
 const { aTexto, validar } = require('../../lib/fracciones');
+// Cuánto hielo queda, para enseñárselo al dueño en el mostrador.
+const { hieloQueQueda } = require('../existencia/calculo');
 const { aCentavos, formato } = require('../../lib/dinero');
 const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
@@ -105,6 +107,16 @@ router.get('/contexto', vender, (req, res) => {
     categorias: categoriasActivas(),
     productos: productosActivos(),
     avisos: avisos(),
+    // CUÁNTO HIELO QUEDA, SOLO PARA EL ADMINISTRADOR  (v4.1)
+    //
+    // Ningún rol lista este permiso, así que solo lo alcanza el comodín del
+    // dueño. No es secreto: es que en el mostrador, con gente esperando, un
+    // número más que leer es un número más que estorba — y el cajero ya
+    // tiene el suyo en el cuadre del turno.
+    cuartoFrio: puede(req.usuario.rol, 'existencia.ver_en_caja')
+      ? (() => { const h = hieloQueQueda();
+                 return h ? { ...h, texto: aTexto(h.dieciseisavos) } : null; })()
+      : null,
     // Las listas de mayoreo, con sus precios. La caja las necesita enteras
     // para poder repintar el ticket en el acto cuando el cajero dice de
     // quién es. El servidor vuelve a decidir al cobrar; esto es la pantalla.

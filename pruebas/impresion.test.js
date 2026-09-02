@@ -398,13 +398,86 @@ test('al imprimir el corte sale también el hielo que queda y los paños del dí
   limpiarPapel();
   const r = await llamar(`/api/impresion/corte/${cajaId}`, { method: 'POST', cuerpo: {} });
   assert.equal(r.estado, 200);
-  assert.equal(r.json.datos.papeles, 2, 'el corte y el día');
 
   const papel = loImpreso();
   assert.match(papel, /Corte #/, 'el papel que se firma');
   assert.match(papel, /HIELO EN EL CUARTO FRIO/, 'cuánto queda');
   assert.match(papel, /PANOS SACADOS HOY/, 'y qué se sacó');
-  assert.equal(papel.split('VB').length - 1, 2, 'dos papeles, dos cortes de papel');
+  // Un corte de papel por cada papel: se entregan a personas distintas.
+  assert.equal(papel.split('VB').length - 1, r.json.datos.papeles,
+               'cada papel sale con su corte');
+});
+
+// ============================================================
+// EL CORTE EN DOS PAPELES  (v4.1)
+//
+// "Una como la que existe pero solo con el total de los gastos, corta el
+// papel, y otra con los gastos, entradas y movimientos ya desglosaditos."
+//
+// Y no es solo gusto: el primero se firma y se entrega con el cajón; el
+// segundo se queda en la carpeta. Son dos papeles porque son de dos
+// personas distintas.
+// ============================================================
+
+test('el corte sale en dos papeles: el del dinero y el del detalle', async () => {
+  await entrarAdmin();
+  await llamar('/api/caja/abrir', { method: 'POST', cuerpo: { fondo: 500 } });
+  await llamar('/api/ventas', { method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 16 }], pago: 300 } });
+  await llamar('/api/caja/movimientos', {
+    method: 'POST', cuerpo: { tipo: 'salida', concepto: 'Gasolina', monto: 200 } });
+  await llamar('/api/caja/movimientos', {
+    method: 'POST', cuerpo: { tipo: 'entrada', concepto: 'Cambio del banco', monto: 500 } });
+  const cerrar = await llamar('/api/caja/cerrar', { method: 'POST', cuerpo: {} });
+  const cajaId = cerrar.json.datos.corte.caja.id;
+
+  limpiarPapel();
+  await llamar(`/api/impresion/corte/${cajaId}`, { method: 'POST', cuerpo: {} });
+  const papel = loImpreso();
+
+  // El primero lleva el TOTAL de gastos con su cuenta, pero no el desglose.
+  const primero = papel.slice(0, papel.indexOf('Detalle #'));
+  assert.match(primero, /Corte #/);
+  assert.match(primero, /Gastos y retiros \(1\)/, 'el total, y cuántos son');
+  assert.ok(!primero.includes('GASOLINA') && !primero.includes('Gasolina'),
+            'el desglose NO va en el papel que se firma');
+
+  // El segundo es el desglose, y va después de un corte de papel.
+  assert.match(papel, /Detalle #/, 'el segundo papel');
+  assert.match(papel, /GASTOS/);
+  assert.match(papel, /Gasolina/);
+  assert.match(papel, /ENTRADAS/);
+  assert.match(papel, /Cambio del banco/);
+});
+
+test('sin gastos ni entradas no se imprime un papel de detalle en blanco', async () => {
+  await entrarAdmin();
+  await llamar('/api/caja/abrir', { method: 'POST', cuerpo: { fondo: 500 } });
+  await llamar('/api/ventas', { method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 16 }], pago: 300 } });
+  const cerrar = await llamar('/api/caja/cerrar', { method: 'POST', cuerpo: {} });
+
+  limpiarPapel();
+  await llamar(`/api/impresion/corte/${cerrar.json.datos.corte.caja.id}`, {
+    method: 'POST', cuerpo: {} });
+  const papel = loImpreso();
+  assert.ok(!papel.includes('Detalle #'),
+            'media hoja en blanco que dice GASTOS es papel tirado todos los días');
+});
+
+test('un corte sin contar no dice ni que cuadró ni que falta', async () => {
+  await entrarAdmin();
+  await llamar('/api/caja/abrir', { method: 'POST', cuerpo: { fondo: 500 } });
+  await llamar('/api/ventas', { method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 16 }], pago: 300 } });
+  const cerrar = await llamar('/api/caja/cerrar', { method: 'POST', cuerpo: {} });
+  const caja = cerrar.json.datos.corte.caja;
+  assert.equal(caja.diferencia_centavos, null, 'nadie ha contado: no hay diferencia');
+
+  limpiarPapel();
+  await llamar(`/api/impresion/corte/${caja.id}`, { method: 'POST', cuerpo: {} });
+  const papel = loImpreso();
+  assert.match(papel, /DEBERIA HABER/, 'lo que debía haber sí');
+  assert.match(papel, /SIN CONTAR/, 'y que todavía no se ha contado');
+  assert.match(papel, /Entregado \$/, 'con su raya para escribirlo a mano');
+  assert.ok(!papel.includes('CUADRO'), 'decir que cuadró sin contar sería mentir');
 });
 
 test('si el turno se relevó, sale un papel por cada quien', async () => {

@@ -244,6 +244,35 @@ function estadoAlmacen(almacen) {
   };
 }
 
+/**
+ * CUÁNTO HIELO QUEDA AHORA MISMO, para enseñarlo de reojo  (v4.1)
+ *
+ * Lo pide Producción —el obrero que saca el hielo es a quien más le sirve
+ * saber si el cuarto está vacío— y la caja del administrador. Es un número
+ * para MIRAR: contar de verdad sigue siendo otra cosa, con su cuadre.
+ *
+ * Sale de `estadoAlmacen` y no de una cuenta propia: dos cuentas del mismo
+ * número terminan diciendo cosas distintas el día que alguien cambie una.
+ */
+function hieloQueQueda() {
+  const almacen = bd.prepare(
+    'SELECT * FROM almacenes WHERE activo = 1 AND recibe_produccion = 1 ORDER BY orden LIMIT 1'
+  ).get() || bd.prepare('SELECT * FROM almacenes WHERE activo = 1 ORDER BY orden LIMIT 1').get();
+  if (!almacen) return null;
+
+  const e = estadoAlmacen(almacen);
+  return {
+    almacenId: almacen.id,
+    almacen: almacen.nombre,
+    dieciseisavos: e.esperado,
+    marquetas: Math.floor(e.esperado / DIECISEISAVOS_POR_MARQUETA),
+    // Sin ningún conteo detrás, esto es una suma desde el principio de los
+    // tiempos. Hay que poder decirlo en vez de presumir un número exacto.
+    desdeConteo: Boolean(e.ultimoConteo),
+    contadoEn: e.ultimoConteo?.fecha || null
+  };
+}
+
 /** Convierte marquetas enteras a dieciseisavos. */
 function deMarquetas(marquetas) {
   return Math.round(marquetas) * DIECISEISAVOS_POR_MARQUETA;
@@ -256,6 +285,6 @@ function aMarquetas(dieciseisavos) {
 
 module.exports = {
   ultimoConteo, producidoDesde, producidoEntreDias, producidoPorRangos, vendidoDesde, partidoPorLista,
-  mermaDesde, mermasDesde, cortadoDesde, cortesDesde, estadoAlmacen,
+  mermaDesde, mermasDesde, cortadoDesde, cortesDesde, estadoAlmacen, hieloQueQueda,
   deMarquetas, aMarquetas, DIECISEISAVOS_POR_MARQUETA
 };

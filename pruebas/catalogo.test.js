@@ -35,6 +35,20 @@ test('la fábrica arranca con el hielo dado de alta', async () => {
   assert.deepEqual(codigos, ['1', '116', '12', '12M', '14', '18', '1M'],
                    'las cinco fracciones de público, y las dos de mayoreo (v2.0)');
 
+  // LA BOLSA DE HIELO GOURMET NACE DADA DE BAJA  (v4.1)
+  //
+  // Existe en el catálogo desde el primer arranque —para que cortar hielo
+  // tenga dónde sumar las bolsas— pero no sale en la caja hasta que hay
+  // bolsas de verdad: un producto con existencia en cero aparecería como
+  // AGOTADO, y una fábrica que todavía no corta hielo tendría ese aviso
+  // puesto para siempre.
+  const bolsa = bd.prepare("SELECT * FROM productos WHERE id = 'prod-bolsa-gourmet'").get();
+  assert.ok(bolsa, 'está sembrada');
+  assert.equal(bolsa.activo, 0, 'pero de baja hasta que se corte hielo');
+  assert.equal(bolsa.lleva_inventario, 1, 'y lleva cuenta de piezas');
+  assert.equal(bolsa.precio_centavos, 0,
+    'sin precio: inventárselo sería venderla mal el primer día');
+
   // Los de mayoreo NO tienen precio propio: su precio sale de la lista del
   // cliente. Un precio propio aquí sería un segundo lugar donde cambiarlo.
   const mayoreo = json.datos.productos.filter((p) => p.mayoreo);

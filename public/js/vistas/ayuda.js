@@ -251,9 +251,16 @@ const TEMAS = [
   // ==========================================================
   {
     id: 'existencia',
-    titulo: 'Existencia: contar el cuarto frío',
-    busca: 'existencia conteo cuarto frío contar marquetas fracción 5/8 cuadre faltante vendido salidas almacén horarios anotar la existencia tres pasos hielo cortado gourmet bolsas turnos nocturno',
+    titulo: 'El cuarto frío: cuánto hielo hay',
+    busca: 'existencia conteo cuarto frío contar marquetas fracción 5/8 cuadre faltante vendido salidas almacén horarios hielo cortado gourmet bolsas turnos nocturno merma derretida rota regalada',
     cuerpo: `
+      <p class="ayuda-tip"><b>Contar el cuarto frío ya no se hace aquí.</b>
+      Desde la v4.1 se cuenta <b>al terminar el turno</b>, en la caja, junto
+      con los paños del día — que es como se canta de verdad. Esta pantalla
+      es para <b>mirar</b> lo que hay, anotar lo que se derritió, y revisar
+      los conteos que ya se hicieron. Se entra desde
+      <b>Producción de hielo › 🧊 El cuarto frío</b>.</p>
+
       <h4>Los turnos de la fábrica</h4>
       <p>El de la mañana va de <b>7 a 3</b>, el de la tarde de <b>3 a 8</b>, y
       a las 8 se cierra al público. A veces —no siempre— hay un
@@ -261,48 +268,14 @@ const TEMAS = [
       mañana. Ese no vende: solo saca, y lo suyo se anota igual que lo demás,
       a su nombre.</p>
 
-      <h4>Cuándo se anota</h4>
-      <p>Normalmente al mismo tiempo que el corte de caja, a las horas que
-      estén configuradas (de fábrica, <b>3 de la tarde y 8 de la noche</b>).
-      Cuando pasa la hora y nadie ha anotado, la pantalla lo marca en
-      naranja.</p>
-
-      <h4>Anotar la existencia: tres pasos, en ese orden</h4>
-      <p>El botón <b>Anotar la existencia</b> no empieza preguntando cuánto
-      hielo queda. Empieza por los paños, y el orden no es capricho:</p>
-      <ol>
-        <li><b>¿Qué paños se sacaron?</b> — con su calidad, sus mermas, sus
-        huecas y sus aguadas. Va primero porque el obrero canta las dos cosas
-        juntas, y si el conteo se anota antes, la producción de esa jornada
-        todavía no está capturada: el cuadre diría que <b>sobra</b> hielo
-        cuando lo que falta es el registro.</li>
-        <li><b>¿Se cortó hielo?</b> — marquetas que se agarraron del cuarto
-        frío para cortarlas y hacer <b>hielo gourmet</b> en bolsas.</li>
-        <li><b>¿Cuánto quedó en el cuarto frío?</b> — el conteo de siempre.</li>
-      </ol>
-      <p class="ayuda-tip">Quién lo anota <b>no se pregunta</b>: es el usuario
-      que tiene la sesión abierta en esa computadora, y queda guardado
-      siempre.</p>
-
-      <h4>El hielo que se corta no se pierde</h4>
-      <p>Esas marquetas salen del cuarto frío sin pasar por la caja y sin
-      haberse derretido: <b>dejan de ser marquetas y se vuelven bolsas</b>.
-      Antes no había dónde ponerlas y aparecían dentro del faltante,
-      revueltas con lo que se derritió y con lo que se fue sin pagar. En
-      temporada, eso hacía que el corte dijera que faltan cuarenta marquetas
-      sin que nadie supiera si era robo o era trabajo.</p>
-      <p>Las <b>bolsas</b> se anotan si alguien las contó, y si no se dejan en
-      cero y se guarda sin ese dato. Todavía no son un producto del sistema
-      —lo serán—, pero el día que lo sean ese número va a hacer falta y ya no
-      se puede ir a buscar hacia atrás.</p>
-
-      <h4>Por qué no te dice cuánto debería haber</h4>
-      <p>En el paso 3, el sistema <b>no enseña el número esperado</b> hasta
-      que anotes el tuyo. Con el número a la vista, contar se vuelve
-      confirmar: se aprieta aceptar, el cuadre da cero siempre y el conteo
-      deja de servir para lo único que sirve, que es descubrir lo que no
-      cuadra. Sale enseguida, en el resultado, cuando ya no puede influir en
-      nadie.</p>
+      <h4>Anotar lo que se derritió o se rompió</h4>
+      <p>Con <b>💧 Anotar hielo derretido o roto</b>. Se escribe cuánto y qué
+      le pasó: se derritió, se rompió, se regaló, se usó en la fábrica, u
+      otra cosa.</p>
+      <p class="ayuda-tip">Esto importa más de lo que parece. Sin anotarlo,
+      el hielo derretido aparece dentro del <b>faltante</b>, revuelto con el
+      que se fue sin pagar. Son dos cosas muy distintas: una es física y no
+      tiene remedio, la otra es un problema que hay que atender.</p>
 
       <h4>Cómo se captura</h4>
       <p>Tal como te lo dictan. Si te dicen <b>"quedan 14 marquetas y 5/8"</b>,
@@ -580,7 +553,7 @@ debería quedar − contado = FALTA</pre>
   {
     id: 'caja',
     titulo: 'Caja: el turno y el corte',
-    busca: 'caja turno fondo corte arqueo gasto retiro efectivo cerrar cuadrar sobra falta corregir corte firmado olvidó gasto agregar quitar administrador motivo copia comprobante reimprimir volver a imprimir papel',
+    busca: 'caja turno fondo corte arqueo gasto retiro efectivo cerrar cuadrar sobra falta corregir corte firmado olvidó gasto agregar quitar administrador motivo copia comprobante reimprimir volver a imprimir papel existencia contar hielo paños bolsas gourmet entregar entregado sin contar dos papeles detalle',
     cuerpo: `
       <h4>El turno se abre solo</h4>
       <p>No hay que ir a ninguna pantalla a abrir la caja: <b>lo hace tu
@@ -639,20 +612,63 @@ debería quedar − contado = FALTA</pre>
       —que no tiene remedio— de <b>lo que se fue sin pagar</b>, que sí es un
       problema. Antes iban revueltos en el mismo "faltante".</p>
 
-      <h4>Cerrar y contar</h4>
-      <p>Cuentas <b>todo</b> el dinero del cajón, incluido el fondo, y lo
-      escribes. El sistema hace la cuenta:</p>
+      <h4>Terminar el turno: cuatro pasos</h4>
+      <p>Hasta la v4.0 esto era dos cosas: el corte de caja por un lado y
+      <b>anotar la existencia</b> por otro. Eran <b>la misma cosa hecha dos
+      veces</b> —se hacen al mismo tiempo, con la misma persona enfrente y
+      con los mismos números en la boca—, así que ahora es un solo momento.
+      Con el botón <b>Terminar el turno</b> aparecen, en el orden en que se
+      cantan de verdad:</p>
+      <ol class="instrucciones">
+        <li><b>¿Qué paños se sacaron?</b> Es la pantalla de Producción de
+        siempre, entera: se toca cada paño y se anota como todos los días,
+        con quién lo sacó, cómo salió el hielo y canasta por canasta.</li>
+        <li><b>¿Cuánto hielo queda en el cuarto frío?</b> Tal como te lo
+        dictan: 14 marquetas y una fracción.</li>
+        <li><b>¿Se cortó hielo para bolsas?</b> Sí o no, y cuántas
+        marquetas.</li>
+        <li><b>¿Cuántas bolsas salieron?</b> Solo si se cortó.</li>
+      </ol>
+      <p class="ayuda-tip">Los paños van <b>primero</b> y no es capricho:
+      anotando el conteo antes, la producción de esa jornada todavía no está
+      capturada y el cuadre sale mal — parece que SOBRA hielo, cuando lo que
+      falta es el registro.</p>
 
-      <pre class="ayuda-formula">fondo + cobrado + entradas − gastos = debería haber
-debería haber − contado = DIFERENCIA</pre>
+      <h4>El dinero NO se cuenta al cerrar</h4>
+      <p>Los cortes son rápidos y hay que seguir atendiendo. Así que el
+      turno se cierra <b>sin contar</b>: sale el papel con <b>lo que debería
+      haber</b> en el cajón, el cajero lo entrega y sigue vendiendo.</p>
+
+      <pre class="ayuda-formula">fondo + cobrado + entradas − gastos = DEBERÍA HABER</pre>
+
+      <p>Cuando el dueño o el gerente reciben el dinero, lo cuentan y lo
+      anotan en ese corte: <b>Cortes › el turno › 💵 Anotar lo que me
+      entregaron</b>. Recién entonces existe la diferencia.</p>
+
+      <pre class="ayuda-formula">debería haber − lo que entregaron = DIFERENCIA</pre>
 
       <p>Si <b>falta</b>: casi siempre es un cambio dado de más o un gasto que
       no se anotó. Si <b>sobra</b>: un cambio que no se dio, o una venta
       cobrada sin registrar.</p>
+      <p class="ayuda-tip">Mientras nadie haya contado, el corte dice
+      <b>«sin contar»</b>, no «cuadró exacto». Decir que cuadró cuando nadie
+      ha contado sería inventarse el dato. En la lista de <b>Cortes</b> sale
+      arriba cuántos turnos están esperando que se anote su dinero. Anotarlo
+      es del <b>gerente</b> o del <b>administrador</b>: que lo hiciera el
+      propio cajero sería firmarse a sí mismo la entrega.</p>
 
-      <p>El corte se imprime con espacio para la firma. Los gastos y las
-      entradas salen <b>en dos columnas</b>, cada una con su suma: un día de
-      gastos son quince renglones, y así cabe en la mitad de papel.</p>
+      <h4>El corte sale en dos papeles</h4>
+      <ul>
+        <li>El <b>primero</b> es el del dinero, con espacio para la firma y
+        una raya para escribir a mano lo que se entrega. Los gastos van solo
+        como <b>total</b>, con cuántos son.</li>
+        <li>El <b>segundo</b> es el <b>detalle</b>: los gastos y las entradas
+        uno por uno, con sus sumas, en dos columnas para ahorrar papel.</li>
+      </ul>
+      <p class="ayuda-tip">Son dos porque son de dos personas distintas: el
+      primero se entrega con el cajón, el segundo se queda en la carpeta.
+      Si el turno no tuvo ningún gasto ni entrada, el segundo no se imprime:
+      media hoja en blanco que dice GASTOS es papel tirado todos los días.</p>
 
       <h4>Mandar el corte por WhatsApp</h4>
       <p>Abajo del corte, <b>📲 Mandar por WhatsApp</b>. El sistema arma la
@@ -758,7 +774,7 @@ debería haber − contado = DIFERENCIA</pre>
   {
     id: 'productos',
     titulo: 'Productos y precios: qué aparece en la caja',
-    busca: 'productos categorías catálogo precios códigos alta baja refrescos garrafones botones color inventario costo ganancia margen foto pedir mínimo contar existencias piezas',
+    busca: 'productos categorías catálogo precios códigos alta baja refrescos garrafones botones color inventario costo ganancia margen foto pedir mínimo contar existencias piezas bolsa hielo gourmet cortado bolsas',
     cuerpo: `
       <p>Los botones de la caja se dan de alta en <b>Productos y precios</b>,
       sin tocar el programa. Solo el administrador.</p>
@@ -860,7 +876,22 @@ debería haber − contado = FALTA</pre>
       <p>Se configura en <b>Sistema</b>, junto a los respaldos: es un aparato
       de esta computadora, no un producto. Con el nombre de la impresora
       puesto, el ticket sale <b>al instante</b>; sin él, lo imprime el
-      navegador y aparece la ventana de impresión.</p>`
+      navegador y aparece la ventana de impresión.</p>
+      <h4>La bolsa de hielo gourmet</h4>
+      <p>Viene dada de alta desde el primer día, pero <b>de baja y sin
+      precio</b>, y no sale en la caja hasta que hay bolsas de verdad: un
+      producto con existencia en cero aparecería como <b>agotado</b> desde
+      siempre.</p>
+      <p>En cuanto un corte anota bolsas —al terminar el turno, paso 4— la
+      bolsa <b>se da de alta sola</b> y le entran esas piezas al inventario.
+      Ahí es cuando toca <b>ponerle su precio</b>: sin él no se puede
+      vender.</p>
+      <p class="ayuda-tip">Cortar marquetas no es perder hielo: es
+      <b>transformarlo</b>. Sale del cuarto frío y entra como bolsas, y desde
+      ahí se vende con la misma cuenta que todo lo demás — venderlas se las
+      resta solas. Si se anula ese corte, las bolsas se van con él: si el
+      hielo vuelve al cuarto frío y las bolsas se quedan, está contado dos
+      veces.</p>`
   },
 
   // ==========================================================

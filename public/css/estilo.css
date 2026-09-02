@@ -3903,3 +3903,52 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 .corte-corregido strong { display: block; font-size: 14.5px; }
 .corte-corregido p { margin: 6px 0 0; font-size: 13.5px; line-height: 1.5; }
 .corte-corregido p.ayuda { font-size: 12.5px; }
+
+/* ============================================================
+   CUÁNTO HIELO QUEDA, A LA VISTA  (v4.1)
+
+   El obrero que saca el hielo es a quien más le sirve saber si el cuarto
+   está vacío, y es justo quien nunca lo tenía delante. Va grande porque se
+   mira de reojo, no se lee.
+   ============================================================ */
+
+.cuarto-frio { text-align: center; }
+.cuarto-frio-numero {
+  display: block; font-size: 34px; font-weight: 800; line-height: 1.1;
+  color: var(--primario); font-variant-numeric: tabular-nums;
+}
+.cuarto-frio small { display: block; margin-top: 4px; font-size: 11.5px; color: var(--suave); }
+/* Bajo cero no es un dato del cuarto frío: es que falta capturar algo. */
+.cuarto-frio-numero.malo { color: var(--rojo); }
+
+/* La barra del paso, cuando Producción se usa dentro del corte. */
+.corte-paso {
+  display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+  padding: 12px 16px; margin-bottom: 12px; border-radius: var(--radio);
+  background: var(--et-operario-f); border: 2px solid var(--primario);
+}
+.corte-paso .crece { flex: 1 1 280px; min-width: 0; }
+.corte-paso strong { display: block; font-size: 17px; }
+.corte-paso small { display: block; font-size: 13px; color: var(--suave); line-height: 1.45; }
+.corte-paso-num {
+  display: inline-block; margin-bottom: 2px;
+  font-size: 11.5px; font-weight: 800; letter-spacing: .7px;
+  text-transform: uppercase; color: var(--primario);
+}
+.corte-paso button { width: auto; flex: 0 0 auto; }
+
+/* El corte que todavía nadie contó: ni verde ni rojo, porque no se sabe. */
+.salidas.sin-contar {
+  border-color: var(--borde-fuerte);
+  background: var(--superficie-alt);
+}
+.salidas.sin-contar strong { color: var(--texto); }
+
+/* El hielo que queda, junto al reloj de la caja. Solo lo ve el dueño. */
+.pos-hielo {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 9px; border-radius: 999px;
+  background: var(--et-operario-f); color: var(--primario);
+  font-size: 13px; font-weight: 800; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}

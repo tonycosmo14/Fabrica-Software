@@ -17,9 +17,34 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '4.0';
+const VERSION_ACTUAL = '4.1';
 
 const VERSIONES = [
+  {
+    numero: '4.1',
+    nombre: 'El corte se lo come todo',
+    fecha: '2026-09-02',
+    resumen:
+      'Anotar la existencia y hacer el corte eran la misma cosa hecha dos ' +
+      'veces. Ahora es un solo momento con cuatro pasos, el dinero no se ' +
+      'cuenta al cerrar —se anota cuando se entrega—, el corte sale en dos ' +
+      'papeles, y las bolsas de gourmet son un producto de verdad.',
+    cambios: [
+      { tipo: 'importante', texto: 'SE ELIMINÓ ANOTAR LA EXISTENCIA COMO PANTALLA APARTE. Tenías razón: era prácticamente el corte de caja. Se hacen al mismo tiempo, con la misma persona enfrente y con los mismos números en la boca, así que tener dos pantallas solo servía para que a veces se hiciera una y no la otra. Ahora al TERMINAR EL TURNO aparecen los cuatro pasos, en el orden en que se cantan: 1) qué paños se sacaron, 2) cuánto hielo queda en el cuarto frío, 3) si se cortó hielo para bolsas, 4) cuántas bolsas salieron.' },
+      { tipo: 'importante', texto: 'Y EL PASO DE LOS PAÑOS ES LA PANTALLA DE PRODUCCIÓN ENTERA, no la página rápida: se toca cada paño y se anota como todos los días, canasta por canasta, con lo que le pasó a cada molde. Es la misma pantalla de siempre, no una parecida.' },
+      { tipo: 'mejora', texto: 'POR DENTRO, EL ORDEN DE GUARDAR NO ES EL DE PREGUNTAR. Se pregunta como se canta —primero cuánto queda, luego si se cortó— pero se guarda el hielo cortado PRIMERO: el conteo se congela con la foto de lo que ya se había explicado, y si el corte de hielo entrara después, esas marquetas aparecerían como faltante.' },
+      { tipo: 'importante', texto: 'EL DINERO YA NO SE CUENTA AL CERRAR EL TURNO. Como dijiste: los cortes son rápidos y se tiene que seguir atendiendo. Ahora sale el papel con LO QUE DEBERÍA HABER, el cajero entrega el cajón y sigue vendiendo. Cuando tú o el gerente reciben el dinero, lo cuentan y lo anotan en ese corte, y de ahí sale la diferencia.' },
+      { tipo: 'importante', texto: 'MIENTRAS NADIE CUENTE, EL CORTE DICE "SIN CONTAR", no "cuadró exacto". Decir que cuadró cuando nadie ha contado sería inventarse justo el dato que falta. En la lista de Cortes sale arriba cuántos turnos están esperando que se anote su dinero, para que ninguno se quede olvidado.' },
+      { tipo: 'nuevo', texto: 'ANOTAR LA ENTREGA es del gerente o del administrador, nunca del cajero: sería firmarse a sí mismo la entrega. Y no se puede anotar dos veces por descuido — para cambiarla hay que decir que se está corrigiendo.' },
+      { tipo: 'nuevo', texto: 'EL CORTE SALE EN DOS PAPELES, como pediste. El primero es el del dinero, con espacio para la firma y una raya para escribir a mano lo que se entrega; los gastos van solo como TOTAL, con cuántos son. Corta el papel, y sale el segundo con los gastos y las entradas UNO POR UNO, con sus sumas. Son dos porque son de dos personas distintas: el primero se entrega con el cajón, el segundo se queda en la carpeta.' },
+      { tipo: 'mejora', texto: 'Si el turno no tuvo ningún gasto ni entrada, el segundo papel no se imprime: media hoja en blanco que dice GASTOS es papel tirado todos los días.' },
+      { tipo: 'nuevo', texto: 'LAS BOLSAS DE HIELO GOURMET SON UN PRODUCTO DE VERDAD. Me preguntaste dónde se guardan y dónde se suman: ahora tienen su lugar. Cortar marquetas no es perder hielo, es TRANSFORMARLO — sale del cuarto frío y entra al inventario como bolsas, y desde ahí se venden como cualquier otra cosa, restándose solas con cada venta.' },
+      { tipo: 'importante', texto: 'LA BOLSA NACE DADA DE BAJA Y SIN PRECIO, y se da de alta sola con el primer corte que le meta bolsas. Sin precio porque inventárselo sería peor: se vendería mal el primer día sin que nadie se diera cuenta — hay que ponérselo en Productos y precios. Y de baja porque un producto con existencia en cero sale como AGOTADO en la caja, y una fábrica que todavía no corta hielo tendría ese aviso puesto para siempre.' },
+      { tipo: 'nuevo', texto: 'CUÁNTO HIELO QUEDA, A LA VISTA. En Producción de hielo, grande, en el panel de la derecha: el obrero que saca el hielo es a quien más le sirve saber si el cuarto está vacío, y era justo quien nunca lo tenía delante. Y en la pantalla de vender, junto al reloj, SOLO PARA EL ADMINISTRADOR — en el mostrador, con gente esperando, un número más que leer es un número más que estorba.' },
+      { tipo: 'mejora', texto: 'LA PANTALLA DE EXISTENCIA SALIÓ DEL INICIO Y DEL MENÚ. Lo que quedaba de ella —mirar lo que hay, anotar lo derretido o roto, y revisar los conteos viejos— vive ahora dentro de PRODUCCIÓN DE HIELO, con el botón 🧊 El cuarto frío. Es donde está el hielo y donde está la gente que lo mueve.' },
+      { tipo: 'mejora', texto: 'Todo esto está explicado en el manual, en Caja, en El cuarto frío y en Productos y precios.' }
+    ]
+  },
   {
     numero: '4.0',
     nombre: 'Una sola manera de anotar el hielo',

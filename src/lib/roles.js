@@ -47,6 +47,10 @@ const PERMISOS_POR_ROL = {
     'existencia.ver',
     'existencia.contar',
     'existencia.corregir',
+    // RECIBIR EL DINERO DE UN TURNO. El cajero entrega el cajón y se va;
+    // quien cuenta lo que le entregaron es el gerente o el dueño. Que lo
+    // hiciera el cajero sería firmarse a sí mismo la entrega.
+    'caja.recibir',
     'inventario.ver',
     'inventario.mover',
     // Ver a cómo se compra cada cosa y cuánto se le gana.

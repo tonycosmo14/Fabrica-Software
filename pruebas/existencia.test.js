@@ -435,3 +435,104 @@ test('el conteo guarda su foto de lo derretido y lo cortado', async () => {
   assert.ok(c.merma > 0);
   assert.ok(c.cortado > 0);
 });
+
+
+// ============================================================
+// LAS BOLSAS SON UN PRODUCTO DE VERDAD  (v4.1)
+//
+// Cortar marquetas no es perder hielo: es transformarlo. Sale del cuarto
+// frío y entra al inventario como bolsas, y desde ahí se vende con la
+// misma cuenta que todo lo demás.
+// ============================================================
+
+const BOLSA = 'prod-bolsa-gourmet';
+
+test('la bolsa existe en el catálogo, con inventario y sin precio', async () => {
+  await entrarAdmin();
+  const p = bd.prepare('SELECT * FROM productos WHERE id = ?').get(BOLSA);
+  assert.ok(p, 'la bolsa existe desde la primera vez que arranca el sistema');
+  assert.equal(p.lleva_inventario, 1);
+  assert.equal(p.precio_centavos, 0, 'inventarle un precio sería peor que no ponerlo');
+});
+
+test('cortar hielo le suma bolsas al inventario y la da de alta', async () => {
+  await entrarAdmin();
+  const antes = (await llamar(`/api/inventario/${BOLSA}`)).json.datos.estado.esperado;
+
+  const r = await llamar('/api/existencia/cortes', {
+    method: 'POST', cuerpo: { almacenId, dieciseisavos: 2 * 16, bolsas: 30 }
+  });
+  assert.equal(r.estado, 201);
+  assert.equal(r.json.datos.producto.id, BOLSA);
+  assert.equal(r.json.datos.producto.sinPrecio, true, 'y lo avisa: sin precio no se vende');
+
+  const p = bd.prepare('SELECT * FROM productos WHERE id = ?').get(BOLSA);
+  assert.equal(p.activo, 1, 'en cuanto hay bolsas de verdad, existe');
+
+  const inv = (await llamar(`/api/inventario/${BOLSA}`)).json.datos;
+  assert.equal(inv.estado.esperado, antes + 30, 'treinta bolsas más para vender');
+
+  // Y el renglón dice de dónde salieron.
+  const corte = bd.prepare('SELECT * FROM cortes_hielo WHERE id = ?').get(r.json.datos.corte.id);
+  assert.equal(corte.producto_id, BOLSA);
+  assert.ok(corte.movimiento_id, 'con su renglón de inventario, para poder deshacerlo');
+});
+
+test('venderlas se las resta solas', async () => {
+  await entrarAdmin();
+  await llamar(`/api/catalogo/productos/${BOLSA}`, {
+    method: 'PUT', cuerpo: { precioCentavos: 4000 } });
+
+  const antes = (await llamar(`/api/inventario/${BOLSA}`)).json.datos.estado.esperado;
+  const v = await llamar('/api/ventas', {
+    method: 'POST', cuerpo: { lineas: [{ productoId: BOLSA, cantidad: 4 }], pago: 200 } });
+  assert.equal(v.estado, 201, JSON.stringify(v.json));
+
+  const despues = (await llamar(`/api/inventario/${BOLSA}`)).json.datos.estado.esperado;
+  assert.equal(despues, antes - 4, 'la misma cuenta de siempre, sin guardar cuántas hay');
+});
+
+test('anular el corte se lleva las bolsas con él', async () => {
+  await entrarAdmin();
+  const r = await llamar('/api/existencia/cortes', {
+    method: 'POST', cuerpo: { almacenId, dieciseisavos: 16, bolsas: 12 }
+  });
+  const antes = (await llamar(`/api/inventario/${BOLSA}`)).json.datos.estado.esperado;
+
+  await llamar(`/api/existencia/cortes/${r.json.datos.corte.id}/anular`, {
+    method: 'POST', cuerpo: { motivo: 'Se capturó dos veces' } });
+
+  const despues = (await llamar(`/api/inventario/${BOLSA}`)).json.datos.estado.esperado;
+  assert.equal(despues, antes - 12,
+    'si el hielo vuelve al cuarto frío y las bolsas se quedan, está contado dos veces');
+});
+
+test('un corte sin bolsas no mueve el inventario', async () => {
+  await entrarAdmin();
+  const antes = (await llamar(`/api/inventario/${BOLSA}`)).json.datos.estado.esperado;
+  const r = await llamar('/api/existencia/cortes', {
+    method: 'POST', cuerpo: { almacenId, dieciseisavos: 16 } });
+  assert.equal(r.json.datos.producto, null);
+
+  const despues = (await llamar(`/api/inventario/${BOLSA}`)).json.datos.estado.esperado;
+  assert.equal(despues, antes, 'nadie las contó: no se inventa un número');
+});
+
+test('el conteo y el corte de hielo se cuelgan de su turno de caja', async () => {
+  await entrarAdmin();
+  const abierta = (await llamar('/api/caja')).json.datos.abierta
+    || (await llamar('/api/caja/abrir', { method: 'POST', cuerpo: { fondo: 0 } }))
+       .json.datos.abierta;
+  const cajaId = abierta.caja.id;
+
+  const corte = await llamar('/api/existencia/cortes', {
+    method: 'POST', cuerpo: { almacenId, dieciseisavos: 16, bolsas: 5, cajaId } });
+  assert.equal(bd.prepare('SELECT caja_id FROM cortes_hielo WHERE id = ?')
+    .get(corte.json.datos.corte.id).caja_id, cajaId);
+
+  const conteo = await llamar('/api/existencia/conteos', {
+    method: 'POST', cuerpo: { almacenId, dieciseisavos: 10 * 16, cajaId } });
+  assert.equal(bd.prepare('SELECT caja_id FROM conteos WHERE id = ?')
+    .get(conteo.json.datos.conteo.id).caja_id, cajaId,
+    'poder volver a imprimir un corte completo meses después');
+});

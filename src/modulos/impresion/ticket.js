@@ -559,18 +559,43 @@ function ticketCorte(corte, { negocio = '' } = {}) {
               `${corte.ventas.cobradas} tickets`
               + (cancelados ? ` (${cancelados} cancelado${cancelados === 1 ? '' : 's'})` : ''));
 
+  // EL PRIMER PAPEL ES EL DEL DINERO, y nada más  (v4.1)
+  //
+  // Los gastos van SOLO como total: el desglose se imprime aparte, en el
+  // segundo papel. Este es el que se firma y el que se entrega con el
+  // cajón, y con quince renglones de gastos en medio deja de leerse de un
+  // vistazo justo cuando hay que leerlo rápido.
+  const cuantosGastos = corte.movimientos.filter(
+    (m) => m.tipo === 'salida' && !m.anulado_en).length;
+
   t.bloqueDerecha([
     ['Fondo', formato(c.fondo_centavos)],
     ['Cobrado', '+' + formato(c.vendido_centavos)],
     c.entradas_centavos ? ['Entradas', '+' + formato(c.entradas_centavos)] : null,
-    ['Gastos y retiros', '-' + formato(c.salidas_centavos)],
+    [`Gastos y retiros${cuantosGastos ? ` (${cuantosGastos})` : ''}`,
+     '-' + formato(c.salidas_centavos)],
     ['DEBERIA HABER', formato(c.esperado_centavos)],
-    ['CONTADO', formato(c.contado_centavos)]
+    // Desde la v4.1 el turno se cierra SIN contar: el cajero entrega el
+    // cajón y sigue vendiendo. Lo que se contó se anota después, cuando el
+    // dueño o el gerente reciben el dinero. Si todavía no se ha recibido,
+    // este papel no puede decir cuánto había — solo cuánto debía haber.
+    c.entregado_centavos != null ? ['ENTREGADO', formato(c.entregado_centavos)]
+      : c.contado_centavos != null ? ['CONTADO', formato(c.contado_centavos)]
+      : null
   ]);
 
-  t.centro().negrita().tamano(2, 1)
-   .linea(dif === 0 ? 'CUADRO' : dif > 0 ? `SOBRA ${formato(dif)}` : `FALTA ${formato(-dif)}`)
-   .normal().izquierda();
+  t.centro().negrita().tamano(2, 1);
+  if (dif === null || dif === undefined) {
+    // Ni "cuadró" ni "falta": todavía no se ha contado, y decir cualquiera
+    // de las dos cosas sería inventarse el dato que este papel viene a
+    // pedir. La raya de abajo es donde se escribe a mano lo que se entrega.
+    t.linea('SIN CONTAR').tamano(1, 1).normal();
+    t.linea('Se anota al recibir el dinero').izquierda();
+    t.firma('Entregado $');
+  } else {
+    t.linea(dif === 0 ? 'CUADRO' : dif > 0 ? `SOBRA ${formato(dif)}` : `FALTA ${formato(-dif)}`)
+     .normal().izquierda();
+  }
 
   // QUIÉN METIÓ QUÉ. Solo cuando de verdad hubo relevo: con una sola
   // persona esto repetiría el bloque de arriba con otro nombre.
@@ -587,18 +612,63 @@ function ticketCorte(corte, { negocio = '' } = {}) {
     }
   }
 
-  // Los movimientos, en dos columnas para ahorrar papel.
-  if (corte.movimientos.length) {
-    const gastos = corte.movimientos.filter((m) => m.tipo === 'salida');
-    const entradas = corte.movimientos.filter((m) => m.tipo !== 'salida');
-    if (gastos.length) columnaDeMovimientos(t, 'GASTOS', gastos, '-');
-    if (entradas.length) columnaDeMovimientos(t, 'ENTRADAS', entradas, '+');
-  }
-
   // Quién cerró y la raya para firmar, en el mismo renglón: es su firma la
   // que va ahí, así que el nombre delante de la raya dice las dos cosas.
   t.separador();
   t.firma(`Cerro ${(c.cerrada_por_nombre || '-').slice(0, 24)}`);
+  pie(t, negocio);
+  t.izquierda().cortar(cfg.avanceCorte);
+  return t.bytes();
+}
+
+/**
+ * EL SEGUNDO PAPEL DEL CORTE: EL DESGLOSE  (v4.1)
+ *
+ * "Que se imprima como si fueran dos notas: una como la que existe pero
+ * solo con el total de los gastos, corta el papel, y otra con los gastos,
+ * entradas y movimientos importantes ya desglosaditos."
+ *
+ * Y tiene sentido más allá del gusto: el primero se firma y se entrega con
+ * el cajón; este se queda en la carpeta, o se le da a quien tenga que
+ * revisar en qué se fue el dinero. Son dos papeles porque son de dos
+ * personas distintas.
+ *
+ * Devuelve null cuando no hay nada que desglosar: media hoja en blanco que
+ * dice "GASTOS" y nada debajo es papel tirado todos los días.
+ */
+function ticketCorteMovimientos(corte, { negocio = '' } = {}) {
+  const vivos = corte.movimientos.filter((m) => !m.anulado_en);
+  const anulados = corte.movimientos.filter((m) => m.anulado_en);
+  if (!corte.movimientos.length) return null;
+
+  const cfg = configuracion();
+  const t = new Ticket(cfg.anchoMm, cfg.codigoPagina);
+  const c = corte.caja;
+
+  encabezado(t, {
+    titulo: `Detalle #${c.folio}`,
+    atendio: c.cajero_nombre,
+    fecha: fechaTicket(c.cerrada_en)
+  });
+  t.separador();
+
+  const gastos = vivos.filter((m) => m.tipo === 'salida');
+  const entradas = vivos.filter((m) => m.tipo !== 'salida');
+  if (gastos.length) columnaDeMovimientos(t, 'GASTOS', gastos, '-');
+  if (entradas.length) columnaDeMovimientos(t, 'ENTRADAS', entradas, '+');
+
+  // Lo anulado va al final y aparte. No suma, pero que un gasto se haya
+  // anulado a media tarde es justo lo que se viene a mirar aquí.
+  if (anulados.length) {
+    t.negrita().separadorConTitulo('ANULADOS').negrita(false);
+    for (const m of anulados) {
+      t.columnas2(m.concepto.slice(0, 26), formato(m.centavos));
+      if (m.motivo_anulacion) t.linea(`  ${m.motivo_anulacion.slice(0, 40)}`);
+    }
+  }
+
+  t.separador();
+  t.columnas2('Del turno de', c.cajero_nombre || '-');
   pie(t, negocio);
   t.izquierda().cortar(cfg.avanceCorte);
   return t.bytes();
@@ -734,5 +804,5 @@ function pulsoCajon(salida = 2) {
 
 module.exports = {
   ticketVenta, ticketMovimiento, ticketCotizacion, ticketPrueba,
-  ticketCorte, ticketCortePersona, ticketConteo, ticketProduccion, ticketResumenDia, pulsoCajon, fechaCorta, fechaTicket
+  ticketCorte, ticketCorteMovimientos, ticketCortePersona, ticketConteo, ticketProduccion, ticketResumenDia, pulsoCajon, fechaCorta, fechaTicket
 };

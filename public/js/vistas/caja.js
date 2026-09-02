@@ -28,6 +28,9 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
   // Anular deja el renglón tachado; borrar lo quita. Lo segundo es del
   // administrador y con su contraseña.
   const esAdmin = estadoApp.permisos.includes('*');
+  // Recibir el dinero de un turno es del gerente o del dueño: que lo
+  // hiciera el propio cajero sería firmarse a sí mismo la entrega.
+  const puedeRecibir = esAdmin || estadoApp.permisos.includes('caja.recibir');
 
   const marca = await cargarMarca();
 
@@ -181,9 +184,16 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
               <button class="secundario" id="salida">− Gasto o retiro</button>
               <button class="secundario" id="entrada">＋ Meter dinero</button>
             </div>
+            <!-- Ya no dice "y contar": desde la v4.1 el corte no cuenta el
+                 dinero. Cuenta el HIELO, hace el corte y lo imprime. -->
             <button class="grande" id="cerrar" style="margin-top:10px;width:100%">
-              Terminar turno y contar
-            </button>` : ''}
+              Terminar el turno
+            </button>
+            <p class="ayuda" style="margin:8px 0 0;font-size:13px">
+              Se anotan los paños y el hielo del cuarto frío, y sale el corte
+              con lo que <b>debería haber</b> en el cajón. Contar el dinero es
+              después, cuando se entrega.
+            </p>` : ''}
         </section>
 
         <section class="tarjeta">
@@ -603,6 +613,24 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
    *    lo que entre se aparta para el que llega, y en cuanto ponga su PIN
    *    el turno se le asigna.
    */
+  /**
+   * TERMINAR EL TURNO  (rehecho en la v4.1)
+   *
+   * Anotar la existencia y hacer el corte de caja eran la misma cosa hecha
+   * dos veces: se hacen al mismo tiempo, con la misma persona enfrente y
+   * con los mismos números en la boca. Ahora es un solo momento, y adentro
+   * van los cuatro pasos en el orden en que se cantan de verdad:
+   *
+   *   1. qué paños se sacaron        (la pantalla de Producción, entera)
+   *   2. cuánto hielo queda en el cuarto frío
+   *   3. si se cortó hielo para bolsas, y cuánto
+   *   4. cuántas bolsas salieron de ese hielo
+   *
+   * Y EL DINERO NO SE CUENTA. "Como los cortes son rápidos y se tiene que
+   * seguir atendiendo": sale el papel con lo que debía haber, el cajero
+   * entrega el cajón y sigue vendiendo. Quien cuenta es el dueño o el
+   * gerente cuando llegan (⋯ en el historial de cortes).
+   */
   async function terminarTurno(e, sinDueno) {
     const como = sinDueno
       ? 'cerrar'
@@ -613,24 +641,228 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
             { valor: 'cerrar', texto: 'Sí, ya llegó',
               detalle: 'Se hace el corte y se cierra la sesión. Quien entra pone su PIN.' },
             { valor: 'entregar', texto: 'Todavía no llega',
-              detalle: 'Se cuenta tu dinero y la venta sigue. Lo que entre se aparta para quien llegue.' }
+              detalle: 'Se hace tu corte y la venta sigue. Lo que entre se aparta para quien llegue.' }
           ]
         });
     if (!como) return;
 
-    const contado = await pedirImporte({
-      titulo: como === 'entregar' ? 'Entregar el turno' : 'Cerrar el turno',
-      texto: `Cuenta todo el dinero del cajón, incluido el fondo. Deberían ser ${pesos(e.esperado)}.`,
-      marcador: paraEditar(e.esperado),
-      ok: 'Contar y ver el corte'
+    // Lo que se va anotando por el camino. Nada se guarda hasta el final:
+    // un corte a medias —con el hielo contado y el turno abierto— dejaría
+    // la fábrica en un estado que nadie sabría cómo terminar.
+    const cierre = { como, marquetas: null, cortadas: null, bolsas: null, almacenId: null };
+
+    pasoPanos(cierre);
+  }
+
+  /** PASO 1 · Los paños, en la pantalla de Producción de siempre. */
+  async function pasoPanos(cierre) {
+    const { vistaProduccion } = await import('./produccion.js');
+    return vistaProduccion(pantalla, estadoApp, {
+      enCorte: true,
+      alSeguir: () => pasoCuartoFrio(cierre)
     });
-    if (contado === null) return;
+  }
+
+  /**
+   * PASO 2 · Cuánto hielo queda.
+   *
+   * NO se enseña lo que debería haber. Con ese número delante, contar se
+   * vuelve confirmar —se aprieta aceptar y el cuadre da cero siempre— y el
+   * conteo deja de servir para lo único que sirve, que es descubrir lo que
+   * no cuadra. El número sale enseguida, en el resultado.
+   */
+  async function pasoCuartoFrio(cierre) {
+    let almacenes = [];
+    try { almacenes = (await api.obtener('/existencia')).almacenes; }
+    catch (err) { return avisar(err.message, 'error'); }
+
+    const almacen = almacenes.find((a) => a.almacen.recibe_produccion) || almacenes[0];
+    if (!almacen) return cerrarDeVerdad(cierre);
+    cierre.almacenId = almacen.almacen.id;
+
+    pantalla.innerHTML = `
+      <div class="corte-paso">
+        <div class="crece">
+          <span class="corte-paso-num">Paso 2 de 4</span>
+          <strong>¿Cuánto hielo queda en ${esc(almacen.almacen.nombre)}?</strong>
+          <small>Cuéntalo y escríbelo. Puede llevar fracción: 14 y 5/8.</small>
+        </div>
+      </div>
+
+      <div class="tarjeta">
+        <form id="f">
+          <label>
+            <span class="etiqueta-chica">Marquetas contadas</span>
+            <input id="marquetas" class="campo-importe" inputmode="decimal"
+                   autocomplete="off" placeholder="14" required>
+          </label>
+          <label>
+            <span class="etiqueta-chica">Y una fracción<small>si quedó una partida</small></span>
+            <select id="fraccion">
+              <option value="0">nada más</option>
+              <option value="8">y 1/2</option>
+              <option value="4">y 1/4</option>
+              <option value="2">y 1/8</option>
+              <option value="1">y 1/16</option>
+              <option value="12">y 3/4</option>
+            </select>
+          </label>
+          <button type="submit" style="margin-top:18px">Siguiente →</button>
+        </form>
+      </div>
+
+      <button class="secundario chico" id="atras" style="margin-top:12px">‹ Volver a los paños</button>`;
+
+    const q = (sel) => pantalla.querySelector(sel);
+    setTimeout(() => q('#marquetas').focus(), 150);
+    q('#atras').onclick = () => pasoPanos(cierre);
+    q('#f').onsubmit = (ev) => {
+      ev.preventDefault();
+      const n = Number(q('#marquetas').value);
+      if (!Number.isFinite(n) || n < 0) return avisar('Escribe cuántas marquetas contaste.', 'error');
+      cierre.marquetas = Math.floor(n) * 16 + Number(q('#fraccion').value);
+      pasoCortado(cierre);
+    };
+  }
+
+  /** PASO 3 · ¿Se cortó hielo para bolsas? */
+  function pasoCortado(cierre) {
+    pantalla.innerHTML = `
+      <div class="corte-paso">
+        <div class="crece">
+          <span class="corte-paso-num">Paso 3 de 4</span>
+          <strong>¿Se cortó hielo para bolsas?</strong>
+          <small>
+            Las marquetas que se agarraron del cuarto frío para hacer hielo
+            gourmet. No se perdieron: se transformaron, y por eso van aparte
+            de lo que se derrite.
+          </small>
+        </div>
+      </div>
+
+      <div class="tarjeta">
+        <div class="fila-botones">
+          <button class="secundario grande crece" id="no">No se cortó nada</button>
+          <button class="grande crece" id="si">Sí, se cortó</button>
+        </div>
+
+        <form id="f" hidden style="margin-top:18px">
+          <label>
+            <span class="etiqueta-chica">Cuántas marquetas se cortaron</span>
+            <input id="cortadas" class="campo-importe" inputmode="numeric"
+                   autocomplete="off" placeholder="3">
+          </label>
+          <button type="submit" style="margin-top:18px">Siguiente →</button>
+        </form>
+      </div>
+
+      <button class="secundario chico" id="atras" style="margin-top:12px">‹ Volver al conteo</button>`;
+
+    const q = (sel) => pantalla.querySelector(sel);
+    q('#atras').onclick = () => pasoCuartoFrio(cierre);
+    q('#no').onclick = () => { cierre.cortadas = null; cierre.bolsas = null; cerrarDeVerdad(cierre); };
+    q('#si').onclick = () => {
+      q('#f').hidden = false;
+      q('#cortadas').focus();
+    };
+    q('#f').onsubmit = (ev) => {
+      ev.preventDefault();
+      const n = Number(q('#cortadas').value);
+      if (!Number.isInteger(n) || n <= 0) {
+        return avisar('Escribe cuántas marquetas se cortaron.', 'error');
+      }
+      cierre.cortadas = n * 16;
+      pasoBolsas(cierre);
+    };
+  }
+
+  /** PASO 4 · Cuántas bolsas salieron de ese hielo. */
+  function pasoBolsas(cierre) {
+    pantalla.innerHTML = `
+      <div class="corte-paso">
+        <div class="crece">
+          <span class="corte-paso-num">Paso 4 de 4</span>
+          <strong>¿Cuántas bolsas salieron?</strong>
+          <small>
+            De las ${cierre.cortadas / 16} marquetas que se cortaron. Se le
+            suman a la <b>bolsa de hielo gourmet</b>, y desde ahí se venden
+            como cualquier otra cosa.
+          </small>
+        </div>
+      </div>
+
+      <div class="tarjeta">
+        <form id="f">
+          <label>
+            <span class="etiqueta-chica">Bolsas<small>déjalo vacío si nadie las contó</small></span>
+            <input id="bolsas" class="campo-importe" inputmode="numeric"
+                   autocomplete="off" placeholder="42">
+          </label>
+          <p class="ayuda" style="margin:10px 0 0">
+            Si nadie las contó, se deja vacío. Un cero mañana parecería un
+            dato, y no lo es.
+          </p>
+          <button type="submit" style="margin-top:18px">Terminar el turno</button>
+        </form>
+      </div>
+
+      <button class="secundario chico" id="atras" style="margin-top:12px">‹ Volver</button>`;
+
+    const q = (sel) => pantalla.querySelector(sel);
+    setTimeout(() => q('#bolsas').focus(), 150);
+    q('#atras').onclick = () => pasoCortado(cierre);
+    q('#f').onsubmit = (ev) => {
+      ev.preventDefault();
+      const t = q('#bolsas').value.trim();
+      if (t !== '') {
+        const n = Number(t);
+        if (!Number.isInteger(n) || n < 0) {
+          return avisar('Las bolsas se escriben en números enteros.', 'error');
+        }
+        cierre.bolsas = n;
+      }
+      cerrarDeVerdad(cierre);
+    };
+  }
+
+  /**
+   * Y AHORA SÍ, TODO JUNTO.
+   *
+   * EL ORDEN DE GUARDADO NO ES EL ORDEN DE PREGUNTAR. Se pregunta como se
+   * canta —primero cuánto queda, luego si se cortó— pero se guarda como
+   * manda la aritmética: el hielo cortado PRIMERO, porque el conteo se
+   * congela con la foto de lo que se había explicado hasta ese momento, y
+   * si el corte de hielo entrara después, esas marquetas aparecerían como
+   * faltante.
+   */
+  async function cerrarDeVerdad(cierre) {
+    pantalla.innerHTML = '<div class="cargando">Cerrando el turno…</div>';
 
     try {
-      const r = await api.enviar(`/caja/${como === 'entregar' ? 'entregar' : 'cerrar'}`,
-                                 { contado });
-      verCorte(r.corte.caja.id, r.corte, { cerroSesion: como === 'cerrar' });
-    } catch (err) { avisar(err.message, 'error'); }
+      const caja = (await api.obtener('/caja')).abierta;
+      const cajaId = caja?.caja?.id || null;
+
+      if (cierre.cortadas) {
+        await api.enviar('/existencia/cortes', {
+          almacenId: cierre.almacenId,
+          dieciseisavos: cierre.cortadas,
+          ...(cierre.bolsas === null ? {} : { bolsas: cierre.bolsas }),
+          cajaId
+        });
+      }
+
+      if (cierre.marquetas !== null && cierre.almacenId) {
+        await api.enviar('/existencia/conteos', {
+          almacenId: cierre.almacenId, dieciseisavos: cierre.marquetas, cajaId
+        });
+      }
+
+      const r = await api.enviar(`/caja/${cierre.como === 'entregar' ? 'entregar' : 'cerrar'}`, {});
+      verCorte(r.corte.caja.id, r.corte, { cerroSesion: cierre.como === 'cerrar' });
+    } catch (err) {
+      avisar(err.message, 'error');
+      pintar();
+    }
   }
 
   // ==========================================================
@@ -640,14 +872,19 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
     const { corte } = yaCargado ? { corte: yaCargado } : await api.obtener(`/caja/cortes/${id}`);
     const c = corte.caja;
 
+    // SIN CONTAR TODAVÍA. Desde la v4.1 el turno se cierra sin contar el
+    // dinero: la diferencia llega vacía hasta que alguien recibe la
+    // entrega. Ni "cuadró" ni "falta" — no se sabe, y eso es un dato.
     const dif = c.diferencia_centavos;
+    const sinContar = dif === null || dif === undefined;
     const cuadra = dif === 0;
     const sobra = dif > 0;
+    const recibida = c.entregado_centavos != null;
 
     pantalla.innerHTML = `
       <button class="secundario chico no-imprimir" id="volver">‹ Caja</button>
 
-      <div class="tarjeta ${cuadra ? 'cuadre-exacto' : 'cuadre-diferencia'}"
+      <div class="tarjeta ${sinContar ? '' : cuadra ? 'cuadre-exacto' : 'cuadre-diferencia'}"
            style="margin-top:14px">
         <h2 style="margin:0 0 6px">Corte del turno #${c.folio}</h2>
         <p class="ayuda" style="margin:0 0 14px">
@@ -661,22 +898,56 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
             <div class="cuadre-linea suma"><span>+ Entradas</span><strong>${pesos(c.entradas_centavos)}</strong></div>` : ''}
           <div class="cuadre-linea vendido"><span>− Gastos y retiros</span><strong>${pesos(c.salidas_centavos)}</strong></div>
           <div class="cuadre-linea total"><span>= Debería haber</span><strong>${pesos(c.esperado_centavos)}</strong></div>
-          <div class="cuadre-linea contado"><span>− Contaste</span><strong>${pesos(c.contado_centavos)}</strong></div>
+          ${recibida
+            ? `<div class="cuadre-linea contado"><span>− Te entregaron</span><strong>${pesos(c.entregado_centavos)}</strong></div>`
+            : c.contado_centavos != null
+              ? `<div class="cuadre-linea contado"><span>− Contaste</span><strong>${pesos(c.contado_centavos)}</strong></div>`
+              : ''}
         </div>
 
-        <div class="salidas ${cuadra ? 'exacto' : sobra ? 'sobra' : ''}">
-          <span>${cuadra ? 'Cuadró exacto' : sobra ? 'Sobra' : 'Falta'}</span>
-          <strong>${cuadra ? '✓' : pesos(Math.abs(dif))}</strong>
-          <small>${cuadra ? 'ni un peso de diferencia' : 'en el cajón'}</small>
-        </div>
+        ${sinContar ? `
+          <div class="salidas sin-contar">
+            <span>Todavía sin contar</span>
+            <strong>${pesos(c.esperado_centavos)}</strong>
+            <small>es lo que debería haber en el cajón</small>
+          </div>
 
-        <p class="ayuda" style="margin:14px 0 0">
-          ${cuadra
-            ? 'Todo el dinero que debía estar, está.'
-            : sobra
-              ? 'Hay más dinero del que debería. Casi siempre es un cambio que no se dio, o una venta cobrada sin registrar.'
-              : 'Falta dinero. Puede ser un cambio dado de más, un gasto que no se anotó, o dinero que se sacó del cajón.'}
-        </p>
+          <p class="ayuda" style="margin:14px 0 0">
+            El turno se cierra <b>sin contar</b> para no parar la venta. Quien
+            reciba el dinero anota aquí cuánto le entregaron, y de ahí sale la
+            diferencia.
+          </p>
+
+          ${puedeRecibir ? `
+            <button class="no-imprimir" id="anotar-entrega" style="margin-top:14px">
+              💵 Anotar lo que me entregaron
+            </button>` : ''}
+        ` : `
+          <div class="salidas ${cuadra ? 'exacto' : sobra ? 'sobra' : ''}">
+            <span>${cuadra ? 'Cuadró exacto' : sobra ? 'Sobra' : 'Falta'}</span>
+            <strong>${cuadra ? '✓' : pesos(Math.abs(dif))}</strong>
+            <small>${cuadra ? 'ni un peso de diferencia' : 'en el cajón'}</small>
+          </div>
+
+          <p class="ayuda" style="margin:14px 0 0">
+            ${cuadra
+              ? 'Todo el dinero que debía estar, está.'
+              : sobra
+                ? 'Hay más dinero del que debería. Casi siempre es un cambio que no se dio, o una venta cobrada sin registrar.'
+                : 'Falta dinero. Puede ser un cambio dado de más, un gasto que no se anotó, o dinero que se sacó del cajón.'}
+          </p>
+
+          ${recibida ? `
+            <p class="ayuda" style="margin:8px 0 0">
+              Lo recibió <b>${esc(c.recibido_por_nombre || '—')}</b>
+              · ${esc(formatoFecha(c.recibido_en))}
+              ${c.notas_entrega ? `<br>«${esc(c.notas_entrega)}»` : ''}
+            </p>
+            ${puedeRecibir ? `
+              <button class="secundario chico no-imprimir" id="anotar-entrega"
+                      style="margin-top:10px">Corregir lo que entregaron</button>` : ''}
+          ` : ''}
+        `}
 
         ${c.corregido_en ? avisoCorregido(c) : ''}
       </div>
@@ -701,10 +972,19 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
           ${c.entradas_centavos ? `<tr><td>Entradas</td><td>+${pesos(c.entradas_centavos)}</td></tr>` : ''}
           <tr><td>Gastos y retiros</td><td>−${pesos(c.salidas_centavos)}</td></tr>
           <tr class="fuerte"><td>Debería haber</td><td>${pesos(c.esperado_centavos)}</td></tr>
-          <tr class="fuerte"><td>Contado</td><td>${pesos(c.contado_centavos)}</td></tr>
-          <tr class="fuerte"><td>${sobra ? 'Sobra' : cuadra ? 'Diferencia' : 'Falta'}</td>
-              <td>${pesos(Math.abs(dif))}</td></tr>
+          ${recibida
+            ? `<tr class="fuerte"><td>Entregado</td><td>${pesos(c.entregado_centavos)}</td></tr>`
+            : c.contado_centavos != null
+              ? `<tr class="fuerte"><td>Contado</td><td>${pesos(c.contado_centavos)}</td></tr>`
+              : ''}
+          ${sinContar
+            ? '<tr class="fuerte"><td>Sin contar</td><td>—</td></tr>'
+            : `<tr class="fuerte"><td>${sobra ? 'Sobra' : cuadra ? 'Diferencia' : 'Falta'}</td>
+                   <td>${pesos(Math.abs(dif))}</td></tr>`}
         </table>
+
+        ${sinContar ? `
+          <div class="ticket-firma" style="margin-top:10px">Entregado $ _______________</div>` : ''}
 
         ${corte.porPersona?.length > 1 ? `
           <div class="ticket-folio" style="margin-top:10px">CADA QUIEN</div>
@@ -715,13 +995,26 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
                   <td>${pesos(p.efectivo)}</td></tr>`).join('')}
           </table>` : ''}
 
-        ${movimientosEnDosColumnas(corte.movimientos)}
-
         <div class="ticket-pie">
           <div>Cerró: ${esc(c.cerrada_por_nombre || '—')}</div>
           <div class="ticket-firma">Firma: ______________________</div>
         </div>
       </div>
+
+      <!-- EL SEGUNDO PAPEL, igual que sale de la impresora: el primero se
+           firma y se entrega con el cajón, este se queda en la carpeta. -->
+      ${corte.movimientos.length ? `
+        <div class="ticket" id="ticket-detalle">
+          <div class="ticket-cabeza">
+            <strong>${esc((marca.nombreNegocio || 'Hielo LOLHA').toUpperCase())}</strong>
+            <span>${esc(formatoFecha(c.cerrada_en))}</span>
+          </div>
+          <div class="ticket-folio">DETALLE DEL CORTE #${c.folio}</div>
+          ${movimientosEnDosColumnas(corte.movimientos)}
+          <div class="ticket-pie">
+            <div>Del turno de ${esc(c.cajero_nombre || '—')}</div>
+          </div>
+        </div>` : ''}
 
       ${corte.porPersona?.length > 1 ? `
         <p class="ayuda no-imprimir" style="margin-top:14px">
@@ -805,8 +1098,52 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
     const arreglar = pantalla.querySelector('#corregir-corte');
     if (arreglar) arreglar.onclick = () => pantallaCorregir(corte);
 
+    const entrega = pantalla.querySelector('#anotar-entrega');
+    if (entrega) entrega.onclick = () => anotarEntrega(c);
+
     const siguiente = pantalla.querySelector('#siguiente-cajero');
     if (siguiente) siguiente.onclick = () => alTerminar?.();
+  }
+
+  /**
+   * ANOTAR EL DINERO QUE ENTREGARON  (v4.1)
+   *
+   * La otra mitad del corte. El cajero entregó el cajón y se fue; aquí es
+   * donde el dueño o el gerente cuentan lo que les dieron, y recién
+   * entonces existe la diferencia.
+   *
+   * NO se enseña lo que debería haber antes de escribirlo, por la misma
+   * razón que en el conteo del hielo: con el número delante, contar se
+   * vuelve confirmar. Sale enseguida, cuando ya no puede influir.
+   */
+  async function anotarEntrega(c) {
+    const yaHabia = c.entregado_centavos != null;
+    const monto = await pedirImporte({
+      titulo: yaHabia ? 'Corregir lo que entregaron' : `Turno #${c.folio}`,
+      texto: yaHabia
+        ? `Estaba anotado ${pesos(c.entregado_centavos)}. Escribe lo correcto.`
+        : `Cuenta el dinero que te entregó ${c.cajero_nombre || 'el cajero'} y escríbelo.`,
+      ok: 'Anotarlo'
+    });
+    if (monto === null) return;
+
+    const notas = await pedirTexto({
+      titulo: 'Alguna nota',
+      texto: 'Opcional. Por ejemplo: "me lo dio al día siguiente".',
+      marcador: 'Lo que haga falta recordar', ok: 'Guardar',
+      largo: 200, unaLinea: true, opcional: true
+    });
+    if (notas === null) return;
+
+    try {
+      const r = await api.enviar(`/caja/cortes/${c.id}/entregado`,
+                                 { monto, notas, corregir: yaHabia });
+      const d = r.corte.caja.diferencia_centavos;
+      avisar(d === 0 ? 'Cuadró exacto'
+        : d > 0 ? `Sobran ${pesos(d)}` : `Faltan ${pesos(-d)}`,
+        d === 0 ? 'bien' : 'error');
+      verCorte(c.id, r.corte);
+    } catch (e) { avisar(e.message, 'error'); }
   }
 
   /**
@@ -1052,14 +1389,26 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
   // ==========================================================
   async function verHistorial() {
     const { cortes } = await api.obtener('/caja/cortes?limite=40');
+    // Los que se cerraron y nadie ha contado todavía. Son los que hay que
+    // atender: un corte sin entrega anotada es dinero sin cuadrar.
+    const sinContar = cortes.filter((c) => c.diferencia_centavos == null);
 
     pantalla.innerHTML = `
       <button class="secundario chico" id="volver">‹ Caja</button>
       <h2 style="margin-top:14px">Cortes de caja</h2>
       <p class="ayuda">
-        Un renglón por turno. La columna de diferencia es lo que sobró o
-        faltó al contar el dinero.
+        Un renglón por turno. Los turnos se cierran <b>sin contar el
+        dinero</b>: la diferencia aparece cuando alguien anota lo que le
+        entregaron.
       </p>
+      ${sinContar.length ? `
+        <div class="aviso-sin-caja" style="margin-bottom:12px">
+          <strong>${sinContar.length} ${sinContar.length === 1
+            ? 'turno está esperando' : 'turnos están esperando'} que se anote el dinero.</strong>
+          ${puedeRecibir
+            ? 'Tócalos y anota cuánto te entregaron.'
+            : 'Lo anota el gerente o el administrador.'}
+        </div>` : ''}
 
       <div class="tarjeta plana">
         <table class="tabla">
@@ -1073,9 +1422,14 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
               <td>${esc(formatoFecha(c.cerrada_en))}</td>
               <td>${esc(c.cajero_nombre || '—')}</td>
               <td>${pesos(c.vendido_centavos)}</td>
-              <td class="${c.diferencia_centavos === 0 ? '' : 'malo'}">
-                ${c.diferencia_centavos === 0 ? '✓' : pesos(c.diferencia_centavos)}
+              <td class="${c.diferencia_centavos == null ? 'vacio-folio'
+                            : c.diferencia_centavos === 0 ? '' : 'malo'}">
+                ${c.diferencia_centavos == null
+                  ? 'sin contar'
+                  : c.diferencia_centavos === 0 ? '✓' : pesos(c.diferencia_centavos)}
                 ${c.corregido_en ? '<small>corregido</small>' : ''}
+                ${c.recibido_por_nombre
+                  ? `<small>lo recibió ${esc(c.recibido_por_nombre)}</small>` : ''}
               </td>
               ${esAdmin ? `
                 <td class="der">

@@ -1091,3 +1091,120 @@ test('no se le puede colgar a un corte un movimiento de otro', async () => {
   assert.equal(r.estado, 404);
   assert.match(r.json.error, /no es de este corte/);
 });
+
+
+// ============================================================
+// EL TURNO SE CIERRA SIN CONTAR EL DINERO  (v4.1)
+//
+// "Como los cortes son rápidos y se tiene que seguir atendiendo, no hay
+// que anotar cuánto dinero hay físicamente, sino imprimir el ticket con el
+// dinero que debería haber." El cajero entrega el cajón y sigue vendiendo;
+// quien cuenta es el dueño o el gerente cuando llegan.
+// ============================================================
+
+test('el turno se cierra sin contar, y entonces no hay diferencia', async () => {
+  await turnoLimpio();
+  await venderUnaMarqueta();
+  const { abierta } = (await llamar('/api/caja')).json.datos;
+
+  const r = await llamar('/api/caja/cerrar', { method: 'POST', cuerpo: {} });
+  assert.equal(r.estado, 200);
+
+  const c = r.json.datos.corte.caja;
+  assert.equal(c.esperado_centavos, abierta.esperado, 'lo que debía haber sí se sabe');
+  assert.equal(c.contado_centavos, null);
+  assert.equal(c.diferencia_centavos, null,
+    'decir "cuadró exacto" cuando nadie contó sería inventarse el dato');
+});
+
+test('lo que entregaron se anota después, y de ahí sale la diferencia', async () => {
+  await turnoLimpio();
+  await venderUnaMarqueta();
+  const { abierta } = (await llamar('/api/caja')).json.datos;
+  const esperado = abierta.esperado;
+  const corte = (await llamar('/api/caja/cerrar', { method: 'POST', cuerpo: {} }))
+    .json.datos.corte;
+
+  // Entregaron $50 menos de lo que debía haber.
+  const r = await llamar(`/api/caja/cortes/${corte.caja.id}/entregado`, {
+    method: 'POST', cuerpo: { monto: (esperado - 5000) / 100, notas: 'Me lo dio en la tarde' } });
+  assert.equal(r.estado, 200);
+
+  const c = r.json.datos.corte.caja;
+  assert.equal(c.entregado_centavos, esperado - 5000);
+  assert.equal(c.diferencia_centavos, -5000, 'faltan $50');
+  assert.ok(c.recibido_en && c.recibido_por, 'y queda quién lo recibió y cuándo');
+  assert.ok(c.recibido_por_nombre, 'y con nombre, no con un id');
+  assert.match(c.notas_entrega, /en la tarde/);
+});
+
+test('la entrega no se anota dos veces por descuido', async () => {
+  await turnoLimpio();
+  await venderUnaMarqueta();
+  const corte = (await llamar('/api/caja/cerrar', { method: 'POST', cuerpo: {} }))
+    .json.datos.corte;
+
+  await llamar(`/api/caja/cortes/${corte.caja.id}/entregado`, {
+    method: 'POST', cuerpo: { monto: 100 } });
+
+  const otra = await llamar(`/api/caja/cortes/${corte.caja.id}/entregado`, {
+    method: 'POST', cuerpo: { monto: 200 } });
+  assert.equal(otra.estado, 409);
+  assert.match(otra.json.error, /Ya se anotó una entrega/);
+
+  // Diciendo que se corrige, sí.
+  const buena = await llamar(`/api/caja/cortes/${corte.caja.id}/entregado`, {
+    method: 'POST', cuerpo: { monto: 200, corregir: true } });
+  assert.equal(buena.estado, 200);
+  assert.equal(buena.json.datos.corte.caja.entregado_centavos, 20000);
+});
+
+test('un turno abierto no puede recibir entrega', async () => {
+  await turnoLimpio();
+  const { caja } = (await llamar('/api/caja')).json.datos.abierta;
+  const r = await llamar(`/api/caja/cortes/${caja.id}/entregado`, {
+    method: 'POST', cuerpo: { monto: 100 } });
+  assert.equal(r.estado, 409);
+});
+
+test('el cajero no se recibe a sí mismo la entrega', async () => {
+  await turnoLimpio();
+  await venderUnaMarqueta();
+  const corte = (await llamar('/api/caja/cerrar', { method: 'POST', cuerpo: {} }))
+    .json.datos.corte;
+
+  await entrarPorNombre('Rosa', '4444');    // cajera
+  const r = await llamar(`/api/caja/cortes/${corte.caja.id}/entregado`, {
+    method: 'POST', cuerpo: { monto: 100 } });
+  assert.equal(r.estado, 403, 'sería firmarse a sí misma la entrega');
+
+  await entrarPorNombre('Mari', '7777');    // gerente: sí
+  const g = await llamar(`/api/caja/cortes/${corte.caja.id}/entregado`, {
+    method: 'POST', cuerpo: { monto: 100 } });
+  assert.equal(g.estado, 200);
+  await entrarAdmin();
+});
+
+test('corregir un corte con entrega anotada corrige la diferencia', async () => {
+  await turnoLimpio();
+  await venderUnaMarqueta();
+  const { abierta } = (await llamar('/api/caja')).json.datos;
+  const esperado = abierta.esperado;
+  const corte = (await llamar('/api/caja/cerrar', { method: 'POST', cuerpo: {} }))
+    .json.datos.corte;
+
+  // Entregó $200 menos: se le olvidó anotar la gasolina.
+  await llamar(`/api/caja/cortes/${corte.caja.id}/entregado`, {
+    method: 'POST', cuerpo: { monto: (esperado - 20000) / 100 } });
+  let c = (await llamar(`/api/caja/cortes/${corte.caja.id}`)).json.datos.corte.caja;
+  assert.equal(c.diferencia_centavos, -20000);
+
+  await llamar(`/api/caja/cortes/${corte.caja.id}/movimientos`, {
+    method: 'POST',
+    cuerpo: { tipo: 'salida', concepto: 'Gasolina', monto: 200,
+              motivo: 'Trajo el ticket al día siguiente' } });
+
+  c = (await llamar(`/api/caja/cortes/${corte.caja.id}`)).json.datos.corte.caja;
+  assert.equal(c.diferencia_centavos, 0,
+    'con el gasto anotado, lo que entregó era exactamente lo que debía');
+});

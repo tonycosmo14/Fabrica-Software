@@ -11,8 +11,12 @@ const ACCESOS = [
   // habido un tanque nuevo. Un acceso permanente en el inicio para algo
   // que se usa una vez en la vida ocupa el sitio de lo que sí se usa todos
   // los días. Vive donde hace falta: en la tuerca de Producción de hielo.
+  // Y la EXISTENCIA salió del inicio en la v4.1 por la misma razón, pero
+  // más fuerte: contar el cuarto frío y hacer el corte de caja eran la
+  // misma cosa hecha dos veces. Ahora se cuenta al terminar el turno, y lo
+  // que queda del cuarto frío —lo derretido, los conteos viejos— vive
+  // dentro de Producción de hielo, que es donde está el hielo.
   { emoji: '🏭', titulo: 'Producción de hielo', ruta: '#/tanques', permiso: 'produccion.ver', desde: null },
-  { emoji: '📦', titulo: 'Existencia',   ruta: '#/existencia', permiso: 'existencia.ver',      desde: null   },
   { emoji: '🛒', titulo: 'Vender',       ruta: '#/venta',     permiso: 'venta.registrar',      desde: null   },
   { emoji: '💵', titulo: 'Caja',         ruta: '#/caja',      permiso: 'caja.ver',             desde: null   },
   { emoji: '👥', titulo: 'Usuarios',     ruta: '#/usuarios',  permiso: 'usuarios.administrar', desde: null   },
