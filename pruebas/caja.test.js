@@ -912,3 +912,182 @@ test('un concepto que se repite solo lo da de alta el administrador', async () =
   const lista = await llamar('/api/caja/conceptos');
   assert.equal(lista.estado, 200, 'los ve para poder usarlos');
 });
+
+
+// ============================================================
+// CORREGIR UN CORTE YA FIRMADO  (v3.9)
+//
+// EL CASO: a la cajera se le olvidó anotar un gasto. Cerró su turno, el
+// cajón salió corto y quedó escrito un faltante que no existió. Al día
+// siguiente llega con el ticket en la mano.
+//
+// Lo que se comprueba es lo que hace que esto sea seguro: que lo contado
+// no se toque, que lo que decía el papel firmado se guarde, y que solo el
+// administrador pueda hacerlo.
+// ============================================================
+
+/**
+ * Un turno propio y limpio: se cierra lo que hubiera quedado de otra
+ * prueba, se abre uno nuevo, se vende una marqueta y se cuenta el dinero.
+ * `contadoDeMenos` es lo que "falta" al contar.
+ */
+async function turnoLimpio(fondo = 500) {
+  await entrarAdmin();
+  // Entrar al sistema abre un turno solo, y las pruebas de arriba le
+  // dejaron gastos: se cierra con cero, que aquí da igual.
+  if ((await llamar('/api/caja')).json.datos.abierta) {
+    await llamar('/api/caja/cerrar', { method: 'POST', cuerpo: { contado: 0 } });
+  }
+  const r = await llamar('/api/caja/abrir', { method: 'POST', cuerpo: { fondo } });
+  assert.equal(r.estado, 201, JSON.stringify(r.json));
+}
+
+async function turnoCerrado({ contadoDeMenos = 0 } = {}) {
+  await turnoLimpio();
+  await venderUnaMarqueta();
+  const { abierta } = (await llamar('/api/caja')).json.datos;
+  const r = await llamar('/api/caja/cerrar', {
+    method: 'POST',
+    cuerpo: { contado: (abierta.esperado - contadoDeMenos) / 100 }
+  });
+  assert.equal(r.estado, 200, JSON.stringify(r.json));
+  return r.json.datos.corte;
+}
+
+test('un gasto que se olvidó se le agrega al corte y el faltante desaparece', async () => {
+  // La cajera gastó $200 en gasolina y no lo anotó: el cajón sale corto.
+  const corte = await turnoCerrado({ contadoDeMenos: 20000 });
+  assert.equal(corte.caja.diferencia_centavos, -20000, 'faltan $200');
+
+  const r = await llamar(`/api/caja/cortes/${corte.caja.id}/movimientos`, {
+    method: 'POST',
+    cuerpo: { tipo: 'salida', concepto: 'Gasolina', monto: 200,
+              motivo: 'Se le olvidó anotarlo y trajo el ticket' }
+  });
+  assert.equal(r.estado, 201);
+
+  const c = r.json.datos.corte.caja;
+  assert.equal(c.diferencia_centavos, 0, 'ya cuadra: el dinero sí se había gastado');
+  assert.equal(c.salidas_centavos, 20000);
+
+  // Lo contado NO se toca: eso es lo que había en el cajón.
+  assert.equal(c.contado_centavos, corte.caja.contado_centavos);
+
+  // Y lo que decía el papel firmado se guardó.
+  assert.equal(c.diferencia_original_centavos, -20000);
+  assert.equal(c.esperado_original_centavos, corte.caja.esperado_centavos);
+  assert.equal(c.correcciones, 1);
+  assert.ok(c.corregido_en && c.corregido_por);
+  assert.match(c.motivo_correccion, /trajo el ticket/);
+
+  // El renglón queda marcado como agregado después del corte: al
+  // reimprimirlo se distingue de los que sí estaban en el papel.
+  const nuevo = r.json.datos.corte.movimientos.find((m) => m.concepto === 'Gasolina');
+  assert.equal(nuevo.tras_corte, 1);
+  // Y con la fecha del turno, no la de hoy: el gasto pasó en ese turno.
+  assert.equal(nuevo.fecha, corte.caja.cerrada_en);
+});
+
+test('corregir dos veces no pisa lo que decía el papel', async () => {
+  await entrarAdmin();
+  const corte = await turnoCerrado({ contadoDeMenos: 30000 });
+  const original = corte.caja.diferencia_centavos;
+
+  for (const monto of [100, 200]) {
+    const r = await llamar(`/api/caja/cortes/${corte.caja.id}/movimientos`, {
+      method: 'POST',
+      cuerpo: { tipo: 'salida', concepto: `Gasto de ${monto}`, monto,
+                motivo: 'Aparecieron los tickets' }
+    });
+    assert.equal(r.estado, 201);
+  }
+
+  const c = (await llamar(`/api/caja/cortes/${corte.caja.id}`)).json.datos.corte.caja;
+  assert.equal(c.diferencia_original_centavos, original,
+    'lo original sigue siendo lo del papel, no lo de la corrección anterior');
+  assert.equal(c.correcciones, 2);
+  assert.equal(c.diferencia_centavos, 0);
+});
+
+test('un gasto que no era se le quita al corte', async () => {
+  await turnoLimpio();
+  await venderUnaMarqueta();
+  await llamar('/api/caja/movimientos', {
+    method: 'POST', cuerpo: { tipo: 'salida', concepto: 'Refacción', monto: 150 } });
+
+  const { abierta } = (await llamar('/api/caja')).json.datos;
+  // Se cuenta $150 de MÁS respecto a lo esperado: el gasto no fue de verdad.
+  const cerrado = (await llamar('/api/caja/cerrar', {
+    method: 'POST', cuerpo: { contado: (abierta.esperado + 15000) / 100 } })).json.datos.corte;
+  assert.equal(cerrado.caja.diferencia_centavos, 15000, 'sobran $150');
+
+  const m = cerrado.movimientos.find((x) => x.concepto === 'Refacción');
+  const r = await llamar(`/api/caja/cortes/${cerrado.caja.id}/movimientos/${m.id}/quitar`, {
+    method: 'POST', cuerpo: { motivo: 'Ese gasto no fue de este turno' } });
+  assert.equal(r.estado, 200);
+
+  const c = r.json.datos.corte.caja;
+  assert.equal(c.diferencia_centavos, 0, 'quitándolo, cuadra');
+  assert.equal(c.salidas_centavos, 0);
+
+  // No se borró: sigue ahí, tachado con su motivo (regla 3.4).
+  const sigue = r.json.datos.corte.movimientos.find((x) => x.id === m.id);
+  assert.ok(sigue.anulado_en);
+  assert.match(sigue.motivo_anulacion, /no fue de este turno/);
+});
+
+test('corregir un corte pide motivo', async () => {
+  await entrarAdmin();
+  const corte = await turnoCerrado();
+
+  for (const cuerpo of [
+    { tipo: 'salida', concepto: 'X', monto: 10 },
+    { tipo: 'salida', concepto: 'X', monto: 10, motivo: '   ' }
+  ]) {
+    const r = await llamar(`/api/caja/cortes/${corte.caja.id}/movimientos`, {
+      method: 'POST', cuerpo });
+    assert.equal(r.estado, 400, 'un corte firmado no se cambia sin decir por qué');
+  }
+});
+
+test('un turno todavía abierto no se corrige por aquí', async () => {
+  await turnoLimpio();
+  const { caja } = (await llamar('/api/caja')).json.datos.abierta;
+
+  const r = await llamar(`/api/caja/cortes/${caja.id}/movimientos`, {
+    method: 'POST',
+    cuerpo: { tipo: 'salida', concepto: 'X', monto: 10, motivo: 'porque sí' } });
+  assert.equal(r.estado, 409);
+  assert.match(r.json.error, /sigue abierto/);
+  await cerrarSiHayAbierto();
+});
+
+test('ni el gerente puede corregir un corte firmado', async () => {
+  await entrarAdmin();
+  const corte = await turnoCerrado();
+
+  await entrarPorNombre('Mari', '7777');    // gerente: anula movimientos del día
+  const r = await llamar(`/api/caja/cortes/${corte.caja.id}/movimientos`, {
+    method: 'POST',
+    cuerpo: { tipo: 'salida', concepto: 'Gasolina', monto: 200, motivo: 'se olvidó' } });
+  assert.equal(r.estado, 403, 'esto toca un papel firmado: es del administrador');
+
+  await entrarAdmin();
+});
+
+test('no se le puede colgar a un corte un movimiento de otro', async () => {
+  await entrarAdmin();
+  const uno = await turnoCerrado();
+  const dos = await turnoCerrado();
+
+  await llamar(`/api/caja/cortes/${uno.caja.id}/movimientos`, {
+    method: 'POST',
+    cuerpo: { tipo: 'salida', concepto: 'Gasolina', monto: 100, motivo: 'se olvidó' } });
+  const suyo = (await llamar(`/api/caja/cortes/${uno.caja.id}`))
+    .json.datos.corte.movimientos.find((m) => m.concepto === 'Gasolina');
+
+  const r = await llamar(`/api/caja/cortes/${dos.caja.id}/movimientos/${suyo.id}/quitar`, {
+    method: 'POST', cuerpo: { motivo: 'a ver' } });
+  assert.equal(r.estado, 404);
+  assert.match(r.json.error, /no es de este corte/);
+});

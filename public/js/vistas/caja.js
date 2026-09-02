@@ -654,6 +654,8 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
               ? 'Hay más dinero del que debería. Casi siempre es un cambio que no se dio, o una venta cobrada sin registrar.'
               : 'Falta dinero. Puede ser un cambio dado de más, un gasto que no se anotó, o dinero que se sacó del cajón.'}
         </p>
+
+        ${c.corregido_en ? avisoCorregido(c) : ''}
       </div>
 
       <div class="ticket" id="ticket">
@@ -708,6 +710,8 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
       <div class="fila-botones no-imprimir" style="margin-top:14px;flex-wrap:wrap">
         <button id="imprimir">🖨️ Imprimir el corte y el día</button>
         <button class="secundario" id="compartir">📲 Mandar por WhatsApp</button>
+        ${esAdmin && c.cerrada_en
+          ? '<button class="secundario" id="corregir-corte">⋯ Corregir este corte</button>' : ''}
         ${cerroSesion
           ? '<button class="grande crece" id="siguiente-cajero">Listo · pasa el siguiente</button>'
           : ''}
@@ -775,8 +779,210 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
       boton.disabled = false;
     };
 
+    const arreglar = pantalla.querySelector('#corregir-corte');
+    if (arreglar) arreglar.onclick = () => pantallaCorregir(corte);
+
     const siguiente = pantalla.querySelector('#siguiente-cajero');
     if (siguiente) siguiente.onclick = () => alTerminar?.();
+  }
+
+  /**
+   * EL AVISO DE QUE UN CORTE SE CORRIGIÓ.
+   *
+   * Un corte corregido tiene que poder enseñar las DOS cifras: la que
+   * decía el papel que se firmó y la que dice ahora. Sin eso, alguien que
+   * guardó su copia impresa vería dos números distintos y no habría manera
+   * de saber cuál vale.
+   */
+  function avisoCorregido(c) {
+    const antes = c.diferencia_original_centavos ?? 0;
+    const ahora = c.diferencia_centavos ?? 0;
+
+    // Dos tiempos verbales, porque son dos momentos: lo que el papel DECÍA
+    // y lo que el corte DICE. Con el mismo verbo para los dos, la frase se
+    // lee como si las dos cifras siguieran vivas.
+    const decia = (n) => n === 0 ? 'cuadraba exacto'
+      : n > 0 ? `sobraban ${pesos(n)}` : `faltaban ${pesos(Math.abs(n))}`;
+    const dice = (n) => n === 0 ? 'cuadra exacto'
+      : n > 0 ? `sobran ${pesos(n)}` : `faltan ${pesos(Math.abs(n))}`;
+
+    return `
+      <div class="corte-corregido">
+        <strong>Este corte se corrigió${c.correcciones > 1 ? ` ${c.correcciones} veces` : ''}.</strong>
+        <p>
+          El papel que se firmó decía que <b>${esc(decia(antes))}</b>;
+          ya corregido, <b>${esc(dice(ahora))}</b>.
+        </p>
+        <p class="ayuda">
+          ${esc(c.corregido_por_nombre || '—')} · ${esc(formatoFecha(c.corregido_en))}
+          ${c.motivo_correccion ? `<br>«${esc(c.motivo_correccion)}»` : ''}
+        </p>
+      </div>`;
+  }
+
+  /**
+   * CORREGIR UN CORTE YA FIRMADO  (v3.9)
+   *
+   * "A la cajera se le olvidó poner algo y tiene las pruebas para
+   * demostrarlo." El caso completo: cerró su turno, el cajón salió corto y
+   * quedó escrito un faltante que no existió. Al día siguiente aparece el
+   * ticket de la gasolina.
+   *
+   * Aquí se le agrega ese gasto, o se le quita uno que no era, y el corte
+   * se vuelve a sacar solo. Es del administrador y pide motivo: un corte
+   * firmado no se cambia sin dejar dicho por qué.
+   */
+  async function pantallaCorregir(corte) {
+    const c = corte.caja;
+    let conceptos = [];
+    try { conceptos = (await api.obtener('/caja/conceptos')).conceptos; }
+    catch { conceptos = []; }
+
+    const vivos = corte.movimientos.filter((m) => !m.anulado_en);
+
+    pantalla.innerHTML = `
+      <button class="secundario chico" id="volver">‹ El corte #${c.folio}</button>
+      <h2 style="margin-top:14px">Corregir el corte #${c.folio}</h2>
+      <p class="ayuda">
+        De <b>${esc(c.cajero_nombre || '—')}</b>, ${esc(rango(c.abierta_en, c.cerrada_en))}
+        · ahora mismo ${c.diferencia_centavos === 0 ? 'cuadra exacto'
+          : c.diferencia_centavos > 0 ? `sobran ${pesos(c.diferencia_centavos)}`
+          : `faltan ${pesos(Math.abs(c.diferencia_centavos))}`}.
+      </p>
+
+      <div class="aviso-sin-caja" style="margin:12px 0">
+        <strong>Esto cambia un papel que ya se firmó.</strong>
+        Lo que se contó en el cajón no se toca —eso fue lo que había—, pero
+        sí lo que <b>debía</b> haber, y con ello la diferencia. Lo que decía
+        antes se guarda y sigue saliendo en el corte, con tu nombre y el
+        motivo.
+      </div>
+
+      <div class="tarjeta">
+        <h3 class="emp-sub" style="margin-top:0">Agregarle algo que se olvidó</h3>
+        <form id="f">
+          <div class="emp-campos">
+            <label>
+              <span class="etiqueta-chica">Qué fue</span>
+              <select id="tipo">
+                <option value="salida">Un gasto o un retiro</option>
+                <option value="entrada">Una entrada de dinero</option>
+              </select>
+            </label>
+            <label>
+              <span class="etiqueta-chica">En qué</span>
+              <select id="concepto">
+                <option value="">✎ Escribirlo</option>
+                ${conceptos.map((x) => `
+                  <option value="${esc(x.id)}" data-tipo="${esc(x.tipo)}">
+                    ${esc(x.nombre)}
+                  </option>`).join('')}
+              </select>
+            </label>
+            <label id="campo-otro">
+              <span class="etiqueta-chica">Escríbelo</span>
+              <input id="otro" maxlength="80" placeholder="Gasolina de la camioneta">
+            </label>
+            <label>
+              <span class="etiqueta-chica">Cuánto</span>
+              <input id="monto" inputmode="decimal" placeholder="200">
+            </label>
+          </div>
+
+          <label>
+            <span class="etiqueta-chica">Notas<small>opcional</small></span>
+            <input id="notas" maxlength="300" placeholder="Trajo el ticket de la gasolinera">
+          </label>
+
+          <label>
+            <span class="etiqueta-chica">Por qué se corrige<small>queda escrito en el corte</small></span>
+            <input id="motivo" maxlength="200" required
+                   placeholder="Se le olvidó anotarlo y trajo el ticket">
+          </label>
+
+          <button type="submit" style="margin-top:18px">Agregarlo y volver a sacar el corte</button>
+        </form>
+      </div>
+
+      <div class="tarjeta plana">
+        <h3 class="emp-sub" style="margin-top:0">Quitarle algo que no era</h3>
+        ${vivos.length ? `
+          <table class="tabla">
+            <tr><th>Qué</th><th>Tipo</th><th class="der">Cuánto</th><th></th></tr>
+            ${vivos.map((m) => `
+              <tr>
+                <td>${esc(m.concepto)}
+                    ${m.tras_corte ? '<small>agregado después del corte</small>' : ''}</td>
+                <td>${m.tipo === 'salida' ? 'Gasto' : 'Entrada'}</td>
+                <td class="der">${pesos(m.centavos)}</td>
+                <td><button class="secundario chico peligro"
+                            data-quitar="${esc(m.id)}">Quitar</button></td>
+              </tr>`).join('')}
+          </table>
+          <p class="ayuda" style="margin:12px 0 0">
+            No se borra: queda <b>tachado con su motivo</b> y deja de contar.
+            Así después se puede entender qué pasó con este corte.
+          </p>`
+          : '<p class="vacio">Este turno no tuvo gastos ni entradas.</p>'}
+      </div>`;
+
+    const q = (sel) => pantalla.querySelector(sel);
+    q('#volver').onclick = () => verCorte(c.id);
+
+    // El catálogo de conceptos está partido en gastos y entradas: al
+    // cambiar el tipo, los que no son de ese tipo estorban.
+    const selTipo = q('#tipo');
+    const selConcepto = q('#concepto');
+    const acomodar = () => {
+      for (const op of selConcepto.options) {
+        if (!op.value) continue;
+        const suyo = op.dataset.tipo === selTipo.value;
+        op.hidden = !suyo;
+        if (!suyo && selConcepto.value === op.value) selConcepto.value = '';
+      }
+      q('#campo-otro').hidden = Boolean(selConcepto.value);
+    };
+    selTipo.onchange = acomodar;
+    selConcepto.onchange = acomodar;
+    acomodar();
+
+    q('#f').onsubmit = async (ev) => {
+      ev.preventDefault();
+      const cuerpo = {
+        tipo: selTipo.value,
+        monto: q('#monto').value,
+        notas: q('#notas').value,
+        motivo: q('#motivo').value
+      };
+      if (selConcepto.value) cuerpo.conceptoId = selConcepto.value;
+      else cuerpo.concepto = q('#otro').value;
+
+      try {
+        const r = await api.enviar(`/caja/cortes/${c.id}/movimientos`, cuerpo);
+        avisar('Corte corregido', 'bien');
+        verCorte(c.id, r.corte);
+      } catch (e) { avisar(e.message, 'error'); }
+    };
+
+    pantalla.querySelectorAll('[data-quitar]').forEach((b) => {
+      b.onclick = async () => {
+        const m = vivos.find((x) => x.id === b.dataset.quitar);
+        const motivo = await pedirTexto({
+          titulo: `Quitar "${m.concepto}"`,
+          texto: 'Deja de contar en el corte y el corte se vuelve a sacar. '
+               + 'No se borra: queda tachado con lo que escribas aquí.',
+          marcador: 'Se anotó dos veces, no era de este turno…',
+          ok: 'Quitarlo', largo: 200, unaLinea: true
+        });
+        if (!motivo) return;
+        try {
+          const r = await api.enviar(
+            `/caja/cortes/${c.id}/movimientos/${m.id}/quitar`, { motivo });
+          avisar('Quitado · corte corregido', 'bien');
+          verCorte(c.id, r.corte);
+        } catch (e) { avisar(e.message, 'error'); }
+      };
+    });
   }
 
   /**
@@ -834,7 +1040,10 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
 
       <div class="tarjeta plana">
         <table class="tabla">
-          <tr><th>#</th><th>Cuándo</th><th>Cajero</th><th>Cobrado</th><th>Diferencia</th></tr>
+          <tr>
+            <th>#</th><th>Cuándo</th><th>Cajero</th><th>Cobrado</th><th>Diferencia</th>
+            ${esAdmin ? '<th></th>' : ''}
+          </tr>
           ${cortes.map((c) => `
             <tr data-corte="${esc(c.id)}" style="cursor:pointer">
               <td><strong>${c.folio}</strong></td>
@@ -843,14 +1052,36 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
               <td>${pesos(c.vendido_centavos)}</td>
               <td class="${c.diferencia_centavos === 0 ? '' : 'malo'}">
                 ${c.diferencia_centavos === 0 ? '✓' : pesos(c.diferencia_centavos)}
+                ${c.corregido_en ? '<small>corregido</small>' : ''}
               </td>
-            </tr>`).join('') || '<tr><td colspan="5">Todavía no hay cortes.</td></tr>'}
+              ${esAdmin ? `
+                <td class="der">
+                  <button class="secundario chico" data-arreglar="${esc(c.id)}"
+                          title="Agregarle o quitarle un gasto">⋯</button>
+                </td>` : ''}
+            </tr>`).join('')
+            || `<tr><td colspan="${esAdmin ? 6 : 5}">Todavía no hay cortes.</td></tr>`}
         </table>
-      </div>`;
+      </div>
+      ${esAdmin ? `
+        <p class="ayuda" style="margin-top:12px">
+          Con los <b>⋯</b> se le puede agregar a un corte un gasto que se
+          olvidó, o quitarle uno que no era. El corte se vuelve a sacar solo
+          y queda dicho quién lo corrigió y por qué.
+        </p>` : ''}`;
 
     pantalla.querySelector('#volver').onclick = pintar;
     pantalla.querySelectorAll('[data-corte]').forEach((f) => {
       f.onclick = () => verCorte(f.dataset.corte);
+    });
+    pantalla.querySelectorAll('[data-arreglar]').forEach((b) => {
+      b.onclick = async (ev) => {
+        ev.stopPropagation();          // si no, también abre el corte
+        try {
+          const { corte } = await api.obtener(`/caja/cortes/${b.dataset.arreglar}`);
+          pantallaCorregir(corte);
+        } catch (e) { avisar(e.message, 'error'); }
+      };
     });
   }
 }

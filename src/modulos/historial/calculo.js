@@ -35,7 +35,7 @@ const TIPOS = ['venta', 'gasto', 'entrada', 'abono'];
  * `campoFecha` y `campoUsuario` cambian según la tabla, pero las preguntas
  * son las mismas.
  */
-function filtros({ desde, hasta, horaDesde, horaHasta, usuarioId, antesDe },
+function filtros({ desde, hasta, horaDesde, horaHasta, usuarioId, antesDe, desdeMomento },
                  campoFecha, campoUsuario) {
   const donde = [];
   const valores = [];
@@ -59,6 +59,15 @@ function filtros({ desde, hasta, horaDesde, horaHasta, usuarioId, antesDe },
   // no cuadró en un turno.
   if (horaDesde) { donde.push(`time(${campoFecha}, 'localtime') >= time(?)`); valores.push(horaDesde); }
   if (horaHasta) { donde.push(`time(${campoFecha}, 'localtime') <= time(?)`); valores.push(horaHasta); }
+
+  // LAS ÚLTIMAS TANTAS HORAS  (v3.9)
+  //
+  // Va por INSTANTE y no por día, que es lo que la hace distinta de
+  // `desde`: "las últimas 24 horas" a las 10 de la mañana del jueves
+  // empieza a las 10 de la mañana del miércoles, no a medianoche. Es la
+  // pregunta de "¿qué ha pasado desde ayer a esta hora?", y con días de
+  // calendario no se puede hacer.
+  if (desdeMomento) { donde.push(`${campoFecha} >= ?`); valores.push(desdeMomento); }
 
   if (usuarioId) { donde.push(`${campoUsuario} = ?`); valores.push(usuarioId); }
 

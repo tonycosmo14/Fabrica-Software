@@ -41,6 +41,14 @@ const corregir = exigirPermiso('venta.cancelar');   // gerente y administrador
 // permiso, así que solo lo alcanza el comodín del administrador.
 const conceptos = exigirPermiso('caja.conceptos');
 
+// CORREGIR UN CORTE YA FIRMADO ES SOLO DEL ADMINISTRADOR.
+//
+// No es lo mismo que anular un movimiento del turno abierto —eso lo hace
+// el gerente y es trabajo del día—: esto toca un papel que ya se firmó y
+// cambia un faltante que ya se dio por bueno. Ningún rol lista este
+// permiso, así que solo lo alcanza el comodín del administrador.
+const corregirCorte = exigirPermiso('caja.corregir_corte');
+
 /**
  * Lee un importe tecleado. Vive en lib/dinero porque el mismo error
  * —limpiar la cadena a la brava y quedarse con un 0 que nadie escribió—
@@ -565,10 +573,12 @@ router.post('/movimientos/:id/anular', corregir, (req, res) => {
 
 function detalleCorte(id) {
   const caja = bd.prepare(`
-    SELECT c.*, u.nombre AS cajero_nombre, v.nombre AS cerrada_por_nombre
+    SELECT c.*, u.nombre AS cajero_nombre, v.nombre AS cerrada_por_nombre,
+           g.nombre AS corregido_por_nombre
       FROM cajas c
       LEFT JOIN usuarios u ON u.id = c.cajero_id
       LEFT JOIN usuarios v ON v.id = c.cerrada_por
+      LEFT JOIN usuarios g ON g.id = c.corregido_por
      WHERE c.id = ?
   `).get(id);
   if (!caja) return null;
@@ -586,12 +596,187 @@ function detalleCorte(id) {
   };
 }
 
+/**
+ * VOLVER A SACAR LAS CUENTAS DE UN CORTE YA CERRADO  (v3.9)
+ *
+ * Los totales de un corte están congelados a propósito: son el papel que
+ * se firmó. Pero cuando aparece un gasto que se había olvidado, dejar el
+ * papel intacto es dejar escrito un faltante que no existió — y ese
+ * faltante es exactamente lo que se viene a arreglar.
+ *
+ * Así que se vuelven a sacar de los movimientos, con dos cuidados:
+ *
+ *   · LO CONTADO NO SE TOCA. Es el dinero que había en el cajón cuando se
+ *     contó, y no lo cambia ningún ticket que aparezca después.
+ *   · LO QUE DECÍA ANTES SE GUARDA, la primera vez. Un corte corregido
+ *     tiene que poder enseñar las dos cifras.
+ */
+function recalcularCorte(cajaId, { usuarioId, motivo }) {
+  const caja = bd.prepare('SELECT * FROM cajas WHERE id = ?').get(cajaId);
+  if (!caja) return null;
+
+  const estado = estadoCaja(caja);
+  const diferencia = (caja.contado_centavos ?? 0) - estado.esperado;
+
+  // Solo la PRIMERA vez: si se corrige dos veces, lo original sigue siendo
+  // lo del papel firmado, no lo de la corrección anterior.
+  const guardarOriginal = caja.esperado_original_centavos === null
+                       || caja.esperado_original_centavos === undefined;
+
+  bd.prepare(`
+    UPDATE cajas SET
+      esperado_original_centavos   = COALESCE(esperado_original_centavos, ?),
+      diferencia_original_centavos = COALESCE(diferencia_original_centavos, ?),
+      salidas_original_centavos    = COALESCE(salidas_original_centavos, ?),
+      entradas_original_centavos   = COALESCE(entradas_original_centavos, ?),
+      esperado_centavos = ?, diferencia_centavos = ?,
+      vendido_centavos = ?, entradas_centavos = ?, salidas_centavos = ?,
+      corregido_en = ?, corregido_por = ?, motivo_correccion = ?,
+      correcciones = correcciones + 1
+    WHERE id = ?
+  `).run(caja.esperado_centavos, caja.diferencia_centavos,
+         caja.salidas_centavos, caja.entradas_centavos,
+         estado.esperado, diferencia,
+         estado.vendido, estado.entradas, estado.salidas,
+         ahora(), usuarioId, motivo.slice(0, 200), caja.id);
+
+  return { guardarOriginal, antes: caja, ahora: bd.prepare('SELECT * FROM cajas WHERE id = ?').get(caja.id) };
+}
+
+/**
+ * AGREGARLE A UN CORTE UN GASTO QUE SE OLVIDÓ.
+ *
+ * "A la cajera se le olvidó poner algo y tiene las pruebas para
+ * demostrarlo." El renglón entra al turno que ya se cerró, marcado como
+ * agregado después, y el corte se vuelve a sacar.
+ */
+router.post('/cortes/:id/movimientos', corregirCorte, (req, res) => {
+  const caja = bd.prepare('SELECT * FROM cajas WHERE id = ?').get(req.params.id);
+  if (!caja) return error(res, 'Ese corte no existe.', 404);
+  if (!caja.cerrada_en) {
+    return error(res, 'Ese turno sigue abierto: anótalo como cualquier otro movimiento.', 409);
+  }
+
+  const motivo = String(req.body?.motivo || '').trim();
+  if (!motivo) {
+    return error(res, 'Escribe por qué se corrige. Un corte firmado no se cambia sin razón.');
+  }
+
+  const tipo = req.body?.tipo;
+  if (tipo !== 'entrada' && tipo !== 'salida') {
+    return error(res, 'El movimiento tiene que ser una entrada o una salida.');
+  }
+
+  const centavos = leerImporte(req.body?.monto, { permitirCero: false });
+  if (centavos === null) return error(res, 'Escribe de cuánto es el movimiento.');
+
+  // El concepto lo pone el catálogo cuando viene, igual que en el turno
+  // normal: es lo que hace que los cien desayunos del mes se llamen igual.
+  let conceptoId = null;
+  let concepto = String(req.body?.concepto || '').trim();
+  if (req.body?.conceptoId) {
+    const c = bd.prepare('SELECT * FROM conceptos_gasto WHERE id = ?').get(req.body.conceptoId);
+    if (!c) return error(res, 'Ese concepto no existe.', 409);
+    if (c.tipo !== tipo) {
+      return error(res, `"${c.nombre}" es de ${c.tipo === 'salida' ? 'salidas' : 'entradas'}.`);
+    }
+    conceptoId = c.id;
+    concepto = c.nombre;
+  }
+  if (!concepto) return error(res, 'Escribe en qué se usó el dinero.');
+
+  const id = nuevoId();
+
+  // LA FECHA DEL MOVIMIENTO ES LA DEL TURNO, no la de hoy.
+  //
+  // El gasto ocurrió dentro de ese turno; anotarlo con la fecha de hoy lo
+  // sacaría del periodo al que pertenece y lo metería en el de este mes,
+  // donde no pasó nada. Se le pone la hora del cierre, que es el último
+  // instante en que ese turno todavía existía.
+  const cuando = caja.cerrada_en;
+
+  bd.transaction(() => {
+    bd.prepare(`
+      INSERT INTO movimientos_caja
+        (id, caja_id, fecha, tipo, concepto, centavos, ejecutor_id, capturista_id,
+         notas, concepto_id, tras_corte)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    `).run(id, caja.id, cuando, tipo, concepto.slice(0, 80), centavos,
+           req.body?.ejecutorId || caja.cajero_id, req.usuario.id,
+           String(req.body?.notas || '').trim().slice(0, 300) || null, conceptoId);
+
+    recalcularCorte(caja.id, { usuarioId: req.usuario.id, motivo });
+  })();
+
+  const despues = bd.prepare('SELECT * FROM cajas WHERE id = ?').get(caja.id);
+  bitacora.registrar({
+    accion: 'caja.corte_corregido', entidad: 'caja', entidadId: caja.id,
+    ejecutorId: req.usuario.id,
+    detalle: {
+      folio: caja.folio, agrego: concepto, tipo, centavos, motivo,
+      diferenciaAntes: caja.diferencia_centavos,
+      diferenciaAhora: despues.diferencia_centavos
+    }
+  });
+
+  return ok(res, { corte: detalleCorte(caja.id) }, 201);
+});
+
+/**
+ * QUITARLE A UN CORTE UN GASTO QUE NO ERA.
+ *
+ * No se borra el renglón (regla 3.4): se anula con su motivo y deja de
+ * contar. En la lista sigue saliendo tachado, que es lo que permite
+ * entender después qué pasó con ese corte.
+ */
+router.post('/cortes/:id/movimientos/:movimiento/quitar', corregirCorte, (req, res) => {
+  const caja = bd.prepare('SELECT * FROM cajas WHERE id = ?').get(req.params.id);
+  if (!caja) return error(res, 'Ese corte no existe.', 404);
+  if (!caja.cerrada_en) {
+    return error(res, 'Ese turno sigue abierto: anúlalo como cualquier otro movimiento.', 409);
+  }
+
+  const m = bd.prepare('SELECT * FROM movimientos_caja WHERE id = ? AND caja_id = ?')
+    .get(req.params.movimiento, caja.id);
+  if (!m) return error(res, 'Ese movimiento no es de este corte.', 404);
+  if (m.anulado_en) return error(res, 'Ese movimiento ya está anulado.');
+
+  const motivo = String(req.body?.motivo || '').trim();
+  if (!motivo) {
+    return error(res, 'Escribe por qué se quita. Un corte firmado no se cambia sin razón.');
+  }
+
+  bd.transaction(() => {
+    bd.prepare(`
+      UPDATE movimientos_caja SET anulado_en = ?, anulado_por = ?, motivo_anulacion = ?
+       WHERE id = ?
+    `).run(ahora(), req.usuario.id, motivo.slice(0, 200), m.id);
+
+    recalcularCorte(caja.id, { usuarioId: req.usuario.id, motivo });
+  })();
+
+  const despues = bd.prepare('SELECT * FROM cajas WHERE id = ?').get(caja.id);
+  bitacora.registrar({
+    accion: 'caja.corte_corregido', entidad: 'caja', entidadId: caja.id,
+    ejecutorId: req.usuario.id,
+    detalle: {
+      folio: caja.folio, quito: m.concepto, tipo: m.tipo, centavos: m.centavos, motivo,
+      diferenciaAntes: caja.diferencia_centavos,
+      diferenciaAhora: despues.diferencia_centavos
+    }
+  });
+
+  return ok(res, { corte: detalleCorte(caja.id) });
+});
+
 /** Historial de cortes: el de cada turno, del más nuevo al más viejo. */
 router.get('/cortes', verCaja, (req, res) => {
   const limite = Math.min(Number(req.query.limite) || 30, 200);
   const cortes = bd.prepare(`
-    SELECT c.*, u.nombre AS cajero_nombre FROM cajas c
+    SELECT c.*, u.nombre AS cajero_nombre, g.nombre AS corregido_por_nombre
+      FROM cajas c
       LEFT JOIN usuarios u ON u.id = c.cajero_id
+      LEFT JOIN usuarios g ON g.id = c.corregido_por
      WHERE c.cerrada_en IS NOT NULL
      ORDER BY c.cerrada_en DESC LIMIT ?
   `).all(limite);

@@ -17,9 +17,31 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '3.8';
+const VERSION_ACTUAL = '3.9';
 
 const VERSIONES = [
+  {
+    numero: '3.9',
+    nombre: 'Corregir un corte, y el historial de un vistazo',
+    fecha: '2026-09-02',
+    resumen:
+      'Cuando a la cajera se le olvidó anotar un gasto, el administrador ' +
+      'puede agregárselo al corte ya firmado y el faltante desaparece — ' +
+      'quedando escrito qué decía antes, quién lo corrigió y por qué. Y el ' +
+      'historial abre con atajos de tiempo.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'YA SE PUEDE CORREGIR UN CORTE YA FIRMADO. El caso completo, tal como pasa: a la cajera se le olvidó anotar la gasolina, cerró su turno, el cajón salió $200 corto y ahí quedó escrito un faltante que no existió. Al día siguiente llega con el ticket en la mano. Hasta hoy no había nada que hacer. Ahora, en Historial de cortes, los ⋯ de cada renglón abren la pantalla de corregir: se le agrega ese gasto —o se le quita uno que no era— y el corte se vuelve a sacar solo.' },
+      { tipo: 'importante', texto: 'LO QUE SE CONTÓ NO SE TOCA. Ese es el dinero que había en el cajón cuando se contó, y no lo cambia ningún ticket que aparezca después. Lo que cambia es lo que DEBÍA haber, y con ello la diferencia — que es justo el número que estaba mal.' },
+      { tipo: 'importante', texto: 'Y LO QUE DECÍA EL PAPEL FIRMADO SE GUARDA. Un corte corregido enseña LAS DOS CIFRAS: la que decía cuando se firmó y la que dice ahora, con quién lo corrigió, cuándo y por qué. Sin eso, quien guardó su copia impresa vería dos números distintos y no habría manera de saber cuál vale. Corregirlo dos veces no pisa lo original: lo del papel sigue siendo lo del papel.' },
+      { tipo: 'importante', texto: 'ES SOLO DEL ADMINISTRADOR Y PIDE MOTIVO. Ni el gerente puede: anular un movimiento del turno abierto es trabajo del día, pero esto toca un papel que ya se firmó y cambia un faltante que ya se dio por bueno. El motivo es obligatorio y queda escrito en el corte.' },
+      { tipo: 'mejora', texto: 'El gasto que se agrega lleva LA FECHA DE ESE TURNO, no la de hoy: ahí fue donde pasó, y con la fecha de hoy se iría al mes en curso, donde no ocurrió nada. Y queda marcado como agregado después, para que al reimprimir el corte se distinga de los renglones que sí estaban en el papel.' },
+      { tipo: 'mejora', texto: 'Quitarle un gasto a un corte NO LO BORRA (regla 3.4): queda tachado con su motivo y deja de contar. Así después se puede entender qué pasó con ese corte.' },
+      { tipo: 'nuevo', texto: 'EL HISTORIAL ABRE CON ATAJOS DE TIEMPO: hoy, últimas 24 horas, últimos 7 días y últimos 30 días. "Hoy" y "las últimas 24 horas" NO son lo mismo, y por eso están los dos: a las diez de la mañana, hoy son diez horas y las últimas 24 llegan hasta ayer a las diez, donde estuvo el turno de la tarde. Cuando algo no cuadró, la pregunta casi siempre es la segunda.' },
+      { tipo: 'nuevo', texto: 'Y EL BOTÓN DE ORDENAR POR QUIÉN, que junta los renglones de cada persona SIN esconder a nadie. Es distinto de escoger a alguien en el selector de Quién, que sí deja fuera a los demás: a veces lo que se quiere es comparar los dos turnos, no mirar uno.' },
+      { tipo: 'mejora', texto: 'Los filtros están ahora en dos filas con su etiqueta —DE CUÁNDO arriba y QUÉ abajo—, que es el orden en que se preguntan.' },
+      { tipo: 'mejora', texto: 'Todo esto está en el manual, en Caja y en Historial.' }
+    ]
+  },
   {
     numero: '3.8',
     nombre: 'La gente y los clientes, con cara',

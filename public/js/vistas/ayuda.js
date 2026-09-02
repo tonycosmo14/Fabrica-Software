@@ -563,7 +563,7 @@ debería quedar − contado = FALTA</pre>
   {
     id: 'caja',
     titulo: 'Caja: el turno y el corte',
-    busca: 'caja turno fondo corte arqueo gasto retiro efectivo cerrar cuadrar sobra falta',
+    busca: 'caja turno fondo corte arqueo gasto retiro efectivo cerrar cuadrar sobra falta corregir corte firmado olvidó gasto agregar quitar administrador motivo',
     cuerpo: `
       <h4>El turno se abre solo</h4>
       <p>No hay que ir a ninguna pantalla a abrir la caja: <b>lo hace tu
@@ -647,11 +647,36 @@ debería haber − contado = DIFERENCIA</pre>
       <p class="ayuda-tip">La imagen se arma <b>en el aparato</b>: no se sube
       a ningún lado ni pasa por internet hasta que tú la mandas.</p>
 
+      <h4>Corregir un corte ya firmado</h4>
+      <p>Pasa: a la cajera <b>se le olvidó anotar un gasto</b>. Cerró su
+      turno, el cajón salió $200 corto y ahí quedó escrito un faltante que
+      no existió. Al día siguiente llega con el ticket de la gasolina en la
+      mano y lo demuestra.</p>
+      <p>En <b>Historial de cortes</b>, los <b>⋯</b> de cada renglón abren
+      la pantalla de corregir. Ahí se le puede:</p>
+      <ul>
+        <li><b>Agregar el gasto que se olvidó</b> (o una entrada). Entra al
+        turno que ya se cerró, con la fecha de ese turno —no la de hoy—,
+        porque ahí fue donde pasó.</li>
+        <li><b>Quitarle uno que no era.</b> No se borra: queda tachado con
+        su motivo y deja de contar.</li>
+      </ul>
+      <p>En los dos casos el corte <b>se vuelve a sacar solo</b> y el
+      faltante se corrige.</p>
+      <p class="ayuda-tip">Esto es <b>solo del administrador</b>, y <b>pide
+      motivo</b>. Lo que se contó en el cajón <b>no se toca</b> —eso fue lo
+      que había—, pero sí lo que <b>debía</b> haber. Y lo que decía el papel
+      firmado se guarda: un corte corregido enseña las dos cifras, con quién
+      lo corrigió, cuándo y por qué. Los renglones agregados después quedan
+      marcados, para que al reimprimirlo se distingan de los que sí estaban
+      en el papel.</p>
+
       <h4>Cosas que conviene saber</h4>
       <ul class="instrucciones">
         <li>Solo puede haber <b>un turno abierto</b> a la vez.</li>
-        <li>Un corte cerrado <b>ya no cambia</b>. Si mañana cancelas una venta
-        de hoy, el corte firmado se queda como está.</li>
+        <li>Un corte cerrado <b>no cambia solo</b>: si mañana cancelas una
+        venta de hoy, el corte firmado se queda como está. Cambiarlo es un
+        acto aparte y a propósito, el de arriba.</li>
         <li>Al cerrar el turno, el siguiente se abre solo cuando alguien
         vuelva a entrar con su PIN.</li>
       </ul>
@@ -1211,7 +1236,7 @@ debería haber − contado = FALTA</pre>
   {
     id: 'historial',
     titulo: 'Historial: revisar lo que se hizo',
-    busca: 'historial revisar auditar quién hizo qué cajero fecha hora filtro tickets gastos entradas abonos borrar eliminar dar de baja contraseña ordenar columna cargar más hoy devolución cambio mayoreo',
+    busca: 'historial revisar auditar quién hizo qué cajero fecha hora filtro tickets gastos entradas abonos borrar eliminar dar de baja contraseña ordenar columna cargar más hoy devolución cambio mayoreo atajos últimas 24 horas 7 días 30 días semana mes ordenar por quién',
     cuerpo: `
       <p>Todo lo que ha pasado en la caja, de quien sea y de cuando sea:
       ventas, gastos, entradas de dinero y abonos, mezclados y en orden.</p>
@@ -1226,6 +1251,25 @@ debería haber − contado = FALTA</pre>
         <li>Poner <b>fechas</b>, un <b>número de ticket</b> o cualquier otro
         filtro: con eso la ventana de hoy se quita sola.</li>
       </ul>
+
+      <h4>Los atajos de arriba</h4>
+      <p>En la fila <b>De cuándo</b> están los cuatro periodos que se piden
+      de verdad:</p>
+      <ul>
+        <li><b>Hoy</b> — el día de calendario, de medianoche para acá.</li>
+        <li><b>Últimas 24 horas</b> — que <b>no es lo mismo</b>: a las diez
+        de la mañana, "hoy" son diez horas y "las últimas 24" llegan hasta
+        ayer a las diez, donde estuvo el turno de la tarde. Cuando algo no
+        cuadró, casi siempre es esta.</li>
+        <li><b>Últimos 7 días</b> y <b>Últimos 30 días</b> — por días de
+        calendario contando hoy, que es como se dicen.</li>
+      </ul>
+      <p>Al lado está <b>👤 Ordenar por quién</b>, que junta los renglones
+      de cada persona <b>sin esconder a nadie</b>. Es distinto de escoger a
+      alguien en el selector de <b>Quién</b>, que sí deja fuera a los demás:
+      a veces lo que se quiere es comparar los dos turnos.</p>
+      <p class="ayuda-tip">Tocar una fecha a mano apaga el atajo, porque a
+      partir de ahí la pantalla ya no está enseñando eso.</p>
 
       <h4>Ordenar</h4>
       <p>Se toca el título de una columna y se ordena por ella; se toca otra

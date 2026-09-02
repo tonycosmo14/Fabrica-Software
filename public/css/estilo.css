@@ -2494,7 +2494,21 @@ body.imprimir-hoja { page: hoja; }
 .hist-fila { display: flex; gap: 12px; flex-wrap: wrap; }
 .hist-fila label { display: flex; flex-direction: column; gap: 3px; flex: 1 1 150px; min-width: 0; }
 .hist-fila input, .hist-fila select { margin: 0; }
-.hist-tipos { display: flex; gap: 8px; flex-wrap: wrap; }
+.hist-tipos { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+/* Los atajos de tiempo, arriba de los tipos: es la pregunta que se hace
+   primero —de cuándo— y va antes que la de qué. */
+.hist-atajos {
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  margin-bottom: 10px;
+}
+.hist-atajos .etiqueta-chica, .hist-tipos .etiqueta-chica {
+  margin: 0 2px 0 0; min-width: 62px;
+}
+/* Ordenar por quién no es un periodo: comparte renglón con los atajos
+   porque ahí sobra sitio, pero se va al otro extremo para que no se lea
+   como uno más de ellos. */
+.hist-suelto { margin-left: auto; }
 
 /* Los cuatro números que se miran primero. */
 .hist-resumen {
@@ -3851,3 +3865,19 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 @media (max-width: 620px) {
   .cli-cabeza .saldo-grande { flex: 1 1 100%; }
 }
+
+/* ============================================================
+   UN CORTE CORREGIDO  (v3.9)
+
+   Tiene que poder enseñar las DOS cifras: la que decía el papel firmado y
+   la que dice ahora. Sin eso, quien guardó su copia impresa vería dos
+   números distintos y no sabría cuál vale.
+   ============================================================ */
+
+.corte-corregido {
+  margin-top: 14px; padding: 12px 14px; border-radius: var(--radio);
+  background: var(--superficie-alt); border-left: 4px solid var(--ambar);
+}
+.corte-corregido strong { display: block; font-size: 14.5px; }
+.corte-corregido p { margin: 6px 0 0; font-size: 13.5px; line-height: 1.5; }
+.corte-corregido p.ayuda { font-size: 12.5px; }

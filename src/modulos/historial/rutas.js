@@ -49,6 +49,10 @@ router.get('/', verHistorial, (req, res) => {
     tipos: String(req.query.tipos || '').split(',').filter(Boolean),
     numero: leerNumero(req.query.folio),
     antesDe: leerInstante(req.query.antesDe),
+    // "Las últimas tantas horas": va por instante, no por día. A las 10
+    // de la mañana, las últimas 24 horas empiezan ayer a las 10, no a
+    // medianoche — y esa es justo la pregunta que se hace al abrir esto.
+    desdeMomento: horasAtras(req.query.ultimasHoras),
     limite: Number(req.query.limite) || 100
   };
 
@@ -61,12 +65,15 @@ router.get('/', verHistorial, (req, res) => {
   if (req.query.horaDesde && !opciones.horaDesde) return error(res, 'Esa hora no se entiende.');
   if (req.query.horaHasta && !opciones.horaHasta) return error(res, 'Esa hora no se entiende.');
   if (req.query.antesDe && !opciones.antesDe) return error(res, 'Ese momento no se entiende.');
+  if (req.query.ultimasHoras && !opciones.desdeMomento) {
+    return error(res, 'Las últimas horas van de 1 a 8760 (un año).');
+  }
 
   // La ventana de hoy. Se pone aquí y no en el navegador para que valga
   // aunque la llamada venga de otro lado, y en hora LOCAL de la fábrica:
   // en Yucatán un ticket de las 6:29 p.m. se guarda con la fecha de mañana.
   const soloHoy = !opciones.desde && !opciones.hasta
-                  && !opciones.numero && !opciones.antesDe;
+                  && !opciones.numero && !opciones.antesDe && !opciones.desdeMomento;
   if (soloHoy) opciones.desde = hoyLocal();
 
   const { movimientos, hayMas, cursor } = historial(opciones);
@@ -90,6 +97,17 @@ function hoyLocal() {
   const d = new Date();
   const dosDigitos = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${dosDigitos(d.getMonth() + 1)}-${dosDigitos(d.getDate())}`;
+}
+
+/**
+ * Hace tantas horas, como instante. El tope es un año: más allá esto deja
+ * de ser un filtro rápido y toca poner fechas, que para eso están.
+ */
+function horasAtras(valor) {
+  if (valor === undefined || valor === null || valor === '') return null;
+  const n = Number(valor);
+  if (!Number.isFinite(n) || n < 1 || n > 8760) return null;
+  return new Date(Date.now() - n * 60 * 60 * 1000).toISOString();
 }
 
 /** Un instante exacto, como lo devuelve el propio historial en `cursor`. */

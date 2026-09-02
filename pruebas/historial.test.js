@@ -457,3 +457,54 @@ test('un ticket de mayoreo se distingue de una venta de mostrador', async () => 
                                             && m.forma_pago !== 'credito');
   for (const m of mayoreo) assert.equal(m.que.clave, 'mayoreo');
 });
+
+
+// ============================================================
+// LOS ATAJOS DE TIEMPO  (v3.9)
+//
+// "Hoy" y "las últimas 24 horas" NO son lo mismo: a las diez de la mañana,
+// hoy son diez horas y las últimas 24 llegan hasta ayer a las diez, donde
+// estuvo el turno de la tarde. Cuando algo no cuadró, la pregunta casi
+// siempre es la segunda.
+// ============================================================
+
+test('las últimas horas van por instante, no por día', async () => {
+  await entrarAdmin();
+
+  // Una venta de hace 30 horas: es de ayer, así que "hoy" no la trae.
+  const hace30 = new Date(Date.now() - 30 * 60 * 60 * 1000).toISOString();
+  const v = await llamar('/api/ventas', {
+    method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 16 }] } });
+  bd.prepare('UPDATE ventas SET fecha = ? WHERE id = ?')
+    .run(hace30, v.json.datos.venta.id);
+
+  const hoy = (await llamar('/api/historial')).json.datos;
+  assert.ok(!hoy.movimientos.some((m) => m.id === v.json.datos.venta.id),
+    'de hoy no es');
+
+  const dosDias = (await llamar('/api/historial?ultimasHoras=48')).json.datos;
+  assert.ok(dosDias.movimientos.some((m) => m.id === v.json.datos.venta.id),
+    'en las últimas 48 horas sí cae');
+  assert.equal(dosDias.ventana, 'filtro',
+    'pedir horas quita la ventana de hoy, igual que poner fechas');
+
+  const un_dia = (await llamar('/api/historial?ultimasHoras=24')).json.datos;
+  assert.ok(!un_dia.movimientos.some((m) => m.id === v.json.datos.venta.id),
+    'en las últimas 24 no, porque fue hace 30');
+});
+
+test('el resumen de las últimas horas cuenta lo mismo que la lista', async () => {
+  await entrarAdmin();
+  const d = (await llamar('/api/historial?ultimasHoras=48')).json.datos;
+  const ventas = d.movimientos.filter((m) => m.tipo === 'venta' && !m.cancelada);
+  assert.equal(d.resumen.ventas, ventas.length,
+    'los totales de arriba son de lo mismo que la tabla');
+});
+
+test('unas horas que no se entienden se rechazan', async () => {
+  await entrarAdmin();
+  for (const v of ['cero', '0', '-3', '99999']) {
+    const r = await llamar(`/api/historial?ultimasHoras=${encodeURIComponent(v)}`);
+    assert.equal(r.estado, 400, v);
+  }
+});

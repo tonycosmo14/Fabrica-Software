@@ -67,8 +67,58 @@ export async function vistaHistorial(pantalla, estadoApp) {
   const filtro = {
     folio: '',
     desde: '', hasta: '', horaDesde: '', horaHasta: '',
+    // Las últimas tantas horas, cuando se pidió con un atajo. Va aparte de
+    // `desde` porque no es un día de calendario: es un instante.
+    ultimasHoras: null,
     usuarioId: '', tipos: new Set(TIPOS.map((t) => t.id))
   };
+
+  /**
+   * LOS ATAJOS DE TIEMPO  (v3.9)
+   *
+   * "Hoy" y "las últimas 24 horas" NO son lo mismo, y por eso están los
+   * dos: a las diez de la mañana, "hoy" son diez horas y "las últimas 24"
+   * llegan hasta ayer a las diez — que es donde estuvo el turno de la
+   * tarde. Cuando algo no cuadró, casi siempre es lo segundo.
+   *
+   * Los de días sí van por calendario, porque así se dicen: "los últimos
+   * siete días" es esta semana contando hoy, no ciento sesenta y ocho
+   * horas exactas.
+   */
+  const ATAJOS = [
+    { id: 'hoy',   texto: 'Hoy',              dias: 1 },
+    { id: '24h',   texto: 'Últimas 24 horas', horas: 24 },
+    { id: '7d',    texto: 'Últimos 7 días',   dias: 7 },
+    { id: '30d',   texto: 'Últimos 30 días',  dias: 30 }
+  ];
+
+  /** Cuál atajo está puesto ahora mismo, para pintarlo encendido. */
+  let atajo = 'hoy';
+
+  /** Un día del calendario, en el reloj de la fábrica. */
+  function diaLocal(hace = 0) {
+    const d = new Date();
+    d.setDate(d.getDate() - hace);
+    const dd = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${dd(d.getMonth() + 1)}-${dd(d.getDate())}`;
+  }
+
+  function ponerAtajo(id) {
+    const a = ATAJOS.find((x) => x.id === id);
+    if (!a) return;
+    atajo = id;
+    filtro.folio = '';
+    filtro.horaDesde = ''; filtro.horaHasta = '';
+    if (a.horas) {
+      filtro.ultimasHoras = a.horas;
+      filtro.desde = ''; filtro.hasta = '';
+    } else {
+      filtro.ultimasHoras = null;
+      filtro.desde = diaLocal(a.dias - 1);
+      filtro.hasta = diaLocal(0);
+    }
+    cargar();
+  }
 
   try {
     quienes = (await api.obtener('/historial/quienes')).quienes;
@@ -84,6 +134,7 @@ export async function vistaHistorial(pantalla, estadoApp) {
     if (filtro.hasta) q.set('hasta', filtro.hasta);
     if (filtro.horaDesde) q.set('horaDesde', filtro.horaDesde);
     if (filtro.horaHasta) q.set('horaHasta', filtro.horaHasta);
+    if (filtro.ultimasHoras) q.set('ultimasHoras', String(filtro.ultimasHoras));
     if (filtro.usuarioId) q.set('usuarioId', filtro.usuarioId);
     if (filtro.tipos.size !== TIPOS.length) q.set('tipos', [...filtro.tipos].join(','));
     if (antesDe) q.set('antesDe', antesDe);
@@ -202,11 +253,22 @@ export async function vistaHistorial(pantalla, estadoApp) {
           </label>
         </div>
 
+        <div class="hist-atajos">
+          <span class="etiqueta-chica">De cuándo</span>
+          ${ATAJOS.map((a) => `
+            <button class="secundario chico ${atajo === a.id ? 'activo' : ''}"
+                    data-atajo="${a.id}">${esc(a.texto)}</button>`).join('')}
+          <button class="secundario chico hist-suelto ${orden.columna === 'quien' ? 'activo' : ''}"
+                  id="por-quien" title="Junta los renglones de cada persona">
+            👤 Ordenar por quién
+          </button>
+        </div>
+
         <div class="hist-tipos">
+          <span class="etiqueta-chica">Qué</span>
           ${TIPOS.map((t) => `
             <button class="secundario chico ${filtro.tipos.has(t.id) ? 'activo' : ''}"
                     data-tipo="${t.id}">${t.emoji} ${t.texto}</button>`).join('')}
-          <button class="secundario chico" id="hoy">Hoy</button>
           <button class="secundario chico" id="limpiar">Quitar filtros</button>
         </div>
         ${filtro.folio ? `
@@ -238,7 +300,7 @@ export async function vistaHistorial(pantalla, estadoApp) {
       <div class="tarjeta plana">
         <div class="hist-cuantos">
           <span>
-            ${lista.length} renglón${lista.length === 1 ? '' : 'es'}
+            ${lista.length} ${lista.length === 1 ? 'renglón' : 'renglones'}
             ${ventana === 'hoy' ? '<b>de hoy</b>' : 'cargados'}
           </span>
           <span class="ayuda">Los totales de arriba son de todo lo que cae en el filtro.</span>
@@ -515,10 +577,14 @@ export async function vistaHistorial(pantalla, estadoApp) {
     };
     folio.onkeydown = (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); folio.blur(); } };
 
-    q('#desde').onchange = () => { filtro.desde = q('#desde').value; cargar(); };
-    q('#hasta').onchange = () => { filtro.hasta = q('#hasta').value; cargar(); };
-    q('#hora-desde').onchange = () => { filtro.horaDesde = q('#hora-desde').value; cargar(); };
-    q('#hora-hasta').onchange = () => { filtro.horaHasta = q('#hora-hasta').value; cargar(); };
+    // Al tocar una fecha a mano el atajo deja de estar puesto: seguir
+    // enseñándolo encendido diría que la pantalla muestra algo que ya no
+    // muestra.
+    const aMano = () => { atajo = null; filtro.ultimasHoras = null; };
+    q('#desde').onchange = () => { aMano(); filtro.desde = q('#desde').value; cargar(); };
+    q('#hasta').onchange = () => { aMano(); filtro.hasta = q('#hasta').value; cargar(); };
+    q('#hora-desde').onchange = () => { aMano(); filtro.horaDesde = q('#hora-desde').value; cargar(); };
+    q('#hora-hasta').onchange = () => { aMano(); filtro.horaHasta = q('#hora-hasta').value; cargar(); };
     q('#quien').onchange = () => { filtro.usuarioId = q('#quien').value; cargar(); };
 
     pantalla.querySelectorAll('[data-tipo]').forEach((b) => {
@@ -533,14 +599,17 @@ export async function vistaHistorial(pantalla, estadoApp) {
       };
     });
 
-    // "Hoy" vuelve a la ventana de arranque: se quitan las fechas y ya, que
-    // sin fechas el servidor enseña justo el día de hoy.
-    q('#hoy').onclick = () => {
-      const hoy = new Date();
-      const dia = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${
-        String(hoy.getDate()).padStart(2, '0')}`;
-      filtro.desde = dia; filtro.hasta = dia;
-      cargar();
+    pantalla.querySelectorAll('[data-atajo]').forEach((b) => {
+      b.onclick = () => ponerAtajo(b.dataset.atajo);
+    });
+
+    // ORDENAR POR QUIÉN: junta los renglones de cada persona sin esconder
+    // a nadie. Es distinto de escoger a alguien en "Quién", que sí esconde
+    // a los demás — y a veces lo que se quiere es comparar los dos turnos.
+    q('#por-quien').onclick = () => {
+      if (orden.columna === 'quien') { orden.columna = 'fecha'; orden.descendente = true; }
+      else { orden.columna = 'quien'; orden.descendente = false; }
+      pintar();
     };
 
     pantalla.querySelectorAll('[data-copia]').forEach((b) => {
@@ -572,8 +641,11 @@ export async function vistaHistorial(pantalla, estadoApp) {
       filtro.folio = '';
       filtro.desde = ''; filtro.hasta = '';
       filtro.horaDesde = ''; filtro.horaHasta = '';
+      filtro.ultimasHoras = null;
       filtro.usuarioId = '';
       TIPOS.forEach((t) => filtro.tipos.add(t.id));
+      atajo = 'hoy';
+      orden.columna = 'fecha'; orden.descendente = true;
       cargar();
     };
   }
