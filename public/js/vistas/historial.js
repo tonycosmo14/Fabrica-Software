@@ -23,6 +23,7 @@ import { api } from '../api.js';
 import { esc, avisar, fecha as formatoFecha } from '../util.js';
 import { pedirTexto, confirmar, pedirContrasena, menu, verTicket } from '../dialogo.js';
 import { pesos } from '../fracciones.js';
+import { imprimirTicket, htmlDeEspejo } from '../imprimir.js';
 
 const TIPOS = [
   { id: 'venta',   texto: 'Ventas',   emoji: '🧾' },
@@ -522,8 +523,15 @@ export async function vistaHistorial(pantalla, estadoApp) {
       : `/impresion/movimiento/${m.movimiento_id}`;
     try {
       const r = await api.enviar(ruta, { copia: true });
-      avisar(r.impreso ? 'Copia impresa' : 'No hay impresora configurada', r.impreso ? 'bien' : '');
-    } catch (e) { avisar(e.message, 'error'); }
+      if (r.impreso) return avisar('Copia impresa', 'bien');
+    } catch (e) { return avisar(e.message, 'error'); }
+
+    // SIN TÉRMICA LO SACA EL NAVEGADOR  (v4.4). "No hay impresora
+    // configurada" dejaba a quien pedía la copia sin copia y sin salida.
+    try {
+      const { renglones, ancho } = await api.obtener(`${ruta}/previa`);
+      imprimirTicket(htmlDeEspejo(renglones, ancho));
+    } catch { avisar('No hay impresora configurada', ''); }
   }
 
   /**

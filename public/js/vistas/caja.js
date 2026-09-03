@@ -16,6 +16,7 @@ import { pedirTexto, pedirImporte, confirmar, menu, pedirContrasena } from '../d
 import { pesos, crearTeclado, aTexto as textoFraccion, deTexto } from '../fracciones.js';
 import { cargarMarca } from '../marca.js';
 import { compartirCorte } from '../corte-imagen.js';
+import { hacerVale } from '../vale.js';
 
 export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
   // Al cerrar el turno se sale del sistema: así el siguiente cajero tiene
@@ -202,7 +203,7 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
             <div class="caja-acciones">
               <button class="secundario" id="salida">− Gasto</button>
               <button class="secundario" id="entrada">＋ Meter dinero</button>
-              <button class="secundario" id="vale"
+              <button class="secundario ancho-completo-boton" id="vale"
                       title="Alguien se llevó efectivo del cajón">📤 Vale</button>
             </div>
             <!-- Ya no dice "y contar": desde la v4.1 el corte no cuenta el
@@ -262,7 +263,9 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
     if (puedeOperar) {
       pantalla.querySelector('#salida').onclick = () => nuevoMovimiento('salida');
       pantalla.querySelector('#entrada').onclick = () => nuevoMovimiento('entrada');
-      pantalla.querySelector('#vale').onclick = () => nuevoVale();
+      pantalla.querySelector('#vale').onclick = async () => {
+        if (await hacerVale()) pintar();
+      };
       pantalla.querySelector('#cerrar').onclick = () => terminarTurno(e, sinDueno);
     }
 
@@ -408,104 +411,6 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
     } catch (e) { avisar(e.message, 'error'); }
   }
 
-  /**
-   * UN VALE: ALGUIEN SE LLEVÓ DINERO DEL CAJÓN  (v4.3)
-   *
-   * "De repente yo o algún gerente o mi papá llegamos y recogemos el dinero
-   *  que haya en caja, para que las muchachas nunca tengan mucho. Él deja
-   *  su papelito, que se llama vale, y la cantidad que se llevó."
-   *
-   * Y con el mismo nombre existe el otro, que es el opuesto: el trabajador
-   * que pide por adelantado parte de su sueldo de la semana. Por eso lo
-   * primero que se pregunta es CUÁL de los dos, con la diferencia escrita
-   * en el mismo botón — nadie tiene por qué acordarse de memoria.
-   *
-   * Son tres toques: cuál, quién y cuánto. Y sale el papel por duplicado.
-   */
-  async function nuevoVale() {
-    let datos;
-    try {
-      datos = await api.obtener('/caja/vales');
-    } catch (err) { return avisar(err.message, 'error'); }
-
-    const clase = await menu({
-      titulo: 'Vale',
-      texto: '¿Cuál de los dos?',
-      opciones: [
-        { valor: 'retiro', texto: '🏦 Se llevaron dinero',
-          detalle: 'El dueño o un gerente, para que no se junte mucho. Nadie queda debiendo.' },
-        { valor: 'raya', texto: '🧑\u200d🏭 Adelanto de sueldo',
-          detalle: 'Parte de su raya de la semana, pedida antes. El sábado se le paga de menos.' }
-      ]
-    });
-    if (!clase) return;
-
-    const gente = (datos.gente?.[clase] || []);
-    if (!gente.length) {
-      return avisar(clase === 'retiro'
-        ? 'No hay ningún gerente ni administrador dado de alta.'
-        : 'No hay nadie dado de alta.', 'error');
-    }
-
-    // QUIÉN SE LO LLEVÓ, y es obligatorio: un vale sin nombre no es un
-    // vale, es un faltante. Se pregunta ANTES del importe porque es lo que
-    // el cajero tiene enfrente —la persona— y el número viene después.
-    const quienId = await menu({
-      titulo: clase === 'retiro' ? '¿Quién se llevó el dinero?' : '¿A quién es el adelanto?',
-      texto: clase === 'retiro'
-        ? 'Aunque no sea quien está en la computadora: el papel sale con los dos nombres.'
-        : 'Se le apunta en su ficha para descontárselo el día de la raya.',
-      opciones: gente.map((u) => ({ valor: u.id, texto: u.nombre }))
-    });
-    if (!quienId) return;
-
-    const quien = gente.find((u) => u.id === quienId);
-    const monto = await pedirImporte({
-      titulo: quien?.nombre || 'Vale',
-      texto: '¿Cuánto se llevó?',
-      ok: 'Hacer el vale',
-      ayuda: clase === 'raya'
-        ? 'Sale del cajón hoy y se le descuenta de su raya de esta semana.'
-        : 'Sale del cajón, pero no es un gasto de la fábrica: el dinero cambió de sitio.'
-    });
-    if (!monto) return;
-
-    // UN CERO DE MÁS. Nadie se lleva más dinero del que hay en el cajón, así
-    // que un vale más grande que el turno casi siempre es $15,000 tecleado
-    // donde iban $1,500. No se prohíbe —el cajón puede ir atrasado— pero se
-    // pregunta, que es lo que hubiera evitado el error.
-    const hayEnCajon = (await api.obtener('/caja')).abierta?.esperado ?? null;
-    const pedido = Math.round(Number(String(monto).replace(/[^0-9.]/g, '')) * 100);
-    if (hayEnCajon !== null && Number.isFinite(pedido) && pedido > hayEnCajon) {
-      const seguir = await confirmar({
-        titulo: '¿Seguro que es tanto?',
-        texto: `En el cajón hay ${pesos(hayEnCajon)} y este vale es de ` +
-               `${pesos(pedido)}. El turno va a quedar en números rojos.`,
-        ok: 'Sí, es correcto'
-      });
-      if (!seguir) return;
-    }
-
-    let creado;
-    try {
-      creado = await api.enviar('/caja/vales', { clase, monto, ejecutorId: quienId });
-    } catch (err) { return avisar(err.message, 'error'); }
-
-    await pintar();
-
-    // El papel es el vale. Si la impresora no contesta, el vale YA está
-    // anotado —el dinero salió— y lo que se avisa es que falta el papel,
-    // no que falló el vale.
-    try {
-      const r = await api.enviar(`/impresion/movimiento/${creado.movimientoId}`, {});
-      avisar(r.impreso
-        ? 'Vale hecho. Salieron los dos papeles: que firme el suyo.'
-        : 'Vale anotado. No hay impresora: escríbanlo a mano.', r.impreso ? 'bien' : 'aviso');
-    } catch {
-      avisar('Vale anotado, pero no se pudo imprimir. Vuelve a sacarlo con 🖨️.', 'aviso');
-    }
-  }
-
   // ==========================================================
   // LOS GASTOS QUE SE REPITEN
   //
@@ -559,19 +464,29 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
                       ? `<span class="hist-que que-cambio"
                                title="El dinero no se gastó: cambió de sitio. No cuenta como gasto de la fábrica.">⇄ Traspaso</span>`
                       : ''}
+                    ${c.es_vale
+                      ? `<span class="hist-que que-vale"
+                               title="Se usa desde el botón 📤 Vale de la caja. No se puede dar de baja.">📤 Vale</span>`
+                      : ''}
                     ${c.activo ? '' : '<span class="hist-que que-cancelada">de baja</span>'}
                   </td>
                   <td class="cp-c-mes der">${g ? pesos(g.centavos) : '—'}</td>
                   <td class="cp-c-usos der">${g ? g.veces : 0}</td>
                   <td class="cp-c-acciones">
                     <button class="secundario chico" data-editar="${esc(c.id)}">Editar</button>
-                    <button class="secundario chico" data-baja="${esc(c.id)}"
-                            title="${c.activo ? 'Dejar de usarlo' : 'Volver a usarlo'}">
-                      ${c.activo ? '🗑' : '↩'}
-                    </button>
-                    ${c.activo ? '' : `
-                      <button class="secundario chico" data-eliminar="${esc(c.id)}"
-                              title="Borrarlo de esta lista para siempre. Sus gastos no se tocan.">✕</button>`}
+                    <!-- LOS DOS CONCEPTOS DE VALE NO SE DAN DE BAJA (v4.4).
+                         No son gastos que alguien dio de alta: son lo que
+                         hace funcionar el botón de vales. Dándolos de baja
+                         desde aquí, el botón dejaba de servir sin que nada
+                         lo dijera. Renombrarlos sí se puede. -->
+                    ${c.es_vale ? '' : `
+                      <button class="secundario chico" data-baja="${esc(c.id)}"
+                              title="${c.activo ? 'Dejar de usarlo' : 'Volver a usarlo'}">
+                        ${c.activo ? '🗑' : '↩'}
+                      </button>
+                      ${c.activo ? '' : `
+                        <button class="secundario chico" data-eliminar="${esc(c.id)}"
+                                title="Borrarlo de esta lista para siempre. Sus gastos no se tocan.">✕</button>`}`}
                   </td>
                 </tr>`; }).join('')
                 || '<tr><td colspan="5">Todavía no hay ninguno.</td></tr>'}
@@ -586,6 +501,11 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
         Dar de baja uno <b>no borra nada</b>: deja de salir en la caja y los
         gastos que ya se anotaron con él siguen sumando. Un gasto de marzo no
         desaparece porque en agosto se deje de usar.
+      </p>
+      <p class="ayuda" style="margin-top:8px">
+        Los marcados <b>📤 Vale</b> no se pueden dar de baja: no son gastos
+        que se dieron de alta aquí, son los que hacen funcionar el botón
+        <b>📤 Vale</b> de la caja. Cambiarles el nombre sí se puede.
       </p>`;
 
     pantalla.querySelector('#volver').onclick = pintar;
@@ -1023,7 +943,16 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
     pantalla.innerHTML = `
       <button class="secundario chico no-imprimir" id="volver">‹ Caja</button>
 
-      <div class="tarjeta ${sinContar ? '' : cuadra ? 'cuadre-exacto' : 'cuadre-diferencia'}"
+      <!-- DOS COLUMNAS: EL DINERO Y EL HIELO  (v4.4)
+           Son las dos cuentas del turno y se miran juntas — "cuadró el
+           dinero pero faltó hielo" es una sola pregunta, no dos. Puestas
+           una debajo de otra había que rodar la pantalla para compararlas.
+           En pantalla angosta se apilan solas. -->
+      <div class="corte-tablero">
+       <div class="corte-columna">
+
+      <div class="tarjeta ${sinContar ? '' : cuadra ? 'cuadre-exacto'
+                              : sobra ? 'cuadre-sobra' : 'cuadre-diferencia'}"
            style="margin-top:14px">
         <h2 style="margin:0 0 6px">Corte del turno #${c.folio}</h2>
         <p class="ayuda" style="margin:0 0 14px">
@@ -1107,14 +1036,22 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
 
       ${valesDelTurno(corte)}
 
+       </div>
+       <div class="corte-columna">
+
       ${corte.hielo ? cuadreDelHielo(corte.hielo) : `
-        <div class="aviso-sin-caja" style="margin-top:16px">
+        <div class="aviso-sin-caja" style="margin-top:14px">
           <strong>Este turno no contó el hielo.</strong>
           Sin conteo no hay cuadre: no se puede decir si faltó o sobró
           hielo, porque nadie lo contó. Se cuenta al terminar el turno.
         </div>`}
 
+       </div>
+      </div>
 
+      <!-- Y los dos papeles, tal como salen de la impresora, también lado
+           a lado: son las dos hojas de un mismo corte. -->
+      <div class="corte-papeles">
       <div class="ticket" id="ticket">
         <div class="ticket-cabeza">
           <strong>${esc((marca.nombreNegocio || 'Hielo LOLHA').toUpperCase())}</strong>
@@ -1183,6 +1120,7 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
             <div>Del turno de ${esc(c.cajero_nombre || '—')}</div>
           </div>
         </div>` : ''}
+      </div>
 
       ${corte.porPersona?.length > 1 ? `
         <p class="ayuda no-imprimir" style="margin-top:14px">
@@ -1291,8 +1229,8 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
     const frac = (n) => esc(textoFraccion(n));
 
     return `
-      <div class="tarjeta ${cuadra ? 'cuadre-exacto' : 'cuadre-diferencia'}"
-           style="margin-top:16px">
+      <div class="tarjeta ${cuadra ? 'cuadre-exacto' : falta ? 'cuadre-diferencia' : 'cuadre-sobra'}"
+           style="margin-top:14px">
         <h3 style="margin:0 0 4px">El hielo · ${esc(h.almacen || 'cuarto frío')}</h3>
         <p class="ayuda" style="margin:0 0 14px">
           ${h.primerConteo
@@ -1326,67 +1264,67 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
               ? 'Ese hielo salió del cuarto frío sin ticket, sin anotarse como derretido y sin cortarse. Es el número que hay que vigilar.'
               : 'Hay más hielo del que debería. Casi siempre falta capturar un paño, o el conteo anterior se quedó corto.'}
           </p>`}
+      </div>
 
-        <h4 class="emp-sub">Los paños</h4>
+      ${papelDelHielo(h)}`;
+  }
+
+  /**
+   * EL PAPEL DEL HIELO, COMO PAPEL  (v4.4)
+   *
+   * "Quiero que me muestre más simple: qué paños salieron y quién los sacó,
+   *  y que sea como un ticket. Y simplemente cuántas marquetas en total se
+   *  vendieron a precio normal y cuántas a mayoreo. Es todo, no necesito
+   *  más."
+   *
+   * Antes iban además los pedazos uno por uno —15 x 1/8, 3 x 1/4…—, las
+   * mermas por motivo y lo cortado para bolsas. Los tres SIGUEN contando:
+   * están restados arriba, en el cuadre. Lo que se quitó es el desglose,
+   * que hacía una tarjeta larguísima que nadie leía de pie.
+   */
+  function papelDelHielo(h) {
+    const frac = (n) => esc(textoFraccion(n));
+
+    return `
+      <div class="ticket" id="ticket-hielo">
+        <div class="ticket-cabeza">
+          <strong>${esc((marca.nombreNegocio || 'Hielo LOLHA').toUpperCase())}</strong>
+          <span>${esc(formatoFecha(h.hasta))}</span>
+        </div>
+        <div class="ticket-folio">PAÑOS SACADOS</div>
+
         ${h.panos.length ? `
-          <table class="tabla">
-            <tr><th>Tanque</th><th>Paño</th><th>Quién lo sacó</th>
-                <th class="der">Al cuarto frío</th><th class="der">Rotas</th></tr>
+          <table class="ticket-tabla">
             ${h.panos.map((p) => `
               <tr>
-                <td>${esc(p.tanque)}</td>
-                <td>#${p.pano}${p.enProceso ? ' <small>a medias</small>' : ''}</td>
-                <td>${esc(p.quien || '—')}</td>
-                <td class="der"><strong>${p.alAlmacen}</strong></td>
-                <td class="der ${p.rotas ? 'malo' : ''}">${p.rotas || '—'}</td>
+                <td>${esc(p.tanque)} #${p.pano}${p.enProceso ? ' <small>a medias</small>' : ''}
+                    ${p.quien ? `<small class="vale-quien">${esc(p.quien)}</small>` : ''}</td>
+                <td>${p.alAlmacen}</td>
               </tr>`).join('')}
             <tr class="fuerte">
-              <td colspan="3"><strong>${h.produccion.cuantos} ${
-                h.produccion.cuantos === 1 ? 'paño' : 'paños'}</strong></td>
-              <td class="der"><strong>${h.produccion.alAlmacen}</strong></td>
-              <td class="der ${h.produccion.merma ? 'malo' : ''}">${h.produccion.merma || '—'}</td>
+              <td>${h.produccion.cuantos} ${h.produccion.cuantos === 1 ? 'paño' : 'paños'}</td>
+              <td>${h.produccion.alAlmacen}</td>
             </tr>
-          </table>` : '<p class="ayuda">No se sacó ningún paño en esta ventana.</p>'}
+          </table>`
+        : '<p class="ticket-vacio">Ninguno</p>'}
 
-        <h4 class="emp-sub">Qué pedazos se vendieron</h4>
-        ${h.pedazos.length ? `
-          <table class="tabla">
-            <tr><th>Pedazo</th><th class="der">Cuántos</th><th class="der">En marquetas</th></tr>
-            ${h.pedazos.map((p) => `
-              <tr>
-                <td><strong>${esc(p.texto)}</strong></td>
-                <td class="der"><strong>${p.piezas}</strong></td>
-                <td class="der">${frac(p.dieciseisavos)}</td>
-              </tr>`).join('')}
-          </table>
-          <div class="cuadre" style="margin-top:10px">
+        <div class="ticket-folio" style="margin-top:12px">SE VENDIÓ</div>
+        ${h.listas.length ? `
+          <table class="ticket-tabla">
             ${h.listas.map((l) => `
-              <div class="cuadre-linea">
-                <span>${l.tipo === 'mayoreo' ? '🏷️ Mayoreo' : 'Público'} · ${esc(l.lista)}
-                  <small>${l.tickets} ${l.tickets === 1 ? 'ticket' : 'tickets'}</small></span>
-                <strong>${frac(l.dieciseisavos)}</strong>
-              </div>`).join('')}
-          </div>` : '<p class="ayuda">No se vendió hielo en esta ventana.</p>'}
+              <tr>
+                <td>${l.tipo === 'mayoreo' ? 'Mayoreo' : 'Público'}
+                    <small class="vale-quien">${l.tickets} ${
+                      l.tickets === 1 ? 'ticket' : 'tickets'}</small></td>
+                <td>${frac(l.dieciseisavos)}</td>
+              </tr>`).join('')}
+            <tr class="fuerte"><td>Total</td><td>${frac(h.cuadre.vendido)}</td></tr>
+          </table>`
+        : '<p class="ticket-vacio">Nada</p>'}
 
-        ${h.mermas.length ? `
-          <h4 class="emp-sub">Lo que se derritió o se rompió</h4>
-          <div class="cuadre">
-            ${h.mermas.map((m) => `
-              <div class="cuadre-linea">
-                <span>${esc(m.motivo)}<small>${m.veces} ${m.veces === 1 ? 'vez' : 'veces'}</small></span>
-                <strong>${frac(m.dieciseisavos)}</strong>
-              </div>`).join('')}
-          </div>` : ''}
-
-        ${h.cortes.length ? `
-          <h4 class="emp-sub">Lo que se cortó para bolsas</h4>
-          <div class="cuadre">
-            ${h.cortes.map((x) => `
-              <div class="cuadre-linea">
-                <span>${esc(x.texto)} de hielo</span>
-                <strong>${x.bolsas != null ? `${x.bolsas} bolsas` : 'sin contar'}</strong>
-              </div>`).join('')}
-          </div>` : ''}
+        <div class="ticket-pie">
+          <div>Contó: ${esc(h.conteo?.ejecutor_nombre || '—')}</div>
+        </div>
       </div>`;
   }
 

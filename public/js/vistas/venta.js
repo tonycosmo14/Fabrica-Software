@@ -26,8 +26,9 @@ import { pedirTexto, pedirImporte, pedirCantidad, pedirEntero, confirmar,
          pedirAutorizacion, menu, verTicket } from '../dialogo.js';
 import { aTexto, descomponer, desglose, pesos, paraEditar } from '../fracciones.js';
 import { cargarMarca } from '../marca.js';
-import { imprimirTicket, limpiarImpresion } from '../imprimir.js';
+import { imprimirTicket, limpiarImpresion, htmlDeEspejo } from '../imprimir.js';
 import { tono } from '../sonido.js';
+import { hacerVale } from '../vale.js';
 
 /** Billetes con los que de verdad paga la gente. */
 const BILLETES = [50, 100, 200, 500, 1000];
@@ -272,6 +273,13 @@ export async function vistaVenta(pantalla, estadoApp) {
             <div class="pos-dinero">
               <button class="pos-btn-entrada" id="meter">＋ Meter dinero</button>
               <button class="pos-btn-salida" id="gasto">− Gasto</button>
+              <!-- EL VALE, AQUÍ TAMBIÉN (v4.4). Quien llega a llevarse el
+                   efectivo llega al mostrador, no a la pantalla de Caja.
+                   Ni verde ni rojo: el dinero sale, pero no se gastó. -->
+              <button class="pos-btn-vale" id="vale"
+                      title="Alguien se llevó efectivo del cajón: sale su papel firmado">
+                📤 Vale
+              </button>
             </div>` : ''}
 
           <button class="pos-cobrar" id="cobrar">
@@ -1783,8 +1791,16 @@ export async function vistaVenta(pantalla, estadoApp) {
       if (r.impreso) {
         avisar(`Cotización impresa: ${pesos(r.total)}. No es venta.`, 'bien');
       } else {
-        // Sin impresora, se enseña en pantalla con forma de ticket.
-        await verTicket({ titulo: 'Cotización', renglones: r.renglones, ancho: r.ancho });
+        // SIN IMPRESORA TÉRMICA, LO SACA EL NAVEGADOR  (v4.4). Antes solo
+        // se enseñaba en pantalla y ahí moría: el cliente venía por un
+        // papel con el precio y no había manera de dárselo. Es lo mismo
+        // que ya hacía el ticket de una venta.
+        const que = await verTicket({
+          titulo: 'Cotización', renglones: r.renglones, ancho: r.ancho,
+          notas: ['No hay impresora térmica configurada.'],
+          acciones: [{ valor: 'imprimir', texto: '🖨️ Imprimir' }]
+        });
+        if (que === 'imprimir') imprimirTicket(htmlDeEspejo(r.renglones, r.ancho));
       }
     } catch (e) {
       if (e.faltaCliente) {
@@ -2419,6 +2435,14 @@ export async function vistaVenta(pantalla, estadoApp) {
   if (puedeOperarCaja) {
     pantalla.querySelector('#meter').onclick = () => movimiento('entrada');
     pantalla.querySelector('#gasto').onclick = () => movimiento('salida');
+    pantalla.querySelector('#vale').onclick = async () => {
+      await hacerVale();
+      // El vale cambió lo que hay en el cajón; los avisos de la pista lo
+      // leen de ahí. Y el foco vuelve al código, que es donde vive la mano
+      // del cajero.
+      refrescarAvisos();
+      enfocar();
+    };
   }
 
   /**

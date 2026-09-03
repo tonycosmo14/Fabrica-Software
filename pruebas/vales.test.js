@@ -355,6 +355,87 @@ test('la libreta de vales es del administrador', async () => {
 });
 
 // ============================================================
+// EL VALE NO SE PUEDE ROMPER DESDE LOS AJUSTES  (v4.4)
+//
+// Lo que le pasó a Tony: dio de baja "Retiro a la caja fuerte" en los
+// gastos que se repiten —cosa razonable de hacer— y a partir de ahí NINGÚN
+// vale se podía hacer, con un mensaje que hablaba de una pantalla que él
+// no estaba usando. Un ajuste no puede tumbar una parte del programa.
+// ============================================================
+
+test('los conceptos de vale no se pueden dar de baja', async () => {
+  const r = await llamar('/api/caja/conceptos/gasto-retiro', {
+    method: 'PUT', cuerpo: { activo: false }
+  });
+  assert.equal(r.estado, 409);
+  assert.match(r.json.error, /botón 📤 Vale/);
+});
+
+test('ni quitar de la lista', async () => {
+  const r = await llamar('/api/caja/conceptos/gasto-vale-raya/eliminar', { method: 'POST' });
+  assert.equal(r.estado, 409);
+});
+
+test('renombrarlos sí se puede, y el vale sigue funcionando', async () => {
+  const r = await llamar('/api/caja/conceptos/gasto-retiro', {
+    method: 'PUT', cuerpo: { nombre: 'Se lo llevó el patrón' }
+  });
+  assert.equal(r.estado, 200);
+
+  await llamar('/api/caja/abrir', { method: 'POST', cuerpo: { fondo: 100 } })
+    .catch(() => {});
+  const v = await llamar('/api/caja/vales', {
+    method: 'POST', cuerpo: { clase: 'retiro', monto: 50, ejecutorId: mari.id }
+  });
+  assert.equal(v.estado, 201);
+
+  // Y el papel dice el nombre nuevo (regla 3.5: el texto se copia).
+  const m = bd.prepare('SELECT concepto FROM movimientos_caja WHERE id = ?')
+    .get(v.json.datos.movimientoId);
+  assert.equal(m.concepto, 'Se lo llevó el patrón');
+
+  await llamar('/api/caja/conceptos/gasto-retiro', {
+    method: 'PUT', cuerpo: { nombre: 'Retiro a la caja fuerte' }
+  });
+});
+
+test('si YA estaba dado de baja, el vale lo revive en vez de fallar', async () => {
+  // Se le da de baja por la puerta de atrás, que es como quedó la base de
+  // Tony antes de que existiera la protección de arriba.
+  bd.prepare("UPDATE conceptos_gasto SET activo = 0, oculto = 1 WHERE id = 'gasto-retiro'").run();
+
+  const r = await llamar('/api/caja/vales', {
+    method: 'POST', cuerpo: { clase: 'retiro', monto: 75, ejecutorId: mari.id }
+  });
+  assert.equal(r.estado, 201, 'el vale se hace igual');
+
+  const c = bd.prepare("SELECT * FROM conceptos_gasto WHERE id = 'gasto-retiro'").get();
+  assert.equal(c.activo, 1, 'y de paso quedó revivido');
+  assert.equal(c.oculto, 0);
+});
+
+test('si alguien creó a mano otro con el mismo nombre, se adopta el suyo', async () => {
+  bd.prepare("UPDATE conceptos_gasto SET activo = 0, oculto = 1 WHERE id = 'gasto-vale-raya'").run();
+  const alta = await llamar('/api/caja/conceptos', {
+    method: 'POST', cuerpo: { nombre: 'Vale de raya', tipo: 'salida' }
+  });
+  assert.equal(alta.estado, 201);
+  const suyo = alta.json.datos.concepto.id;
+
+  const r = await llamar('/api/caja/vales', {
+    method: 'POST', cuerpo: { clase: 'raya', monto: 60, ejecutorId: chema.id }
+  });
+  assert.equal(r.estado, 201);
+
+  // Se usó el que él dio de alta —es el que ya está tocando— y quedó
+  // marcado como vale para que el corte lo separe bien.
+  const m = bd.prepare('SELECT concepto_id FROM movimientos_caja WHERE id = ?')
+    .get(r.json.datos.movimientoId);
+  assert.equal(m.concepto_id, suyo);
+  assert.equal(bd.prepare('SELECT es_vale FROM conceptos_gasto WHERE id = ?').get(suyo).es_vale, 1);
+});
+
+// ============================================================
 // LAS BOLSAS, POR TAMAÑO
 // ============================================================
 

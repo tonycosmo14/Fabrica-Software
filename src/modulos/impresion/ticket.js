@@ -848,15 +848,24 @@ function ticketHielo(corte, { negocio = '' } = {}) {
     t.centro().linea(q.faltante > 0 ? 'hielo que nadie explico' : 'mas hielo del que debia').izquierda();
   }
 
-  // ---- LOS PAÑOS ----
+  // ---- LOS PAÑOS: QUÉ SALIÓ Y QUIÉN LO SACÓ  (v4.4) ----
+  //
+  // "Quiero que me muestre más simple: qué paños salieron y quién los
+  //  sacó, y cuántas marquetas se vendieron a precio normal y cuántas a
+  //  mayoreo. Es todo, no necesito más."
+  //
+  // Antes iban además los pedazos uno por uno (15 x 1/8, 3 x 1/4...), las
+  // mermas por motivo y lo que se cortó para bolsas. Los tres SIGUEN
+  // contando —están restados arriba, en el cuadre— pero desglosarlos hacía
+  // un papel largo que nadie leía. El desglose está en las estadísticas,
+  // que es donde se va a buscar; este papel se lee de pie.
   t.negrita().separadorConTitulo('PANOS SACADOS').negrita(false);
   if (!h.panos.length) {
     t.linea('  ninguno');
   } else {
     for (const uno of h.panos) {
-      const roto = uno.rotas ? ` -${uno.rotas}` : '';
       t.columnas2(`${uno.tanque} #${uno.pano}${uno.enProceso ? ' (a medias)' : ''}`,
-                  `${uno.alAlmacen}${roto}`);
+                  String(uno.alAlmacen));
       // Quién lo sacó va en su propio renglón: es el dato por el que se
       // pregunta cuando un paño sale mal, y en la misma línea no cabe.
       if (uno.quien) t.linea(`  ${uno.quien}`);
@@ -864,45 +873,24 @@ function ticketHielo(corte, { negocio = '' } = {}) {
     t.separador('.');
     t.bloqueDerecha([
       ['Panos', String(h.produccion.cuantos)],
-      ['Al cuarto frio', String(h.produccion.alAlmacen)],
-      h.produccion.merma ? ['Rotas', String(h.produccion.merma)] : null
+      ['MARQUETAS', String(h.produccion.alAlmacen)]
     ]);
-
-    const salieron = CALIDADES.filter((x) => h.produccion[x.clave] > 0);
-    if (salieron.length) {
-      t.separador('.');
-      t.negrita().linea('COMO SALIO').negrita(false);
-      for (const x of salieron) t.columnas2(`  ${x.corto}`, String(h.produccion[x.clave]));
-    }
   }
 
-  // ---- QUÉ PEDAZOS SE VENDIERON ----
-  if (h.pedazos.length) {
-    t.negrita().separadorConTitulo('SE VENDIO').negrita(false);
-    for (const p of h.pedazos) {
-      t.columnas2(`  ${p.piezas} x ${p.texto}`, aTexto(p.dieciseisavos));
-    }
-    t.separador('.');
+  // ---- CUÁNTO SE VENDIÓ, Y A QUÉ PRECIO ----
+  //
+  // Dos números y ya: al público y a mayoreo. Es la pregunta que se hace
+  // mirando esto —"¿cuánto se fue barato?"— y se contesta de un vistazo.
+  t.negrita().separadorConTitulo('SE VENDIO').negrita(false);
+  if (!h.listas.length) {
+    t.linea('  nada');
+  } else {
     for (const l of h.listas) {
-      t.columnas2(`  ${l.tipo === 'mayoreo' ? 'Mayoreo' : 'Publico'} (${l.lista})`,
+      t.columnas2(`  ${l.tipo === 'mayoreo' ? 'Mayoreo' : 'Publico'}`,
                   `${aTexto(l.dieciseisavos)} · ${l.tickets} tk`);
     }
-  }
-
-  // ---- LO QUE SE DERRITIÓ ----
-  if (h.mermas.length) {
-    t.negrita().separadorConTitulo('DERRETIDO O ROTO').negrita(false);
-    for (const m of h.mermas) {
-      t.columnas2(`  ${m.motivo}`, aTexto(m.dieciseisavos));
-    }
-  }
-
-  // ---- LO QUE SE CORTÓ PARA BOLSAS ----
-  if (h.cortes.length) {
-    t.negrita().separadorConTitulo('CORTADO PARA BOLSAS').negrita(false);
-    for (const x of h.cortes) {
-      t.columnas2(`  ${x.texto}`, x.bolsas != null ? `${x.bolsas} bolsas` : 'sin contar');
-    }
+    t.separador('.');
+    t.bloqueDerecha([['TOTAL', aTexto(q.vendido)]]);
   }
 
   t.separador();

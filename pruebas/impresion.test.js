@@ -849,8 +849,17 @@ test('el corte imprime el cuadre del hielo, con lo que faltó', async () => {
   assert.match(papel, /CONTADO/);
   assert.match(papel, /FALTA 2/, 'y el número que se viene a ver');
   assert.match(papel, /PANOS SACADOS/);
-  assert.match(papel, /SE VENDIO/, 'qué pedazos salieron');
-  assert.match(papel, /DERRETIDO O ROTO/);
+  assert.match(papel, /SE VENDIO/);
+
+  // EL PAPEL SE ACORTÓ A PROPÓSITO  (v4.4). "Quiero que me muestre más
+  // simple: qué paños salieron y quién los sacó, y cuántas marquetas a
+  // precio normal y cuántas a mayoreo. Es todo." Los pedazos uno por uno,
+  // las mermas por motivo y lo cortado para bolsas SIGUEN restados arriba,
+  // en el cuadre; lo que se quitó es el desglose que nadie leía.
+  assert.doesNotMatch(papel, /DERRETIDO O ROTO/);
+  assert.doesNotMatch(papel, /CORTADO PARA BOLSAS/);
+  assert.doesNotMatch(papel, /x 1\/8/, 'los pedazos uno por uno ya no van');
+  assert.match(papel, /Publico/, 'pero sí cuánto se fue a cada precio');
 });
 
 test('un turno que no contó hielo no imprime un cuadre en cero', async () => {

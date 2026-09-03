@@ -27,7 +27,8 @@ const {
 } = require('./calculo');
 const { cuadreDeHielo } = require('./hielo');
 const {
-  conceptosDeVale, salidasPartidas, adelantosDelTurno, adelantoDelMovimiento
+  conceptoDeVale, conceptosDeVale, esConceptoDeVale, salidasPartidas,
+  adelantosDelTurno, adelantoDelMovimiento
 } = require('./vales');
 
 const router = express.Router();
@@ -241,6 +242,19 @@ router.post('/entregar', operarCaja, (req, res) => {
 // ============================================================
 
 /**
+ * LOS DOS CONCEPTOS DE VALE NO SE DAN DE BAJA A MANO  (v4.4)
+ *
+ * No son gastos que alguien dio de alta: son la parte del programa que
+ * hace funcionar el botón de vales. Dándolos de baja desde aquí, el botón
+ * dejaba de servir sin que nada lo dijera — y así pasó. Ahora se explica
+ * dónde se usan en vez de romperse en silencio.
+ */
+const MOTIVO_VALE =
+  'Ese concepto es el de los vales y no se puede dar de baja: los vales se ' +
+  'hacen con el botón 📤 Vale de la caja. Si no quieres usarlos, simplemente ' +
+  'no los toques.';
+
+/**
  * EL HISTORIAL DEL CAJÓN, CRUZANDO TURNOS.
  *
  * El de la pantalla de Caja solo trae el turno de ahora, y eso deja fuera
@@ -328,6 +342,7 @@ router.post('/conceptos/:id/eliminar', conceptos, (req, res) => {
   const c = bd.prepare('SELECT * FROM conceptos_gasto WHERE id = ? AND oculto = 0')
     .get(req.params.id);
   if (!c) return error(res, 'Ese concepto no existe.', 404);
+  if (esConceptoDeVale(c.id)) return error(res, MOTIVO_VALE, 409);
 
   bd.prepare('UPDATE conceptos_gasto SET oculto = 1, activo = 0, fecha_baja = COALESCE(fecha_baja, ?) WHERE id = ?')
     .run(ahora(), c.id);
@@ -486,6 +501,7 @@ router.put('/conceptos/:id', conceptos, (req, res) => {
   // gastos que ya se anotaron con él siguen sumando en la estadística: un
   // gasto de marzo no desaparece porque en agosto se deje de usar.
   if (req.body?.activo !== undefined) {
+    if (!req.body.activo && esConceptoDeVale(c.id)) return error(res, MOTIVO_VALE, 409);
     cambios.activo = req.body.activo ? 1 : 0;
     cambios.fecha_baja = req.body.activo ? null : ahora();
   }
@@ -594,7 +610,7 @@ router.get('/vales', verCaja, (req, res) => {
   const mandan = new Set(['gerente', 'admin']);
 
   return ok(res, {
-    conceptos: conceptosDeVale().filter((c) => c.activo),
+    conceptos: conceptosDeVale(),
     gente: {
       retiro: gente.filter((u) => mandan.has(u.rol)),
       raya: gente
@@ -623,11 +639,11 @@ router.post('/vales', operarCaja, (req, res) => {
   if (!caja) return error(res, 'Abre el turno de caja antes de dar un vale.', 409);
 
   const clase = req.body?.clase === 'raya' ? 'raya' : 'retiro';
-  const conceptoId = clase === 'raya' ? 'gasto-vale-raya' : 'gasto-retiro';
-  const concepto = bd.prepare('SELECT * FROM conceptos_gasto WHERE id = ?').get(conceptoId);
-  if (!concepto || !concepto.activo) {
-    return error(res, 'Ese vale se dio de baja en los gastos que se repiten.', 409);
-  }
+  // Se busca, y si alguien lo dio de baja o lo quitó de la lista de gastos
+  // que se repiten, se revive aquí mismo. Un ajuste de esa pantalla no
+  // puede dejar sin vales a la fábrica — que es exactamente lo que pasaba.
+  const concepto = conceptoDeVale(clase);
+  if (!concepto) return error(res, 'Ese vale no existe.', 400);
 
   const centavos = leerImporte(req.body?.monto, { permitirCero: false });
   if (centavos === null) return error(res, 'Escribe de cuánto es el vale.');

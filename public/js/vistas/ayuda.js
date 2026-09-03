@@ -634,6 +634,11 @@ debería quedar − contado = FALTA</pre>
       para firmar. Con un solo papel, el día que alguien pregunte «¿y esos
       dos mil?» solo hay una versión, y es la del que la tiene en la mano.</p>
 
+      <p class="ayuda-tip">El mismo botón <b>📤 Vale</b> está en
+      <b>Vender</b>, debajo de Meter dinero y Gasto: quien llega a llevarse
+      el efectivo llega al mostrador, no a la pantalla de Caja. Es el mismo
+      vale desde los dos sitios.</p>
+
       <p class="ayuda-tip"><b>Lo anota quien está en la computadora, no
       quien se lleva el dinero.</b> Es el caso de verdad: llega tu papá, se
       lleva el efectivo y no toca la máquina. La cajera lo anota a nombre de
@@ -723,6 +728,20 @@ sabado   lo que le falta $1,100   ← gasto (sueldo)
       es del <b>gerente</b> o del <b>administrador</b>: que lo hiciera el
       propio cajero sería firmarse a sí mismo la entrega.</p>
 
+      <h4>El corte se lee en dos columnas</h4>
+      <p>A la izquierda <b>el dinero</b>, a la derecha <b>el hielo</b>. Son
+      las dos cuentas del mismo turno y casi siempre se miran juntas —
+      «cuadró el dinero pero faltó hielo» es una sola pregunta, no dos—.
+      Una debajo de otra había que rodar la pantalla para compararlas.
+      Debajo caen los dos papeles, lado a lado. En un teléfono se apila
+      todo solo.</p>
+
+      <p class="ayuda-tip">Cuando <b>sobra</b> dinero, el número sale en
+      <b>ámbar</b>, ni rojo ni verde: rojo diría «falta», que es mentira, y
+      verde diría «todo en orden», que tampoco. Que sobre no está bien —casi
+      siempre es un cambio que no se dio o una venta cobrada sin
+      registrar— pero no es lo mismo que faltar.</p>
+
       <h4>El corte separa los gastos de los vales</h4>
       <p>Salían sumados en un solo renglón, y así un turno con mucha salida
       no dice nada: no se sabe si la fábrica <b>gastó</b> mucho o si nada
@@ -768,6 +787,15 @@ debería quedar − lo que se contó = FALTA o SOBRA</pre>
       sin anotarse como derretido y sin cortarse</b>. Ese es el número que
       hay que vigilar. Si <b>sobra</b>, casi siempre falta capturar un paño
       o el conteo anterior se quedó corto.</p>
+
+      <p>Y debajo, con forma de ticket, lo poco que hace falta saber:
+      <b>qué paños salieron y quién los sacó</b>, y <b>cuánto se vendió al
+      público y cuánto a mayoreo</b>. Nada más.</p>
+      <p class="ayuda-tip">Los pedazos uno por uno —15 × 1/8, 3 × 1/4…—,
+      las mermas por motivo y lo que se cortó para bolsas ya no salen en
+      este papel: <b>siguen contando</b>, están restados arriba en el
+      cuadre, pero desglosarlos hacía un papel largo que nadie leía de pie.
+      Ese detalle está en las estadísticas, que es donde se va a buscar.</p>
 
       <p>Y debajo, de dónde salió cada número:</p>
       <ul>

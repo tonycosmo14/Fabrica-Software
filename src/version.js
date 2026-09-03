@@ -17,9 +17,29 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '4.3';
+const VERSION_ACTUAL = '4.4';
 
 const VERSIONES = [
+  {
+    numero: '4.4',
+    nombre: 'El corte en dos columnas',
+    fecha: '2026-09-03',
+    resumen:
+      'Dos cosas que estaban rotas —la cotización no se podía imprimir y el ' +
+      'vale no dejaba hacerse—, el corte partido en dos columnas con el ' +
+      'dinero y el hielo, el papel del hielo mucho más corto, y el vale ' +
+      'también desde Vender.',
+    cambios: [
+      { tipo: 'arreglo', texto: 'LA COTIZACIÓN NO SE PODÍA IMPRIMIR. Sin impresora térmica salía en pantalla y ahí moría: el cliente venía por un papel con el precio y no había manera de dárselo. Ahora lleva su botón 🖨️ Imprimir y la saca por la impresora del navegador, igual que el ticket de una venta. Lo mismo la copia de cualquier ticket viejo desde el historial.' },
+      { tipo: 'arreglo', texto: 'EL VALE NO DEJABA HACERSE, dijera lo que dijera el mensaje. La culpa fue mía: até el botón de vales a un renglón de «gastos que se repiten», que se puede dar de baja — y al darlo de baja, los vales dejaron de funcionar sin que nada lo dijera. Ahora los dos conceptos de vale se reviven solos si hacen falta, y en esa pantalla salen marcados 📤 Vale y ya no se pueden dar de baja. Cambiarles el nombre sí se puede.' },
+      { tipo: 'nuevo', texto: 'EL VALE, TAMBIÉN DESDE VENDER. Tienes razón en que ahí es más rápido: quien llega a llevarse el efectivo llega al mostrador, no a la pantalla de Caja. El botón 📤 Vale está debajo de Meter dinero y Gasto, y es exactamente el mismo vale desde los dos sitios.' },
+      { tipo: 'mejora', texto: 'EL CORTE, EN DOS COLUMNAS: el dinero a la izquierda y el hielo a la derecha. Son las dos cuentas del mismo turno y casi siempre se miran juntas —«cuadró el dinero pero faltó hielo» es una sola pregunta—; una debajo de otra había que rodar la pantalla para compararlas. Los dos papeles también salen lado a lado, y en un teléfono se apila todo solo.' },
+      { tipo: 'mejora', texto: 'EL PAPEL DEL HIELO, MUCHO MÁS CORTO. Ahora solo dice qué paños salieron y QUIÉN LOS SACÓ, y cuántas marquetas se vendieron al público y cuántas a mayoreo. Es todo. Los pedazos uno por uno, las mermas por motivo y lo cortado para bolsas siguen contando —están restados arriba, en el cuadre— pero desglosarlos hacía un papel largo que nadie leía de pie.' },
+      { tipo: 'mejora', texto: 'CUANDO SOBRA DINERO, EL NÚMERO SALE EN ÁMBAR. Ni rojo ni verde: rojo diría «falta», que es mentira, y verde diría «todo en orden», que tampoco. Que sobre no está bien, pero no es lo mismo que faltar.' },
+      { tipo: 'mejora', texto: 'El botón de vale de la caja ocupa el ancho entero en vez de quedarse a media fila, y un vale más grande que lo que hay en el cajón pregunta si es correcto: casi siempre es un cero de más.' },
+      { tipo: 'mejora', texto: 'Todo está en el manual, en Vender y en Caja.' }
+    ]
+  },
   {
     numero: '4.3',
     nombre: 'Los vales',

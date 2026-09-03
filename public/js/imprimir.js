@@ -21,6 +21,36 @@ export function imprimirTicket(html) {
   window.print();
 }
 
+/**
+ * EL MISMO PAPEL, PERO PARA EL NAVEGADOR  (v4.4)
+ *
+ * El servidor devuelve el "espejo" de cada ticket: los mismos renglones que
+ * salen por la térmica, con su alineación y su tamaño de letra. Cuando no
+ * hay impresora térmica configurada, esto los convierte en HTML para que el
+ * navegador saque el papel — que es lo que ya hacía el ticket de una venta
+ * y a la cotización se le había olvidado.
+ *
+ * Se respeta el ancho en caracteres del papel: así el ticket de pantalla y
+ * el de la térmica se parten igual y dicen lo mismo.
+ */
+export function htmlDeEspejo(renglones = [], ancho = 48) {
+  const escapar = (t) => String(t)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  const cuerpo = renglones.map((r) => {
+    const alineado = r.alin === 'centro' ? 'center' : r.alin === 'derecha' ? 'right' : 'left';
+    const grande = (r.anchoLetra || 1) > 1 || (r.altoLetra || 1) > 1;
+    return `<div style="text-align:${alineado};${grande ? 'font-size:1.7em;font-weight:700;line-height:1.15;' : ''}${
+      r.negrita && !grande ? 'font-weight:700;' : ''}">${escapar(r.t) || '&nbsp;'}</div>`;
+  }).join('');
+
+  return `
+    <div style="font-family:ui-monospace,'Courier New',monospace;font-size:12px;
+                line-height:1.35;white-space:pre-wrap;width:${ancho}ch;max-width:100%">
+      ${cuerpo}
+    </div>`;
+}
+
 /** Deja el área limpia: un ticket viejo no debe salir por accidente. */
 export function limpiarImpresion() {
   const area = document.getElementById('area-impresion');

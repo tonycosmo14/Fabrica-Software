@@ -20,11 +20,94 @@
  */
 const { bd } = require('../../db/conexion');
 
-/** Los conceptos que son un vale. Se lee del catálogo, no está escrito aquí. */
+/**
+ * LOS DOS VALES, tal como tienen que existir.
+ *
+ * Están escritos aquí y no solo sembrados en la base: un vale es una parte
+ * del programa, no un gasto que alguien dio de alta. La lista de "gastos
+ * que se repiten" se edita, se da de baja y se limpia —y así tiene que
+ * ser—, pero si al hacerlo se llevaba por delante el botón de vales, el
+ * programa quedaba roto desde una pantalla de ajustes. Eso fue justo lo
+ * que pasó.
+ */
+const VALES = {
+  retiro: {
+    id: 'gasto-retiro', nombre: 'Retiro a la caja fuerte', traspaso: 1, orden: 3,
+    ayuda: 'Cuando ya hay mucho efectivo junto'
+  },
+  raya: {
+    id: 'gasto-vale-raya', nombre: 'Vale de raya', traspaso: 0, orden: 6,
+    ayuda: 'Parte del sueldo de la semana, pedida antes'
+  }
+};
+
+/** Un concepto vivo que ya se llame así. El nombre es único entre los vivos. */
+function vivoConEseNombre(nombre, salvo = '') {
+  return bd.prepare(`
+    SELECT * FROM conceptos_gasto
+     WHERE activo = 1 AND oculto = 0 AND lower(nombre) = lower(?) AND id <> ?
+  `).get(nombre, salvo) || null;
+}
+
+/**
+ * EL CONCEPTO DE UN VALE, PASE LO QUE PASE.
+ *
+ * Si está, se usa. Si lo dieron de baja o lo quitaron de la lista, SE
+ * REVIVE. Si nunca existió, se crea. Nunca devuelve nada que impida hacer
+ * un vale, porque no hay ningún ajuste que deba poder impedirlo.
+ *
+ * El único caso raro: que alguien haya creado a mano otro concepto con ese
+ * mismo nombre. Entonces se adopta el suyo —es el que la gente ya está
+ * tocando— y se le ponen las banderas que le tocan.
+ */
+function conceptoDeVale(clase) {
+  const def = VALES[clase];
+  if (!def) return null;
+
+  const marcar = (id) => {
+    bd.prepare('UPDATE conceptos_gasto SET es_vale = 1, es_traspaso = ? WHERE id = ?')
+      .run(def.traspaso, id);
+    return bd.prepare('SELECT * FROM conceptos_gasto WHERE id = ?').get(id);
+  };
+
+  const mio = bd.prepare('SELECT * FROM conceptos_gasto WHERE id = ?').get(def.id);
+
+  if (mio && mio.activo && !mio.oculto) {
+    return mio.es_vale ? mio : marcar(mio.id);
+  }
+
+  // Lo dieron de baja, lo ocultaron, o nunca estuvo. Antes de revivirlo o
+  // crearlo hay que mirar si ya hay otro vivo con ese nombre: los nombres
+  // de los conceptos vivos no se repiten.
+  const ajeno = vivoConEseNombre(def.nombre, def.id);
+  if (ajeno) return marcar(ajeno.id);
+
+  if (mio) {
+    bd.prepare(`
+      UPDATE conceptos_gasto
+         SET activo = 1, oculto = 0, fecha_baja = NULL, es_vale = 1, es_traspaso = ?
+       WHERE id = ?
+    `).run(def.traspaso, mio.id);
+    return bd.prepare('SELECT * FROM conceptos_gasto WHERE id = ?').get(mio.id);
+  }
+
+  bd.prepare(`
+    INSERT INTO conceptos_gasto
+      (id, nombre, tipo, orden, ayuda, es_vale, es_traspaso, fecha_alta)
+    VALUES (?, ?, 'salida', ?, ?, 1, ?, datetime('now'))
+  `).run(def.id, def.nombre, def.orden, def.ayuda, def.traspaso);
+  return bd.prepare('SELECT * FROM conceptos_gasto WHERE id = ?').get(def.id);
+}
+
+/** Los dos, listos para usarse. Los revive si hace falta. */
 function conceptosDeVale() {
-  return bd.prepare(
-    'SELECT * FROM conceptos_gasto WHERE es_vale = 1 ORDER BY orden'
-  ).all();
+  return Object.keys(VALES).map((clase) => conceptoDeVale(clase)).filter(Boolean);
+}
+
+/** ¿Este concepto es el de un vale? Los vales no se dan de baja a mano. */
+function esConceptoDeVale(id) {
+  return Object.values(VALES).some((v) => v.id === id)
+    || Boolean(bd.prepare('SELECT es_vale FROM conceptos_gasto WHERE id = ?').get(id)?.es_vale);
 }
 
 /**
@@ -139,6 +222,6 @@ function adelantoDelMovimiento(movimientoId) {
 }
 
 module.exports = {
-  conceptosDeVale, salidasPartidas,
+  VALES, conceptoDeVale, conceptosDeVale, esConceptoDeVale, salidasPartidas,
   adelantosDe, pendienteDe, pendientesDeTodos, adelantosDelTurno, adelantoDelMovimiento
 };

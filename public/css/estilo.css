@@ -675,11 +675,45 @@ select { color-scheme: light dark; }
 }
 .salidas.exacto { background: var(--et-cajero-f); border-color: var(--verde); }
 .salidas.exacto strong { color: var(--verde); }
-.salidas.sobra { background: var(--et-operario-f); border-color: var(--acento); }
-.salidas.sobra strong { color: var(--acento); }
+/* QUE SOBRE NO ESTÁ BIEN, PERO NO ES LO MISMO QUE FALTAR  (v4.4)
+   Rojo diría "falta dinero", que es mentira; verde diría "todo en orden",
+   que tampoco. Ámbar: hay algo que mirar. Sobrar casi siempre es un cambio
+   que no se dio o una venta cobrada sin registrar. */
+.salidas.sobra { background: var(--et-repartidor-f); border-color: var(--ambar); }
+.salidas.sobra strong { color: var(--ambar); }
 
 .cuadre-exacto { border-left: 5px solid var(--verde); }
 .cuadre-diferencia { border-left: 5px solid var(--est-fuera); }
+.cuadre-sobra { border-left: 5px solid var(--ambar); }
+
+/* ============================================================
+   EL CORTE, EN DOS COLUMNAS  (v4.4)
+   El dinero a la izquierda y el hielo a la derecha: son las dos cuentas
+   del mismo turno y se miran juntas. Una debajo de otra había que rodar
+   la pantalla para compararlas. En angosto se apilan solas.
+   ============================================================ */
+.corte-tablero { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: start; }
+.corte-columna { min-width: 0; }
+.corte-columna > .tarjeta:first-child { margin-top: 0 !important; }
+
+.corte-papeles {
+  display: grid; grid-template-columns: 1fr; gap: 16px;
+  justify-items: center; align-items: start; margin-top: 16px;
+}
+/* Dentro del tablero el ticket ya no se centra solo: lo centra la rejilla,
+   y su margen automático le robaría el sitio a la otra columna. */
+.corte-papeles .ticket { margin: 0; width: 320px; max-width: 100%; }
+
+@media (min-width: 960px) {
+  .corte-tablero { grid-template-columns: 1fr 1fr; }
+  /* Los dos papeles caen bajo las dos columnas de arriba: el ojo ya viene
+     bajando por esas dos guías y no tiene que buscarlos en otro sitio. */
+  .corte-papeles { grid-template-columns: 1fr 1fr; }
+}
+
+/* El papel del hielo va pegado a la izquierda de su columna, no centrado:
+   así su borde coincide con el de la tarjeta que lleva encima. */
+.corte-columna .ticket { margin-left: 0; margin-right: 0; width: 320px; max-width: 100%; }
 
 .horarios { display: flex; gap: 8px; flex-wrap: wrap; }
 .horario {
@@ -705,9 +739,10 @@ select { color-scheme: light dark; }
 .ticket-movimientos.dos-columnas {
   display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start;
 }
-/* El nombre de quien se llevó el dinero, debajo del concepto: es el dato
-   por el que se mira la lista de vales. */
-.ticket-columna .vale-quien { display: block; font-size: 10px; opacity: .8; }
+/* El nombre debajo del concepto: quién se llevó el dinero en un vale, o
+   quién sacó el paño en el papel del hielo. Es el dato por el que se miran
+   esas listas, y en el mismo renglón no cabe. */
+.ticket .vale-quien { display: block; font-size: 10px; opacity: .8; font-weight: 400; }
 .ticket-movimientos.dos-columnas .ticket-tabla { font-size: 10.5px; }
 /* El importe nunca se parte en dos renglones: "−$1,890" cortado a la mitad
    se lee como otro número. */
@@ -1800,6 +1835,12 @@ tr.anulada { opacity: .45; text-decoration: line-through; }
 
 /* El ticket de venta, pensado para la impresora térmica de 80 mm */
 .ticket-venta { max-width: 302px; }
+/* "Ninguno" / "Nada" dentro de un ticket: centrado y discreto, para que no
+   parezca un renglón más de la lista. */
+.ticket-vacio {
+  margin: 6px 0; text-align: center; font-size: 12px; opacity: .6;
+}
+
 .ticket-folio {
   text-align: center; font-size: 15px; font-weight: 800;
   letter-spacing: 1px; margin: 0 0 8px; padding: 5px 0;
@@ -1867,6 +1908,9 @@ tr.anulada { opacity: .45; text-decoration: line-through; }
   display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 18px;
 }
 .caja-acciones button { min-width: 0; }
+/* Un tercer botón sin pareja se queda a media fila y se ve mal: ocupa el
+   renglón entero, como el de cobrar. */
+.caja-acciones .ancho-completo-boton { grid-column: 1 / -1; }
 
 /* La tachita fuera de una imagen tiene que seguir siendo un círculo, no una
    pastilla estirada por la celda de la tabla. */
@@ -2123,6 +2167,14 @@ body.imprimir-hoja { page: hoja; }
    para dónde va el dinero antes de leer la palabra. */
 .pos-dinero { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .pos-dinero button { min-width: 0; padding: 11px 8px; font-size: 14px; }
+/* El vale ocupa el renglón entero: es el tercero y no tiene pareja, y
+   medio botón suelto al lado de un hueco se ve mal. Ni verde ni rojo — el
+   dinero sale del cajón, pero no se gastó. */
+.pos-btn-vale {
+  grid-column: 1 / -1;
+  background: var(--et-admin-f); color: var(--et-admin-t);
+  border: 2px solid var(--et-admin-t);
+}
 .pos-btn-entrada {
   background: var(--et-cajero-f); color: var(--et-cajero-t);
   border: 2px solid var(--verde);
@@ -3283,6 +3335,7 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 .hist-que.que-cambio,
 .hist-que.que-cambiado   { background: var(--et-operario-f);   color: var(--et-operario-t); }
 .hist-que.que-abono      { background: var(--et-operario-f);   color: var(--et-operario-t); }
+.hist-que.que-vale       { background: var(--et-admin-f);      color: var(--et-admin-t); }
 .hist-que.que-devolucion { background: var(--et-baja-f);       color: var(--et-baja-t); }
 .hist-que.que-cancelada  { background: var(--et-baja-f);       color: var(--et-baja-t); }
 .hist-que.que-par {
