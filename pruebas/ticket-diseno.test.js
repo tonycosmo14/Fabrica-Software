@@ -85,14 +85,18 @@ preparar(async () => {
 // LA ESQUINA DE ARRIBA
 // ============================================================
 
-test('el número del ticket va arriba del todo, y a la izquierda', () => {
+test('el número a la izquierda y quién lo hizo a la derecha, en un renglón', () => {
   const l = renglones(ticket.ticketVenta(venta, { negocio: 'Hielo LOLHA' }));
 
-  assert.match(l[0], /^#\d{4}-\d+$/, 'el primer renglón es el número, y nada más');
-  // Quién y cuándo van JUNTOS en el segundo renglón: eran dos y son el
-  // mismo dato. Cada renglón que se funde son 3 mm menos por ticket.
-  assert.match(l[1], /^Atendio: .+\d+\/[A-Z][a-z]{2}\/\d{4} \d{1,2}:\d{2}(am|pm)$/,
-               'quién estaba en la caja y a qué hora, en un solo renglón');
+  // EL DISEÑO DE LA v5.0: los dos datos que se miran primero comparten el
+  // renglón de arriba, uno pegado a cada orilla.
+  assert.match(l[0], /^#\d{4}-\d+ +\S.*$/, 'el número, y a la derecha el nombre');
+  assert.ok(l[0].includes(venta.cajero_nombre), 'el nombre, sin el «Atendio:» de antes');
+  assert.equal(l[0].length, 48, 'de orilla a orilla del papel');
+
+  // Y la fecha debajo, pegada a la derecha.
+  assert.match(l[1], /\d+\/[A-Z][a-z]{2}\/\d{4} \d{1,2}:\d{2}(am|pm)$/,
+               'la fecha, en el segundo renglón');
 });
 
 test('con un nombre largo, quién y cuándo se separan antes que recortarse', () => {
@@ -103,7 +107,7 @@ test('con un nombre largo, quién y cuándo se separan antes que recortarse', ()
   // nombre de alguien, se gasta el papel.
   assert.ok(l.join(' ').includes('Maria Guadalupe de los Angeles Chan Cauich'));
   assert.match(l.find((r) => /\d+\/[A-Z][a-z]{2}\/\d{4}/.test(r)),
-               /^\d+\/[A-Z][a-z]{2}\/\d{4} \d{1,2}:\d{2}(am|pm)$/, 'y la fecha aparte');
+               /\d+\/[A-Z][a-z]{2}\/\d{4} \d{1,2}:\d{2}(am|pm)$/, 'y la fecha aparte');
   // Partido por palabras aquí, no por la impresora a media palabra.
   for (const r of l) assert.ok(r.length <= 48, `se salió del papel: "${r}"`);
 });
@@ -119,38 +123,35 @@ test('la fecha lleva el mes en letras para que no se confunda con el día', () =
 // EL CUERPO
 // ============================================================
 
-test('el hielo va en grande y su desglose lleva el precio con puntitos', () => {
+test('el hielo va en grande y CON SU PRECIO en el mismo renglón', () => {
   const l = renglones(ticket.ticketVenta(venta, { negocio: 'Hielo LOLHA' }));
 
+  // v5.0: el hielo y lo que costó son el renglón que el cliente comprueba.
+  // Antes eran dos —el hielo grande y debajo el importe— y son uno.
   const grande = donde(l, '3/8');
   assert.ok(grande > 0, 'lo que se llevó, en su renglón');
-
-  const desglose = l[grande + 1];
-  assert.match(desglose, /\.{5,}/, 'los puntos llevan el ojo hasta el precio');
-  assert.match(desglose, /\$\d/, 'y ahí está el precio');
+  assert.match(l[grande], /\.{5,}/, 'los puntos llevan el ojo hasta el precio');
+  assert.match(l[grande], /\$\d/, 'y ahí está el precio, en el mismo renglón');
 });
 
 test('los artículos llevan cuántos eran', () => {
   const l = renglones(ticket.ticketVenta(venta, { negocio: 'Hielo LOLHA' }));
   const coca = l.find((r) => r.includes('Coca 600'));
   assert.ok(coca, 'el refresco sale en el ticket');
-  assert.match(coca, /^2 Coca 600 \.+ \$50/, 'dos, con su precio al final');
+  assert.match(coca, /^2 +Coca 600 \.+ \$50/, 'dos, con su precio al final');
 });
 
-test('el total va solo, y el pago con su cambio en un renglón', () => {
+test('total, pago y cambio en UN renglón, repartidos a lo ancho', () => {
   const l = renglones(ticket.ticketVenta(venta, { negocio: 'Hielo LOLHA' }));
   const t = donde(l, 'TOTAL:');
 
   assert.ok(t > 0);
-  // PAGO y CAMBIO son la cuenta que el cliente comprueba: juntos se leen
-  // de corrido, y de paso son un renglón en vez de dos.
-  assert.match(l[t + 1], /^PAGO: \$500 +CAMBIO: \$/);
-
-  // El TOTAL, que es el número que manda, queda pegado a la orilla derecha.
-  const sinCortar = Buffer.from(ticket.ticketVenta(venta, { negocio: 'Hielo LOLHA' }))
-    .toString('latin1').split('\n').map((r) => r.replace(/[\x00-\x1f]/g, ''));
-  const renglonTotal = sinCortar.find((r) => r.includes('TOTAL:'));
-  assert.equal(renglonTotal.length, 48, 'llega hasta la orilla del papel');
+  // v5.0: los tres números de la venta en el mismo renglón, uno a cada
+  // tercio, como en el diseño. Eran dos renglones.
+  assert.match(l[t], /^TOTAL: \$\d+ +PAGO: \$500 +CAMBIO: \$/);
+  // De orilla a orilla del papel: el renglón se arma contando columnas, y
+  // si la cuenta se desfasa la impresora lo parte en dos.
+  assert.equal(l[t].length, 48, 'llega justo a la orilla');
 });
 
 test('el nombre del negocio cierra el ticket, abajo a la izquierda', () => {
@@ -262,9 +263,12 @@ test('el gasto se arma igual que el ticket: qué, quién y cuándo', () => {
     cajero_nombre: 'Tony Castilla', ejecutor_nombre: 'Luis'
   }, { negocio: 'Hielo LOLHA' }));
 
+  // v5.0: el título en grande y al centro, y debajo quién y cuándo, uno a
+  // cada orilla — como en el diseño que mandó Tony.
   assert.equal(l[0], 'Gasto');
-  assert.match(l[1], /^Atendio: Tony Castilla\s+26\/Ago\/2026 5:45pm$/,
+  assert.match(l[1], /^Tony Castilla\s+26\/Ago\/2026 5:45pm$/,
                'quién tiene el turno de caja y a qué hora, en un renglón');
+  assert.equal(l[1].length, 48, 'de orilla a orilla');
   assert.match(l[donde(l, '$')], /^\$6,250$/, 'el importe, solo, en grande');
   assert.match(l.join('\n'), /GASOLINA PARA LIMPIAR PIEZAS/, 'el concepto en mayúsculas');
   assert.ok(donde(l, 'FIRMA') > 0, 'alguien se llevó dinero: se firma');
@@ -431,4 +435,178 @@ test('la raya para firmar llega a la orilla, y con letrero largo se parte', () =
   assert.match(larga.at(-1), /^_{40,}$/, 'y queda raya de sobra donde firmar');
   assert.ok(larga.join(' ').includes('FIRMA DE QUIEN RECIBIO EL DINERO EN MANO Y LO CONTO'),
             'sin comerse ni una palabra del letrero');
+});
+
+
+// ============================================================
+// EL DISEÑO DE LA v5.0
+//
+// Tony mandó cuatro papeles dibujados. Lo que se prueba aquí es lo que
+// esos dibujos tienen en común y que antes no estaba: todo por renglones
+// del mismo ancho, con puntitos que llevan el ojo hasta el número, una
+// raya encima del resultado y el resultado subrayado.
+// ============================================================
+
+const { Ticket } = require('../src/modulos/impresion/escpos');
+
+test('la cuenta va con puntitos y con los números en la misma columna', () => {
+  const t = new Ticket(80);
+  t.bloquePunteado([
+    ['Cobrado', '+$5,785'],
+    ['Gastos y retiros', '-$785'],
+    { etiqueta: 'Deberia haber', valor: '$455', raya: true },
+    ['Entregado', '-$450']
+  ]);
+  const l = t.espejo.map((r) => r.t);
+
+  for (const r of l) assert.equal(r.length, 48, `"${r}" no llega a la orilla`);
+
+  // Los importes, todos terminando en la misma columna: es lo que hace que
+  // la cuenta se lea como una cuenta y no como cuatro renglones sueltos.
+  const conNumero = l.filter((r) => /\$/.test(r));
+  assert.equal(new Set(conNumero.map((r) => r.length)).size, 1);
+  assert.ok(conNumero.every((r) => r.endsWith(r.trimEnd().slice(-r.trimEnd().length))));
+
+  // Y la raya de la suma, justo encima del resultado.
+  const raya = l.findIndex((r) => /^ +_+$/.test(r));
+  assert.ok(raya > 0, 'hay una raya');
+  assert.match(l[raya + 1], /Deberia haber/, 'y debajo va el resultado');
+});
+
+test('el resultado del corte va subrayado, que es lo que hace una térmica en vez de cursiva', () => {
+  const t = new Ticket(80);
+  t.centro().negrita().subrayado().linea('FALTA $55').normal();
+  assert.equal(t.espejo[0].subrayado, 1, 'el espejo lo lleva, para que la pantalla lo pinte');
+
+  const crudo = Buffer.from(t.bytes()).toString('latin1');
+  assert.ok(crudo.includes('\x1b-\x01'), 'y la impresora recibe la orden de subrayar');
+  assert.ok(crudo.includes('\x1b-\x00'), 'y la de dejar de subrayar');
+});
+
+test('la raya que separa bloques lleva hueco entre guión y guión', () => {
+  const l = new Ticket(80).separador().espejo.map((r) => r.t);
+  assert.match(l[0], /^(- )+-$/, 'guión, hueco, guión — como en un recibo de papel');
+  assert.ok(l[0].length <= 48);
+});
+
+test('un párrafo justificado llega justo a la orilla, menos el último renglón', () => {
+  const t = new Ticket(80);
+  t.parrafo('GASOLINA PARA LIMPIAR LAS PIEZAS DE LA MAQUINA NUEVA QUE ESTA EN '
+          + 'REPARACION DESDE LA SEMANA PASADA EN EL TALLER DE ENFRENTE',
+    { justificado: true });
+  const l = t.espejo.map((r) => r.t);
+
+  assert.ok(l.length > 2);
+  for (const r of l.slice(0, -1)) assert.equal(r.length, 48, `"${r}" no llegó a la orilla`);
+  assert.ok(l.at(-1).length < 48, 'el último no se estira: quedaría ridículo');
+});
+
+// ============================================================
+// EL TAMAÑO DE LA LETRA
+// ============================================================
+
+test('la letra chica cabe más por renglón; la grande no desacomoda nada', () => {
+  assert.equal(new Ticket(80, 2, 'chica').ancho, 64, 'fuente B: 64 columnas');
+  assert.equal(new Ticket(80, 2, 'normal').ancho, 48);
+  assert.equal(new Ticket(80, 2, 'grande').ancho, 48,
+    'la grande dobla el ALTO, no el ancho: las columnas no cambian');
+
+  // Y en papel de 58 mm, lo mismo a otra escala.
+  assert.equal(new Ticket(58, 2, 'chica').ancho, 42);
+  assert.equal(new Ticket(58, 2, 'normal').ancho, 32);
+});
+
+test('la letra grande escala TODO, así que las proporciones no cambian', () => {
+  const grande = new Ticket(80, 2, 'grande');
+  grande.linea('normal').tamano(2, 1).linea('el titulo');
+
+  assert.equal(grande.espejo[0].altoLetra, 2, 'lo normal ya sale al doble');
+  assert.equal(grande.espejo[1].altoLetra, 2, 'y un titulo de ancho doble, también');
+  assert.equal(grande.espejo[1].anchoLetra, 2, 'sigue siendo el doble de ancho que el texto');
+});
+
+test('cada tamaño manda su orden de fuente a la impresora', () => {
+  const orden = (tamano) => Buffer.from(new Ticket(80, 2, tamano).bytes()).toString('latin1');
+  assert.ok(orden('chica').includes('\x1bM\x01'), 'ESC M 1 elige la fuente B');
+  assert.ok(orden('normal').includes('\x1bM\x00'), 'ESC M 0 elige la fuente A');
+  assert.ok(orden('grande').includes('\x1bM\x00'), 'la grande es la A, multiplicada');
+});
+
+test('un tamaño inventado no rompe nada: se cae en el normal', () => {
+  assert.equal(new Ticket(80, 2, 'gigantesca').ancho, 48);
+  assert.equal(new Ticket(80, 2, undefined).ancho, 48);
+});
+
+// ============================================================
+// EL VALE ES EL PAPEL DEL GASTO CON OTRO TÍTULO
+// ============================================================
+
+test('el vale dice DE QUIÉN es en el título, como el gasto dice Gasto', () => {
+  const l = renglones(ticket.ticketVale({
+    fecha: '2026-08-26T17:45:00', centavos: 200000, esRaya: true, folio: 11,
+    concepto: 'Vale sueldo', ejecutor_nombre: 'Jesus Pech Canul',
+    capturista_nombre: 'Tony Castilla'
+  }, { negocio: 'Hielo LOLHA' }));
+
+  assert.equal(l[0], 'Vale de Jesus', 'el título lleva su nombre, no la palabra "Vale" a secas');
+  assert.match(l[1], /^Tony Castilla\s+26\/Ago\/2026 5:45pm$/, 'quién lo dio y cuándo');
+  assert.ok(l.includes('$2,000'), 'el importe, en grande');
+  assert.ok(l.includes('Jesus Pech Canul'), 'y el nombre completo debajo');
+  assert.ok(donde(l, 'FIRMA') > 0, 'se firma');
+});
+
+test('el gasto y el vale son el mismo papel: mismo orden de renglones', () => {
+  const forma = (l) => [
+    /^[A-Za-z]/.test(l[0]),                       // un título
+    /\d{1,2}:\d{2}(am|pm)$/.test(l[1]),           // quién y cuándo
+    /^(- )+-$/.test(l[2]),                        // la raya
+    l.some((r) => /^\$[\d,]+$/.test(r)),          // el importe solo, en grande
+    donde(l, 'FIRMA') > 0                         // y la raya para firmar
+  ];
+
+  const gasto = renglones(ticket.ticketMovimiento({
+    tipo: 'salida', fecha: '2026-08-26T17:45:00', centavos: 625000,
+    concepto: 'Gasolina', cajero_nombre: 'Tony Castilla'
+  }, { negocio: 'Hielo LOLHA' }));
+
+  const vale = renglones(ticket.ticketVale({
+    fecha: '2026-08-26T17:45:00', centavos: 200000, concepto: 'Vale',
+    ejecutor_nombre: 'Jesus Pech', capturista_nombre: 'Tony Castilla'
+  }, { negocio: 'Hielo LOLHA' }));
+
+  assert.deepEqual(forma(gasto), [true, true, true, true, true]);
+  assert.deepEqual(forma(vale), forma(gasto), 'la misma forma, con otro texto');
+});
+
+// ============================================================
+// HIELO A SACAR
+// ============================================================
+
+test('los números a sacar van en un renglón por tanque, en grande', () => {
+  const l = renglones(ticket.ticketProduccion({
+    fecha: '2026-08-31T09:15:00', entregadoPor: 'Tony Castilla',
+    lista: [
+      { tanque: 'N', siguientes: [11, 13, 15, 17] },
+      { tanque: 'T', siguientes: [11, 13, 15, 17] },
+      { tanque: '2N', siguientes: [11, 13, 15, 17],
+        aMedias: [{ pano: 11, faltan: 2, total: 6, empezadoPor: 'Chuy' }] }
+    ]
+  }, { negocio: 'Hielo LOLHA' }));
+
+  assert.equal(l[0].slice(0, 13), 'Hielo a sacar');
+  assert.ok(l[0].includes('Tony Castilla'), 'y quién lo entregó, a la derecha');
+
+  // Un renglón por tanque, con la letra del tanque en una columna fija
+  // para que todos los números arranquen a la misma altura.
+  assert.equal(l.filter((r) => /^N +11 \. 13 \. 15 \. 17$/.test(r)).length, 1);
+  assert.equal(l.filter((r) => /^2N +11 \. 13 \. 15 \. 17$/.test(r)).length, 1);
+  const n = l.find((r) => r.startsWith('N '));
+  const dosN = l.find((r) => r.startsWith('2N'));
+  assert.equal(n.indexOf('11'), dosN.indexOf('11'), 'los números, a la misma altura');
+
+  // Y una raya entre tanque y tanque, pero no después del último.
+  assert.equal(l.filter((r) => /^_{40,}$/.test(r)).length, 2, 'dos rayas para tres tanques');
+
+  assert.ok(l.some((r) => /pano 11 incompleto/.test(r)), 'lo que quedó a medias, debajo');
+  assert.ok(l.some((r) => /lo empezo Chuy/.test(r)), 'y quién lo empezó');
 });

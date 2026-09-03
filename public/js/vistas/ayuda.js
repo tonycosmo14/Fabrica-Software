@@ -1718,38 +1718,38 @@ debería haber − contado = FALTA</pre>
   {
     id: 'tickets',
     titulo: 'Cómo se lee un ticket',
-    busca: 'ticket papel comprobante copia cambio gasto firma atendio fecha total pago cambio impreso',
+    busca: 'ticket papel comprobante copia cambio gasto vale firma fecha total pago cambio impreso ' +
+           'tamaño letra fuente chica grande columnas puntitos subrayado renglon diseño',
     cuerpo: `
       <p>Todos los papeles del negocio se arman igual, para que se reconozcan
-      sin leerlos: <b>arriba a la izquierda qué es</b> este papel, <b>arriba a
-      la derecha quién y cuándo</b>, en medio el contenido entre dos rayas, y
-      abajo el nombre del negocio.</p>
+      sin leerlos: <b>arriba a la izquierda qué es</b> este papel y <b>a la
+      derecha quién lo hizo</b>, la fecha debajo, en medio el contenido entre
+      rayas, y abajo el nombre del negocio.</p>
 
-      <pre class="ayuda-formula">#2026-152125          Atendio: Tony Castilla
-                          26/Ago/2026 5:45pm
-Cliente: Mario Cauich
-------------------------------------------------
-2 3/8
-(2 + 1/4 + 1/8) ......................... $610.00
-2 Coca 600 ............................... $50.00
-------------------------------------------------
-                                 TOTAL:   $660.00
-                                 PAGO:    $700.00
-                                 CAMBIO:   $40.00
+      <pre class="ayuda-formula">#2026-152125                       Tony Castilla
+Cliente: Mario Cauich         26/Ago/2026 5:45pm
+- - - - - - - - - - - - - - - - - - - - - - - -
+2 3/8 ..................................... $627
+  (2 + 1/4 + 1/8)
+- - - - - - - - - - - - - - - - - - - - - - - -
+1    Agua 600ml ........................... $25
+10   Garrafon 20L ......................... $60
+- - - - - - - - - - - - - - - - - - - - - - - -
+TOTAL: $912       PAGO: $1,000       CAMBIO: $88
 HIELO LOLHA</pre>
 
       <h4>Qué es cada cosa</h4>
       <ul>
         <li><b>#2026-152125</b> — el número del ticket. El año y el
         consecutivo, que vuelve a empezar cada 1 de enero.</li>
-        <li><b>Atendio</b> — quién tenía el turno de caja. Es de ese cajón de
-        donde salió o entró el dinero.</li>
-        <li><b>El número grande</b> — cuánto hielo se llevó. Es lo único que
-        el cliente comprueba de un vistazo, y por eso va en grande.</li>
-        <li><b>El paréntesis de abajo</b> — de qué pedazos salió esa cuenta,
-        y cuánto costó el hielo.</li>
+        <li><b>El nombre de la derecha</b> — quién tenía el turno de caja. Es
+        de ese cajón de donde salió o entró el dinero.</li>
+        <li><b>El renglón grande</b> — cuánto hielo se llevó y cuánto costó,
+        juntos. Es lo único que el cliente comprueba de un vistazo.</li>
+        <li><b>El paréntesis de abajo</b> — de qué pedazos salió esa cuenta.
+        Solo sale cuando dice algo que el renglón de arriba no diga ya.</li>
         <li><b>Los puntitos</b> — llevan el ojo del concepto a su precio sin
-        que se salte de renglón.</li>
+        que se salte de renglón. En una tira de ocho conceptos eso se nota.</li>
       </ul>
 
       <h4>Los avisos que puede llevar</h4>
@@ -1764,25 +1764,70 @@ HIELO LOLHA</pre>
         crédito y este papel es el vale.</li>
       </ul>
 
-      <h4>El comprobante de un gasto</h4>
-      <pre class="ayuda-formula">Gasto                     Atendio: Tony Castilla
-                              26/Ago/2026 5:45pm
-------------------------------------------------
-$6,250
+      <h4>El gasto y el vale: el mismo papel</h4>
+      <pre class="ayuda-formula">                     Gasto
+Tony Castilla                 26/Ago/2026 5:45pm
+- - - - - - - - - - - - - - - - - - - - - - - -
+                    $6,250
 GASOLINA PARA LIMPIAR PIEZAS DE LA MAQUINA NUEVA
 EN REPARACION
-------------------------------------------------
-                  ______________
-                       FIRMA</pre>
 
-      <p>Mismo armazón: qué, quién, cuándo. Se firma porque alguien se llevó
-      dinero del cajón. <b>Meter</b> dinero también saca su papel, pero sin
-      raya para firmar: nadie firma por dejar.</p>
+FIRMA: _________________________________________</pre>
 
-      <p class="ayuda-tip">El papel no dice quién tomó el dinero ni quién lo
-      anotó, aunque el sistema lo guarde. Casi siempre es la misma persona y
-      llenaba el ticket de nombres. Cuando de verdad haga falta saberlo, está
-      en la <b>bitácora</b>, en Sistema.</p>`
+      <p>El vale es <b>exactamente este papel</b> con otro título: donde dice
+      «Gasto» dice <b>«Vale de Jesús»</b>, y debajo del importe va su nombre
+      completo. El nombre en el título no es adorno: es el único dato que
+      separa un vale de un faltante.</p>
+
+      <p>Se firma porque alguien se llevó dinero del cajón. <b>Meter</b>
+      dinero también saca su papel, pero sin raya para firmar: nadie firma
+      por dejar.</p>
+
+      <h4>El corte</h4>
+      <pre class="ayuda-formula">Corte #11                          Tony Castilla
+        31/Ago/2026 9:15am - 2:47pm
+- - - - - - - - - - - - - - - - - - - - - - - -
+750 tickets           15 gastos           1 vale
+- - - - - - - - - - - - - - - - - - - - - - - -
+        Fondo ..........................    $500
+      Cobrado .......................... +$5,785
+   Gastos (2) ..........................   -$385
+    Vales (1) ..........................   -$400
+                                        ________
+DEBERIA HABER ..........................  $5,500
+    ENTREGADO ..........................  $5,450
+- - - - - - - - - - - - - - - - - - - - - - - -
+                   FALTA $55</pre>
+
+      <p>La cuenta se lee como una cuenta de papel: los sumandos arriba, una
+      raya, y el resultado debajo. Y el <b>FALTA</b> va subrayado, que es lo
+      que hace que se lea como el resultado y no como un renglón más.</p>
+
+      <h4>El tamaño de la letra</h4>
+      <p>Está en <b>Sistema › La impresora de tickets</b>, junto al ancho del
+      papel. Tres pasos:</p>
+      <ul>
+        <li><b>Chica</b> — 64 letras por renglón en vez de 48. Cabe más y se
+        gasta menos papel, pero la letra queda apretada.</li>
+        <li><b>Normal</b> — lo de siempre, 48 columnas.</li>
+        <li><b>Grande</b> — las mismas 48 columnas, así que <b>nada se
+        desacomoda</b>, pero la letra mide el doble de alto. Gasta el doble
+        de papel: ese es el trato.</li>
+      </ul>
+
+      <p class="ayuda-tip"><b>Por qué son tres pasos y no un número.</b> Una
+      impresora térmica no tiene tamaños libres como un procesador de textos:
+      trae <b>dos letras grabadas</b> de fábrica y un multiplicador que
+      agranda lo que ya hay. Un «13.5» no existe, y ofrecerlo sería mentir.
+      Lo que sí se puede es probar los tres —el botón <b>Imprimir una
+      prueba</b> está ahí mismo— y quedarse con el que se lea mejor en tu
+      impresora.</p>
+
+      <p class="ayuda-tip"><b>Dos cosas que una térmica no sabe hacer</b>, por
+      si el papel no sale exactamente como en un dibujo: <b>no cambia de
+      estilo a media línea</b> —en «Hielo a sacar · Tony Castilla» o los dos
+      van en negritas o ninguno— y <b>no tiene cursivas</b>. Donde haría
+      falta una cursiva va subrayado, que sí existe y hace el mismo trabajo.</p>`
   },
 
   // ==========================================================

@@ -69,9 +69,52 @@ const EQUIVALENTES = {
   '‘': "'", '’': "'", '“': '"', '”': '"', '…': '...'
 };
 
-/** Cuántas letras caben por renglón según el ancho del papel. */
-function columnas(anchoMm) {
-  return Number(anchoMm) <= 58 ? 32 : 48;
+/**
+ * REPARTE LOS ESPACIOS PARA QUE EL RENGLÓN LLEGUE JUSTO A LA ORILLA.
+ *
+ * Con letra de ancho fijo —que es toda la de una térmica— justificar es
+ * solo repartir los huecos que faltan entre las palabras. Los primeros
+ * huecos se llevan uno de más cuando la cuenta no es exacta, que es lo que
+ * hace la imprenta de toda la vida.
+ *
+ * Dos casos en los que NO se justifica, porque quedaría peor: una palabra
+ * sola —se pegaría a la izquierda y ya— y un renglón tan corto que haría
+ * falta meter cinco espacios entre cada palabra.
+ */
+function estirar(palabras, ancho) {
+  if (palabras.length < 2) return palabras.join(' ');
+  const letras = palabras.reduce((n, p) => n + p.length, 0);
+  const huecos = palabras.length - 1;
+  const faltan = ancho - letras;
+  if (faltan <= huecos) return palabras.join(' ');
+
+  const porHueco = Math.floor(faltan / huecos);
+  if (porHueco > 4) return palabras.join(' ');
+
+  const sobran = faltan % huecos;
+  return palabras.reduce((texto, palabra, i) => i === 0 ? palabra
+    : texto + ' '.repeat(porHueco + (i <= sobran ? 1 : 0)) + palabra, '');
+}
+
+/**
+ * CUÁNTAS LETRAS CABEN POR RENGLÓN.
+ *
+ * Depende de dos cosas: el ancho del papel y cuál de las dos letras de
+ * fábrica se use. Toda impresora térmica trae dos:
+ *
+ *   FUENTE A — 12 puntos de ancho. 48 columnas en papel de 80 mm. Es la
+ *              de siempre y la que se lee mejor.
+ *   FUENTE B — 9 puntos. 64 columnas. Letra más chica y apretada: cabe
+ *              más en cada renglón y se gasta menos papel.
+ *
+ * No hay una tercera: son las que la impresora lleva grabadas. Lo demás
+ * —hacer la letra más grande— se consigue multiplicando (GS !), y eso sí
+ * cambia cuántas columnas quedan.
+ */
+function columnas(anchoMm, fuente = 'a') {
+  const chico = Number(anchoMm) <= 58;
+  if (fuente === 'b') return chico ? 42 : 64;
+  return chico ? 32 : 48;
 }
 
 /**
@@ -80,21 +123,53 @@ function columnas(anchoMm) {
  *   new Ticket(80).centro().doble().texto('3/4').cortar().bytes()
  */
 class Ticket {
-  constructor(anchoMm = 80, codigoPagina = 2) {
-    this.ancho = columnas(anchoMm);
+  /**
+   * @param anchoMm      el papel: 58 o 80
+   * @param codigoPagina la tabla de acentos (2 = CP850)
+   * @param tamano       'chica' | 'normal' | 'grande'  (v5.0)
+   *
+   * EL TAMAÑO DE LA LETRA, Y POR QUÉ SON TRES Y NO UN NÚMERO.
+   *
+   * Una impresora térmica no tiene "tamaño de fuente" como un procesador
+   * de textos: tiene DOS letras grabadas y un multiplicador de 1 a 8. Un
+   * número libre de puntos no existe y prometerlo sería mentir.
+   *
+   *   chica   — fuente B. 64 columnas: cabe más y se gasta menos papel.
+   *   normal  — fuente A. 48 columnas. Lo de siempre.
+   *   grande  — fuente A con el ALTO al doble. Siguen siendo 48 columnas
+   *             —o sea que nada se desacomoda— pero las letras miden el
+   *             doble de altas. Cuesta el doble de papel, y ése es el
+   *             trato.
+   *
+   * Se multiplica solo el ALTO a propósito. Doblar también el ancho
+   * dejaría 24 columnas y ahí ya no cabe "Retiro a la caja fuerte ...
+   * $2,000" en un renglón: el diseño entero se vendría abajo.
+   */
+  constructor(anchoMm = 80, codigoPagina = 2, tamano = 'normal') {
+    this.fuente = tamano === 'chica' ? 'b' : 'a';
+    // Cuánto se multiplica el alto de TODO lo que se imprima. Se aplica
+    // dentro de `tamano()`, así que un `tamano(2,1)` de un título sigue
+    // siendo el doble de grande que el texto de al lado: la proporción
+    // entre las partes del ticket no cambia, solo la escala.
+    this.altoBase = tamano === 'grande' ? 2 : 1;
+    this.ancho = columnas(anchoMm, this.fuente);
     this.partes = [];
     // EL ESPEJO: los mismos renglones que van a la impresora, pero como
     // datos —texto, alineación, negrita, tamaño—. Con él la pantalla puede
     // pintar el ticket TAL CUAL sin gastar papel ni reimplementar nada:
     // si un día cambia el diseño del papel, la pantalla cambia sola.
     this.espejo = [];
-    this.estilo = { alin: 'izquierda', negrita: false, anchoLetra: 1, altoLetra: 1 };
+    this.estilo = { alin: 'izquierda', negrita: false, anchoLetra: 1, altoLetra: 1,
+                    subrayado: false, fuente: this.fuente };
     // ESC @ deja la impresora en un estado conocido: si el ticket anterior
     // se cortó a la mitad, el siguiente no hereda letra gigante.
     this.crudo([ESC, 0x40]);
     // ESC t n elige la tabla de acentos. La 2 (CP850) trae la ñ y las
     // vocales acentuadas en casi todas las térmicas.
     this.crudo([ESC, 0x74, codigoPagina]);
+    // ESC M n elige la letra grabada: 0 la A, 1 la B.
+    this.crudo([ESC, 0x4d, this.fuente === 'b' ? 1 : 0]);
+    if (this.altoBase > 1) this.tamano(1, 1);
   }
 
   crudo(bytes) {
@@ -157,7 +232,8 @@ class Ticket {
   /** El estilo vigente, aplanado para el espejo. */
   estiloActual() {
     const e = this.estilo;
-    return { alin: e.alin, negrita: e.negrita, anchoLetra: e.anchoLetra, altoLetra: e.altoLetra };
+    return { alin: e.alin, negrita: e.negrita, anchoLetra: e.anchoLetra,
+             altoLetra: e.altoLetra, subrayado: e.subrayado, fuente: e.fuente };
   }
 
   izquierda() { this.estilo.alin = 'izquierda'; return this.crudo([ESC, 0x61, 0]); }
@@ -172,17 +248,58 @@ class Ticket {
    */
   tamano(ancho = 1, alto = 1) {
     const a = Math.min(Math.max(ancho, 1), 8) - 1;
-    const b = Math.min(Math.max(alto, 1), 8) - 1;
+    // El alto que se pide, multiplicado por la escala del ticket. Así un
+    // título que pedía el doble sigue siendo el doble de lo que tiene al
+    // lado con la letra grande puesta: se escala todo junto.
+    const b = Math.min(Math.max(alto * this.altoBase, 1), 8) - 1;
     this.estilo.anchoLetra = a + 1;
     this.estilo.altoLetra = b + 1;
     return this.crudo([GS, 0x21, (a << 4) | b]);
   }
 
-  normal() { return this.tamano(1, 1).negrita(false); }
+  normal() { return this.tamano(1, 1).negrita(false).subrayado(false); }
 
-  /** Una raya de guiones de lado a lado. */
+  /**
+   * SUBRAYADO.  ESC - n : 0 nada, 1 raya fina, 2 raya gruesa.
+   *
+   * Es lo que hace que "FALTA $55" se lea como el resultado de la cuenta y
+   * no como un renglón más. Ojo: la impresora subraya también los
+   * espacios, así que un renglón centrado sale con la raya de orilla a
+   * orilla — por eso se usa en textos cortos y no en bloques.
+   */
+  subrayado(si = true) {
+    this.estilo.subrayado = si ? (si === 2 ? 2 : 1) : false;
+    return this.crudo([ESC, 0x2d, si ? (si === 2 ? 2 : 1) : 0]);
+  }
+
+  /**
+   * LA RAYA QUE SEPARA BLOQUES.
+   *
+   *     - - - - - - - - - - - - - - - - - - - - - - - -
+   *
+   * Con hueco entre guión y guión, que es como se ve en un recibo de
+   * papel: una fila de guiones pegados sale casi como una línea sólida y
+   * pesa demasiado para lo que hace, que es solo separar.
+   */
   separador(caracter = '-') {
+    if (caracter === '-') return this.linea(('- ').repeat(Math.floor(this.ancho / 2)).trimEnd());
     return this.linea(caracter.repeat(this.ancho));
+  }
+
+  /**
+   * UNA RAYA MACIZA, de orilla a orilla o de un ancho dado.
+   *
+   * La de arriba separa bloques; ésta cierra una cuenta —la que va encima
+   * del total, como en una suma de papel— y por eso es sólida y corta.
+   */
+  raya({ ancho = this.ancho, alinear = 'izquierda' } = {}) {
+    const n = Math.min(Math.max(Math.round(ancho), 1), this.ancho);
+    const barra = '_'.repeat(n);
+    if (alinear === 'derecha') return this.linea(' '.repeat(this.ancho - n) + barra);
+    if (alinear === 'centro') {
+      return this.linea(' '.repeat(Math.floor((this.ancho - n) / 2)) + barra);
+    }
+    return this.linea(barra);
   }
 
   /**
@@ -279,28 +396,73 @@ class Ticket {
   }
 
   /**
+   * LA CUENTA, CON PUNTITOS Y CUADRADA.  (v5.0)
+   *
+   *              Cobrado ..................... +$5,785
+   *     Gastos y retiros .....................   -$785
+   *                                          _________
+   *        Deberia haber .....................    $455
+   *            Entregado .....................   -$450
+   *
+   * Es `bloqueDerecha` con los puntos que llevan el ojo de la etiqueta a
+   * su número, como en una cuenta de papel. Igual que allá, los anchos se
+   * calculan mirando TODAS las filas: así los importes caen en la misma
+   * columna y el bloque no sale escalonado.
+   *
+   * Una fila puede pedir una raya encima —`{ raya: true }`— y ahí va la
+   * línea que en una suma de papel separa los sumandos del resultado.
+   */
+  bloquePunteado(pares, { caracter = '.' } = {}) {
+    const filas = pares.filter(Boolean).map(
+      (f) => (Array.isArray(f) ? { etiqueta: f[0], valor: f[1] } : f));
+    if (!filas.length) return this;
+
+    const importe = Math.max(...filas.map((f) => String(f.valor).length));
+    const sitio = Math.max(this.ancho - importe - 4, 4);
+    const etiqueta = Math.min(Math.max(...filas.map((f) => String(f.etiqueta).length)), sitio);
+    const puntos = Math.max(this.ancho - etiqueta - importe - 2, 1);
+
+    for (const f of filas) {
+      if (f.raya) this.raya({ ancho: importe + 1, alinear: 'derecha' });
+      if (f.negrita) this.negrita();
+      this.linea(String(f.etiqueta).slice(0, etiqueta).padStart(etiqueta)
+        + ' ' + caracter.repeat(puntos) + ' '
+        + String(f.valor).padStart(importe));
+      if (f.negrita) this.negrita(false);
+    }
+    return this;
+  }
+
+  /**
    * Un texto largo cortado por palabras, que es como se lee.
    * Una palabra más larga que el renglón se parte a la fuerza: más vale
    * partida que empujando todo lo demás fuera del papel.
    */
-  parrafo(texto, { sangria = 0 } = {}) {
+  parrafo(texto, { sangria = 0, justificado = false } = {}) {
     const util = Math.max(this.ancho - sangria, 8);
     const hueco = ' '.repeat(sangria);
-    let linea = '';
+    let palabras = [];
 
-    const soltar = () => { if (linea) { this.linea(hueco + linea); linea = ''; } };
+    // El ÚLTIMO renglón nunca se justifica, ni aquí ni en un libro: una
+    // frase de tres palabras estirada de orilla a orilla queda ridícula.
+    const soltar = (ultimo) => {
+      if (!palabras.length) return;
+      this.linea(hueco + (justificado && !ultimo ? estirar(palabras, util) : palabras.join(' ')));
+      palabras = [];
+    };
+    const largo = () => palabras.reduce((n, p) => n + p.length, 0) + palabras.length - 1;
 
     for (let palabra of String(texto ?? '').split(/\s+/).filter(Boolean)) {
       while (palabra.length > util) {
-        soltar();
+        soltar(false);
         this.linea(hueco + palabra.slice(0, util));
         palabra = palabra.slice(util);
       }
-      if (!linea) linea = palabra;
-      else if (linea.length + 1 + palabra.length <= util) linea += ' ' + palabra;
-      else { soltar(); linea = palabra; }
+      if (!palabras.length) palabras.push(palabra);
+      else if (largo() + 1 + palabra.length <= util) palabras.push(palabra);
+      else { soltar(false); palabras = [palabra]; }
     }
-    soltar();
+    soltar(true);
     return this;
   }
 

@@ -17,9 +17,33 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '4.9';
+const VERSION_ACTUAL = '5.0';
 
 const VERSIONES = [
+  {
+    numero: '5.0',
+    nombre: 'Los tickets, como los dibujaste',
+    fecha: '2026-09-03',
+    resumen:
+      'Los papeles rediseñados con los cuatro dibujos que mandaste: todo ' +
+      'por renglones, puntitos hasta el número, una raya encima del ' +
+      'resultado, y el tamaño de la letra a tu gusto en configuraciones.',
+    cambios: [
+      { tipo: 'importante', texto: 'LOS TICKETS, REDIBUJADOS con los cuatro papeles que mandaste. Todo va por renglones del mismo ancho, de orilla a orilla: arriba a la izquierda qué es el papel y a la derecha quién lo hizo, la fecha debajo, y en medio el contenido entre rayas.' },
+      { tipo: 'nuevo', texto: 'EL TAMAÑO DE LA LETRA, EN CONFIGURACIONES, que es lo que pediste. Está en Sistema › La impresora de tickets, junto al ancho del papel, y tiene tres pasos: CHICA (64 letras por renglón en vez de 48: cabe más y se gasta menos papel), NORMAL (lo de siempre) y GRANDE (las mismas 48 columnas —así que NADA se desacomoda— pero al doble de alto). Sácate una prueba con cada una y quédate con la que se lea mejor.' },
+      { tipo: 'importante', texto: 'POR QUÉ SON TRES Y NO UN NÚMERO DE PUNTOS: una impresora térmica no tiene tamaños libres como Word. Trae DOS LETRAS GRABADAS de fábrica y un multiplicador que agranda lo que ya hay. Un «13.5» no existe en esa máquina, y ponértelo en la pantalla sería mentirte. La grande solo dobla el ALTO a propósito: doblando también el ancho quedarían 24 columnas y ahí ya no cabe «Retiro a la caja fuerte ... $2,000» en un renglón.' },
+      { tipo: 'nuevo', texto: 'LA CUENTA DEL CORTE, CON PUNTITOS Y CUADRADA, como en tu dibujo: las etiquetas alineadas, los puntos llevando el ojo hasta el número, todos los importes en la misma columna, UNA RAYA encima del resultado —como en una suma de papel— y el FALTA $55 en grande y SUBRAYADO.' },
+      { tipo: 'nuevo', texto: 'Y LOS TRES NÚMEROS DEL TURNO DE UN VISTAZO en un renglón: 750 tickets · 15 gastos · 1 vale. La hora de abrir se subió arriba junto a la de cerrar, que es el mismo dato —de cuándo a cuándo fue este turno— y estaba en dos sitios.' },
+      { tipo: 'importante', texto: 'EL VALE ES EL MISMO PAPEL QUE EL GASTO, como dijiste: donde el gasto dice «Gasto», el vale dice «VALE DE JESÚS». Y con eso el nombre subió al título, que es donde tiene que estar — antes iba a media altura del papel, y es el único dato que separa un vale de un faltante. Debajo del importe va su nombre completo.' },
+      { tipo: 'nuevo', texto: 'HIELO A SACAR, UN RENGLÓN POR TANQUE: la letra del tanque a la izquierda y sus cuatro números en grande, separados por puntos, con una raya fina entre tanque y tanque. Antes eran dos renglones por tanque y solo el primer paño salía grande. Los cuatro en grande se leen desde el otro lado del cuarto, que es donde se lee ese papel.' },
+      { tipo: 'nuevo', texto: 'EN LA VENTA, EL HIELO Y SU PRECIO EN EL MISMO RENGLÓN («2 3/8 ......... $627»), y abajo TOTAL, PAGO y CAMBIO también en uno solo, repartidos a lo ancho. Eran cuatro renglones y son dos, en el papel que más se imprime.' },
+      { tipo: 'mejora', texto: 'LAS RAYAS QUE SEPARAN AHORA LLEVAN HUECO entre guión y guión, como en un recibo de papel. Una fila de guiones pegados salía casi como una línea sólida y pesaba demasiado para lo que hace, que es solo separar.' },
+      { tipo: 'mejora', texto: 'EL TEXTO LARGO —el concepto de un gasto— VA JUSTIFICADO, de orilla a orilla, como en tu dibujo. El último renglón no se estira: una frase de tres palabras estirada a lo ancho queda ridícula, y eso lo sabe cualquier imprenta desde hace quinientos años.' },
+      { tipo: 'importante', texto: 'DOS COSAS QUE UNA TÉRMICA NO PUEDE HACER, para que no las busques en el papel. NO CAMBIA DE ESTILO A MEDIA LÍNEA: en «Hielo a sacar · Tony Castilla» o los dos van en negritas o ninguno, y va el renglón entero. Y NO TIENE CURSIVAS: donde tu dibujo lleva cursiva va subrayado, que sí existe y hace el mismo trabajo — decir «esto es el resultado».' },
+      { tipo: 'arreglo', texto: 'Un corte sin nombre de quien lo cerró decía «Cerro -: ______», que se lee como un error. Ahora dice «FIRMA DE QUIEN CIERRA».' },
+      { tipo: 'mejora', texto: 'Todo está en el manual, en «Cómo se lee un ticket», con los cuatro papeles dibujados.' }
+    ]
+  },
   {
     numero: '4.9',
     nombre: 'Que el sistema te escriba',

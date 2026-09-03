@@ -229,8 +229,6 @@ export async function vistaSistema(pantalla, estadoApp) {
         try {
           await api.actualizar('/impresion/config', {
             abrirCajon: pantalla.querySelector('#imp-cajon').checked,
-      valeDuplicado: pantalla.querySelector('#imp-vale-doble').checked,
-      corteImprimeDia: pantalla.querySelector('#imp-corte-dia').checked,
             valeDuplicado: pantalla.querySelector('#imp-vale-doble').checked,
             corteImprimeDia: pantalla.querySelector('#imp-corte-dia').checked,
             salidaCajon: Number(pantalla.querySelector('#imp-cajon-salida').value),
@@ -449,11 +447,29 @@ export async function vistaSistema(pantalla, estadoApp) {
             </select>
           </label>
           <label>
+            <span class="etiqueta-chica">Tamaño de la letra</span>
+            <select id="imp-tamano" ${puedeConfigurar ? '' : 'disabled'}>
+              ${[['chica', 'Chica — cabe más'],
+                 ['normal', 'Normal'],
+                 ['grande', 'Grande — el doble de alta']].map(([v, texto]) => `
+                <option value="${v}" ${i.tamanoLetra === v ? 'selected' : ''}>${texto}</option>`).join('')}
+            </select>
+          </label>
+          <label>
             <span class="etiqueta-chica">Copias por venta</span>
             <input id="imp-copias" inputmode="numeric" value="${i.copias}"
                    ${puedeConfigurar ? '' : 'disabled'}>
           </label>
         </div>
+        <p class="ayuda" style="margin:8px 0 0;font-size:13.5px">
+          Una impresora térmica no tiene tamaños de letra libres: trae
+          <b>dos letras grabadas</b> y un multiplicador. <b>Chica</b> usa la
+          segunda —64 letras por renglón en vez de 48, así que cabe más y se
+          gasta menos papel—. <b>Grande</b> deja las mismas 48 columnas
+          —nada se desacomoda— pero al <b>doble de alto</b>, y por eso gasta
+          el doble de papel. Sácate una prueba con cada una y quédate con la
+          que se lea mejor en tu impresora.
+        </p>
 
         <label class="etiqueta-chica" for="imp-pie">Renglón al pie (opcional)</label>
         <input id="imp-pie" autocomplete="off" placeholder="Tel. 999 000 0000"
@@ -668,6 +684,7 @@ export async function vistaSistema(pantalla, estadoApp) {
     const datos = {
       destino: pantalla.querySelector('#imp-destino').value.trim(),
       anchoMm: Number(pantalla.querySelector('#imp-ancho').value),
+      tamanoLetra: pantalla.querySelector('#imp-tamano').value,
       copias: Number(pantalla.querySelector('#imp-copias').value.replace(/[^0-9]/g, '')) || 1,
       pie: pantalla.querySelector('#imp-pie').value.trim(),
       abrirCajon: pantalla.querySelector('#imp-cajon').checked,

@@ -40,8 +40,16 @@ export function htmlDeEspejo(renglones = [], ancho = 48) {
   const cuerpo = renglones.map((r) => {
     const alineado = r.alin === 'centro' ? 'center' : r.alin === 'derecha' ? 'right' : 'left';
     const grande = (r.anchoLetra || 1) > 1 || (r.altoLetra || 1) > 1;
-    return `<div style="text-align:${alineado};${grande ? 'font-size:1.7em;font-weight:700;line-height:1.15;' : ''}${
-      r.negrita && !grande ? 'font-weight:700;' : ''}">${escapar(r.t) || '&nbsp;'}</div>`;
+    const estilo = [
+      `text-align:${alineado}`,
+      grande ? 'font-size:1.7em;font-weight:700;line-height:1.15' : '',
+      r.negrita && !grande ? 'font-weight:700' : '',
+      // El subrayado del papel también se ve aquí (v5.0): es lo que marca
+      // el resultado de una cuenta, y sin él la copia en pantalla dice
+      // menos que el papel.
+      r.subrayado ? 'text-decoration:underline' : ''
+    ].filter(Boolean).join(';');
+    return `<div style="${estilo}">${escapar(r.t) || '&nbsp;'}</div>`;
   }).join('');
 
   return `

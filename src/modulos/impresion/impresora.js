@@ -150,6 +150,11 @@ function configuracion() {
       };
     }),
     anchoMm: Number(ajuste('ticket_ancho_mm', '80')),
+    // EL TAMAÑO DE LA LETRA  (v5.0). Tres pasos y no un número de puntos,
+    // porque una térmica no tiene tamaños libres: tiene dos letras
+    // grabadas y un multiplicador. Está explicado en escpos.js.
+    tamanoLetra: ['chica', 'normal', 'grande'].includes(ajuste('ticket_tamano', 'normal'))
+      ? ajuste('ticket_tamano', 'normal') : 'normal',
     copias: Math.min(Math.max(Number(ajuste('ticket_copias', '1')) || 1, 1), 5),
     pie: ajuste('ticket_pie', ''),
     codigoPagina: Number(ajuste('ticket_codepage', '2')),

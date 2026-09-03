@@ -151,6 +151,13 @@ router.put('/config', configurar, (req, res) => {
     guardarAjuste('ticket_ancho_mm', n, req.usuario.id);
   }
 
+  if (c.tamanoLetra !== undefined) {
+    if (!['chica', 'normal', 'grande'].includes(c.tamanoLetra)) {
+      return error(res, 'La letra es chica, normal o grande.');
+    }
+    guardarAjuste('ticket_tamano', c.tamanoLetra, req.usuario.id);
+  }
+
   if (c.copias !== undefined) {
     const n = Number(c.copias);
     if (!Number.isInteger(n) || n < 1 || n > 5) {

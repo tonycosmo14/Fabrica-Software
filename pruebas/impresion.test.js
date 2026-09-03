@@ -171,8 +171,8 @@ test('una reimpresión sale marcada como COPIA', async () => {
   assert.match(papel, /\*{20}/, 'y con asteriscos de lado a lado, que se vea de lejos');
   // Y hasta arriba de todo: una marca de copia debajo del número no la ve
   // nadie con el cliente enfrente.
-  assert.ok(papel.indexOf('COPIA') < papel.indexOf('Atendio'),
-            'la marca va antes que nada');
+  assert.ok(papel.indexOf('COPIA') < papel.indexOf('#'),
+            'la marca va antes que nada, hasta arriba del número');
 });
 
 test('se imprimen tantas copias como estén configuradas', async () => {
@@ -203,8 +203,8 @@ test('el comprobante de un gasto dice quién estaba en la caja, y nada más', as
   assert.equal(r.estado, 200);
 
   const papel = loImpreso();
-  assert.match(papel, /Gasto/, 'arriba a la izquierda, qué es este papel');
-  assert.match(papel, /Atendio:/, 'y a la derecha, de qué caja salió el dinero');
+  assert.match(papel, /Gasto/, 'arriba y en grande, qué es este papel');
+  assert.match(papel, /Tony/, 'y debajo, de qué caja salió el dinero');
   assert.match(papel, /GASOLINA/, 'el concepto, en mayúsculas como en la foto');
   assert.match(papel, /FIRMA/, 'y la raya para firmar: alguien se llevó dinero');
 
@@ -354,8 +354,8 @@ test('los números a sacar salen por la térmica, no por el navegador', async ()
   assert.equal(r.json.datos.impreso, true);
 
   const papel = loImpreso();
-  assert.match(papel, /A sacar/, 'qué es este papel, arriba a la izquierda');
-  assert.match(papel, /Atendio:/, 'y quién lo entregó');
+  assert.match(papel, /Hielo a sacar/, 'qué es este papel, arriba a la izquierda');
+  assert.match(papel, /Tony/, 'y quién lo entregó, a la derecha del título');
   assert.match(papel, /FIRMA DEL OPERARIO/, 'vuelve firmado con lo que sacó de verdad');
 });
 
@@ -661,9 +661,11 @@ test('el espejo trae los mismos renglones que el papel, con su estilo', () => {
 
   assert.equal(b.anchoTicket, 48);
   assert.deepEqual(b.espejo[0],
-    { t: 'HIELO LOLHA', alin: 'centro', negrita: true, anchoLetra: 2, altoLetra: 1 });
+    { t: 'HIELO LOLHA', alin: 'centro', negrita: true, anchoLetra: 2, altoLetra: 1,
+      subrayado: false, fuente: 'a' });
   assert.deepEqual(b.espejo[1],
-    { t: 'renglón normal', alin: 'izquierda', negrita: false, anchoLetra: 1, altoLetra: 1 });
+    { t: 'renglón normal', alin: 'izquierda', negrita: false, anchoLetra: 1, altoLetra: 1,
+      subrayado: false, fuente: 'a' });
   assert.equal(b.espejo[2].alin, 'derecha');
 });
 
@@ -783,8 +785,8 @@ test('al gasto se le puede sacar otra copia, marcada', async () => {
   assert.match(papel, /REFACCION/, 'y sigue siendo el mismo papel');
   // La marca va antes que nada, igual que en el ticket de venta: debajo
   // del concepto no la ve nadie.
-  assert.ok(papel.indexOf('COPIA') < papel.indexOf('Atendio'),
-            'la marca va hasta arriba');
+  assert.ok(papel.indexOf('COPIA') < papel.indexOf('Gasto'),
+            'la marca va hasta arriba, antes del título');
 });
 
 test('una copia NO vuelve a abrir el cajón', async () => {
