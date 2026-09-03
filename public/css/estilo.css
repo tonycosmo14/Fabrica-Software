@@ -4249,3 +4249,81 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 .quien-fijo {
   margin: 4px 0 0; font-size: 18px; font-weight: 800;
 }
+
+/* ============================================================
+   AVISOS POR CORREO  (v4.9)
+
+   Quince interruptores y una cuenta. El reto no es el aspecto: es que
+   un renglón diga en una frase QUÉ manda, porque una lista de quince
+   nombres a secas no se lee — se prende todo o no se prende nada.
+   ============================================================ */
+
+/* El renglón de arriba: la única pregunta que se hace todo el mundo al
+   abrir esta pantalla, contestada de un vistazo y con su color. */
+.correo-estado {
+  display: flex; flex-direction: column; gap: 3px;
+  margin: 0 0 16px; padding: 13px 16px;
+  border-radius: 12px; border: 1px solid var(--borde);
+  background: var(--superficie-alt);
+}
+.correo-estado b { font-size: 15px; }
+.correo-estado span { font-size: 13.5px; color: var(--suave); }
+.correo-estado.verde { background: var(--cal-normal-f); border-color: var(--verde); }
+.correo-estado.verde b { color: var(--verde); }
+.correo-estado.ambar { background: var(--cal-poco_hueca-f); border-color: var(--ambar); }
+.correo-estado.ambar b { color: var(--ambar); }
+
+.correo-dos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 520px) { .correo-dos { grid-template-columns: 1fr; } }
+
+.correo-puesta { color: var(--verde); font-weight: 700; font-size: 12.5px; }
+
+.correo-acciones { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+.correo-acciones button { flex: 1; min-width: 160px; }
+
+/* El apagador general va abajo y separado por una raya: no es un aviso
+   más, es el que los apaga todos. */
+.correo-maestro {
+  padding-top: 16px; border-top: 1px solid var(--borde);
+}
+
+.correo-grupo {
+  margin: 20px 0 10px; font-size: 12px; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--suave);
+}
+.correo-grupo:first-of-type { margin-top: 0; }
+
+.correo-aviso {
+  padding: 11px 12px; border-radius: 11px; margin-bottom: 6px;
+  border: 1px solid transparent;
+}
+.correo-aviso:hover { background: var(--superficie-alt); }
+/* El que está prendido se ve prendido sin tener que mirar la casilla:
+   son quince seguidos y de reojo todos parecen iguales. */
+.correo-aviso:has(input:checked) {
+  background: var(--cal-normal-f); border-color: var(--verde);
+}
+
+/* El número que acompaña a dos de los avisos (desde cuánto, a qué hora). */
+.correo-extra {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin: -2px 0 10px 46px; font-size: 13.5px; color: var(--suave);
+}
+.correo-extra select { width: auto; min-width: 130px; }
+
+.correo-tabla td { vertical-align: middle; }
+.correo-tabla small { display: block; font-size: 11.5px; color: var(--suave); }
+.correo-asunto { font-size: 14px; }
+.correo-marca {
+  display: inline-block; white-space: nowrap;
+  border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 700;
+}
+.correo-marca.salio  { background: var(--cal-normal-f); color: var(--verde); }
+.correo-marca.fallo  { background: var(--et-baja-f); color: var(--et-baja-t); }
+.correo-marca.espera { background: var(--superficie-alt); color: var(--suave); }
+/* El porqué de un fallo es una frase entera, no un dato de tabla: se deja
+   caer completo en vez de recortarlo con puntos suspensivos. */
+.correo-porque {
+  display: block; margin-top: 3px; max-width: 260px;
+  white-space: normal; font-size: 11.5px; line-height: 1.35;
+}

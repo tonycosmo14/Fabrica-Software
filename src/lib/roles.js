@@ -84,6 +84,10 @@ const PERMISOS_POR_ROL = {
   // gerente de turno debe ver. Como admin tiene el comodín, quedan suyos.
   // El día que haga falta un contador, se le da `raya.ver` a un rol nuevo
   // sin tocar ninguna ruta.
+  //
+  // LO MISMO CON `correo.configurar`  (v4.9). Ahí vive la contraseña de la
+  // cuenta de correo de la fábrica, y la lista de a quién le llegan los
+  // avisos de lo que pasa dentro. Ninguna de las dos cosas es de un turno.
 };
 
 const ETIQUETAS_ROL = {

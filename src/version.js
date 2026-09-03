@@ -17,9 +17,32 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '4.8';
+const VERSION_ACTUAL = '4.9';
 
 const VERSIONES = [
+  {
+    numero: '4.9',
+    nombre: 'Que el sistema te escriba',
+    fecha: '2026-09-03',
+    resumen:
+      'Quince avisos por correo que prendes y apagas uno por uno: el ' +
+      'corte, las anulaciones que no hiciste tú, el inventario bajo, el ' +
+      'resumen del día, el informe del mes y diez más.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'AVISOS POR CORREO, pantalla nueva en el inicio (✉️ Avisos). Son QUINCE y cada uno se prende y se apaga por su cuenta, como pediste: hay semanas en las que quieres enterarte de todo y semanas en las que no. Es solo del administrador: ahí vive la contraseña de la cuenta de correo de la fábrica.' },
+      { tipo: 'nuevo', texto: 'LOS QUE PEDISTE: el INFORME DEL MES, el PRODUCTO BAJO DE INVENTARIO, CADA CORTE de caja, las ANULACIONES —tickets cancelados, sacadas anuladas, cosas eliminadas—, TANQUE NUEVO, EMPLEADO NUEVO y la LLEGADA Y SALIDA de un trabajador.' },
+      { tipo: 'importante', texto: 'Y LO QUE ANULA UN ADMINISTRADOR NO AVISA, como dijiste. Lo hiciste tú y ya lo sabes; un correo por cada cosa que uno mismo acaba de hacer es la forma más rápida de que se dejen de leer los correos de este sistema. Lo que anula cualquier otro sí llega, con su nombre, su rol y el motivo que escribió.' },
+      { tipo: 'nuevo', texto: 'Y OCHO MÁS QUE ME PARECIERON OPORTUNOS: SOLO LOS CORTES QUE NO CUADRAN —para el que no quiere el corte de todos los días pero sí quiere enterarse cuando falta dinero—, VALE DE SUELDO, RAYA PAGADA, GASTO GRANDE DE LA EMPRESA con su monto configurable, CAMBIO DE PRECIOS, HIELO POR DEBAJO DEL MÍNIMO, EL CUARTO FRÍO NO CUADRÓ y el RESUMEN DEL DÍA a la hora que pongas.' },
+      { tipo: 'nuevo', texto: 'EL APAGADOR GENERAL, abajo de la cuenta. Apagado ahí no sale nada aunque los quince estén prendidos: sirve para callarlo todo un fin de semana sin perder lo que tenías configurado.' },
+      { tipo: 'importante', texto: 'CÓMO SE CONECTA: con SMTP, que era tu pregunta. Una cuenta de correo cualquiera —lo mejor, una de Gmail hecha para la fábrica y no la personal—. OJO: Gmail NO acepta la contraseña normal, hay que crear una CONTRASEÑA DE APLICACIÓN de 16 letras. Está explicado paso a paso en el manual, incluido el requisito que atora a todo el mundo: la cuenta necesita la verificación en dos pasos prendida.' },
+      { tipo: 'nuevo', texto: 'EL BOTÓN DE PROBAR manda un correo de verdad en el momento, y si algo está mal TE DICE QUÉ ESTÁ MAL. «Contraseña no aceptada — si es Gmail tiene que ser una de aplicación», «no se encontró ese servidor», «no contestó por ese puerto, prueba el otro». Un «no se pudo» a secas no le sirve a nadie.' },
+      { tipo: 'importante', texto: 'UN AVISO NO SE PIERDE SI SE VA EL INTERNET. No se manda en el momento: se apunta y sale en cuanto haya línea. Se vuelve a intentar solo, cada vez con más espera, hasta ocho veces. Y como el aviso no se manda en el momento, cerrar un turno sigue tardando lo que tarda cerrar un turno, no lo que tarde Gmail en contestar.' },
+      { tipo: 'nuevo', texto: 'LA LIBRETA DE LO QUE SALIÓ, abajo en la misma pantalla: los últimos avisos, cada uno diciendo si SALIÓ, si está ESPERANDO o si NO SALIÓ, y en los dos últimos casos por qué. Así «no me llegó el correo» se contesta mirando algo en vez de adivinando.' },
+      { tipo: 'mejora', texto: 'EL PRODUCTO BAJO AVISA UNA VEZ, cuando cruza el mínimo, y no vuelve hasta que se surta y se acabe otra vez. Un correo cada media hora diciendo lo mismo acaba en la carpeta de spam, y se lleva con él los otros catorce avisos.' },
+      { tipo: 'mejora', texto: 'Y EN EL CORREO DEL CORTE, EL RETIRO A LA CAJA FUERTE VA APARTE de los gastos, bajo «salió del cajón, pero no se gastó». Tenías razón cuando lo dijiste de los tickets: no es tan literal un gasto, aunque el cajón lo reste igual.' },
+      { tipo: 'mejora', texto: 'Todo está en el manual, en «Avisos por correo: que el sistema te escriba».' }
+    ]
+  },
   {
     numero: '4.8',
     nombre: 'La raya',

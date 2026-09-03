@@ -73,6 +73,7 @@ function crearApp() {
           require('./modulos/empresa/rutas'));
   app.use('/api/clima', require('./modulos/clima/rutas'));
   app.use('/api/versiones', require('./modulos/versiones/rutas'));
+  app.use('/api/correo', require('./modulos/correo/rutas'));
   app.use('/api', (req, res) => error(res, 'Esa ruta de la API no existe.', 404));
 
   // Interfaz
@@ -272,6 +273,12 @@ async function arrancar() {
     console.log(`  ⚠ No se pudo respaldar al arrancar: ${e.message}`);
   }
   respaldos.arrancarAutomaticos();
+
+  // EL CARTERO  (v4.9). Cada cinco minutos se asoma a la cola de avisos:
+  // entrega lo que quedó pendiente cuando no había internet y dispara los
+  // avisos que salen del reloj y no de un botón —el resumen del día, el
+  // informe del mes, el producto que se está acabando—.
+  require('./modulos/correo/cola').arrancarReloj();
 
   const app = crearApp();
   const servidor = app.listen(config.PUERTO, config.HOST, () => {

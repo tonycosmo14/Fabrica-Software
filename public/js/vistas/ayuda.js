@@ -2064,6 +2064,150 @@ EN REPARACION
 
   // ==========================================================
   {
+    id: 'correo',
+    titulo: 'Avisos por correo: que el sistema te escriba',
+    busca: 'correo correos email gmail smtp aviso avisos alerta alertas notificacion notificaciones ' +
+           'contraseña de aplicacion puerto 465 587 tls starttls informe del mes resumen del dia ' +
+           'inventario bajo corte anulaciones tanque nuevo empleado nuevo llegada salida vale ' +
+           'no me llego el correo spam cola pendiente',
+    cuerpo: `
+      <p>El sistema puede <b>escribirte por correo</b> cuando pase algo que
+      quieras saber. Son quince avisos y cada uno se prende y se apaga por
+      su cuenta, cuando quieras: hay semanas en las que uno quiere enterarse
+      de todo y semanas en las que no.</p>
+
+      <p class="ayuda-tip">Está en <b>✉️ Avisos</b>, desde el inicio. Es
+      <b>solo del administrador</b>: ahí vive la contraseña de la cuenta de
+      correo de la fábrica.</p>
+
+      <h4>Primero: la cuenta que los manda</h4>
+      <p>Hace falta una cuenta de correo desde la cual salgan los avisos. Lo
+      normal —y lo que recomiendo— es <b>abrir una de Gmail para la
+      fábrica</b>, no usar la personal: así, si algo se complica, se le
+      cambia la contraseña sin tocar tu correo de todos los días.</p>
+
+      <p class="ayuda-tip"><b>Gmail NO acepta tu contraseña normal.</b> Esto
+      es lo que atora a todo el mundo. Hay que crear una
+      <b>contraseña de aplicación</b>: son 16 letras que Google genera para
+      un solo programa y que se pueden revocar solas.</p>
+
+      <p>Cómo se saca, desde la computadora:</p>
+      <ol>
+        <li>Entra a la cuenta de Google de la fábrica.</li>
+        <li><b>Tiene que tener prendida la verificación en dos pasos.</b> Sin
+        eso, Google ni siquiera enseña la opción. Está en
+        <b>Seguridad › Verificación en dos pasos</b>.</li>
+        <li>Ya con eso, busca <b>«Contraseñas de aplicaciones»</b> en el
+        buscador de la cuenta de Google.</li>
+        <li>Ponle un nombre —«Hielo LOLHA»— y te da 16 letras.</li>
+        <li>Cópialas en <b>Su contraseña</b> aquí, y guarda.</li>
+      </ol>
+
+      <p>Lo demás viene puesto y casi nunca hay que tocarlo:
+      <b>smtp.gmail.com</b>, puerto <b>465</b>, cifrado <b>TLS</b>. Si usas un
+      correo de dominio propio, tu proveedor te da esos tres datos; muchos
+      piden el <b>587 con STARTTLS</b>, que es la otra opción del menú.</p>
+
+      <p>En <b>A quién le llegan</b> puedes poner varios correos separados
+      por coma. Y luego el botón <b>✉️ Mandar una prueba</b>: manda uno de
+      verdad en el momento. Si algo está mal, te dice <b>qué</b> está mal —
+      no un «no se pudo» a secas.</p>
+
+      <p class="ayuda-tip">Abajo del todo está <b>Mandar avisos por correo</b>:
+      es el apagador general. Apagado ahí no sale nada, aunque los quince
+      avisos estén prendidos. Sirve para callarlo todo un fin de semana sin
+      perder lo que tenías configurado.</p>
+
+      <h4>Los quince avisos</h4>
+      <p><b>Del dinero:</b></p>
+      <ul>
+        <li><b>Cada corte de caja</b> — al cerrar un turno, el corte completo:
+        lo que debía haber, lo que entregaron y en qué se fue. Los retiros a
+        la caja fuerte salen aparte, porque no son un gasto.</li>
+        <li><b>Solo los cortes que no cuadran</b> — nada más cuando falta o
+        sobra. Si no quieres los cortes de todos los días pero sí quieres
+        enterarte cuando algo no cuadra, prende éste y apaga el de arriba.</li>
+        <li><b>Vale de sueldo</b> — cada vez que alguien pide dinero a cuenta
+        de su sueldo, con su nombre y cuánto.</li>
+        <li><b>Raya pagada</b> — cuando se le paga la semana a alguien, con la
+        cuenta de cómo salió y de dónde salió el dinero.</li>
+        <li><b>Gasto grande de la empresa</b> — los que pasen del monto que
+        pongas. Ese monto se cambia ahí mismo.</li>
+        <li><b>Cambio de precios</b> — cuando alguien cambia un precio, una
+        lista o el mayoreo, con el antes y el después.</li>
+      </ul>
+
+      <p><b>De lo que se deshace:</b></p>
+      <ul>
+        <li><b>Anulaciones que no hiciste tú</b> — tickets cancelados, sacadas
+        anuladas, cosas dadas de baja o eliminadas. Con quién fue y el motivo
+        que escribió.</li>
+      </ul>
+      <p class="ayuda-tip"><b>Lo que anula un administrador no avisa.</b> Lo
+      hiciste tú y ya lo sabes; un correo por cada cosa que uno mismo acaba
+      de hacer es la forma más rápida de que se dejen de leer los correos de
+      este sistema.</p>
+
+      <p><b>De lo que se acaba:</b></p>
+      <ul>
+        <li><b>Producto bajo de inventario</b> — cuando algo baja de su
+        mínimo. <b>Avisa una vez</b>, cuando cruza, y no vuelve a avisar de
+        eso hasta que se surta y se vuelva a acabar.</li>
+        <li><b>Hielo por debajo del mínimo</b> — cuando el cuarto frío baja
+        del mínimo de marquetas que tienes puesto.</li>
+        <li><b>El cuarto frío no cuadró</b> — cuando lo contado no coincide
+        con lo que debía haber, con toda la resta. Es la señal de un paño sin
+        capturar o de hielo que salió sin ticket.</li>
+      </ul>
+
+      <p><b>De la gente y la fábrica:</b></p>
+      <ul>
+        <li><b>Tanque nuevo</b> y <b>Empleado nuevo</b> — cuando se dan de
+        alta, con quién lo hizo.</li>
+        <li><b>Llegada y salida de un trabajador</b> — cada vez que alguien
+        entra al sistema con su PIN y cada vez que sale, con la hora.</li>
+      </ul>
+      <p class="ayuda-tip">Ese último es <b>cuando toca el sistema</b>, no un
+      checador de la puerta. Alguien que llega y no entra a ninguna pantalla
+      no aparece. Si quieres una checada de verdad —llegó a tal hora, se fue a
+      tal hora, comparada con su horario— dímelo y la hacemos.</p>
+
+      <p><b>Los resúmenes:</b></p>
+      <ul>
+        <li><b>Resumen del día</b> — una vez al día, a la hora que pongas: lo
+        que se vendió, lo que se produjo y en qué se gastó. Es del día
+        natural, de las 12 de la noche a las 12 de la noche, no de un turno.
+        Un día sin nada no se manda.</li>
+        <li><b>Informe del mes</b> — al cerrar el mes del negocio —el tuyo,
+        del 12 al 12 si así lo tienes—: ventas, producción, gastos, la luz y
+        el costo por marqueta.</li>
+      </ul>
+
+      <h4>«No me llegó el correo»</h4>
+      <p>Abajo a la izquierda está <b>Lo que ha salido</b>: los últimos
+      avisos con su estado. Cada uno dice <b>salió</b>, <b>esperando</b> o
+      <b>no salió</b>, y en los dos últimos casos, por qué. Eso convierte
+      «no me llegó» en algo que se puede mirar.</p>
+
+      <p class="ayuda-tip"><b>Un aviso no se pierde si se va el internet.</b>
+      No se manda en el momento: se apunta y sale en cuanto haya línea. Se
+      vuelve a intentar solo, cada vez con más espera, hasta ocho veces. Y si
+      el problema no es la red sino la contraseña, no insiste: lo deja
+      marcado como «no salió» con el motivo, que es lo que hay que ver.</p>
+
+      <p>Si un aviso te llega a <b>correo no deseado</b>, márcalo como
+      «no es spam» la primera vez y agrega la cuenta de la fábrica a tus
+      contactos. A partir de ahí llegan a la bandeja normal.</p>
+
+      <p class="ayuda-tip"><b>Gmail deja mandar unos 500 correos al día</b>
+      desde una cuenta normal, que para una fábrica sobra de largo — salvo
+      que prendas «llegada y salida» con mucha gente y muchos turnos. Si
+      alguna vez toparas, el aviso se queda en la cola y sale al día
+      siguiente; no se pierde.</p>`
+  },
+
+  // ==========================================================
+  {
     id: 'numeros',
     titulo: 'Los números: qué significa cada uno',
     busca: 'estadísticas números gráficas costo por marqueta imprimir hoja carta pdf tendencia día por día en qué se fue el dinero raya sueldos reparto amoniaco luz cfe kilowatt kwh consumo recibo precio subir orden acomodar mover flechas dos columnas clientes quién compra más mejores clientes',
