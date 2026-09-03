@@ -13,6 +13,7 @@
  * una suma de movimientos, no puede.
  */
 const { bd } = require('../../db/conexion');
+const { salidasPartidas } = require('./vales');
 
 /** El turno de caja que está abierto ahora mismo. Solo puede haber uno. */
 function sesionAbierta() {
@@ -123,6 +124,10 @@ function estadoCaja(caja) {
     vendidoTransferencia: otros - fiado,
     entradas,
     salidas,
+    // Las salidas partidas en dos: lo que la fábrica GASTÓ y lo que
+    // alguien SE LLEVÓ contra su firma. Las dos ya están restadas de
+    // `salidas`; esto solo dice cuánto es cada montón (v4.3).
+    porVales: salidasPartidas(caja.id),
     // Lo que tiene que haber físicamente en el cajón.
     esperado: caja.fondo_centavos + vendido + entradas - salidas,
     ventas: conteoVentas(caja.id)

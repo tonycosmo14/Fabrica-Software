@@ -26,6 +26,9 @@ const {
   sesionAbierta, movimientos, estadoCaja, conteoVentas, desglosePorPersona
 } = require('./calculo');
 const { cuadreDeHielo } = require('./hielo');
+const {
+  conceptosDeVale, salidasPartidas, adelantosDelTurno, adelantoDelMovimiento
+} = require('./vales');
 
 const router = express.Router();
 
@@ -566,6 +569,126 @@ router.post('/movimientos', operarCaja, (req, res) => {
   }, 201);
 });
 
+// ============================================================
+// LOS VALES  (v4.3)
+// ============================================================
+
+/**
+ * A QUIÉN SE LE PUEDE DAR UN VALE, y de qué clase.
+ *
+ * Son dos listas distintas porque son dos cosas distintas:
+ *
+ *   · El RETIRO se lo lleva quien manda —el dueño, un gerente—. Ofrecer
+ *     ahí a toda la fábrica sería ofrecerle a la cajera llevarse el dinero
+ *     del cajón con un toque.
+ *   · El de RAYA lo pide cualquiera que cobre sueldo, que son todos.
+ *
+ * Esta ruta la puede leer el cajero, y a propósito: cuando el papá del
+ * dueño llega y se lleva el efectivo, él no toca la computadora. Ella lo
+ * anota a nombre de él, y el papel sale con los dos nombres.
+ */
+router.get('/vales', verCaja, (req, res) => {
+  const gente = bd.prepare(`
+    SELECT id, nombre, rol FROM usuarios WHERE activo = 1 ORDER BY nombre
+  `).all();
+  const mandan = new Set(['gerente', 'admin']);
+
+  return ok(res, {
+    conceptos: conceptosDeVale().filter((c) => c.activo),
+    gente: {
+      retiro: gente.filter((u) => mandan.has(u.rol)),
+      raya: gente
+    }
+  });
+});
+
+/**
+ * UN VALE: ALGUIEN SE LLEVÓ DINERO DEL CAJÓN.
+ *
+ * Es una salida como cualquier otra —ya estaba— pero con dos cosas que un
+ * gasto no tiene y un vale no puede no tener:
+ *
+ *   · QUIÉN SE LO LLEVÓ, con nombre. Es obligatorio. Un vale sin nombre no
+ *     es un vale, es un faltante.
+ *   · SU PAPEL FIRMADO, por duplicado: uno para quien se llevó el dinero y
+ *     otro que se queda en el cajón.
+ *
+ * Lo captura el cajero, no el que se lleva el dinero, y a propósito: el
+ * papá del dueño llega, se lleva el efectivo y no toca la computadora. Por
+ * eso quién se lo llevó y quién lo anotó son dos campos distintos desde el
+ * primer día (regla 3.6), y por eso el papel lleva raya para firmar.
+ */
+router.post('/vales', operarCaja, (req, res) => {
+  const caja = sesionAbierta();
+  if (!caja) return error(res, 'Abre el turno de caja antes de dar un vale.', 409);
+
+  const clase = req.body?.clase === 'raya' ? 'raya' : 'retiro';
+  const conceptoId = clase === 'raya' ? 'gasto-vale-raya' : 'gasto-retiro';
+  const concepto = bd.prepare('SELECT * FROM conceptos_gasto WHERE id = ?').get(conceptoId);
+  if (!concepto || !concepto.activo) {
+    return error(res, 'Ese vale se dio de baja en los gastos que se repiten.', 409);
+  }
+
+  const centavos = leerImporte(req.body?.monto, { permitirCero: false });
+  if (centavos === null) return error(res, 'Escribe de cuánto es el vale.');
+
+  const quien = bd.prepare('SELECT id, nombre, rol, activo FROM usuarios WHERE id = ?')
+    .get(req.body?.ejecutorId || '');
+  if (!quien) return error(res, 'Dinos quién se llevó el dinero.');
+  if (!quien.activo) return error(res, `${quien.nombre} está dado de baja.`, 409);
+
+  // EL RETIRO SE LO LLEVA QUIEN MANDA. Sin esta regla, un vale de retiro
+  // sería una manera de sacar dinero del cajón a nombre propio y que el
+  // corte lo diera por bueno: no cuenta como gasto y nadie queda debiendo.
+  // Un adelanto de sueldo sí lo puede pedir cualquiera — ese sí se debe.
+  if (clase === 'retiro' && !['gerente', 'admin'].includes(quien.rol)) {
+    return error(res,
+      `Un retiro se lo lleva el dueño o un gerente. Si ${quien.nombre} pidió ` +
+      'dinero a cuenta de su sueldo, es un vale de raya.', 409);
+  }
+
+  const id = nuevoId();
+  const adelantoId = clase === 'raya' ? nuevoId() : null;
+  const fecha = ahora();
+  const notas = String(req.body?.notas || '').trim() || null;
+
+  bd.transaction(() => {
+    bd.prepare(`
+      INSERT INTO movimientos_caja
+        (id, caja_id, fecha, tipo, concepto, centavos, ejecutor_id, capturista_id,
+         notas, concepto_id)
+      VALUES (?, ?, ?, 'salida', ?, ?, ?, ?, ?, ?)
+    `).run(id, caja.id, fecha, concepto.nombre, centavos,
+           quien.id, req.usuario.id, notas, concepto.id);
+
+    // El de raya, además, se apunta en su libreta: es el recordatorio de
+    // que el día de la raya se le paga de menos. El dinero ya salió aquí
+    // arriba; abajo no sale otra vez.
+    if (adelantoId) {
+      bd.prepare(`
+        INSERT INTO adelantos
+          (id, usuario_id, fecha, centavos, movimiento_id, caja_id, capturista_id, notas)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(adelantoId, quien.id, fecha, centavos, id, caja.id, req.usuario.id, notas);
+    }
+  })();
+
+  bitacora.registrar({
+    accion: `caja.vale.${clase}`, entidad: 'movimiento_caja', entidadId: id,
+    ejecutorId: quien.id, capturistaId: req.usuario.id,
+    detalle: { clase, centavos, quien: quien.nombre, cajaFolio: caja.folio, adelantoId }
+  });
+
+  return ok(res, {
+    movimientoId: id,
+    adelantoId,
+    clase,
+    quien: quien.nombre,
+    abierta: estadoCaja(sesionAbierta()),
+    movimientos: movimientos(caja.id)
+  }, 201);
+});
+
 /** Anular un movimiento mal capturado. No se borra: se marca (regla 3.4). */
 router.post('/movimientos/:id/anular', corregir, (req, res) => {
   const m = bd.prepare('SELECT * FROM movimientos_caja WHERE id = ?').get(req.params.id);
@@ -580,14 +703,37 @@ router.post('/movimientos/:id/anular', corregir, (req, res) => {
   const motivo = String(req.body?.motivo || '').trim();
   if (!motivo) return error(res, 'Escribe por qué se anula.');
 
-  bd.prepare(`
-    UPDATE movimientos_caja SET anulado_en = ?, anulado_por = ?, motivo_anulacion = ?
-     WHERE id = ?
-  `).run(ahora(), req.usuario.id, motivo, m.id);
+  // SI ERA UN VALE DE RAYA, su renglón de la libreta se va con él: dejarlo
+  // vivo haría que el sábado se le descontara un dinero que nunca salió.
+  // Salvo que ya se le haya descontado — entonces la raya ya se pagó de
+  // menos, y borrar el vale ahora dejaría al trabajador debiendo un sueldo
+  // que sí cobró. Eso se arregla en su ficha, no aquí.
+  const adelanto = adelantoDelMovimiento(m.id);
+  if (adelanto?.descontado_en) {
+    return error(res,
+      'Ese vale ya se le descontó de su raya. Para deshacerlo hay que ' +
+      'quitarle antes el descuento en su ficha.', 409);
+  }
+
+  const fecha = ahora();
+  bd.transaction(() => {
+    bd.prepare(`
+      UPDATE movimientos_caja SET anulado_en = ?, anulado_por = ?, motivo_anulacion = ?
+       WHERE id = ?
+    `).run(fecha, req.usuario.id, motivo, m.id);
+
+    if (adelanto) {
+      bd.prepare(`
+        UPDATE adelantos SET anulado_en = ?, anulado_por = ?, motivo_anulacion = ?
+         WHERE id = ?
+      `).run(fecha, req.usuario.id, motivo, adelanto.id);
+    }
+  })();
 
   bitacora.registrar({
     accion: 'caja.movimiento.anulado', entidad: 'movimiento_caja', entidadId: m.id,
-    ejecutorId: req.usuario.id, detalle: { motivo, concepto: m.concepto, centavos: m.centavos }
+    ejecutorId: req.usuario.id,
+    detalle: { motivo, concepto: m.concepto, centavos: m.centavos, adelantoId: adelanto?.id }
   });
 
   return ok(res, {
@@ -619,6 +765,16 @@ function detalleCorte(id) {
     caja,
     movimientos: movimientos(id, { incluirAnulados: true }),
     ventas: conteoVentas(id),
+    // LAS SALIDAS, PARTIDAS EN DOS (v4.3). La gasolina de la camioneta y
+    // los $2,000 que se llevó el patrón salen del mismo cajón y no son lo
+    // mismo: una se gastó y la otra nada más cambió de sitio. Sumadas en
+    // el mismo renglón, un corte con mucha salida no dice cuál de las dos
+    // fue. Ninguna cuenta cambia: las dos ya están restadas del esperado.
+    salidas: salidasPartidas(id),
+    // Los vales de raya que salieron de este turno, con nombre. Van aparte
+    // de la lista de arriba porque cada uno deja una deuda que el día de
+    // la raya hay que descontar, y eso conviene verlo desde el corte.
+    adelantos: adelantosDelTurno(id),
     // EL CUADRE DEL HIELO de ese turno: cuánto había, cuánto se produjo,
     // cuánto se contó y cuánto faltó. Viene `null` cuando ese turno no
     // contó hielo — sin conteo no hay cuadre, y un papel con todo en cero
@@ -914,8 +1070,14 @@ router.delete('/movimientos/:id', verCaja, (req, res) => {
 
   // Un abono de crédito deja su renglón aquí. Si se borra el renglón hay que
   // soltar el enlace, o el abono apuntaría a un movimiento que ya no existe.
+  //
+  // Un vale de raya deja el suyo en la libreta, y ahí SÍ se borra entero:
+  // este botón existe para el gasto capturado tres veces, y dejar el vale
+  // vivo sin su dinero descontaría el sábado algo que ya no está escrito
+  // en ningún lado.
   const borrar = bd.transaction(() => {
     bd.prepare('UPDATE abonos SET movimiento_id = NULL WHERE movimiento_id = ?').run(m.id);
+    bd.prepare('DELETE FROM adelantos WHERE movimiento_id = ?').run(m.id);
     bd.prepare('DELETE FROM movimientos_caja WHERE id = ?').run(m.id);
   });
   borrar();

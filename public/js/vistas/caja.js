@@ -154,9 +154,28 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
               <div class="cuadre-linea suma">
                 <span>+ Entradas de dinero</span><strong>${pesos(e.entradas)}</strong>
               </div>` : ''}
-            <div class="cuadre-linea vendido">
-              <span>− Gastos y retiros</span><strong>${pesos(e.salidas)}</strong>
-            </div>
+            ${(() => {
+              // GASTOS Y VALES, EN DOS RENGLONES  (v4.3). La gasolina y los
+              // $2,000 que se llevó el patrón salían sumados, y así un turno
+              // con mucha salida no dice si la fábrica gastó o si nada más
+              // movieron el dinero. Los dos ya están restados del esperado:
+              // esto no cambia ninguna cuenta, parte la explicación.
+              const v = e.porVales;
+              if (!v || !v.valesCentavos) {
+                return `<div class="cuadre-linea vendido">
+                  <span>− Gastos y retiros</span><strong>${pesos(e.salidas)}</strong>
+                </div>`;
+              }
+              return `
+                ${v.gastosCentavos ? `
+                  <div class="cuadre-linea vendido">
+                    <span>− Gastos</span><strong>${pesos(v.gastosCentavos)}</strong>
+                  </div>` : ''}
+                <div class="cuadre-linea vendido">
+                  <span>− Vales (${v.vales.length})</span>
+                  <strong>${pesos(v.valesCentavos)}</strong>
+                </div>`;
+            })()}
             <div class="cuadre-linea total">
               <span>= Debería haber en el cajón</span><strong>${pesos(e.esperado)}</strong>
             </div>
@@ -181,8 +200,10 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
 
           ${puedeOperar ? `
             <div class="caja-acciones">
-              <button class="secundario" id="salida">− Gasto o retiro</button>
+              <button class="secundario" id="salida">− Gasto</button>
               <button class="secundario" id="entrada">＋ Meter dinero</button>
+              <button class="secundario" id="vale"
+                      title="Alguien se llevó efectivo del cajón">📤 Vale</button>
             </div>
             <!-- Ya no dice "y contar": desde la v4.1 el corte no cuenta el
                  dinero. Cuenta el HIELO, hace el corte y lo imprime. -->
@@ -241,6 +262,7 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
     if (puedeOperar) {
       pantalla.querySelector('#salida').onclick = () => nuevoMovimiento('salida');
       pantalla.querySelector('#entrada').onclick = () => nuevoMovimiento('entrada');
+      pantalla.querySelector('#vale').onclick = () => nuevoVale();
       pantalla.querySelector('#cerrar').onclick = () => terminarTurno(e, sinDueno);
     }
 
@@ -384,6 +406,104 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
       avisar(esSalida ? 'Salida anotada' : 'Entrada anotada', 'bien');
       pintar();
     } catch (e) { avisar(e.message, 'error'); }
+  }
+
+  /**
+   * UN VALE: ALGUIEN SE LLEVÓ DINERO DEL CAJÓN  (v4.3)
+   *
+   * "De repente yo o algún gerente o mi papá llegamos y recogemos el dinero
+   *  que haya en caja, para que las muchachas nunca tengan mucho. Él deja
+   *  su papelito, que se llama vale, y la cantidad que se llevó."
+   *
+   * Y con el mismo nombre existe el otro, que es el opuesto: el trabajador
+   * que pide por adelantado parte de su sueldo de la semana. Por eso lo
+   * primero que se pregunta es CUÁL de los dos, con la diferencia escrita
+   * en el mismo botón — nadie tiene por qué acordarse de memoria.
+   *
+   * Son tres toques: cuál, quién y cuánto. Y sale el papel por duplicado.
+   */
+  async function nuevoVale() {
+    let datos;
+    try {
+      datos = await api.obtener('/caja/vales');
+    } catch (err) { return avisar(err.message, 'error'); }
+
+    const clase = await menu({
+      titulo: 'Vale',
+      texto: '¿Cuál de los dos?',
+      opciones: [
+        { valor: 'retiro', texto: '🏦 Se llevaron dinero',
+          detalle: 'El dueño o un gerente, para que no se junte mucho. Nadie queda debiendo.' },
+        { valor: 'raya', texto: '🧑\u200d🏭 Adelanto de sueldo',
+          detalle: 'Parte de su raya de la semana, pedida antes. El sábado se le paga de menos.' }
+      ]
+    });
+    if (!clase) return;
+
+    const gente = (datos.gente?.[clase] || []);
+    if (!gente.length) {
+      return avisar(clase === 'retiro'
+        ? 'No hay ningún gerente ni administrador dado de alta.'
+        : 'No hay nadie dado de alta.', 'error');
+    }
+
+    // QUIÉN SE LO LLEVÓ, y es obligatorio: un vale sin nombre no es un
+    // vale, es un faltante. Se pregunta ANTES del importe porque es lo que
+    // el cajero tiene enfrente —la persona— y el número viene después.
+    const quienId = await menu({
+      titulo: clase === 'retiro' ? '¿Quién se llevó el dinero?' : '¿A quién es el adelanto?',
+      texto: clase === 'retiro'
+        ? 'Aunque no sea quien está en la computadora: el papel sale con los dos nombres.'
+        : 'Se le apunta en su ficha para descontárselo el día de la raya.',
+      opciones: gente.map((u) => ({ valor: u.id, texto: u.nombre }))
+    });
+    if (!quienId) return;
+
+    const quien = gente.find((u) => u.id === quienId);
+    const monto = await pedirImporte({
+      titulo: quien?.nombre || 'Vale',
+      texto: '¿Cuánto se llevó?',
+      ok: 'Hacer el vale',
+      ayuda: clase === 'raya'
+        ? 'Sale del cajón hoy y se le descuenta de su raya de esta semana.'
+        : 'Sale del cajón, pero no es un gasto de la fábrica: el dinero cambió de sitio.'
+    });
+    if (!monto) return;
+
+    // UN CERO DE MÁS. Nadie se lleva más dinero del que hay en el cajón, así
+    // que un vale más grande que el turno casi siempre es $15,000 tecleado
+    // donde iban $1,500. No se prohíbe —el cajón puede ir atrasado— pero se
+    // pregunta, que es lo que hubiera evitado el error.
+    const hayEnCajon = (await api.obtener('/caja')).abierta?.esperado ?? null;
+    const pedido = Math.round(Number(String(monto).replace(/[^0-9.]/g, '')) * 100);
+    if (hayEnCajon !== null && Number.isFinite(pedido) && pedido > hayEnCajon) {
+      const seguir = await confirmar({
+        titulo: '¿Seguro que es tanto?',
+        texto: `En el cajón hay ${pesos(hayEnCajon)} y este vale es de ` +
+               `${pesos(pedido)}. El turno va a quedar en números rojos.`,
+        ok: 'Sí, es correcto'
+      });
+      if (!seguir) return;
+    }
+
+    let creado;
+    try {
+      creado = await api.enviar('/caja/vales', { clase, monto, ejecutorId: quienId });
+    } catch (err) { return avisar(err.message, 'error'); }
+
+    await pintar();
+
+    // El papel es el vale. Si la impresora no contesta, el vale YA está
+    // anotado —el dinero salió— y lo que se avisa es que falta el papel,
+    // no que falló el vale.
+    try {
+      const r = await api.enviar(`/impresion/movimiento/${creado.movimientoId}`, {});
+      avisar(r.impreso
+        ? 'Vale hecho. Salieron los dos papeles: que firme el suyo.'
+        : 'Vale anotado. No hay impresora: escríbanlo a mano.', r.impreso ? 'bien' : 'aviso');
+    } catch {
+      avisar('Vale anotado, pero no se pudo imprimir. Vuelve a sacarlo con 🖨️.', 'aviso');
+    }
   }
 
   // ==========================================================
@@ -915,7 +1035,21 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
           <div class="cuadre-linea suma"><span>+ Cobrado en efectivo</span><strong>${pesos(c.vendido_centavos)}</strong></div>
           ${c.entradas_centavos ? `
             <div class="cuadre-linea suma"><span>+ Entradas</span><strong>${pesos(c.entradas_centavos)}</strong></div>` : ''}
-          <div class="cuadre-linea vendido"><span>− Gastos y retiros</span><strong>${pesos(c.salidas_centavos)}</strong></div>
+          ${(() => {
+            const v = corte.salidas;
+            const cuadran = v && v.valesCentavos > 0
+              && v.gastosCentavos + v.valesCentavos === c.salidas_centavos;
+            if (!cuadran) {
+              return `<div class="cuadre-linea vendido"><span>− Gastos y retiros</span><strong>${pesos(c.salidas_centavos)}</strong></div>`;
+            }
+            return `
+              ${v.gastosCentavos ? `
+                <div class="cuadre-linea vendido"><span>− Gastos</span><strong>${pesos(v.gastosCentavos)}</strong></div>` : ''}
+              <div class="cuadre-linea vendido">
+                <span>− Vales (${v.vales.length})</span>
+                <strong>${pesos(v.valesCentavos)}</strong>
+              </div>`;
+          })()}
           <div class="cuadre-linea total"><span>= Debería haber</span><strong>${pesos(c.esperado_centavos)}</strong></div>
           ${recibida
             ? `<div class="cuadre-linea contado"><span>− Te entregaron</span><strong>${pesos(c.entregado_centavos)}</strong></div>`
@@ -971,6 +1105,8 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
         ${c.corregido_en ? avisoCorregido(c) : ''}
       </div>
 
+      ${valesDelTurno(corte)}
+
       ${corte.hielo ? cuadreDelHielo(corte.hielo) : `
         <div class="aviso-sin-caja" style="margin-top:16px">
           <strong>Este turno no contó el hielo.</strong>
@@ -997,7 +1133,12 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
           <tr><td>Fondo</td><td>${pesos(c.fondo_centavos)}</td></tr>
           <tr><td>Cobrado</td><td>+${pesos(c.vendido_centavos)}</td></tr>
           ${c.entradas_centavos ? `<tr><td>Entradas</td><td>+${pesos(c.entradas_centavos)}</td></tr>` : ''}
-          <tr><td>Gastos y retiros</td><td>−${pesos(c.salidas_centavos)}</td></tr>
+          ${corte.salidas && corte.salidas.valesCentavos > 0
+              && corte.salidas.gastosCentavos + corte.salidas.valesCentavos === c.salidas_centavos
+            ? `${corte.salidas.gastosCentavos
+                  ? `<tr><td>Gastos</td><td>−${pesos(corte.salidas.gastosCentavos)}</td></tr>` : ''}
+               <tr><td>Vales (${corte.salidas.vales.length})</td><td>−${pesos(corte.salidas.valesCentavos)}</td></tr>`
+            : `<tr><td>Gastos y retiros</td><td>−${pesos(c.salidas_centavos)}</td></tr>`}
           <tr class="fuerte"><td>Debería haber</td><td>${pesos(c.esperado_centavos)}</td></tr>
           ${recibida
             ? `<tr class="fuerte"><td>Entregado</td><td>${pesos(c.entregado_centavos)}</td></tr>`
@@ -1037,7 +1178,7 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
             <span>${esc(formatoFecha(c.cerrada_en))}</span>
           </div>
           <div class="ticket-folio">DETALLE DEL CORTE #${c.folio}</div>
-          ${movimientosEnDosColumnas(corte.movimientos)}
+          ${movimientosEnDosColumnas(corte.movimientos, corte.salidas)}
           <div class="ticket-pie">
             <div>Del turno de ${esc(c.cajero_nombre || '—')}</div>
           </div>
@@ -1499,31 +1640,101 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
    * Si un lado va vacío no se parte: media hoja en blanco al lado de tres
    * renglones no ahorra nada y se lee peor.
    */
-  function movimientosEnDosColumnas(movimientos) {
+  /**
+   * LOS VALES DE ESTE TURNO  (v4.3)
+   *
+   * Un vale no es un gasto y no se lee como un gasto: lo que hay que ver es
+   * QUIÉN se llevó el dinero. Y hay dos clases que se cuentan distinto:
+   *
+   *   · El RETIRO es dinero del turno que YA está en manos del dueño. Al
+   *     final entregan menos porque ya se llevaron una parte, no porque
+   *     falte — y esa suma se hace aquí para que nadie tenga que hacerla
+   *     de cabeza con el papelito al lado.
+   *   · El de RAYA es sueldo pagado antes de tiempo. Ese no vuelve: se
+   *     descuenta el día de la raya, y por eso lleva su recordatorio.
+   */
+  function valesDelTurno(corte) {
+    const v = corte.salidas;
+    if (!v?.vales?.length) return '';
+
+    const c = corte.caja;
+    const conDeuda = new Set((corte.adelantos || []).map((a) => a.movimiento_id));
+    const alDueno = v.traspasadoCentavos || 0;
+    const recibido = c.entregado_centavos ?? c.contado_centavos ?? null;
+
+    return `
+      <div class="tarjeta" style="margin-top:16px">
+        <h3 style="margin:0 0 4px">Vales del turno</h3>
+        <p class="ayuda" style="margin:0 0 12px">
+          Dinero que salió del cajón con nombre y firma.
+        </p>
+
+        <table class="venta-lineas">
+          ${v.vales.map((m) => `
+            <tr>
+              <td class="detalle">
+                ${esc(m.ejecutor_nombre || '—')}
+                <small>${esc(m.concepto)} · ${esc(soloHora(m.fecha))}${
+                  conDeuda.has(m.id) ? ' · se le descuenta de su raya' : ''}</small>
+              </td>
+              <td class="importe malo">−${pesos(m.centavos)}</td>
+            </tr>`).join('')}
+        </table>
+
+        ${alDueno > 0 && recibido !== null ? `
+          <div class="cuadre" style="margin-top:14px">
+            <div class="cuadre-linea"><span>Se llevaron en vales</span><strong>${pesos(alDueno)}</strong></div>
+            <div class="cuadre-linea suma"><span>+ Te entregaron al final</span><strong>${pesos(recibido)}</strong></div>
+            <div class="cuadre-linea total"><span>= De este turno recibiste</span><strong>${pesos(alDueno + recibido)}</strong></div>
+          </div>
+          <p class="ayuda" style="margin:10px 0 0">
+            Los vales de retiro son dinero de este mismo turno que ya está
+            guardado. Los adelantos de sueldo no cuentan aquí: ese dinero se
+            gastó, no volvió.
+          </p>` : ''}
+      </div>`;
+  }
+
+  function movimientosEnDosColumnas(movimientos, partido = null) {
     if (!movimientos.length) return '';
 
-    const gastos = movimientos.filter((m) => m.tipo === 'salida');
+    // LOS VALES, EN SU PROPIA COLUMNA  (v4.3). "Retiro a la caja fuerte
+    // $2,000" en medio de la gasolina y los desayunos no dice lo único que
+    // hay que saber de un retiro, que es quién se lo llevó.
+    const esVale = new Set((partido?.vales || []).map((m) => m.id));
+    const salidas = movimientos.filter((m) => m.tipo === 'salida');
+    const gastos = salidas.filter((m) => !esVale.has(m.id));
+    const vales = salidas.filter((m) => esVale.has(m.id));
     const entradas = movimientos.filter((m) => m.tipo !== 'salida');
     const suma = (lista) => lista.filter((m) => !m.anulado_en)
                                  .reduce((t, m) => t + m.centavos, 0);
 
-    const columna = (titulo, lista, signo) => !lista.length ? '' : `
+    const columna = (titulo, lista, signo, conQuien = false) => !lista.length ? '' : `
       <div class="ticket-columna">
         <div class="ticket-nombre">${titulo} (${lista.length})</div>
         <table class="ticket-tabla">
           ${lista.map((m) => `
             <tr class="${m.anulado_en ? 'anulada' : ''}">
-              <td>${m.anulado_en ? '(anulado) ' : ''}${esc(m.concepto)}</td>
+              <td>${m.anulado_en ? '(anulado) ' : ''}${esc(m.concepto)}
+                  ${conQuien && m.ejecutor_nombre
+                    ? `<small class="vale-quien">${esc(m.ejecutor_nombre)}</small>` : ''}</td>
               <td>${m.anulado_en ? '—' : signo + pesos(m.centavos)}</td>
             </tr>`).join('')}
           <tr class="fuerte"><td>Suman</td><td>${signo}${pesos(suma(lista))}</td></tr>
         </table>
       </div>`;
 
-    const dos = gastos.length && entradas.length;
+    // LOS VALES NO CABEN EN MEDIA COLUMNA. Este bloque imita el papel
+    // térmico, o sea que media columna son unos ciento treinta píxeles: le
+    // basta a "Gasolina" y a "Desayuno", pero "Retiro a la caja fuerte" se
+    // parte en cuatro renglones y encima lleva el nombre debajo. Cuando hay
+    // vales se apila todo, que además es como sale de la impresora.
+    const dos = !vales.length && gastos.length && entradas.length;
     return `
-      <div class="ticket-movimientos ${dos ? 'dos-columnas' : ''}" style="margin-top:10px">
+      <div class="ticket-movimientos ${dos ? 'dos-columnas' : ''}"
+           style="margin-top:10px">
         ${columna('GASTOS', gastos, '−')}
+        ${columna('VALES', vales, '−', true)}
         ${columna('ENTRADAS', entradas, '+')}
       </div>`;
   }

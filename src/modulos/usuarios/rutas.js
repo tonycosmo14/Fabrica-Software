@@ -10,6 +10,7 @@ const { ROLES } = require('../../lib/roles');
 const { ok, error } = require('../../lib/respuestas');
 const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
+const { adelantosDe, pendienteDe, pendientesDeTodos } = require('../caja/vales');
 
 const router = express.Router();
 
@@ -101,9 +102,115 @@ router.get('/', (req, res) => {
   if (req.query.actividad !== '1') return ok(res, { usuarios });
 
   const actividad = actividadDeTodos();
+  // Los vales de raya pendientes de cada quien (v4.3). Van en la lista y no
+  // solo en la ficha porque la pregunta que se hace mirando esta pantalla
+  // el día de la raya es "¿a quién le tengo que descontar?", y esa se
+  // contesta de un vistazo o no se contesta.
+  const vales = pendientesDeTodos();
   return ok(res, {
     desdeCuando: 30,
-    usuarios: usuarios.map((u) => ({ ...u, actividad: actividad.get(u.id) || {} }))
+    usuarios: usuarios.map((u) => ({
+      ...u,
+      actividad: actividad.get(u.id) || {},
+      valesPendientes: vales.get(u.id) || { centavos: 0, cuantos: 0, desde: null }
+    }))
+  });
+});
+
+// ============================================================
+// LOS VALES DE RAYA DE CADA QUIEN  (v4.3)
+// ============================================================
+
+/**
+ * SU LIBRETA DE VALES.
+ *
+ * No es contabilidad —el gasto ya se contó cuando el dinero salió del
+ * cajón— sino el RECORDATORIO de que el día de la raya se le paga de
+ * menos. Lo que debe se suma de los renglones cada vez que se pregunta;
+ * no hay ninguna columna con el saldo (regla 3.2).
+ */
+router.get('/:id/adelantos', (req, res) => {
+  const u = bd.prepare('SELECT id, nombre FROM usuarios WHERE id = ?').get(req.params.id);
+  if (!u) return error(res, 'Esa persona no existe.', 404);
+
+  return ok(res, {
+    usuario: u,
+    pendiente: pendienteDe(u.id),
+    adelantos: adelantosDe(u.id)
+  });
+});
+
+/**
+ * "YA SE LE DESCONTÓ."
+ *
+ * El sábado se le paga su raya menos lo que se llevó, y aquí se apaga el
+ * recordatorio. NO MUEVE DINERO: el dinero salió el día del vale y ya se
+ * contó como gasto entonces. Contarlo otra vez aquí sería pagarle el
+ * sueldo dos veces en los números.
+ *
+ * Se marcan todos los pendientes de un jalón, que es como pasa de verdad:
+ * nadie descuenta un vale sí y otro no de la misma semana. Y no se borra
+ * ninguno (regla 3.4): quedan marcados con quién y cuándo, porque el
+ * sábado que se pagó tiene que poder mirarse en enero.
+ */
+router.post('/:id/adelantos/descontar', (req, res) => {
+  const u = bd.prepare('SELECT id, nombre FROM usuarios WHERE id = ?').get(req.params.id);
+  if (!u) return error(res, 'Esa persona no existe.', 404);
+
+  const pendiente = pendienteDe(u.id);
+  if (!pendiente.cuantos) {
+    return error(res, `${u.nombre} no tiene vales pendientes.`, 409);
+  }
+
+  const nota = String(req.body?.nota || '').trim().slice(0, 120) || null;
+  const fecha = ahora();
+  bd.prepare(`
+    UPDATE adelantos
+       SET descontado_en = ?, descontado_por = ?, descontado_nota = ?
+     WHERE usuario_id = ? AND descontado_en IS NULL AND anulado_en IS NULL
+  `).run(fecha, req.usuario.id, nota, u.id);
+
+  bitacora.registrar({
+    accion: 'usuario.vales.descontados', entidad: 'usuario', entidadId: u.id,
+    ejecutorId: u.id, capturistaId: req.usuario.id,
+    detalle: { centavos: pendiente.centavos, cuantos: pendiente.cuantos, nota }
+  });
+
+  return ok(res, {
+    descontados: pendiente.cuantos,
+    centavos: pendiente.centavos,
+    pendiente: pendienteDe(u.id),
+    adelantos: adelantosDe(u.id)
+  });
+});
+
+/**
+ * DESHACER UN DESCUENTO mal marcado.
+ *
+ * Se marcó "ya se le descontó" y resulta que no: se le pagó completo. El
+ * vale vuelve a estar pendiente, que es la verdad. Lo mismo de siempre: se
+ * corrige, no se borra.
+ */
+router.post('/:id/adelantos/:adelantoId/deshacer', (req, res) => {
+  const a = bd.prepare('SELECT * FROM adelantos WHERE id = ? AND usuario_id = ?')
+    .get(req.params.adelantoId, req.params.id);
+  if (!a) return error(res, 'Ese vale no existe.', 404);
+  if (a.anulado_en) return error(res, 'Ese vale está anulado.', 409);
+  if (!a.descontado_en) return error(res, 'Ese vale todavía está pendiente.', 409);
+
+  bd.prepare(`
+    UPDATE adelantos SET descontado_en = NULL, descontado_por = NULL, descontado_nota = NULL
+     WHERE id = ?
+  `).run(a.id);
+
+  bitacora.registrar({
+    accion: 'usuario.vale.descuento-deshecho', entidad: 'usuario', entidadId: a.usuario_id,
+    ejecutorId: req.usuario.id, detalle: { adelantoId: a.id, centavos: a.centavos }
+  });
+
+  return ok(res, {
+    pendiente: pendienteDe(a.usuario_id),
+    adelantos: adelantosDe(a.usuario_id)
   });
 });
 

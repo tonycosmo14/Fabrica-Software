@@ -705,6 +705,9 @@ select { color-scheme: light dark; }
 .ticket-movimientos.dos-columnas {
   display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: start;
 }
+/* El nombre de quien se llevó el dinero, debajo del concepto: es el dato
+   por el que se mira la lista de vales. */
+.ticket-columna .vale-quien { display: block; font-size: 10px; opacity: .8; }
 .ticket-movimientos.dos-columnas .ticket-tabla { font-size: 10.5px; }
 /* El importe nunca se parte en dos renglones: "−$1,890" cortado a la mitad
    se lee como otro número. */
@@ -714,6 +717,7 @@ select { color-scheme: light dark; }
   border-left: 1px dashed #000; padding-left: 8px;
 }
 .ticket-movimientos .ticket-nombre { border-bottom: 1px dashed #000; padding-bottom: 3px; }
+.ticket-movimientos:not(.dos-columnas) .ticket-columna + .ticket-columna { margin-top: 10px; }
 
 @media (min-width: 900px) {
   .existencia-tarjeta { max-width: 560px; }
@@ -1899,6 +1903,20 @@ tr.anulada { opacity: .45; text-decoration: line-through; }
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   overflow-x: auto;
 }
+
+/* Dos cosas que se llaman igual y son opuestas se explican comparándolas,
+   no en dos párrafos seguidos. En pantalla angosta rueda sola en vez de
+   apretar las columnas hasta que no se lean. */
+.ayuda-tabla {
+  width: 100%; border-collapse: collapse; margin: 0 0 14px;
+  font-size: 14px; display: block; overflow-x: auto;
+}
+.ayuda-tabla th, .ayuda-tabla td {
+  border: 1px solid var(--borde); padding: 8px 10px;
+  text-align: left; vertical-align: top;
+}
+.ayuda-tabla th { background: var(--superficie-alt); font-weight: 600; }
+.ayuda-tabla td:first-child { white-space: nowrap; }
 
 /* El apunte al margen: lo que de verdad hay que recordar */
 .ayuda-tip {
@@ -3796,6 +3814,12 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 .usr-quien { flex: 1 1 180px; min-width: 0; }
 .usr-quien strong { display: block; font-size: 16px; }
 .usr-quien small { display: block; font-size: 12.5px; color: var(--suave); }
+/* "Debe $400 de vales" tiene que saltar sin gritar: es un recordatorio del
+   día de la raya, no un problema. */
+.usr-quien small.usr-vales {
+  margin-top: 3px; color: var(--ambar); font-weight: 600;
+}
+.usr-quien small.usr-vales span { font-weight: 400; opacity: .75; }
 
 .usr-datos { display: flex; gap: 22px; flex-wrap: wrap; }
 .usr-dato { display: flex; flex-direction: column; line-height: 1.25; }

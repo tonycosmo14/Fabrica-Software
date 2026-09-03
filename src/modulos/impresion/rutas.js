@@ -18,7 +18,7 @@ const { listaActiva } = require('../ventas/precios');
 const { listaDeMayoreo } = require('../ventas/mayoreo');
 const { configuracion, guardarAjuste, imprimirCrudo,
         tipoDeDestino, impresorasDeWindows, APARTADOS } = require('./impresora');
-const { ticketCotizacion, ticketVenta, ticketMovimiento, ticketPrueba, pulsoCajon, ticketProduccion,
+const { ticketCotizacion, ticketVenta, ticketMovimiento, ticketVale, ticketPrueba, pulsoCajon, ticketProduccion,
         ticketCorte, ticketCorteMovimientos, ticketHielo, ticketCortePersona, ticketConteo,
         ticketResumenDia } = require('./ticket');
 
@@ -239,21 +239,52 @@ router.get('/venta/:id/previa', exigirPermiso('venta.ver'), (req, res) => {
 });
 
 router.get('/movimiento/:id/previa', exigirPermiso('caja.ver'), (req, res) => {
-  const mov = bd.prepare(`
+  const mov = movimientoParaPapel(req.params.id);
+  if (!mov) return error(res, 'Ese movimiento no existe.', 404);
+
+  const papel = papelDeMovimiento(mov, { negocio: nombreNegocio() });
+  return ok(res, { renglones: recortarEspejo(papel.espejo), ancho: papel.anchoTicket });
+});
+
+/**
+ * UN MOVIMIENTO DEL CAJÓN, CON TODO LO QUE SU PAPEL NECESITA.
+ *
+ * Trae además las dos banderas de su concepto, que son las que deciden qué
+ * papel sale: un vale no se imprime como un gasto (v4.3).
+ */
+function movimientoParaPapel(id) {
+  return bd.prepare(`
     SELECT m.*, u.nombre AS ejecutor_nombre, c.nombre AS capturista_nombre,
-           k.nombre AS cajero_nombre
+           k.nombre AS cajero_nombre, j.folio AS folio,
+           COALESCE(g.es_vale, 0)     AS es_vale,
+           COALESCE(g.es_traspaso, 0) AS es_traspaso
       FROM movimientos_caja m
       LEFT JOIN usuarios u ON u.id = m.ejecutor_id
       LEFT JOIN usuarios c ON c.id = m.capturista_id
       LEFT JOIN cajas   j ON j.id = m.caja_id
       LEFT JOIN usuarios k ON k.id = j.cajero_id
+      LEFT JOIN conceptos_gasto g ON g.id = m.concepto_id
      WHERE m.id = ?
-  `).get(req.params.id);
-  if (!mov) return error(res, 'Ese movimiento no existe.', 404);
+  `).get(id ?? null) || null;
+}
 
-  const papel = ticketMovimiento(mov, { negocio: nombreNegocio() });
-  return ok(res, { renglones: recortarEspejo(papel.espejo), ancho: papel.anchoTicket });
-});
+/**
+ * QUÉ PAPEL LE TOCA A ESTE MOVIMIENTO.
+ *
+ * Un gasto lleva su comprobante de siempre. Un VALE lleva el suyo, por
+ * duplicado y con el nombre de quien se llevó el dinero en grande: es lo
+ * único que separa un vale de un faltante.
+ *
+ * Y si el vale no es un traspaso, es un adelanto de sueldo — el papel lo
+ * dice, porque el día de la raya se le va a pagar de menos y quien lo
+ * recibe tiene derecho a leerlo antes de firmarlo.
+ */
+function papelDeMovimiento(mov, opciones = {}) {
+  if (mov.es_vale) {
+    return ticketVale({ ...mov, esRaya: !mov.es_traspaso }, opciones);
+  }
+  return ticketMovimiento(mov, opciones);
+}
 
 /** Los saltos del final —el avance para el corte— en pantalla solo estorban. */
 function recortarEspejo(renglones = []) {
@@ -560,16 +591,7 @@ router.post('/cajon', puedeImprimir, async (req, res) => {
  * lleva ticket: nadie firma por dejar dinero.
  */
 router.post('/movimiento/:id', puedeImprimir, async (req, res) => {
-  const mov = bd.prepare(`
-    SELECT m.*, u.nombre AS ejecutor_nombre, c.nombre AS capturista_nombre,
-           k.nombre AS cajero_nombre
-      FROM movimientos_caja m
-      LEFT JOIN usuarios u ON u.id = m.ejecutor_id
-      LEFT JOIN usuarios c ON c.id = m.capturista_id
-      LEFT JOIN cajas   j ON j.id = m.caja_id
-      LEFT JOIN usuarios k ON k.id = j.cajero_id
-     WHERE m.id = ?
-  `).get(req.params.id);
+  const mov = movimientoParaPapel(req.params.id);
   if (!mov) return error(res, 'Ese movimiento no existe.', 404);
 
   const cfg = configuracion();
@@ -580,12 +602,18 @@ router.post('/movimiento/:id', puedeImprimir, async (req, res) => {
   // cajón abierto sin motivo es justo lo que no se quiere en el mostrador.
   const copia = req.body?.copia === true;
   const pulso = cfg.abrirCajon && !copia ? pulsoCajon(cfg.salidaCajon) : null;
-  const papel = ticketMovimiento(mov, { copia, negocio: nombreNegocio() });
+  const papel = papelDeMovimiento(mov, { copia, negocio: nombreNegocio() });
 
   const r = await imprimirCrudo(pulso ? Buffer.concat([pulso, papel]) : papel,
                                 { seccion: 'gasto' });
-  if (!r.impreso) return error(res, `No se pudo imprimir: ${r.motivo}`, 502);
-  return ok(res, { impreso: true, copia, cajon: Boolean(pulso) });
+  if (!r.impreso) {
+    return error(res, `No se pudo imprimir: ${r.motivo}`, 502);
+  }
+  // Un vale sale por duplicado: uno para quien se llevó el dinero y otro
+  // que se queda en el cajón. La pantalla lo dice para que nadie se vaya
+  // creyendo que se atoró el papel.
+  return ok(res, { impreso: true, copia, cajon: Boolean(pulso),
+                   papeles: mov.es_vale ? 2 : 1, vale: Boolean(mov.es_vale) });
 });
 
 module.exports = router;

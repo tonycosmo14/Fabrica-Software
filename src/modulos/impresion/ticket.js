@@ -371,6 +371,75 @@ function ticketMovimiento(mov, { copia = false, negocio = '' } = {}) {
 }
 
 /**
+ * EL PAPEL DE UN VALE  (v4.3)
+ *
+ * "Él deja su papelito que se llama vale y la cantidad que se llevó, y
+ *  cuando se hacen las cuentas se cuadra."
+ *
+ * El papelito ya existía; lo escribían a mano. Este es el mismo, pero
+ * escrito por la máquina: con la fecha, el turno, el nombre de quien se
+ * llevó el dinero y el de quien se lo entregó.
+ *
+ * SALE POR DUPLICADO, y no es un lujo: uno se lo lleva quien se llevó el
+ * dinero y el otro se queda en el cajón. Con un solo papel, el día que
+ * alguien pregunte "¿y esos dos mil?" solo hay una versión, y es la del que
+ * la tiene en la mano. Los dos son iguales salvo el renglón que dice de
+ * quién es cada uno, y los dos llevan raya para firmar.
+ *
+ * `esRaya` cambia UNA sola cosa, pero es la que importa: si el vale es un
+ * adelanto de sueldo, el papel lo dice, porque el día de la raya se le
+ * tiene que pagar de menos y quien lo recibe tiene derecho a leerlo.
+ */
+function ticketVale(vale, { negocio = '', copia = false } = {}) {
+  const cfg = configuracion();
+  const t = new Ticket(cfg.anchoMm, cfg.codigoPagina);
+  const esRaya = Boolean(vale.esRaya);
+
+  const unaCopia = (paraQuien) => {
+    if (copia) marcaCopia(t);
+
+    encabezado(t, {
+      titulo: 'Vale',
+      atendio: vale.capturista_nombre,
+      fecha: fechaTicket(vale.fecha)
+    });
+    t.separador();
+
+    t.izquierda().negrita().tamano(2, 1).linea(formato(vale.centavos)).normal();
+    t.parrafo(String(vale.concepto || 'VALE').toUpperCase());
+
+    // A QUIÉN SE LE DIO EL DINERO, en grande. Es el único dato que separa
+    // un vale de un faltante, y por eso no puede ir en letra chica.
+    t.saltos(1).linea('Se lo llevo:');
+    t.negrita().tamano(2, 1).linea(String(vale.ejecutor_nombre || '?').slice(0, 22))
+     .normal();
+
+    if (vale.notas) t.parrafo(vale.notas);
+
+    if (esRaya) {
+      t.saltos(1);
+      t.parrafo('A cuenta de su sueldo de la semana. El dia de la raya se le paga esto de menos.');
+    }
+
+    if (vale.folio) t.linea(`Turno #${vale.folio}`);
+
+    if (vale.anulado_en) {
+      t.centro().negrita().tamano(2, 1).linea('ANULADO').normal().izquierda();
+    }
+
+    t.separador();
+    t.firma('FIRMA DE QUIEN LO RECIBE');
+    t.izquierda().linea(paraQuien);
+    pie(t, negocio);
+    t.izquierda().cortar(cfg.avanceCorte);
+  };
+
+  unaCopia('-- Se lo lleva quien recibio el dinero --');
+  unaCopia('-- Se queda en el cajon --');
+  return t.bytes();
+}
+
+/**
  * LOS NÚMEROS A SACAR, para el obrero.
  *
  * Este papel se lo lleva en la mano al cuarto de tanques, y vuelve escrito
@@ -568,12 +637,34 @@ function ticketCorte(corte, { negocio = '' } = {}) {
   const cuantosGastos = corte.movimientos.filter(
     (m) => m.tipo === 'salida' && !m.anulado_en).length;
 
+  // GASTOS Y VALES, EN DOS RENGLONES  (v4.3)
+  //
+  // La gasolina de la camioneta y los $2,000 que se llevó el patrón salían
+  // sumados en el mismo renglón, y así un corte con mucha salida no dice
+  // cuál de las dos fue: si la fábrica gastó o si nada más movieron el
+  // dinero. Se parten SOLO si los dos montones suman exactamente lo que
+  // dice el corte congelado; si no cuadran —un corte viejo, uno corregido—
+  // manda el número del papel y se imprime como siempre.
+  const partido = corte.salidas || null;
+  const seParten = Boolean(partido) && partido.valesCentavos > 0
+    && partido.gastosCentavos + partido.valesCentavos === c.salidas_centavos;
+  const conCuantos = (nombre, n) => (n ? `${nombre} (${n})` : nombre);
+
   t.bloqueDerecha([
     ['Fondo', formato(c.fondo_centavos)],
     ['Cobrado', '+' + formato(c.vendido_centavos)],
     c.entradas_centavos ? ['Entradas', '+' + formato(c.entradas_centavos)] : null,
-    [`Gastos y retiros${cuantosGastos ? ` (${cuantosGastos})` : ''}`,
-     '-' + formato(c.salidas_centavos)],
+    ...(seParten
+      ? [
+          partido.gastos.length
+            ? [conCuantos('Gastos', partido.gastos.length),
+               '-' + formato(partido.gastosCentavos)]
+            : null,
+          [conCuantos('Vales', partido.vales.length),
+           '-' + formato(partido.valesCentavos)]
+        ]
+      : [[conCuantos('Gastos y retiros', cuantosGastos),
+          '-' + formato(c.salidas_centavos)]]),
     ['DEBERIA HABER', formato(c.esperado_centavos)],
     // Desde la v4.1 el turno se cierra SIN contar: el cajero entrega el
     // cajón y sigue vendiendo. Lo que se contó se anota después, cuando el
@@ -595,6 +686,23 @@ function ticketCorte(corte, { negocio = '' } = {}) {
   } else {
     t.linea(dif === 0 ? 'CUADRO' : dif > 0 ? `SOBRA ${formato(dif)}` : `FALTA ${formato(-dif)}`)
      .normal().izquierda();
+  }
+
+  // LO QUE LE LLEGÓ AL DUEÑO DE ESTE TURNO  (v4.3)
+  //
+  // Un retiro a media mañana es dinero de este turno que ya está en manos
+  // del dueño: al final del día entregan menos porque ya se llevaron una
+  // parte, no porque falte. Este renglón lo dice de una vez, para que no
+  // haya que sumarlo de cabeza con el papel del vale al lado.
+  //
+  // Solo cuenta lo que se llevaron y NO era gasto —el retiro a la caja
+  // fuerte—: un vale de raya es sueldo pagado, no dinero que volvió.
+  const alDueno = corte.salidas?.traspasadoCentavos || 0;
+  const recibido = c.entregado_centavos ?? c.contado_centavos ?? null;
+  if (alDueno > 0 && recibido !== null) {
+    t.izquierda().linea(
+      `De este turno: ${formato(alDueno)} en vales`);
+    t.linea(`  + ${formato(recibido)} entregado = ${formato(alDueno + recibido)}`);
   }
 
   // QUIÉN METIÓ QUÉ. Solo cuando de verdad hubo relevo: con una sola
@@ -652,9 +760,17 @@ function ticketCorteMovimientos(corte, { negocio = '' } = {}) {
   });
   t.separador();
 
-  const gastos = vivos.filter((m) => m.tipo === 'salida');
+  // Los vales van en su propio apartado y CON NOMBRE (v4.3). En la lista
+  // de gastos, "Retiro a la caja fuerte $2,000" no dice lo único que hay
+  // que saber de un retiro, que es quién se lo llevó.
+  const esVale = new Set((corte.salidas?.vales || []).map((m) => m.id));
+  const salidas = vivos.filter((m) => m.tipo === 'salida');
+  const gastos = salidas.filter((m) => !esVale.has(m.id));
+  const vales = salidas.filter((m) => esVale.has(m.id));
   const entradas = vivos.filter((m) => m.tipo !== 'salida');
+
   if (gastos.length) columnaDeMovimientos(t, 'GASTOS', gastos, '-');
+  if (vales.length) columnaDeMovimientos(t, 'VALES', vales, '-', { conQuien: true });
   if (entradas.length) columnaDeMovimientos(t, 'ENTRADAS', entradas, '+');
 
   // Lo anulado va al final y aparte. No suma, pero que un gasto se haya
@@ -845,13 +961,17 @@ function ticketCortePersona(corte, persona, { negocio = '' } = {}) {
 
 
 /** Un bloque de movimientos con su suma, para el corte. */
-function columnaDeMovimientos(t, titulo, lista, signo) {
+function columnaDeMovimientos(t, titulo, lista, signo, { conQuien = false } = {}) {
   // El título va DENTRO de la raya en vez de en su propio renglón: la raya
   // ya estaba y el título ya estaba, y juntos hacen el mismo trabajo.
   t.negrita().separadorConTitulo(`${titulo} (${lista.length})`).negrita(false);
   for (const m of lista) {
     t.columnas2(m.anulado_en ? `(anulado) ${m.concepto}` : m.concepto,
                 m.anulado_en ? '-' : signo + formato(m.centavos));
+    // En los vales, quién se lo llevó va debajo y con sangría: es el dato
+    // por el que se mira esta lista, y en el renglón de arriba no cabe
+    // sin recortarle el nombre a alguien.
+    if (conQuien && m.ejecutor_nombre) t.linea(`  ${m.ejecutor_nombre.slice(0, 40)}`);
   }
   // Sin renglón de "Suman": es exactamente el mismo número que
   // "Gastos y retiros" (o "Entradas") del arqueo de arriba, que es el que
@@ -925,6 +1045,6 @@ function pulsoCajon(salida = 2) {
 }
 
 module.exports = {
-  ticketVenta, ticketMovimiento, ticketCotizacion, ticketPrueba,
+  ticketVenta, ticketMovimiento, ticketVale, ticketCotizacion, ticketPrueba,
   ticketCorte, ticketCorteMovimientos, ticketHielo, ticketCortePersona, ticketConteo, ticketProduccion, ticketResumenDia, pulsoCajon, fechaCorta, fechaTicket
 };

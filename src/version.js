@@ -17,9 +17,31 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '4.2';
+const VERSION_ACTUAL = '4.3';
 
 const VERSIONES = [
+  {
+    numero: '4.3',
+    nombre: 'Los vales',
+    fecha: '2026-09-03',
+    resumen:
+      'En la fábrica hay dos papelitos que se llaman igual y son opuestos: ' +
+      'el que deja quien se lleva el efectivo, y el del trabajador que pide ' +
+      'parte de su sueldo antes. Ahora cada uno tiene lo suyo, sale su papel ' +
+      'firmado por duplicado, y el corte ya no los revuelve con la gasolina.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'EL VALE DE RETIRO: cuando tú, un gerente o tu papá llegan y se llevan el efectivo para que las muchachas no tengan mucho dinero junto. Hay un botón propio en la caja —📤 Vale— que pregunta lo único que hace falta: quién se lo llevó y cuánto. Ese dinero NO CUENTA COMO GASTO de la fábrica: cambió de sitio, sigue siendo tuyo.' },
+      { tipo: 'nuevo', texto: 'EL VALE SALE POR DUPLICADO. Uno se lo lleva quien recibió el dinero y otro se queda en el cajón, los dos con su raya para firmar y con el nombre de quien se lo llevó en grande. Con un solo papel, el día que alguien pregunte "¿y esos dos mil?" solo hay una versión, y es la del que la tiene en la mano.' },
+      { tipo: 'importante', texto: 'LO ANOTA QUIEN ESTÁ EN LA COMPUTADORA, NO QUIEN SE LLEVA EL DINERO. Es el caso de verdad: tu papá llega, se lleva el efectivo y no toca la máquina. La cajera lo anota a nombre de él, y el papel sale con los dos nombres. Lo que NO puede hacer nadie es retirarse dinero a sí mismo: un retiro se lo lleva el dueño o un gerente, y el sistema no deja otra cosa.' },
+      { tipo: 'nuevo', texto: 'EL VALE DE RAYA: el trabajador que pide por adelantado parte de su sueldo de la semana. Tienes razón en que el sueldo es gasto de la empresa, así que se cuenta como gasto el día que el dinero sale del cajón, UNA SOLA VEZ. Si el martes se lleva $400 de vale, el sábado se le paga su raya con $400 de menos: gastaste $1,500 en total, no $1,900.' },
+      { tipo: 'nuevo', texto: 'Y POR ESO CADA QUIEN TIENE SU LIBRETA, en su ficha de La gente de la fábrica: cuánto se llevó, cuándo, y de qué turno salió. En la lista, junto a su nombre, sale «debe $400 de vales» — que es lo que se pregunta uno mirando esa pantalla el día de la raya. Cuando ya se le pagó de menos, un botón dice «ya se le descontó» y el recordatorio se apaga. Ese botón NO MUEVE UN PESO: el dinero salió el día del vale.' },
+      { tipo: 'nuevo', texto: 'EL CORTE YA NO REVUELVE LOS GASTOS CON LOS VALES. Salían sumados en un solo renglón, y así un turno con mucha salida no dice si la fábrica gastó o si nada más movieron el dinero. Ahora son dos renglones —Gastos y Vales— en la pantalla y en el papel, y el desglose trae los vales en su propia columna CON EL NOMBRE de quien se llevó cada uno.' },
+      { tipo: 'nuevo', texto: 'Y EL CORTE SUMA LO QUE DE VERDAD TE LLEGÓ DE ESE TURNO: «se llevaron $2,000 en vales + te entregaron $3,500 = $5,500». Un retiro a media mañana es dinero del mismo turno que ya está guardado: al final entregan menos porque ya se llevaron una parte, no porque falte.' },
+      { tipo: 'mejora', texto: 'LAS BOLSAS, POR TAMAÑO. La que se sembró se llamaba «gourmet» y en realidad la de todos los días es la de 5 kg: ahora se llama así. La de 20 kg queda dada de baja esperando, y se da de alta sola el día que hagan una tanda, igual que pasó con la otra. Las que se compran entran como cualquier otra mercancía, sin tocar nada.' },
+      { tipo: 'arreglo', texto: 'Anular un vale de raya anula también su renglón de la libreta: si se quedara vivo, el sábado se le descontaría un dinero que nunca salió. Y un vale que YA se descontó no se puede anular por detrás — eso dejaría al trabajador debiendo un sueldo que sí cobró.' },
+      { tipo: 'mejora', texto: 'Los dos vales están explicados en el manual, en Caja y en La gente de la fábrica.' }
+    ]
+  },
   {
     numero: '4.2',
     nombre: 'El corte del hielo',

@@ -565,7 +565,7 @@ debería quedar − contado = FALTA</pre>
   {
     id: 'caja',
     titulo: 'Caja: el turno y el corte',
-    busca: 'caja turno fondo corte arqueo gasto retiro efectivo cerrar cuadrar sobra falta corregir corte firmado olvidó gasto agregar quitar administrador motivo copia comprobante reimprimir volver a imprimir papel existencia contar hielo paños bolsas gourmet entregar entregado sin contar dos papeles detalle',
+    busca: 'caja turno fondo corte arqueo gasto retiro efectivo cerrar cuadrar sobra falta corregir corte firmado olvidó gasto agregar quitar administrador motivo copia comprobante reimprimir volver a imprimir papel existencia contar hielo paños bolsas gourmet 5 kg 20 kg entregar entregado sin contar dos papeles detalle vale vales retiro caja fuerte adelanto sueldo raya semana papá firma duplicado',
     cuerpo: `
       <h4>El turno se abre solo</h4>
       <p>No hay que ir a ninguna pantalla a abrir la caja: <b>lo hace tu
@@ -602,10 +602,63 @@ debería quedar − contado = FALTA</pre>
       <b>quién la tecleó</b> y el turno guarda <b>de quién es el dinero</b>.
       Las dos cosas quedan escritas.</p>
 
-      <h4>Gastos y retiros</h4>
+      <h4>Gastos</h4>
       <p>Con el botón rojo <b>− Gasto</b> de la pantalla de venta. Todo el
-      dinero que sale del cajón sin ser cambio: la gasolina, los refrescos, el
-      retiro a la caja fuerte. Verde entra, rojo sale.</p>
+      dinero que sale del cajón sin ser cambio: la gasolina, los refrescos,
+      el desayuno de los muchachos. Verde entra, rojo sale.</p>
+
+      <h4>Los vales: son dos cosas distintas</h4>
+      <p>En la fábrica se le dice <b>vale</b> a dos papelitos que se llaman
+      igual y son <b>opuestos</b>. El botón <b>📤 Vale</b> de la caja
+      pregunta primero cuál de los dos, con la diferencia escrita en el
+      mismo botón — nadie tiene por qué acordarse de memoria.</p>
+
+      <table class="ayuda-tabla">
+        <tr><th></th><th>Vale de retiro</th><th>Vale de raya</th></tr>
+        <tr><td><b>Quién lo toma</b></td>
+            <td>Tú, un gerente, tu papá</td><td>Un trabajador</td></tr>
+        <tr><td><b>Qué es ese dinero</b></td>
+            <td>Tuyo ya: solo cambia de sitio</td>
+            <td>Un adelanto de su sueldo</td></tr>
+        <tr><td><b>¿Es gasto?</b></td>
+            <td>No. No se gastó nada</td>
+            <td>Sí: el sueldo es gasto</td></tr>
+        <tr><td><b>Cómo se salda</b></td>
+            <td>Nunca: no hay nada que saldar</td>
+            <td>Con su raya de la semana</td></tr>
+      </table>
+
+      <p>Los dos se hacen en <b>tres toques</b>: cuál, quién y cuánto. Y de
+      los dos sale <b>el papel por duplicado</b>: uno se lo lleva quien
+      recibió el dinero y otro se queda en el cajón, los dos con su raya
+      para firmar. Con un solo papel, el día que alguien pregunte «¿y esos
+      dos mil?» solo hay una versión, y es la del que la tiene en la mano.</p>
+
+      <p class="ayuda-tip"><b>Lo anota quien está en la computadora, no
+      quien se lleva el dinero.</b> Es el caso de verdad: llega tu papá, se
+      lleva el efectivo y no toca la máquina. La cajera lo anota a nombre de
+      él, y el papel sale con los dos nombres. Lo que <b>no</b> puede hacer
+      nadie es retirarse dinero a sí mismo: un retiro se lo lleva el dueño o
+      un gerente, y el sistema no deja otra cosa. Si quien pidió el dinero
+      es un trabajador, eso es un vale de raya y ahí sí puede ser
+      cualquiera.</p>
+
+      <h4>El vale de raya se cuenta UNA sola vez</h4>
+      <p>El sueldo es gasto de la fábrica, así que el vale de raya
+      <b>sí es gasto</b>, y se cuenta el día que el dinero sale del cajón.
+      Lo que no puede pasar es contarlo dos veces:</p>
+
+      <pre class="ayuda-formula">martes   vale de raya      $400   ← gasto (sueldo)
+sabado   lo que le falta $1,100   ← gasto (sueldo)
+                         ------
+                         $1,500   ← su sueldo, contado UNA vez</pre>
+
+      <p>Por eso el sábado se le paga su raya <b>de menos</b>, y por eso
+      cada quien tiene su libreta de vales en su ficha de <b>La gente de la
+      fábrica</b>. Ahí sale «debe $400 de vales» junto a su nombre, y cuando
+      ya se le pagó de menos, el botón <b>«ya se le descontó»</b> apaga el
+      recordatorio. Ese botón <b>no mueve un peso</b>: el dinero salió el
+      día del vale.</p>
 
       <h4>Lo fiado no está en el cajón</h4>
       <p>Si en el turno salió mercancía <b>fiada</b>, el corte lo dice aparte:
@@ -670,11 +723,28 @@ debería quedar − contado = FALTA</pre>
       es del <b>gerente</b> o del <b>administrador</b>: que lo hiciera el
       propio cajero sería firmarse a sí mismo la entrega.</p>
 
+      <h4>El corte separa los gastos de los vales</h4>
+      <p>Salían sumados en un solo renglón, y así un turno con mucha salida
+      no dice nada: no se sabe si la fábrica <b>gastó</b> mucho o si nada
+      más <b>movieron</b> el dinero. Ahora son dos renglones —Gastos y
+      Vales— en la pantalla y en el papel, y el desglose trae los vales en
+      su propia columna <b>con el nombre</b> de quien se llevó cada uno.</p>
+
+      <p>Y el corte suma lo que de verdad te llegó de ese turno:</p>
+      <pre class="ayuda-formula">se llevaron en vales   $2,000
++ te entregaron        $3,500
+                      -------
+= de este turno        $5,500</pre>
+      <p>Un retiro a media mañana es dinero del mismo turno que ya está
+      guardado: al final entregan menos porque ya se llevaron una parte, no
+      porque falte. Los <b>adelantos de sueldo no cuentan ahí</b>: ese
+      dinero se gastó, no volvió.</p>
+
       <h4>El corte sale en tres papeles</h4>
       <ul>
         <li>El <b>primero</b> es el del dinero, con espacio para la firma y
-        una raya para escribir a mano lo que se entrega. Los gastos van solo
-        como <b>total</b>, con cuántos son.</li>
+        una raya para escribir a mano lo que se entrega. Los gastos y los
+        vales van solo como <b>total</b>, con cuántos son.</li>
         <li>El <b>segundo</b> es el <b>detalle</b>: los gastos y las entradas
         uno por uno, con sus sumas, en dos columnas para ahorrar papel.</li>
         <li>El <b>tercero</b> es <b>el hielo</b>, que es el de abajo.</li>
@@ -1616,7 +1686,7 @@ EN REPARACION
   {
     id: 'gente',
     titulo: 'La gente de la fábrica: altas, bajas y PIN',
-    busca: 'usuarios gente empleados trabajadores alta baja pin contraseña rol operario cajero repartidor gerente administrador quién entró actividad paños vendió turnos reactivar',
+    busca: 'usuarios gente empleados trabajadores alta baja pin contraseña rol operario cajero repartidor gerente administrador quién entró actividad paños vendió turnos reactivar vale vales raya sueldo adelanto semana descontar debe',
     cuerpo: `
       <p>Cada quien entra con <b>su propio PIN</b>. No es burocracia: es lo
       que hace que cada paño, cada ticket y cada corte lleven el nombre de
@@ -1651,6 +1721,29 @@ EN REPARACION
       <p>Son treinta días corridos hacia atrás, no el mes del negocio: la
       pregunta que contestan es "¿está trabajando?", y un día 2 del mes
       todos aparecerían en cero.</p>
+
+      <h4>Los vales de raya</h4>
+      <p>Un <b>vale de raya</b> es parte del sueldo de la semana pedida por
+      adelantado. Se da desde la caja —botón <b>📤 Vale</b>— y aquí, en su
+      ficha, queda su libreta: cuánto se llevó, cuándo y de qué turno
+      salió. En la lista, junto a su nombre, sale <b>«debe $400 de
+      vales»</b>, que es lo que se pregunta uno mirando esta pantalla el día
+      de la raya.</p>
+
+      <p>Cuando ya se le pagó su raya de menos, el botón <b>«ya se le
+      descontó»</b> apaga el recordatorio de todos sus vales pendientes de
+      un jalón — que es como pasa de verdad: nadie descuenta uno sí y otro
+      no de la misma semana.</p>
+
+      <p class="ayuda-tip">Ese botón <b>no mueve un peso</b>. El dinero
+      salió del cajón el día del vale, y ahí se contó como gasto: el sueldo
+      es gasto de la fábrica, y se cuenta una sola vez. Volver a contarlo
+      aquí sería pagarle el sueldo dos veces en los números. Esta libreta
+      es <b>un recordatorio</b>, no contabilidad.</p>
+
+      <p>Nada se borra: los que ya se descontaron quedan marcados con quién
+      y cuándo, y si se marcó por error, un botón lo deja otra vez
+      pendiente. El sábado que se pagó tiene que poder mirarse en enero.</p>
 
       <h4>El PIN y la contraseña</h4>
       <ul>
