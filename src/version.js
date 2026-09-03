@@ -17,9 +17,26 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '4.5';
+const VERSION_ACTUAL = '4.6';
 
 const VERSIONES = [
+  {
+    numero: '4.6',
+    nombre: 'La hoja, a tu manera',
+    fecha: '2026-09-03',
+    resumen:
+      'Los números en dos columnas y con los apartados que se suben y se ' +
+      'bajan a mano. Y dos datos nuevos: la luz desarmada en tres preguntas ' +
+      '—cuánta, a cómo y cuánta por marqueta— y quién compra más.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'EL ORDEN DE LA HOJA LO PONES TÚ. Cada apartado tiene sus flechas ↑ ↓ en la esquina: con ellas se sube o se baja lo que quieras ver primero. El orden se guarda EN LA FÁBRICA y no en la computadora donde lo cambiaste, así que sale igual desde la PC y desde la pantalla táctil. Se mueve con flechas y no arrastrando: arrastrar media pantalla en una táctil no lo hace nadie dos veces.' },
+      { tipo: 'mejora', texto: 'LA HOJA VA EN DOS COLUMNAS en pantalla ancha. Las gráficas que necesitan el ancho entero —el resumen, el día por día y la tendencia— lo siguen ocupando solas; el resto se acomoda de a dos. En un teléfono se apila todo, como antes.' },
+      { tipo: 'nuevo', texto: 'LA LUZ, DESARMADA EN TRES PREGUNTAS. Un recibo más caro puede ser tres cosas distintas y juntas no se contestan: cuántos KILOWATTS se consumieron, A CÓMO salió el kilowatt —eso lo pone la CFE— y cuántos KILOWATTS CUESTA HACER UNA MARQUETA, que es lo que pone la fábrica. El último no se puede leer en el papel del recibo, y es el que avisa de una máquina trabajando peor aunque el recibo venga igual.' },
+      { tipo: 'nuevo', texto: 'Y CADA UNA CON SU LÍNEA en los últimos doce meses, para ver si algo viene subiendo desde hace rato o si fue solo este mes. Si sube «a cómo salió el kilowatt», la luz está más cara y no hay nada que arreglar en la fábrica. Si sube «kilowatts por marqueta», es al revés. Pueden subir las dos a la vez, y por eso van separadas.' },
+      { tipo: 'nuevo', texto: 'QUIÉN COMPRA MÁS: los clientes del mes del que más se llevó al que menos, con su dinero, sus marquetas, cuántas veces vino, cuántas fiadas y cuándo fue la última. Solo entra lo que se cobró con nombre: el mostrador de a cuarto no tiene dueño y meterlo taparía a todos los demás.' },
+      { tipo: 'mejora', texto: 'Todo está en el manual, en «Los números: qué significa cada uno».' }
+    ]
+  },
   {
     numero: '4.5',
     nombre: 'Lo encomendado',

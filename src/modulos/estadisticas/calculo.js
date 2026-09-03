@@ -289,6 +289,85 @@ function costoPorMarqueta(periodo) {
 }
 
 
+/**
+ * LA LUZ: ¿GASTAMOS MÁS, O ESTÁ MÁS CARA?  (v4.6)
+ *
+ * "Necesito poder observar de manera clara si estamos consumiendo más luz
+ *  y produciendo menos, o es lo mismo y el precio de la luz está
+ *  aumentando."
+ *
+ * Son tres preguntas distintas dentro de un solo recibo más caro, y por
+ * separado cada una se contesta con un número:
+ *
+ *   · ¿CONSUMIMOS MÁS?      kWh del periodo
+ *   · ¿ESTÁ MÁS CARA?       centavos por kWh — eso lo pone la CFE
+ *   · ¿RINDE MENOS?         kWh por marqueta producida — eso es la fábrica
+ *
+ * El último es el importante y el que no se puede mirar en el papel del
+ * recibo: si sube, la máquina está trabajando peor, aunque el recibo venga
+ * igual. Y el dinero por marqueta junta los dos efectos, que es lo que de
+ * verdad cuesta.
+ */
+function luzPorMarqueta(periodo) {
+  const rango = instantes(periodo);
+  const marquetas = produccion(rango).producidas;
+  const luz = luzEnPeriodo({ desde: periodo.desde, hasta: periodo.hasta });
+
+  const porMarqueta = (n) => (marquetas > 0 ? n / marquetas : null);
+
+  return {
+    kwh: luz.kwh,
+    centavos: luz.centavos,
+    marquetas,
+    // Lo que pone la CFE.
+    centavosPorKwh: luz.centavosPorKwh,
+    // Lo que pone la fábrica: cuánta luz cuesta hacer una marqueta.
+    kwhPorMarqueta: marquetas > 0 ? Number(porMarqueta(luz.kwh).toFixed(2)) : null,
+    // Y los dos juntos, que es lo que se paga.
+    centavosPorMarqueta: marquetas > 0 ? Math.round(porMarqueta(luz.centavos)) : null,
+    // Sin todos los recibos capturados, estos números van cortos y hay que
+    // decirlo en vez de enseñarlos como si fueran el mes entero.
+    completo: luz.completo,
+    faltanDias: Math.max(luz.diasDelPeriodo - luz.dias, 0),
+    dias: luz.dias
+  };
+}
+
+/**
+ * QUIÉN COMPRA MÁS  (v4.6)
+ *
+ * Del que más se lleva al que menos, con lo que se llevó en dinero y en
+ * hielo, cuántas veces vino y cuándo fue la última. Las canceladas no
+ * cuentan.
+ *
+ * Solo salen las ventas CON CLIENTE: el mostrador de a cuarto es la mitad
+ * del negocio y no tiene nombre, así que meterlo aquí como "sin cliente"
+ * taparía a todos los demás con un renglón que no dice nada.
+ */
+function porCliente({ desde, hasta }, limite = 15) {
+  return bd.prepare(`
+    SELECT c.id, c.nombre, c.negocio,
+           COUNT(*)                                   AS tickets,
+           COALESCE(SUM(v.total_centavos), 0)         AS centavos,
+           COALESCE(SUM(vl.dieciseisavos), 0)         AS dieciseisavos,
+           COUNT(*) FILTER (WHERE v.forma_pago = 'credito') AS fiados,
+           MAX(v.fecha)                               AS ultima
+      FROM ventas v
+      JOIN clientes c ON c.id = v.cliente_id
+      LEFT JOIN (
+        SELECT venta_id, SUM(dieciseisavos) AS dieciseisavos
+          FROM venta_lineas GROUP BY venta_id
+      ) vl ON vl.venta_id = v.id
+     WHERE v.cancelada_en IS NULL AND v.fecha >= ? AND v.fecha <= ?
+     GROUP BY c.id
+     ORDER BY centavos DESC
+     LIMIT ?
+  `).all(desde, hasta, limite).map((c) => ({
+    ...c,
+    marquetas: c.dieciseisavos / DIECISEISAVOS_POR_MARQUETA
+  }));
+}
+
 // ============================================================
 // LAS SERIES — lo que se dibuja
 // ============================================================
@@ -361,6 +440,7 @@ function porMes(periodos) {
     const v = ventas(rango);
     const prod = produccion(rango);
     const costo = costoPorMarqueta(p);
+    const luz = luzPorMarqueta(p);
     return {
       clave: p.clave,
       nombre: p.nombre,
@@ -373,6 +453,15 @@ function porMes(periodos) {
       porCientoSinQueja: prod.porCientoSinQueja,
       gastado: costo.total,
       costoPorMarqueta: costo.centavos,
+      // La luz mes a mes, con las tres preguntas separadas: cuánta se
+      // consumió, a cómo la cobraron, y cuánta cuesta hacer una marqueta.
+      // Es la única forma de ver la tendencia — un mes suelto no dice si
+      // algo está subiendo (v4.6).
+      luzKwh: luz.kwh,
+      luzCentavos: luz.centavos,
+      luzCentavosPorKwh: luz.centavosPorKwh,
+      luzKwhPorMarqueta: luz.kwhPorMarqueta,
+      luzCompleto: luz.completo,
       completo: costo.completo
     };
   });
@@ -380,5 +469,5 @@ function porMes(periodos) {
 
 module.exports = {
   ventas, hieloVendido, abonos, produccion, porObrero,
-  gastosDelCajon, costoPorMarqueta, porDia, porMes
+  gastosDelCajon, costoPorMarqueta, luzPorMarqueta, porCliente, porDia, porMes
 };

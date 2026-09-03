@@ -423,3 +423,114 @@ test('quién sacó cuánto cuadra con las marquetas del mes', async () => {
   assert.equal(suma, d.produccion.alAlmacen,
     'los dos números salen de la misma fecha: si no cuadraran, uno de los dos mentiría');
 });
+
+// ============================================================
+// LA LUZ, DESARMADA  (v4.6)
+//
+// "Necesito poder observar de manera clara si estamos consumiendo más luz
+//  y produciendo menos, o es lo mismo y el precio de la luz está
+//  aumentando."
+//
+// Son tres preguntas distintas dentro de un solo recibo más caro, y juntas
+// no se contestan. Lo que se prueba es que salgan separadas y que cada una
+// se mueva por su lado.
+// ============================================================
+
+test('la luz se parte en consumo, precio y kilowatts por marqueta', async () => {
+  await entrarAdmin();
+  const p = (await llamar('/api/estadisticas')).json.datos.periodo;
+
+  const r = await llamar('/api/empresa/cfe', {
+    method: 'POST',
+    cuerpo: { desde: p.desde, hasta: p.hasta, kwh: 20000, monto: '60000.00' }
+  });
+  assert.equal(r.estado, 201);
+
+  const d = (await llamar('/api/estadisticas')).json.datos;
+  const l = d.luzPorMarqueta;
+
+  assert.equal(l.kwh, 20000, 'los kilowatts del recibo');
+  assert.equal(l.centavos, 6000000, 'y su importe');
+  assert.equal(l.centavosPorKwh, 300, '$3 el kilowatt: eso lo pone la CFE');
+
+  if (l.marquetas > 0) {
+    // El número que NO se puede leer en el papel del recibo: cuánta luz
+    // cuesta hacer una marqueta. Si sube, es la máquina, no la CFE.
+    assert.equal(l.kwhPorMarqueta, Number((20000 / l.marquetas).toFixed(2)));
+    assert.equal(l.centavosPorMarqueta, Math.round(6000000 / l.marquetas));
+  } else {
+    assert.equal(l.kwhPorMarqueta, null, 'sin producción no se inventa el número');
+  }
+});
+
+test('sin recibos capturados no se inventa un precio del kilowatt', async () => {
+  const d = (await llamar('/api/estadisticas?periodo=2020-01')).json.datos;
+  assert.equal(d.luzPorMarqueta.kwh, 0);
+  assert.equal(d.luzPorMarqueta.centavosPorKwh, null,
+    'dividir entre cero kilowatts no significa nada');
+});
+
+test('la tendencia trae la luz mes a mes, con sus dos números', async () => {
+  const { meses } = (await llamar('/api/estadisticas/meses?cuantos=3')).json.datos;
+  assert.ok(meses.length >= 2);
+  for (const m of meses) {
+    assert.ok('luzKwh' in m && 'luzCentavosPorKwh' in m && 'luzKwhPorMarqueta' in m,
+      'las tres, para poder dibujar cada una por su lado');
+  }
+});
+
+// ============================================================
+// QUIÉN COMPRA MÁS  (v4.6)
+// ============================================================
+
+test('los clientes salen del que más se lleva al que menos', async () => {
+  await entrarAdmin();
+  const grande = (await llamar('/api/clientes', {
+    method: 'POST', cuerpo: { nombre: 'Hotel Maya' } })).json.datos.cliente;
+  const chico = (await llamar('/api/clientes', {
+    method: 'POST', cuerpo: { nombre: 'Tiendita de la esquina' } })).json.datos.cliente;
+
+  await llamar('/api/ventas', {
+    method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 5 * 16 }], clienteId: grande.id, pago: 5000 } });
+  await llamar('/api/ventas', {
+    method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 16 }], clienteId: chico.id, pago: 500 } });
+  // Y una del mostrador, sin nombre: no debe aparecer.
+  await llamar('/api/ventas', {
+    method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 8 * 16 }], pago: 5000 } });
+
+  const lista = (await llamar('/api/estadisticas')).json.datos.porCliente;
+  assert.ok(lista.length >= 2);
+  assert.equal(lista[0].nombre, 'Hotel Maya', 'el que más se llevó, primero');
+  assert.ok(lista[0].centavos > lista[1].centavos);
+  assert.equal(lista[0].marquetas, 5);
+  assert.ok(!lista.some((c) => !c.nombre),
+    'el mostrador de a cuarto no tiene dueño y no entra');
+});
+
+// ============================================================
+// EL ORDEN DE LA HOJA  (v4.6)
+// ============================================================
+
+test('el orden de los apartados se guarda en la fábrica', async () => {
+  const r = await llamar('/api/estadisticas/orden', {
+    method: 'PUT', cuerpo: { orden: ['luz', 'clientes', 'resumen'] } });
+  assert.equal(r.estado, 200);
+  assert.deepEqual(r.json.datos.orden, ['luz', 'clientes', 'resumen']);
+
+  // Y viaja con los números, para que la pantalla lo pinte así al entrar.
+  assert.deepEqual((await llamar('/api/estadisticas')).json.datos.orden,
+    ['luz', 'clientes', 'resumen']);
+});
+
+test('el orden se limpia de repetidos y de basura', async () => {
+  const r = await llamar('/api/estadisticas/orden', {
+    method: 'PUT',
+    cuerpo: { orden: ['luz', 'luz', '  ', '<script>', 'clientes'] } });
+  assert.equal(r.estado, 200);
+  assert.deepEqual(r.json.datos.orden, ['luz', 'clientes']);
+});
+
+test('un orden vacío no se guarda: dejaría la hoja sin nada', async () => {
+  const r = await llamar('/api/estadisticas/orden', { method: 'PUT', cuerpo: { orden: [] } });
+  assert.equal(r.estado, 400);
+});

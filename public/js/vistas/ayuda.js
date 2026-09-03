@@ -1919,11 +1919,49 @@ EN REPARACION
   {
     id: 'numeros',
     titulo: 'Los números: qué significa cada uno',
-    busca: 'estadísticas números gráficas costo por marqueta imprimir hoja carta pdf tendencia día por día en qué se fue el dinero raya sueldos reparto amoniaco',
+    busca: 'estadísticas números gráficas costo por marqueta imprimir hoja carta pdf tendencia día por día en qué se fue el dinero raya sueldos reparto amoniaco luz cfe kilowatt kwh consumo recibo precio subir orden acomodar mover flechas dos columnas clientes quién compra más mejores clientes',
     cuerpo: `
       <p>La pantalla <b>📊 Los números</b> no es un tablero: es una
       <b>hoja</b> que se lee de arriba abajo y se imprime tal cual. Está en
       el orden en que uno se hace las preguntas.</p>
+
+      <h4>El orden lo pones tú</h4>
+      <p>Cada apartado tiene sus flechas <b>↑ ↓</b> en la esquina: con
+      ellas se sube o se baja lo que quieras ver primero. El orden
+      <b>se guarda en la fábrica</b>, no en la computadora donde lo
+      cambiaste, así que sale igual desde la PC y desde la pantalla táctil.
+      En pantalla ancha la hoja va en <b>dos columnas</b>; las gráficas que
+      necesitan el ancho entero —el resumen, el día por día y la
+      tendencia— lo ocupan solas. En un teléfono se apila todo.</p>
+
+      <h4>La luz: tres preguntas, no una</h4>
+      <p>Un recibo más caro puede ser tres cosas distintas, y juntas no se
+      contestan. Por eso van separadas:</p>
+      <ul>
+        <li><b>Se consumió</b> — los kilowatts que marcó el medidor.</li>
+        <li><b>A cómo salió el kilowatt</b> — el precio. Eso lo pone la
+        CFE, y si sube <b>no hay nada que arreglar en la fábrica</b>.</li>
+        <li><b>Luz por marqueta</b> — cuántos kilowatts cuesta hacer una.
+        Eso sí lo pone la fábrica: si sube, se está gastando <b>más luz
+        para hacer lo mismo</b>, y eso es una máquina que hay que revisar.
+        Este número <b>no se puede leer en el papel del recibo</b>.</li>
+      </ul>
+      <p class="ayuda-tip">Pueden subir los dos a la vez, y por eso van en
+      renglones y en gráficas separadas. En <b>los últimos doce meses</b>
+      está cada uno con su línea: ahí se ve si algo viene subiendo desde
+      hace rato o si fue solo este mes.</p>
+      <p>Todo esto sale de los <b>recibos de la CFE</b> capturados en
+      <b>La empresa</b>, con sus kilowatts y su importe. Si falta algún
+      recibo del mes, la hoja lo dice y esos números van cortos.</p>
+
+      <h4>Quién compra más</h4>
+      <p>Los clientes que más se llevaron en el mes, con lo que se llevaron
+      en dinero y en marquetas, cuántas veces vinieron, cuántas fiadas y
+      cuándo fue la última.</p>
+      <p class="ayuda-tip">Solo entra lo que se cobró <b>con nombre</b>. El
+      mostrador de a cuarto es la mitad del negocio y no tiene dueño:
+      meterlo aquí como «sin cliente» sería un renglón que tapa a todos los
+      demás y no dice nada de nadie.</p>
 
       <h4>Se vendió</h4>
       <p>El precio de todo lo que salió en el mes, <b>esté cobrado o

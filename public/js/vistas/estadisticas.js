@@ -39,6 +39,86 @@ export async function vistaEstadisticas(pantalla) {
   try { ventanaDirecta = (await api.obtener('/impresion/config')).ventanaDirecta; }
   catch { ventanaDirecta = false; }
 
+  // ==========================================================
+  // EL ORDEN DE LA HOJA  (v4.6)
+  //
+  // "En los reportes, que pueda subir o bajar las gráficas o datos que
+  //  quiera ver primero."
+  //
+  // Cada apartado tiene su id, su título y si necesita el ancho entero.
+  // El orden se guarda EN LA FÁBRICA y no en este navegador: así sigue
+  // igual desde la PC y desde la pantalla táctil.
+  //
+  // Se sube y se baja con flechas, no arrastrando: en una pantalla táctil,
+  // arrastrar una tarjeta de media pantalla no lo hace nadie dos veces.
+  //
+  // Va aquí arriba y no abajo a propósito: `const` no se adelanta como las
+  // funciones, y el primer `pintar()` corre antes de llegar al final del
+  // archivo. Declararlo abajo reventaría con "no se puede acceder antes de
+  // inicializar", que ya nos pasó una vez.
+  // ==========================================================
+  const APARTADOS = [
+    { id: 'resumen',   titulo: 'Cómo nos fue',               pinta: (d) => resumen(d),        ancho: true },
+    { id: 'dia',       titulo: 'Día por día',                pinta: (d) => diaPorDia(d),      ancho: true },
+    { id: 'costo',     titulo: 'Cuánto cuesta una marqueta', pinta: (d) => elCosto(d) },
+    { id: 'luz',       titulo: 'La luz',                     pinta: (d) => laLuz(d) },
+    { id: 'gastos',    titulo: 'En qué se fue el dinero',    pinta: (d) => enQueSeFue(d) },
+    { id: 'hielo',     titulo: 'El hielo que se hizo',       pinta: (d) => elHielo(d) },
+    { id: 'clientes',  titulo: 'Quién compra más',           pinta: (d) => quienCompraMas(d) },
+    { id: 'tendencia', titulo: 'Los últimos doce meses',     pinta: () => laTendencia(),      ancho: true }
+  ];
+
+  let orden = APARTADOS.map((a) => a.id);
+  // El orden guardado se lee UNA sola vez, al entrar. Leerlo en cada
+  // repintado deshacía el movimiento recién hecho: se movía la tarjeta, se
+  // repintaba, y el servidor —que todavía no se había enterado— devolvía el
+  // orden viejo y la tarjeta volvía a su sitio.
+  let ordenLeido = false;
+
+  /**
+   * Los apartados como los quiere ver quien mira, y sin perder ninguno.
+   *
+   * Los que no estén en el orden guardado van al final: así un apartado
+   * NUEVO aparece solo en las fábricas que ya tenían su orden puesto, en
+   * vez de desaparecer para siempre.
+   */
+  function enOrden(d) {
+    const puestos = orden.filter((id) => APARTADOS.some((a) => a.id === id));
+    const faltan = APARTADOS.map((a) => a.id).filter((id) => !puestos.includes(id));
+    orden = [...puestos, ...faltan];
+
+    return orden.map((id, i) => {
+      const a = APARTADOS.find((x) => x.id === id);
+      const cuerpo = a.pinta(d);
+      if (!cuerpo) return '';
+      return `
+        <div class="hoja-apartado ${a.ancho ? 'ancho' : ''}" data-apartado="${esc(id)}">
+          <div class="hoja-mover no-imprimir">
+            <button class="tachita papel" data-subir="${esc(id)}"
+                    title="Subir «${esc(a.titulo)}»" ${i === 0 ? 'disabled' : ''}>↑</button>
+            <button class="tachita papel" data-bajar="${esc(id)}"
+                    title="Bajar «${esc(a.titulo)}»" ${i === orden.length - 1 ? 'disabled' : ''}>↓</button>
+          </div>
+          ${cuerpo}
+        </div>`;
+    }).join('');
+  }
+
+  /** Mover uno de sitio. Se repinta enseguida y se guarda después. */
+  async function mover(id, cuanto) {
+    const i = orden.indexOf(id);
+    const j = i + cuanto;
+    if (i < 0 || j < 0 || j >= orden.length) return;
+    const lista = [...orden];
+    [lista[i], lista[j]] = [lista[j], lista[i]];
+    orden = lista;
+
+    await pintar(mes?.clave || null);
+    try {
+      await api.actualizar('/estadisticas/orden', { orden });
+    } catch (e) { avisar(e.message, 'error'); }
+  }
+
   await pintar();
 
   async function pintar(clave = null) {
@@ -48,24 +128,22 @@ export async function vistaEstadisticas(pantalla) {
     try {
       d = await api.obtener(`/estadisticas${clave ? `?periodo=${encodeURIComponent(clave)}` : ''}`);
       mes = d.periodo;
+      if (!ordenLeido && Array.isArray(d.orden) && d.orden.length) orden = d.orden;
+      ordenLeido = true;
       if (!meses) meses = (await api.obtener('/estadisticas/meses?cuantos=12')).meses;
     } catch (e) { pantalla.innerHTML = `<p class="vacio">${esc(e.message)}</p>`; return; }
 
     pantalla.innerHTML = `
       <div class="ancho-completo hoja">
         ${cabeza(d)}
-        ${resumen(d)}
-        ${diaPorDia(d)}
-        ${elCosto(d)}
-        ${enQueSeFue(d)}
-        ${elHielo(d)}
-        ${laTendencia()}
+        <div class="hoja-rejilla">
+          ${enOrden(d)}
+        </div>
         ${pieDeHoja(d)}
       </div>`;
 
     enganchar(d);
   }
-
 
   // ==========================================================
   // 1 · CÓMO NOS FUE
@@ -415,12 +493,184 @@ export async function vistaEstadisticas(pantalla) {
 
 
   // ==========================================================
+  // LA LUZ  (v4.6)
+  //
+  // "Un dato que sí es importante para mí es el del consumo de luz: cuánto
+  //  se consumió en kW y cuánto en dinero. Necesito poder observar de
+  //  manera clara si estamos consumiendo más luz y produciendo menos, o es
+  //  lo mismo y el precio de la luz está aumentando."
+  //
+  // Son TRES preguntas distintas dentro de un solo recibo más caro, y
+  // juntas no se contestan. Por separado, cada una tiene su número:
+  //
+  //     ¿consumimos más?   kWh del mes
+  //     ¿está más cara?    $ por kWh        ← eso lo pone la CFE
+  //     ¿rinde menos?      kWh por marqueta ← eso lo pone la fábrica
+  //
+  // El tercero es el que no se puede leer en el papel del recibo, y es el
+  // que avisa de una máquina trabajando peor aunque el recibo venga igual.
+  // ==========================================================
+  function laLuz(d) {
+    const l = d.luzPorMarqueta;
+    const antes = d.luzPorMarquetaAntes;
+    if (!l || !l.kwh) {
+      return `
+        <div class="tarjeta est-bloque evitar-corte">
+          <h3>La luz</h3>
+          <p class="est-nota">
+            No hay recibos de la CFE capturados para ${esc(mes.nombre)}. Se
+            capturan en <b>La empresa › Recibos de luz</b>, con sus kilowatts
+            y su importe: sin eso no se puede saber si la luz subió o si la
+            máquina está gastando de más.
+          </p>
+        </div>`;
+    }
+
+    // El cambio contra el mes pasado, en por ciento. Cada uno con su
+    // lectura: más kWh por marqueta es MALO, aunque el recibo baje.
+    const cambio = (hoy, ayer, subirEsMalo = true) => {
+      if (hoy == null || !ayer) return null;
+      const p = Math.round(((hoy - ayer) / ayer) * 100);
+      if (p === 0) return { texto: 'igual que el mes pasado', clase: '' };
+      return {
+        texto: `${p > 0 ? '+' : ''}${p}% contra ${esc(d.anterior.nombre)}`,
+        clase: (p > 0) === subirEsMalo ? 'malo' : 'bueno'
+      };
+    };
+
+    const filas = [
+      {
+        que: 'Se consumió', valor: `${l.kwh.toLocaleString('es-MX')} kWh`,
+        nota: 'kilowatts que marcó el medidor',
+        cambio: cambio(l.kwh, antes?.kwh)
+      },
+      {
+        que: 'Se pagó', valor: pesos(l.centavos),
+        nota: 'lo que cobró la CFE',
+        cambio: cambio(l.centavos, antes?.centavos)
+      },
+      {
+        que: 'A cómo salió el kilowatt',
+        valor: l.centavosPorKwh != null ? pesos(l.centavosPorKwh) : '—',
+        nota: 'esto lo pone la CFE, no la fábrica',
+        cambio: cambio(l.centavosPorKwh, antes?.centavosPorKwh)
+      },
+      {
+        que: 'Luz por marqueta',
+        valor: l.kwhPorMarqueta != null ? `${l.kwhPorMarqueta} kWh` : '—',
+        nota: 'esto sí lo pone la fábrica: cuánta luz cuesta hacer una',
+        cambio: cambio(l.kwhPorMarqueta, antes?.kwhPorMarqueta),
+        fuerte: true
+      },
+      {
+        que: 'Y en dinero por marqueta',
+        valor: l.centavosPorMarqueta != null ? pesos(l.centavosPorMarqueta) : '—',
+        nota: 'los dos efectos juntos, que es lo que se paga',
+        cambio: cambio(l.centavosPorMarqueta, antes?.centavosPorMarqueta)
+      }
+    ];
+
+    return `
+      <div class="tarjeta est-bloque evitar-corte">
+        <h3>La luz</h3>
+        <p class="est-subtitulo">
+          ${l.marquetas.toLocaleString('es-MX')} marquetas producidas
+          en ${esc(mes.nombre)}
+        </p>
+
+        <table class="tabla est-luz">
+          ${filas.map((f) => `
+            <tr class="${f.fuerte ? 'fuerte' : ''}">
+              <th>${esc(f.que)}<small>${esc(f.nota)}</small></th>
+              <td class="der"><strong>${esc(f.valor)}</strong></td>
+              <td class="der">${f.cambio
+                ? `<span class="est-dif ${f.cambio.clase}">${f.cambio.texto}</span>`
+                : '<span class="est-dif">sin comparación</span>'}</td>
+            </tr>`).join('')}
+        </table>
+
+        <p class="est-nota">
+          <b>Cómo se lee.</b> Si sube <b>a cómo salió el kilowatt</b>, la luz
+          está más cara y no hay nada que arreglar en la fábrica. Si sube
+          <b>luz por marqueta</b>, es al revés: se está gastando más luz para
+          hacer lo mismo, y eso es una máquina que hay que revisar. Pueden
+          subir los dos a la vez, y por eso van separados.
+        </p>
+
+        ${l.completo ? '' : `
+          <p class="est-nota est-aviso">
+            Faltan <b>${l.faltanDias} ${l.faltanDias === 1 ? 'día' : 'días'}</b>
+            de ${esc(mes.nombre)} sin recibo capturado, así que estos números
+            van cortos.
+          </p>`}
+      </div>`;
+  }
+
+  // ==========================================================
+  // QUIÉN COMPRA MÁS  (v4.6)
+  //
+  // Solo salen las ventas CON CLIENTE. El mostrador de a cuarto es la mitad
+  // del negocio y no tiene nombre: meterlo aquí como "sin cliente" sería un
+  // renglón que tapa a todos los demás y no dice nada de nadie.
+  // ==========================================================
+  function quienCompraMas(d) {
+    const lista = d.porCliente || [];
+    if (!lista.length) {
+      return `
+        <div class="tarjeta est-bloque evitar-corte">
+          <h3>Quién compra más</h3>
+          <p class="est-nota">
+            En ${esc(mes.nombre)} ninguna venta salió a nombre de un cliente.
+            Aquí solo entra lo que se cobró con nombre: el mostrador de a
+            cuarto no tiene dueño y no se puede repartir.
+          </p>
+        </div>`;
+    }
+
+    const cuando = (iso) => new Date(iso).toLocaleDateString('es-MX',
+      { day: 'numeric', month: 'short' });
+
+    return `
+      <div class="tarjeta est-bloque evitar-corte">
+        <h3>Quién compra más</h3>
+        <p class="est-subtitulo">
+          Los ${lista.length} que más se llevaron en ${esc(mes.nombre)}
+        </p>
+
+        ${barrasAcostadas(
+          lista.slice(0, 8).map((c) => ({ etiqueta: c.nombre, valor: c.centavos })),
+          { formato: pesos })}
+
+        <div class="hist-envoltura" style="margin-top:12px">
+          <table class="tabla hist-tabla">
+            <tr>
+              <th>Cliente</th><th class="der">Se llevó</th>
+              <th class="der">Marquetas</th><th class="der">Veces</th>
+              <th>Última</th>
+            </tr>
+            ${lista.map((c) => `
+              <tr>
+                <td>${esc(c.nombre)}
+                    ${c.negocio ? `<small>${esc(c.negocio)}</small>` : ''}</td>
+                <td class="der"><strong>${pesos(c.centavos)}</strong></td>
+                <td class="der">${c.marquetas ? esc(c.marquetas.toFixed(2).replace(/\.00$/, '')) : '—'}</td>
+                <td class="der">${c.tickets}${c.fiados
+                  ? ` <small>(${c.fiados} fiado${c.fiados === 1 ? '' : 's'})</small>` : ''}</td>
+                <td>${esc(cuando(c.ultima))}</td>
+              </tr>`).join('')}
+          </table>
+        </div>
+      </div>`;
+  }
+
+  // ==========================================================
   // 6 · LA TENDENCIA
   // ==========================================================
 
   function laTendencia() {
     if (!meses?.length) return '';
     const conCosto = meses.filter((m) => m.costoPorMarqueta != null);
+    const conLuz = meses.filter((m) => m.luzCentavosPorKwh != null);
 
     return `
       <div class="tarjeta est-bloque evitar-corte salto-hoja">
@@ -449,6 +699,36 @@ export async function vistaEstadisticas(pantalla) {
             ? ' Los meses a los que les falta recibo de luz salen más baratos de lo que fueron.'
             : ''}
         </p>
+
+        ${conLuz.length >= 2 ? `
+          <!-- LAS DOS LÍNEAS DE LA LUZ, SEPARADAS (v4.6). Una sola línea de
+               "lo que se pagó de luz" sube igual si subió el precio que si
+               la máquina empezó a gastar de más, y son dos problemas
+               distintos con dos soluciones distintas. -->
+          <h4 class="est-subtitulo">A cómo salió el kilowatt</h4>
+          <div class="est-grafica">
+            ${linea(meses.map((m) => ({
+              etiqueta: m.corto, valor: m.luzCentavosPorKwh
+            })), { formato: pesos, color: 'var(--ambar)' })}
+          </div>
+          <p class="est-nota">
+            Si esta sube, <b>la luz está más cara</b> y no hay nada que
+            arreglar en la fábrica.
+          </p>
+
+          <h4 class="est-subtitulo">Kilowatts para hacer una marqueta</h4>
+          <div class="est-grafica">
+            ${linea(meses.map((m) => ({
+              etiqueta: m.corto, valor: m.luzKwhPorMarqueta
+            })), { formato: (n) => `${n} kWh`, color: 'var(--rojo)' })}
+          </div>
+          <p class="est-nota">
+            Si esta sube, es al revés: se está gastando <b>más luz para hacer
+            lo mismo</b>, y eso es una máquina que hay que revisar. Pueden
+            subir las dos a la vez, y por eso van en gráficas separadas.
+            ${meses.some((m) => m.luzKwh && !m.luzCompleto)
+              ? ' A los meses con recibos incompletos les falta consumo.' : ''}
+          </p>` : ''}
       </div>`;
   }
 
@@ -500,5 +780,12 @@ export async function vistaEstadisticas(pantalla) {
 
     const btn = pantalla.querySelector('#imprimir');
     if (btn) btn.onclick = sacarLaHoja;
+
+    pantalla.querySelectorAll('[data-subir]').forEach((b) => {
+      b.onclick = () => mover(b.dataset.subir, -1);
+    });
+    pantalla.querySelectorAll('[data-bajar]').forEach((b) => {
+      b.onclick = () => mover(b.dataset.bajar, +1);
+    });
   }
 }

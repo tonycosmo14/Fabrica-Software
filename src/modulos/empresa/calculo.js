@@ -391,7 +391,10 @@ function recibos({ limite = 24, incluirAnulados = false } = {}) {
  * que decir "va incompleto" en vez de presumir un total que va a subir.
  */
 function luzEnPeriodo({ desde = null, hasta = null } = {}) {
-  if (!desde || !hasta) return { centavos: 0, dias: 0, diasDelPeriodo: 0, completo: false, recibos: [] };
+  if (!desde || !hasta) {
+    return { centavos: 0, kwh: 0, centavosPorKwh: null, dias: 0,
+             diasDelPeriodo: 0, completo: false, recibos: [] };
+  }
 
   const diasDelPeriodo = diasEntre(desde, hasta);
 
@@ -403,6 +406,7 @@ function luzEnPeriodo({ desde = null, hasta = null } = {}) {
   `).all(desde, hasta);
 
   let centavos = 0;
+  let kwh = 0;
   let dias = 0;
   const partes = filas.map((r) => {
     const diasRecibo = diasEntre(r.desde, r.hasta);
@@ -410,8 +414,13 @@ function luzEnPeriodo({ desde = null, hasta = null } = {}) {
     const cruceHasta = r.hasta < hasta ? r.hasta : hasta;
     const diasCruce = diasEntre(cruceDesde, cruceHasta);
     const parte = Math.round((r.centavos / diasRecibo) * diasCruce);
+    // Los kilowatts se reparten igual que los pesos: por días. Hacen falta
+    // para poder separar "gastamos más luz" de "la luz subió de precio",
+    // que es la pregunta de verdad (v4.6).
+    const parteKwh = Math.round(((r.kwh || 0) / diasRecibo) * diasCruce);
 
     centavos += parte;
+    kwh += parteKwh;
     dias += diasCruce;
 
     return {
@@ -420,10 +429,12 @@ function luzEnPeriodo({ desde = null, hasta = null } = {}) {
       hasta: r.hasta,
       numero: r.numero,
       centavosDelRecibo: r.centavos,
+      kwhDelRecibo: r.kwh || 0,
       diasDelRecibo: diasRecibo,
       // Lo que de ese recibo le toca a este periodo.
       dias: diasCruce,
       centavos: parte,
+      kwh: parteKwh,
       // Un recibo que cae entero dentro del periodo no está repartido: es
       // el número exacto del papel, y se puede decir sin advertencias.
       entero: diasCruce === diasRecibo
@@ -432,6 +443,11 @@ function luzEnPeriodo({ desde = null, hasta = null } = {}) {
 
   return {
     centavos,
+    kwh,
+    // EL PRECIO DE LA LUZ, en centavos por kilowatt. Es el número que
+    // separa "consumimos más" de "está más cara": si sube este, no es la
+    // fábrica, es la CFE.
+    centavosPorKwh: kwh > 0 ? Math.round(centavos / kwh) : null,
     dias,
     diasDelPeriodo,
     // Los recibos no se enciman (el índice único lo impide para periodos

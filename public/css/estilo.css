@@ -3710,6 +3710,67 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
   border-top: 1px solid var(--borde); padding-top: 10px;
 }
 
+/* ============================================================
+   LA HOJA, EN DOS COLUMNAS Y ORDENABLE  (v4.6)
+   "Que pueda subir o bajar las gráficas o datos que quiera ver primero, y
+   usa dos columnas con lo que se pueda."
+   Los apartados marcados `ancho` —el resumen, el día por día, la
+   tendencia— ocupan los dos huecos: sus gráficas necesitan el ancho o las
+   barras salen del tamaño de una uña.
+   ============================================================ */
+.hoja-rejilla { display: grid; grid-template-columns: 1fr; gap: 0 16px; align-items: start; }
+.hoja-apartado { position: relative; min-width: 0; }
+
+@media (min-width: 1100px) {
+  .hoja-rejilla { grid-template-columns: 1fr 1fr; }
+  .hoja-apartado.ancho { grid-column: 1 / -1; }
+}
+
+/* Las flechas de mover, en la esquina de cada apartado. Aparecen al pasar
+   por encima en la PC, y en una pantalla táctil están siempre: ahí no hay
+   "pasar por encima". */
+.hoja-mover {
+  position: absolute; top: 26px; right: 10px; z-index: 2;
+  display: flex; gap: 4px; opacity: 0; transition: opacity .12s;
+}
+.hoja-apartado:hover .hoja-mover,
+.hoja-mover:focus-within { opacity: 1; }
+@media (hover: none) {
+  .hoja-mover { opacity: 1; }
+}
+/* `.tachita` nace ABSOLUTA —es la ✕ que se pone encima de una foto—, así
+   que sin esto las dos flechas caen una encima de la otra y solo se puede
+   tocar la de abajo. Aquí van en fila, dentro de su barra. */
+.hoja-mover .tachita {
+  position: static; width: 32px; min-width: 32px; height: 32px;
+  /* `.tachita` es roja con letra blanca; en `papel` el fondo se vuelve
+     transparente y la flecha se quedaba blanca sobre blanco. */
+  background: var(--superficie); color: var(--texto);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .12); font-size: 15px;
+}
+.hoja-mover .tachita:hover:not([disabled]) {
+  background: var(--superficie-alt); border-color: var(--primario); color: var(--primario);
+}
+.hoja-mover button[disabled] { opacity: .3; cursor: default; }
+
+/* Los renglones de la luz: el nombre con su explicación debajo, el número
+   grande, y el cambio contra el mes pasado a la derecha. */
+.est-luz th { font-weight: 600; }
+.est-luz th small { display: block; font-weight: 400; color: var(--suave); font-size: 12px; }
+.est-luz tr.fuerte th, .est-luz tr.fuerte td { background: var(--superficie-alt); }
+.est-luz td strong { font-size: 16px; font-variant-numeric: tabular-nums; }
+/* El cambio contra el mes pasado. Verde y rojo, pero cada renglón decide
+   cuál es cuál: más kilowatts por marqueta es MALO aunque el recibo baje. */
+.est-dif { font-size: 12.5px; color: var(--suave); white-space: nowrap; }
+/* En un teléfono "+7% contra Agosto 2026" no cabe sin empujar la tabla
+   fuera de la pantalla: ahí se parte en dos renglones y ya. */
+@media (max-width: 760px) {
+  .est-luz .est-dif { white-space: normal; }
+  .est-luz th { width: 45%; }
+}
+.est-dif.bueno { color: var(--verde); font-weight: 700; }
+.est-dif.malo  { color: var(--rojo);  font-weight: 700; }
+
 .est-bloque { max-width: none; margin-top: 16px; }
 .est-bloque h3 { margin-top: 0; }
 .est-subtitulo {
