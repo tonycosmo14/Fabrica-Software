@@ -106,6 +106,9 @@ export async function vistaVenta(pantalla, estadoApp) {
    * que hay sino lo que se ha reportado. Avisa, nunca bloquea.
    */
   let alertas = ctx.avisos || { productos: [], bajos: 0, agotados: 0, existencias: {}, hielo: null };
+  // Cómo le dice esta fábrica al hielo guardado. Lo manda el servidor: "le
+  // decimos encomendados, podemos cambiarles de nombre".
+  let nombreEncomienda = 'Encomendado';
 
   // ---- Lo que lleva el cliente ----
   let hielo = 0;                 // dieciseisavos, TODO en una sola línea
@@ -194,6 +197,10 @@ export async function vistaVenta(pantalla, estadoApp) {
 
   pintarTodo();
   enfocar();
+  // Cuántos clientes tienen hielo guardado, desde el primer momento: si el
+  // contador solo apareciera después de la primera venta, la muchacha que
+  // abre a las siete no vería que hay dos papelitos esperando.
+  pintarMarcaEncomiendas();
 
   // ==========================================================
   // EL ARMAZÓN: izquierda el ticket, derecha los botones
@@ -219,6 +226,13 @@ export async function vistaVenta(pantalla, estadoApp) {
           <div class="pos-avisos" id="pos-avisos"></div>
 
           <div class="pos-rapidos">
+            <!-- EL HIELO GUARDADO  (v4.5). Con su contador encima: es el
+                 recordatorio de que hay hielo del cuarto que ya es de
+                 alguien, y de que alguien va a venir por él. -->
+            <button class="pos-chico pos-chico-contador" id="encomiendas"
+                    title="Hielo pagado que se guarda para el cliente">
+              🧊<span class="pos-contador" id="marca-encomiendas" hidden></span>
+            </button>
             ${puedeContarHielo ? `
               <button class="pos-chico" id="ir-existencia"
                       title="Existencia del cuarto frío">📋</button>` : ''}
@@ -851,6 +865,141 @@ export async function vistaVenta(pantalla, estadoApp) {
     });
   }
 
+  // ==========================================================
+  // EL HIELO ENCOMENDADO  (v4.5)
+  //
+  // "A veces algún cliente nos regresa un poco de hielo, pero no es que lo
+  //  devuelva: quiere que se lo guardemos para que pase por él más tarde.
+  //  Ese hielo ya está pagado, solo se guarda en el cuarto frío."
+  //
+  // Un botón para las dos cosas que pasan con él: guardarle a alguien, y
+  // entregárselo cuando vuelve. Y el papelito, que es lo que se pidió.
+  // ==========================================================
+  async function verEncomiendas() {
+    let datos;
+    try {
+      datos = await api.obtener('/encomiendas');
+    } catch (e) { return avisar(e.message, 'error'); }
+
+    nombreEncomienda = datos.nombre || nombreEncomienda;
+    const pendientes = datos.encomiendas || [];
+
+    const que = await menu({
+      titulo: nombreEncomienda,
+      texto: pendientes.length
+        ? `Guardado ahora: ${aTexto(datos.dieciseisavos)} de hielo, en ` +
+          `${pendientes.length} ${pendientes.length === 1 ? 'papelito' : 'papelitos'}.`
+        : 'Hielo ya pagado que se queda guardado en el cuarto frío.',
+      opciones: [
+        { valor: '__guardar', texto: '＋ Guardarle hielo a un cliente',
+          detalle: 'Ya está pagado: esto no cobra nada' },
+        ...pendientes.map((e) => ({
+          valor: e.id,
+          texto: `${aTexto(e.dieciseisavos)} · ${e.cliente_nombre}`,
+          detalle: `Desde ${formatoFecha(e.fecha)}`
+        }))
+      ]
+    });
+    if (!que) return;
+    if (que === '__guardar') return guardarEncomienda();
+
+    await entregarEncomienda(pendientes.find((e) => e.id === que));
+  }
+
+  /** Guardarle hielo a alguien. De quién y cuánto: sin eso no sirve. */
+  async function guardarEncomienda() {
+    // El cliente, de la misma lista de siempre. Y con la opción de
+    // escribir un nombre a mano: al que pasa una vez al año no hay por qué
+    // darlo de alta para guardarle media marqueta.
+    let clienteId = null;
+    let clienteNombre = '';
+
+    const lista = (ctx.clientes || []).slice(0, 60);
+    const elegido = lista.length
+      ? await menu({
+          titulo: `${nombreEncomienda}: ¿de quién es?`,
+          opciones: [
+            ...lista.map((c) => ({ valor: c.id, texto: c.nombre, detalle: c.negocio || '' })),
+            { valor: '__otro', texto: '✎ Otro — escribir el nombre',
+              detalle: 'Para el que no está dado de alta' }
+          ]
+        })
+      : '__otro';
+    if (!elegido) return;
+
+    if (elegido === '__otro') {
+      clienteNombre = await pedirTexto({
+        titulo: `${nombreEncomienda}: ¿de quién es?`,
+        texto: 'El nombre con el que va a volver a preguntar por su hielo.',
+        marcador: 'Doña Mari de la esquina', ok: 'Siguiente', largo: 60
+      });
+      if (!clienteNombre) return;
+    } else {
+      clienteId = elegido;
+      clienteNombre = lista.find((c) => c.id === elegido)?.nombre || '';
+    }
+
+    const cuanto = await pedirCantidad({
+      titulo: clienteNombre,
+      texto: '¿Cuánto hielo se le guarda?'
+    });
+    if (!cuanto) return;
+
+    let creada;
+    try {
+      creada = await api.enviar('/encomiendas', {
+        dieciseisavos: cuanto, clienteId, clienteNombre
+      });
+    } catch (e) { return avisar(e.message, 'error'); }
+
+    await imprimirEncomienda(creada.encomienda.id);
+    refrescarAvisos();
+    enfocar();
+  }
+
+  /** Ya pasó por su hielo. Tampoco cobra nada: se pagó el día que se vendió. */
+  async function entregarEncomienda(e) {
+    if (!e) return;
+    const seguro = await confirmar({
+      titulo: `¿${e.cliente_nombre} ya se lo llevó?`,
+      texto: `${aTexto(e.dieciseisavos)} guardados desde ${formatoFecha(e.fecha)}. ` +
+             'No hay nada que cobrar: ese hielo ya se pagó.',
+      ok: 'Sí, ya se lo llevó'
+    });
+    if (!seguro) return;
+
+    try {
+      await api.enviar(`/encomiendas/${e.id}/entregar`, {});
+      avisar(`Entregado a ${e.cliente_nombre}`, 'bien');
+    } catch (err) { return avisar(err.message, 'error'); }
+
+    refrescarAvisos();
+    enfocar();
+  }
+
+  /**
+   * EL PAPELITO. Es lo que el cliente se lleva y con lo que vuelve, así
+   * que si la impresora no contesta lo saca el navegador: sin papel, el
+   * encomendado se queda en la memoria de quien lo anotó.
+   */
+  async function imprimirEncomienda(id) {
+    try {
+      const r = await api.enviar(`/impresion/encomienda/${id}`, {});
+      if (r.impreso) return avisar('Listo. Ahí está su papelito.', 'bien');
+    } catch {
+      return avisar('Se guardó, pero no se pudo imprimir el papelito.', 'aviso');
+    }
+    try {
+      const { renglones, ancho } = await api.obtener(`/impresion/encomienda/${id}/previa`);
+      const que = await verTicket({
+        titulo: nombreEncomienda, renglones, ancho,
+        notas: ['No hay impresora térmica configurada.'],
+        acciones: [{ valor: 'imprimir', texto: '🖨️ Imprimir' }]
+      });
+      if (que === 'imprimir') imprimirTicket(htmlDeEspejo(renglones, ancho));
+    } catch { avisar('Se guardó, pero no hay impresora.', 'aviso'); }
+  }
+
   /** Después de cada venta cambia lo que queda. Si falla, no pasa nada. */
   async function refrescarAvisos() {
     try {
@@ -867,6 +1016,32 @@ export async function vistaVenta(pantalla, estadoApp) {
         pintarPista();
       }
     } catch { /* el cajero no siempre puede ver inventario; sin aviso y ya */ }
+
+    pintarMarcaEncomiendas();
+  }
+
+  /**
+   * CUÁNTO HIELO DEL CUARTO YA ES DE ALGUIEN  (v4.5)
+   *
+   * El numerito encima del botón. Sin él, un encomendado se anota y se
+   * olvida hasta que el cliente reclama — y para entonces nadie se acuerda
+   * de dónde quedó el papelito.
+   */
+  async function pintarMarcaEncomiendas() {
+    const marca2 = pantalla.querySelector('#marca-encomiendas');
+    if (!marca2) return;
+    try {
+      const r = await api.obtener('/encomiendas');
+      nombreEncomienda = r.nombre || nombreEncomienda;
+      marca2.textContent = r.pendientes > 9 ? '9+' : String(r.pendientes || '');
+      marca2.hidden = !r.pendientes;
+      const boton = pantalla.querySelector('#encomiendas');
+      if (boton) {
+        boton.title = r.pendientes
+          ? `${r.pendientes} ${r.pendientes === 1 ? 'cliente tiene' : 'clientes tienen'} hielo guardado`
+          : `Hielo pagado que se guarda para el cliente (${nombreEncomienda.toLowerCase()})`;
+      }
+    } catch { marca2.hidden = true; }
   }
 
   function pintarLineas() {
@@ -2434,6 +2609,7 @@ export async function vistaVenta(pantalla, estadoApp) {
   // ==========================================================
   if (puedeOperarCaja) {
     pantalla.querySelector('#meter').onclick = () => movimiento('entrada');
+    pantalla.querySelector('#encomiendas').onclick = () => verEncomiendas();
     pantalla.querySelector('#gasto').onclick = () => movimiento('salida');
     pantalla.querySelector('#vale').onclick = async () => {
       await hacerVale();

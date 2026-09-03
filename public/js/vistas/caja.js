@@ -1243,6 +1243,13 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
           <div class="cuadre-linea suma"><span>+ Se produjo</span><strong>${frac(q.producido)}</strong></div>
           <div class="cuadre-linea total"><span>= Tenía que haber</span><strong>${frac(q.teorico)}</strong></div>
           <div class="cuadre-linea vendido"><span>− Se vendió</span><strong>${frac(q.vendido)}</strong></div>
+          <!-- Lo encomendado: vendido pero todavía en el cuarto (suma), y
+               recogido ahora de una venta vieja (resta). Sin esto, cada
+               encomienda salía como "SOBRA" hasta que el cliente pasaba. -->
+          ${q.guardado ? `
+            <div class="cuadre-linea suma"><span>+ Se quedó guardado</span><strong>${frac(q.guardado)}</strong></div>` : ''}
+          ${q.recogido ? `
+            <div class="cuadre-linea vendido"><span>− Pasaron por lo guardado</span><strong>${frac(q.recogido)}</strong></div>` : ''}
           ${q.merma ? `
             <div class="cuadre-linea vendido"><span>− Derretido o roto</span><strong>${frac(q.merma)}</strong></div>` : ''}
           ${q.cortado ? `

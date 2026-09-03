@@ -134,7 +134,11 @@ function cuadreDeHielo(cajaId) {
 
   // Lo que TENÍA que haber, y lo que faltó. Todo de la fila congelada.
   const teorico = conteo.existencia_anterior + conteo.producido;
-  const esperado = teorico - conteo.vendido - conteo.merma - conteo.cortado;
+  // Lo encomendado va en las dos direcciones: lo que se vendió pero se
+  // quedó guardado SUMA (sigue en el cuarto), y lo que un cliente vino a
+  // recoger de una venta vieja RESTA (salió, pero se vendió antes).
+  const esperado = teorico - conteo.vendido - conteo.merma - conteo.cortado
+                   + (conteo.guardado || 0) - (conteo.recogido || 0);
   // El faltante es lo que NADIE explicó: ni la caja, ni lo derretido, ni
   // lo que se cortó. Ese es el número que hay que vigilar.
   const faltante = esperado - conteo.contado;
@@ -157,6 +161,8 @@ function cuadreDeHielo(cajaId) {
       vendido: conteo.vendido,
       merma: conteo.merma,
       cortado: conteo.cortado,
+      guardado: conteo.guardado || 0,
+      recogido: conteo.recogido || 0,
       esperado,
       contado: conteo.contado,
       faltante

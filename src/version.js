@@ -17,9 +17,27 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '4.4';
+const VERSION_ACTUAL = '4.5';
 
 const VERSIONES = [
+  {
+    numero: '4.5',
+    nombre: 'Lo encomendado',
+    fecha: '2026-09-03',
+    resumen:
+      'El hielo que un cliente ya pagó y deja guardado en el cuarto frío ' +
+      'para pasar por él después. Su papelito, con el nombre y la hora — y ' +
+      'el cuadre del cuarto frío arreglado, que era lo que faltaba debajo.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'EL PAPELITO DE LO ENCOMENDADO, que es lo que pediste. Con el botón 🧊 de la pantalla de vender: se elige de quién es el hielo —o se escribe el nombre, si no está dado de alta— y cuánto, y sale su papel con la fecha, la hora y su nombre en grande. Con ese papel vuelve el cliente. El mismo botón sirve para entregárselo: se toca su renglón y listo.' },
+      { tipo: 'importante', texto: 'Y LO QUE HACÍA FALTA DEBAJO: ESE HIELO SIGUE EN EL CUARTO FRÍO. Como la venta ya lo restó, sin arreglarlo habría salido como «SOBRA» en cada conteo hasta que el cliente pasara por él — y «sobra» es justo la palabra que avisa de un paño sin capturar. Ahora el cuadre lo SUMA mientras esté guardado y lo RESTA el día que se lo llevan. Guardarlo y entregarlo el mismo día se cancela solo, que es lo correcto.' },
+      { tipo: 'nuevo', texto: 'EL NUMERITO NARANJA encima del botón dice cuántos papelitos hay esperando. Sin él, un encomendado se anota y se olvida hasta que alguien reclama, y para entonces nadie se acuerda de dónde quedó el papel.' },
+      { tipo: 'nuevo', texto: 'En El cuarto frío sale la lista de QUIÉN TIENE QUÉ y desde cuándo, y el cuadre de esa pantalla ya lleva sus dos renglones nuevos.' },
+      { tipo: 'mejora', texto: 'CÓMO SE LE LLAMA SE PUEDE CAMBIAR —encomendado, apartado, guardado— en El cuarto frío › Cuartos fríos y horarios. Esa es la palabra que sale impresa en el papelito, así que conviene que sea la que se usa ahí.' },
+      { tipo: 'mejora', texto: 'El papelito dice YA ESTÁ PAGADO y lleva su raya para firmar al recogerlo. Sin esa línea el papel se parece a un ticket y alguien podría cobrarlo otra vez.' },
+      { tipo: 'arreglo', texto: 'El nombre de la fábrica se iba disparado a la esquina de la pantalla en la caja de vender: el contador nuevo se llamaba igual que él por dentro. Ya no.' }
+    ]
+  },
   {
     numero: '4.4',
     nombre: 'El corte en dos columnas',

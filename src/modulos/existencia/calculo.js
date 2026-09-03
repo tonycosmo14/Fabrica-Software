@@ -179,6 +179,53 @@ function cortadoDesde(desde, almacenId) {
   return fila.n;
 }
 
+/**
+ * EL HIELO ENCOMENDADO, en las dos direcciones  (v4.5)
+ *
+ * Una encomienda es hielo YA VENDIDO que no salió del cuarto frío: el
+ * cliente lo pagó y pidió que se lo guardaran. Como la venta ya lo restó,
+ * hay que volver a sumarlo mientras siga ahí, o al contar aparecería como
+ * "SOBRA" todos los días hasta que el cliente pasara por él.
+ *
+ * Son dos flujos, no un saldo:
+ *
+ *   · `guardadoDesde`  — lo que se encomendó en esta ventana: se vendió,
+ *     pero NO salió. Suma.
+ *   · `recogidoDesde`  — lo que se llevaron en esta ventana de encomiendas
+ *     de antes: salió, pero se vendió en otra ventana. Resta.
+ *
+ * Guardar y recoger el mismo día se cancelan solos, que es lo correcto.
+ */
+function guardadoDesde(desde, almacenId) {
+  return bd.prepare(`
+    SELECT COALESCE(SUM(dieciseisavos), 0) n
+      FROM encomiendas
+     WHERE fecha > ? AND almacen_id = ? AND anulado_en IS NULL
+  `).get(desde || '', almacenId).n;
+}
+
+function recogidoDesde(desde, almacenId) {
+  return bd.prepare(`
+    SELECT COALESCE(SUM(dieciseisavos), 0) n
+      FROM encomiendas
+     WHERE entregado_en > ? AND almacen_id = ? AND anulado_en IS NULL
+  `).get(desde || '', almacenId).n;
+}
+
+/**
+ * CUÁNTO HIELO DEL CUARTO ES DE ALGUIEN MÁS, ahora mismo.
+ *
+ * No entra en el cuadre —ese va por flujos— pero sí hace falta decirlo: de
+ * las 40 marquetas que hay, 3 ya están pagadas y esperando a su dueño.
+ */
+function encomendadoPendiente(almacenId) {
+  return bd.prepare(`
+    SELECT COALESCE(SUM(dieciseisavos), 0) AS dieciseisavos, COUNT(*) AS cuantas
+      FROM encomiendas
+     WHERE almacen_id = ? AND entregado_en IS NULL AND anulado_en IS NULL
+  `).get(almacenId);
+}
+
 /** Los cortes con su detalle, para enseñarlos y poder anular uno. */
 function cortesDesde(desde, almacenId, limite = 50) {
   return bd.prepare(`
@@ -223,6 +270,10 @@ function estadoAlmacen(almacen) {
   // Y lo que se cortó para volverlo hielo gourmet: salió del cuarto frío,
   // pero no se perdió ni se fue sin pagar. Se vendió en otra forma.
   const cortado = cortadoDesde(desde, almacen.id);
+  // Y el hielo encomendado: vendido pero todavía en el cuarto (suma), o
+  // recogido ahora de una venta vieja (resta). Ver `guardadoDesde`.
+  const guardado = guardadoDesde(desde, almacen.id);
+  const recogido = recogidoDesde(desde, almacen.id);
   const teorico = anterior + producido;
 
   return {
@@ -236,11 +287,15 @@ function estadoAlmacen(almacen) {
     vendidoMayoreo: ventas.mayoreo,
     merma,
     cortado,
+    guardado,
+    recogido,
+    // Cuánto del cuarto es de un cliente que todavía no pasa por él.
+    encomendado: encomendadoPendiente(almacen.id),
     // Lo que debería haber si nada hubiera salido.
     teorico,
     // Lo que debería haber ahora ya descontando todo lo que se explicó:
     // este es el número contra el que se compara el conteo físico.
-    esperado: teorico - vendido - merma - cortado
+    esperado: teorico - vendido - merma - cortado + guardado - recogido
   };
 }
 
@@ -285,6 +340,8 @@ function aMarquetas(dieciseisavos) {
 
 module.exports = {
   ultimoConteo, producidoDesde, producidoEntreDias, producidoPorRangos, vendidoDesde, partidoPorLista,
-  mermaDesde, mermasDesde, cortadoDesde, cortesDesde, estadoAlmacen, hieloQueQueda,
+  mermaDesde, mermasDesde, cortadoDesde, cortesDesde,
+  guardadoDesde, recogidoDesde, encomendadoPendiente,
+  estadoAlmacen, hieloQueQueda,
   deMarquetas, aMarquetas, DIECISEISAVOS_POR_MARQUETA
 };

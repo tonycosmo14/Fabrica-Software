@@ -135,6 +135,8 @@ router.get('/', verExistencia, (req, res) => {
         vendidoMayoreo: aTexto(estado.vendidoMayoreo),
         merma: aTexto(estado.merma),
         cortado: aTexto(estado.cortado),
+        guardado: aTexto(estado.guardado),
+        recogido: aTexto(estado.recogido),
         esperado: aTexto(estado.esperado)
       }
     };
@@ -395,8 +397,9 @@ router.post('/conteos', contar, (req, res) => {
   const estado = estadoAlmacen(almacen);
   const salidas = estado.teorico - contado;
   // El faltante es lo que NADIE explicó: ni la caja, ni lo que se derritió,
-  // ni lo que se cortó para gourmet. Ese es el número que hay que vigilar.
-  const faltante = salidas - estado.vendido - estado.merma - estado.cortado;
+  // ni lo que se cortó para gourmet, ni lo encomendado que sigue ahí. Ese
+  // es el número que hay que vigilar.
+  const faltante = estado.esperado - contado;
 
   const ejecutorId = req.body?.ejecutorId || req.usuario.id;
   const id = nuevoId();
@@ -405,11 +408,11 @@ router.post('/conteos', contar, (req, res) => {
   bd.prepare(`
     INSERT INTO conteos (id, almacen_id, fecha, ejecutor_id, capturista_id, contado,
                          existencia_anterior, producido, vendido, merma, cortado,
-                         salidas, desde, notas, caja_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                         guardado, recogido, salidas, desde, notas, caja_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(id, almacen.id, fecha, ejecutorId, req.usuario.id, contado,
          estado.existenciaAnterior, estado.producido, estado.vendido,
-         estado.merma, estado.cortado, salidas,
+         estado.merma, estado.cortado, estado.guardado, estado.recogido, salidas,
          estado.desde, req.body?.notas || null, cajaDe(req.body?.cajaId));
 
   bitacora.registrar({
@@ -423,6 +426,8 @@ router.post('/conteos', contar, (req, res) => {
       vendido: aTexto(estado.vendido),
       merma: aTexto(estado.merma),
       cortado: aTexto(estado.cortado),
+      guardado: aTexto(estado.guardado),
+      recogido: aTexto(estado.recogido),
       salidas: aTexto(salidas),
       faltante: aTexto(faltante)
     }
@@ -437,6 +442,8 @@ router.post('/conteos', contar, (req, res) => {
       vendido: estado.vendido,
       merma: estado.merma,
       cortado: estado.cortado,
+      guardado: estado.guardado,
+      recogido: estado.recogido,
       esperado: estado.esperado,
       contado,
       salidas,
@@ -576,6 +583,33 @@ router.put('/horarios', configurar, (req, res) => {
   });
 
   return ok(res, { horarios: limpios });
+});
+
+/**
+ * CÓMO SE LE LLAMA AL HIELO GUARDADO  (v4.5)
+ *
+ * "Le decimos encomendados, podemos cambiarles de nombre." Cada fábrica le
+ * dice de una manera, y la palabra sale impresa en el papelito que se le
+ * da al cliente. Que se pueda cambiar cuesta este renglón y evita que el
+ * papel diga algo que ahí nadie dice.
+ */
+router.put('/nombre-encomienda', configurar, (req, res) => {
+  const nombre = String(req.body?.nombre || '').trim().slice(0, 20);
+  if (!nombre) return error(res, 'Escribe cómo le dicen.');
+
+  bd.prepare(`
+    INSERT INTO configuracion (clave, valor, actualizado_en, actualizado_por)
+    VALUES ('nombre_encomienda', ?, ?, ?)
+    ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor,
+      actualizado_en = excluded.actualizado_en, actualizado_por = excluded.actualizado_por
+  `).run(nombre, ahora(), req.usuario.id);
+
+  bitacora.registrar({
+    accion: 'existencia.nombre-encomienda', entidad: 'configuracion',
+    ejecutorId: req.usuario.id, detalle: { nombre }
+  });
+
+  return ok(res, { nombre });
 });
 
 module.exports = router;

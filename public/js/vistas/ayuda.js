@@ -264,7 +264,7 @@ const TEMAS = [
   {
     id: 'existencia',
     titulo: 'El cuarto frío: cuánto hielo hay',
-    busca: 'existencia conteo cuarto frío contar marquetas fracción 5/8 cuadre faltante vendido salidas almacén horarios hielo cortado gourmet bolsas turnos nocturno merma derretida rota regalada',
+    busca: 'existencia conteo cuarto frío contar marquetas fracción 5/8 cuadre faltante vendido salidas almacén horarios hielo cortado gourmet bolsas turnos nocturno merma derretida rota regalada encomendado encomienda apartado guardado cliente papelito sobra',
     cuerpo: `
       <p class="ayuda-tip"><b>Contar el cuarto frío ya no se hace aquí.</b>
       Desde la v4.1 se cuenta <b>al terminar el turno</b>, en la caja, junto
@@ -279,6 +279,17 @@ const TEMAS = [
       <b>trabajador nocturno</b> que saca hielo a media noche o a las 3 de la
       mañana. Ese no vende: solo saca, y lo suyo se anota igual que lo demás,
       a su nombre.</p>
+
+      <h4>El hielo que ya es de un cliente (encomendado)</h4>
+      <p>Hielo que se vendió y se pagó, pero que el cliente pidió que se le
+      guardara. <b>Sigue en el cuarto frío</b> y se cuenta con todo lo demás,
+      así que el cuadre lo <b>suma</b> mientras esté guardado y lo
+      <b>resta</b> el día que se lo llevan. Sin eso saldría «SOBRA» en cada
+      conteo hasta que el cliente pasara por él.</p>
+      <p>Aquí se ve la lista de quién tiene qué. Se guarda y se entrega
+      desde <b>Vender</b>, con el botón <b>🧊</b>. Y en
+      <b>Cuartos fríos y horarios</b> se cambia cómo se le llama, que es la
+      palabra que sale impresa en el papelito del cliente.</p>
 
       <h4>Anotar lo que se derritió o se rompió</h4>
       <p>Con <b>💧 Anotar hielo derretido o roto</b>. Se escribe cuánto y qué
@@ -336,7 +347,7 @@ debería quedar − contado = FALTA</pre>
   {
     id: 'venta',
     titulo: 'Punto de venta: cobrar',
-    busca: 'venta cobrar ticket precio fracción cambio devolución billete folio cancelar imprimir teclado enter f10 f2 f3 f4 código rápido categorías nueva venta espera pendiente aviso bolita se acabó agotado poco hielo inventario bajo atajos gastos historial reloj cotización cotizar precio papel sujetos a cambio temperatura clima grados afuera termómetro',
+    busca: 'venta cobrar ticket precio fracción cambio devolución billete folio cancelar imprimir teclado enter f10 f2 f3 f4 código rápido categorías nueva venta espera pendiente aviso bolita se acabó agotado poco hielo inventario bajo atajos gastos historial reloj cotización cotizar precio papel sujetos a cambio temperatura clima grados afuera termómetro encomendado encomendar apartado guardado papelito guardar hielo cliente pasa por él vale',
     cuerpo: `
       <p>Es la pantalla que se abre al entrar, porque es la que se usa casi
       todo el día. A la izquierda lo que lleva el cliente, a la derecha los
@@ -548,6 +559,30 @@ debería quedar − contado = FALTA</pre>
       <h4>Buscar un ticket viejo</h4>
       <p>Con el botón <b>Buscar tickets</b>: por número, por el importe o por
       la hora. Los últimos 30 salen solos.</p>
+
+      <h4>El hielo que se queda guardado (encomendado)</h4>
+      <p>A veces el cliente paga su hielo y pide que se le guarde para
+      pasar por él más tarde o al otro día. Con el botón <b>🧊</b> de arriba
+      a la derecha: se elige de quién es —o se escribe el nombre, si no está
+      dado de alta— y cuánto, y <b>sale su papelito</b> con la fecha, la
+      hora y su nombre en grande. Con ese papel vuelve.</p>
+      <p>El mismo botón sirve para entregarlo: se toca el renglón del
+      cliente y se confirma. <b>No cobra nada</b> ninguna de las dos veces —
+      ese hielo se pagó el día que se vendió.</p>
+      <p>El numerito naranja encima del botón dice cuántos papelitos hay
+      esperando. Sin él, un encomendado se anota y se olvida hasta que
+      alguien reclama.</p>
+
+      <p class="ayuda-tip">Y lo importante que no se ve: <b>ese hielo sigue
+      en el cuarto frío</b>. Como la venta ya lo restó, sin esto aparecería
+      como <b>«SOBRA»</b> en cada conteo hasta que el cliente pasara por él —
+      y «sobra» es justo la palabra que avisa de un paño sin capturar. Ahora
+      el cuadre lo suma mientras esté guardado y lo resta el día que se lo
+      llevan. Se ve en <b>El cuarto frío</b>, con la lista de quién tiene
+      qué.</p>
+      <p>Cómo se le llama —encomendado, apartado, guardado— se cambia en
+      <b>El cuarto frío › Cuartos fríos y horarios</b>, y esa es la palabra
+      que sale impresa en el papelito.</p>
 
       <h4>Solo cotización</h4>
       <p>A veces solo piden el precio en papel: "¿a cómo me saldrían

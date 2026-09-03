@@ -440,6 +440,62 @@ function ticketVale(vale, { negocio = '', copia = false } = {}) {
 }
 
 /**
+ * EL PAPELITO DE LO ENCOMENDADO  (v4.5)
+ *
+ * "Normalmente le hago un papelito que dice el nombre del cliente, la
+ *  fecha y la hora, y le pongo encomendado."
+ *
+ * Eso, tal cual, pero escrito por la máquina. Lo importante va grande —
+ * CUÁNTO y DE QUIÉN— porque es lo que hay que leer al buscarlo entre los
+ * papelitos de una semana, y lleva la palabra que use esta fábrica.
+ *
+ * NO ES UN TICKET DE VENTA y lo dice: el hielo ya se pagó, y un papel que
+ * pareciera un ticket podría acabar cobrándose dos veces.
+ */
+function ticketEncomienda(e, { negocio = '', nombre = 'Encomendado', copia = false } = {}) {
+  const cfg = configuracion();
+  const t = new Ticket(cfg.anchoMm, cfg.codigoPagina);
+
+  if (copia) marcaCopia(t);
+
+  encabezado(t, {
+    titulo: String(nombre).toUpperCase().slice(0, 20),
+    atendio: e.capturista_nombre,
+    fecha: fechaTicket(e.fecha)
+  });
+  t.separador();
+
+  // CUÁNTO, en grande. Es lo que se comprueba de un vistazo cuando el
+  // cliente vuelve con el papel en la mano.
+  t.izquierda().negrita().tamano(3, 2).linea(aTexto(e.dieciseisavos)).normal();
+  const partes = desglose(e.dieciseisavos);
+  if (partes !== aTexto(e.dieciseisavos)) t.linea(`(${partes})`);
+
+  t.saltos(1).linea('De:');
+  t.negrita().tamano(2, 1).parrafo(String(e.cliente_nombre || '?').slice(0, 40));
+  t.normal();
+  if (e.cliente_negocio) t.parrafo(e.cliente_negocio);
+  if (e.notas) t.parrafo(e.notas);
+
+  t.separador();
+  // Que quede escrito que no hay nada que cobrar: el papel se parece a un
+  // ticket y sin esta línea alguien podría cobrarlo otra vez.
+  t.centro().linea('YA ESTA PAGADO').linea('Se guarda en el cuarto frio').izquierda();
+
+  if (e.entregado_en) {
+    t.separador();
+    t.centro().negrita().tamano(2, 1).linea('ENTREGADO').normal();
+    t.linea(fechaTicket(e.entregado_en)).izquierda();
+  } else {
+    t.firma('ENTREGADO A');
+  }
+
+  pie(t, negocio);
+  t.izquierda().cortar(cfg.avanceCorte);
+  return t.bytes();
+}
+
+/**
  * LOS NÚMEROS A SACAR, para el obrero.
  *
  * Este papel se lo lleva en la mano al cuarto de tanques, y vuelve escrito
@@ -833,6 +889,8 @@ function ticketHielo(corte, { negocio = '' } = {}) {
     ['Se produjo', '+' + aTexto(q.producido)],
     ['TENIA QUE HABER', aTexto(q.teorico)],
     ['Se vendio', '-' + aTexto(q.vendido)],
+    q.guardado ? ['Se quedo guardado', '+' + aTexto(q.guardado)] : null,
+    q.recogido ? ['Pasaron por lo guardado', '-' + aTexto(q.recogido)] : null,
     q.merma ? ['Derretido o roto', '-' + aTexto(q.merma)] : null,
     q.cortado ? ['Se corto', '-' + aTexto(q.cortado)] : null,
     ['DEBERIA QUEDAR', aTexto(q.esperado)],
@@ -1033,6 +1091,6 @@ function pulsoCajon(salida = 2) {
 }
 
 module.exports = {
-  ticketVenta, ticketMovimiento, ticketVale, ticketCotizacion, ticketPrueba,
+  ticketVenta, ticketMovimiento, ticketVale, ticketEncomienda, ticketCotizacion, ticketPrueba,
   ticketCorte, ticketCorteMovimientos, ticketHielo, ticketCortePersona, ticketConteo, ticketProduccion, ticketResumenDia, pulsoCajon, fechaCorta, fechaTicket
 };

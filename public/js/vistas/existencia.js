@@ -18,7 +18,7 @@
  * "quedan 14 marquetas y 5/8".
  */
 import { api } from '../api.js';
-import { esc, avisar, fecha as formatoFecha } from '../util.js';
+import { esc, avisar, fecha as formatoFecha, fechaCorta } from '../util.js';
 import { pedirTexto, pedirCantidad, pedirNumero, menu } from '../dialogo.js';
 import { aTexto } from '../fracciones.js';
 
@@ -39,6 +39,10 @@ export async function vistaExistencia(pantalla, estadoApp) {
 
   async function pintar() {
     const { almacenes, horarios } = await api.obtener('/existencia');
+    // El hielo que ya es de un cliente. Puede fallar sin romper nada: es
+    // un dato de más, no la pantalla.
+    const guardado = await api.obtener('/encomiendas')
+      .catch(() => ({ nombre: 'Encomendado', encomiendas: [], pendientes: 0, dieciseisavos: 0 }));
 
     pantalla.innerHTML = `
       <a class="boton secundario chico" href="#/tanques">‹ Producción de hielo</a>
@@ -51,6 +55,29 @@ export async function vistaExistencia(pantalla, estadoApp) {
       </p>
 
       ${almacenes.map((a) => tarjetaAlmacen(a)).join('')}
+
+      ${guardado.pendientes ? `
+        <div class="tarjeta" style="margin-top:16px">
+          <h3 style="margin:0 0 4px">${esc(guardado.nombre)}</h3>
+          <p class="ayuda" style="margin:0 0 12px">
+            Hay <b>${esc(aTexto(guardado.dieciseisavos))}</b> de hielo
+            guardado: ya está pagado y es de clientes que van a pasar por él.
+            Sigue en el cuarto frío y se cuenta con todo lo demás — el cuadre
+            de arriba ya lo tiene en cuenta.
+          </p>
+          <table class="tabla">
+            <tr><th>De quién</th><th>Desde</th><th class="der">Cuánto</th></tr>
+            ${guardado.encomiendas.map((e) => `
+              <tr>
+                <td>${esc(e.cliente_nombre)}</td>
+                <td>${esc(fechaCorta(e.fecha))}</td>
+                <td class="der"><strong>${esc(aTexto(e.dieciseisavos))}</strong></td>
+              </tr>`).join('')}
+          </table>
+          <p class="ayuda" style="margin:12px 0 0">
+            Se guarda y se entrega desde <b>Vender</b>, con el botón 🧊.
+          </p>
+        </div>` : ''}
 
       <div class="fila-botones" style="margin-top:18px;flex-wrap:wrap">
         <button class="secundario chico" id="historial">Historial de conteos</button>
@@ -166,6 +193,19 @@ export async function vistaExistencia(pantalla, estadoApp) {
             <div class="cuadre-linea vendido">
               <span>− Se cortó para hielo gourmet</span>
               <strong>${t.cortado}</strong>
+            </div>` : ''}
+          <!-- LO ENCOMENDADO, en las dos direcciones (v4.5). Se vendió pero
+               no salió: hay que volver a sumarlo o la cuenta de arriba no
+               cuadra con lo que se ve al abrir la puerta. -->
+          ${a.guardado ? `
+            <div class="cuadre-linea suma">
+              <span>+ Se quedó guardado</span>
+              <strong>${t.guardado}</strong>
+            </div>` : ''}
+          ${a.recogido ? `
+            <div class="cuadre-linea vendido">
+              <span>− Pasaron por lo guardado</span>
+              <strong>${t.recogido}</strong>
             </div>` : ''}
           <div class="cuadre-linea total">
             <span>= Debería haber ahora</span>
@@ -376,6 +416,8 @@ export async function vistaExistencia(pantalla, estadoApp) {
   // ==========================================================
   async function configuracion() {
     const { almacenes, horarios } = await api.obtener('/existencia/almacenes');
+    const nombreEncomienda = (await api.obtener('/encomiendas')
+      .catch(() => ({ nombre: 'Encomendado' }))).nombre || 'Encomendado';
 
     pantalla.innerHTML = `
       <button class="secundario chico" id="volver">‹ El cuarto frío</button>
@@ -408,6 +450,21 @@ export async function vistaExistencia(pantalla, estadoApp) {
         </div>
         <button class="secundario" id="editar-horarios" style="margin-top:14px">
           Cambiar los horarios
+        </button>
+      </div>
+
+      <h3>Cómo le dicen al hielo guardado</h3>
+      <div class="tarjeta">
+        <p class="ayuda" style="margin:0 0 12px">
+          El hielo que un cliente ya pagó y deja apartado en el cuarto frío.
+          Esta palabra sale impresa en su papelito, así que conviene que sea
+          la que se usa aquí.
+        </p>
+        <div class="horarios">
+          <span class="horario" id="nombre-encomienda-actual">${esc(nombreEncomienda)}</span>
+        </div>
+        <button class="secundario" id="editar-encomienda" style="margin-top:14px">
+          Cambiarle el nombre
         </button>
       </div>`;
 
@@ -445,6 +502,21 @@ export async function vistaExistencia(pantalla, estadoApp) {
         const lista = texto.split(',').map((h) => h.trim()).filter(Boolean);
         await api.actualizar('/existencia/horarios', { horarios: lista });
         avisar('Horarios guardados', 'bien');
+        configuracion();
+      } catch (e) { avisar(e.message, 'error'); }
+    };
+
+    pantalla.querySelector('#editar-encomienda').onclick = async () => {
+      const nombre = await pedirTexto({
+        titulo: 'El hielo guardado',
+        texto: '¿Cómo le dicen aquí? Sale impreso en el papelito del cliente.',
+        valor: nombreEncomienda,
+        marcador: 'Encomendado', ok: 'Guardar', largo: 20
+      });
+      if (!nombre) return;
+      try {
+        await api.actualizar('/existencia/nombre-encomienda', { nombre });
+        avisar('Listo. Así se va a llamar de ahora en adelante.', 'bien');
         configuracion();
       } catch (e) { avisar(e.message, 'error'); }
     };

@@ -2534,6 +2534,20 @@ body.imprimir-hoja { page: hoja; }
 }
 .pos-chico:hover { border-color: var(--borde-fuerte); }
 
+/* El contador encima de un icono: cuántos clientes tienen hielo guardado.
+   Sin él, un encomendado se anota y se olvida hasta que alguien reclama.
+
+   Se llama `pos-contador` y no `pos-marca` porque esa ya existe y es el
+   nombre del negocio: la primera versión de esto se la pisó y el nombre de
+   la fábrica salió disparado a la esquina de la pantalla, en ámbar. */
+.pos-chico-contador { position: relative; overflow: visible; }
+.pos-contador {
+  position: absolute; top: -6px; right: -6px; min-width: 19px; height: 19px;
+  padding: 0 4px; border-radius: 10px; background: var(--ambar); color: #fff;
+  font-size: 11px; font-weight: 800; line-height: 19px; text-align: center;
+  font-variant-numeric: tabular-nums; pointer-events: none;
+}
+
 /* Quién está en la caja. Va aquí y no en una franja aparte. */
 .pos-quien { display: flex; align-items: center; gap: 8px; }
 .pos-quien-nombre {

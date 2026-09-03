@@ -18,7 +18,8 @@ const { listaActiva } = require('../ventas/precios');
 const { listaDeMayoreo } = require('../ventas/mayoreo');
 const { configuracion, guardarAjuste, imprimirCrudo,
         tipoDeDestino, impresorasDeWindows, APARTADOS } = require('./impresora');
-const { ticketCotizacion, ticketVenta, ticketMovimiento, ticketVale, ticketPrueba, pulsoCajon, ticketProduccion,
+const { ticketCotizacion, ticketVenta, ticketMovimiento, ticketVale, ticketEncomienda,
+        ticketPrueba, pulsoCajon, ticketProduccion,
         ticketCorte, ticketCorteMovimientos, ticketHielo, ticketCortePersona, ticketConteo,
         ticketResumenDia } = require('./ticket');
 
@@ -285,6 +286,53 @@ function papelDeMovimiento(mov, opciones = {}) {
   }
   return ticketMovimiento(mov, opciones);
 }
+
+/**
+ * EL PAPELITO DE LO ENCOMENDADO  (v4.5)
+ *
+ * El cliente se va con él y con eso vuelve por su hielo. Sale sin pulso de
+ * cajón: no entró ni salió dinero, la venta ya se cobró antes.
+ */
+function encomiendaCompleta(id) {
+  return bd.prepare(`
+    SELECT e.*, u.nombre AS capturista_nombre, c.negocio AS cliente_negocio
+      FROM encomiendas e
+      LEFT JOIN usuarios u ON u.id = e.capturista_id
+      LEFT JOIN clientes c ON c.id = e.cliente_id
+     WHERE e.id = ?
+  `).get(id ?? null) || null;
+}
+
+router.get('/encomienda/:id/previa', exigirPermiso('venta.ver'), (req, res) => {
+  const e = encomiendaCompleta(req.params.id);
+  if (!e) return error(res, 'Esa encomienda no existe.', 404);
+
+  const papel = ticketEncomienda(e, {
+    negocio: nombreNegocio(), nombre: require('../encomiendas/rutas').comoSeLlama()
+  });
+  return ok(res, { renglones: recortarEspejo(papel.espejo), ancho: papel.anchoTicket });
+});
+
+router.post('/encomienda/:id', puedeImprimir, async (req, res) => {
+  const e = encomiendaCompleta(req.params.id);
+  if (!e) return error(res, 'Esa encomienda no existe.', 404);
+
+  const cfg = configuracion();
+  if (!cfg.directa) return ok(res, { impreso: false, motivo: 'sin-destino' });
+
+  const papel = ticketEncomienda(e, {
+    negocio: nombreNegocio(),
+    nombre: require('../encomiendas/rutas').comoSeLlama(),
+    copia: req.body?.copia === true
+  });
+
+  // SIN PULSO DE CAJÓN: no entró dinero. Abrirlo por un papel que no
+  // cobra nada es abrirlo por nada, y el cajón abierto sin motivo en el
+  // mostrador es justo lo que no se quiere.
+  const r = await imprimirCrudo(papel, { seccion: 'venta' });
+  if (!r.impreso) return error(res, `No se pudo imprimir: ${r.motivo}`, 502);
+  return ok(res, { impreso: true });
+});
 
 /** Los saltos del final —el avance para el corte— en pantalla solo estorban. */
 function recortarEspejo(renglones = []) {
