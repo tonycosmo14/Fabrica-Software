@@ -122,7 +122,7 @@ const APARTADOS = [
   { id: 'conteo', nombre: 'Conteos del cuarto frío',
     ayuda: 'El cuadre de las marquetas, cada vez que se cuenta.' },
   { id: 'produccion', nombre: 'Números a sacar',
-    ayuda: 'El papel que se le da al obrero con los paños que le tocan.' }
+    ayuda: 'El papel que se le da al operario con los paños que le tocan.' }
 ];
 
 /** Dónde imprime un apartado. Vacío = donde imprimen los tickets. */
@@ -154,6 +154,11 @@ function configuracion() {
     pie: ajuste('ticket_pie', ''),
     codigoPagina: Number(ajuste('ticket_codepage', '2')),
     abrirCajon: ajuste('ticket_abrir_cajon', '0') === '1',
+    // Los dos papeles de un vale: de fábrica sale UNO (v4.7).
+    valeDuplicado: ajuste('ticket_vale_duplicado', '0') === '1',
+    // El resumen del día pegado al corte: de fábrica NO. Tiene su botón
+    // en Producción de hielo.
+    corteImprimeDia: ajuste('corte_imprime_dia', '0') === '1',
     // CUÁNTO PAPEL AVANZA ANTES DE CORTAR.
     //
     // La cuchilla no está donde imprime: está uno o dos centímetros más

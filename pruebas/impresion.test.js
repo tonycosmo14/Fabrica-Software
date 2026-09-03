@@ -356,7 +356,7 @@ test('los números a sacar salen por la térmica, no por el navegador', async ()
   const papel = loImpreso();
   assert.match(papel, /A sacar/, 'qué es este papel, arriba a la izquierda');
   assert.match(papel, /Atendio:/, 'y quién lo entregó');
-  assert.match(papel, /FIRMA DEL OBRERO/, 'vuelve firmado con lo que sacó de verdad');
+  assert.match(papel, /FIRMA DEL OPERARIO/, 'vuelve firmado con lo que sacó de verdad');
 });
 
 test('los números a sacar tienen su propia impresora si hace falta', async () => {
@@ -388,7 +388,12 @@ test('quien no puede ver los números tampoco los imprime', async () => {
 // hielo, el problema no está en la caja.
 // ============================================================
 
-test('al imprimir el corte sale también el hielo que queda y los paños del día', async () => {
+// EL RESUMEN DEL DÍA YA NO SALE CON EL CORTE  (v4.7)
+//
+// "Al hacer el corte me das 4 tickets, me parece mucho. El del día está
+// genial, pero no quiero que se imprima cuando hago el corte: que lo pueda
+// imprimir en otro lado, en un momento que quiera ver cómo está la cosa."
+test('el corte ya NO arrastra el resumen del día', async () => {
   await entrarAdmin();
   await llamar('/api/caja/abrir', { method: 'POST', cuerpo: { fondo: 500 } });
   await llamar('/api/ventas', { method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 16 }], pago: 300 } });
@@ -401,11 +406,23 @@ test('al imprimir el corte sale también el hielo que queda y los paños del dí
 
   const papel = loImpreso();
   assert.match(papel, /Corte #/, 'el papel que se firma');
-  assert.match(papel, /HIELO EN EL CUARTO FRIO/, 'cuánto queda');
-  assert.match(papel, /PANOS SACADOS HOY/, 'y qué se sacó');
+  assert.doesNotMatch(papel, /HIELO EN EL CUARTO FRIO/, 'eso es del papel del día');
+  assert.doesNotMatch(papel, /PANOS SACADOS HOY/, 'y eso también');
   // Un corte de papel por cada papel: se entregan a personas distintas.
   assert.equal(papel.split('VB').length - 1, r.json.datos.papeles,
                'cada papel sale con su corte');
+});
+
+test('el papel del día sale cuando se pide, con quién sacó cada paño', async () => {
+  await entrarAdmin();
+  limpiarPapel();
+  const r = await llamar('/api/impresion/dia', { method: 'POST', cuerpo: {} });
+  assert.equal(r.estado, 200);
+
+  const papel = loImpreso();
+  assert.match(papel, /El dia/, 'su propio papel');
+  assert.match(papel, /HIELO EN EL CUARTO FRIO/, 'cuánto queda');
+  assert.match(papel, /PANOS SACADOS HOY/, 'y qué se sacó');
 });
 
 // ============================================================
@@ -497,7 +514,7 @@ test('si el turno se relevó, sale un papel por cada quien', async () => {
 
   limpiarPapel();
   const r = await llamar(`/api/impresion/corte/${cajaId}`, { method: 'POST', cuerpo: {} });
-  assert.equal(r.json.datos.papeles, 4, 'el corte, uno por cada quien, y el día');
+  assert.equal(r.json.datos.papeles, 3, 'el corte y uno por cada quien; el día va aparte');
 
   const papel = loImpreso();
   assert.match(papel, /Su parte del #/, 'cada uno firma lo suyo');
@@ -848,8 +865,14 @@ test('el corte imprime el cuadre del hielo, con lo que faltó', async () => {
   assert.match(papel, /DEBERIA QUEDAR/);
   assert.match(papel, /CONTADO/);
   assert.match(papel, /FALTA 2/, 'y el número que se viene a ver');
-  assert.match(papel, /PANOS SACADOS/);
   assert.match(papel, /SE VENDIO/);
+
+  // LOS PAÑOS NO VAN AQUÍ  (v4.7). "Solo deja paños sacados para lo del
+  // día, y déjame toda la info de cuarto frío, se vendió, con eso." Son
+  // producción del DÍA, no del turno de caja, y ya salen en el papel del
+  // día con quién los sacó: repetirlos aquí era el mismo dato dos veces en
+  // dos papeles que se imprimían juntos.
+  assert.doesNotMatch(papel, /PANOS SACADOS\n/);
 
   // EL PAPEL SE ACORTÓ A PROPÓSITO  (v4.4). "Quiero que me muestre más
   // simple: qué paños salieron y quién los sacó, y cuántas marquetas a

@@ -173,6 +173,14 @@ router.put('/config', configurar, (req, res) => {
     guardarAjuste('ticket_abrir_cajon', c.abrirCajon ? '1' : '0', req.usuario.id);
   }
 
+  if (c.valeDuplicado !== undefined) {
+    guardarAjuste('ticket_vale_duplicado', c.valeDuplicado ? '1' : '0', req.usuario.id);
+  }
+
+  if (c.corteImprimeDia !== undefined) {
+    guardarAjuste('corte_imprime_dia', c.corteImprimeDia ? '1' : '0', req.usuario.id);
+  }
+
   if (c.avanceCorte !== undefined) {
     const n = Number(c.avanceCorte);
     if (!Number.isInteger(n) || n < 0 || n > 8) {
@@ -282,7 +290,11 @@ function movimientoParaPapel(id) {
  */
 function papelDeMovimiento(mov, opciones = {}) {
   if (mov.es_vale) {
-    return ticketVale({ ...mov, esRaya: !mov.es_traspaso }, opciones);
+    // De fábrica sale UNO. Los dos papeles —uno para quien se llevó el
+    // dinero y otro para el cajón— se encienden en la configuración de la
+    // impresora (v4.7).
+    return ticketVale({ ...mov, esRaya: !mov.es_traspaso },
+                      { ...opciones, duplicado: ajusteEncendido('ticket_vale_duplicado') });
   }
   return ticketMovimiento(mov, opciones);
 }
@@ -494,7 +506,10 @@ router.post('/corte/:id', exigirPermiso('caja.ver'), async (req, res) => {
   //   3. EL CUADRE DEL HIELO: cuánto había, cuánto se produjo, cuánto se
   //      contó, cuánto faltó, y de dónde salió cada número (v4.2)
   //   4. uno por cajero, si el turno se relevó a media noche
-  //   5. el resumen del día: cuánto hielo queda ahora mismo en cada cuarto
+  //
+  // El resumen del día ya NO sale aquí (v4.7): son papeles de dos
+  // momentos distintos y cuatro al cerrar eran demasiados. Tiene su propio
+  // botón en Producción de hielo.
   //
   // Van juntos porque juntos es como se leen: si el cajón cuadra pero
   // falta hielo, el problema no está en la caja. En papeles separados
@@ -516,12 +531,22 @@ router.post('/corte/:id', exigirPermiso('caja.ver'), async (req, res) => {
     }
   }
 
-  papeles.push(ticketResumenDia({
-    fecha: caja.cerrada_en,
-    quien: caja.cerrada_por_nombre || caja.cajero_nombre,
-    almacenes: existenciaParaElCorte(),
-    produccion: resumenDelDia()
-  }, { negocio }));
+  // EL RESUMEN DEL DÍA YA NO SALE CON EL CORTE  (v4.7)
+  //
+  // "El del día está genial, pero no quiero que se imprima cuando hago el
+  //  corte: que lo pueda imprimir en otro lado, en un momento que quiera
+  //  ver cómo está la cosa."
+  //
+  // Tiene su botón en Producción de hielo. Aquí queda apagado de fábrica y
+  // se puede volver a encender, por si alguna vez conviene lo contrario.
+  if (ajusteEncendido('corte_imprime_dia')) {
+    papeles.push(ticketResumenDia({
+      fecha: caja.cerrada_en,
+      quien: caja.cerrada_por_nombre || caja.cajero_nombre,
+      almacenes: existenciaParaElCorte(),
+      produccion: resumenDelDia()
+    }, { negocio }));
+  }
 
   let ultimo = { impreso: false, motivo: 'nada' };
   for (const papel of papeles) {
@@ -531,6 +556,43 @@ router.post('/corte/:id', exigirPermiso('caja.ver'), async (req, res) => {
 
   if (!ultimo.impreso) return error(res, `No se pudo imprimir: ${ultimo.motivo}`, 502);
   return ok(res, { impreso: true, papeles: papeles.length });
+});
+
+/** ¿Está encendido un ajuste de sí/no? Vacío o "0" es que no. */
+function ajusteEncendido(clave) {
+  const v = bd.prepare('SELECT valor FROM configuracion WHERE clave = ?').get(clave)?.valor;
+  return v === '1' || v === 'true';
+}
+
+/**
+ * EL PAPEL DEL DÍA, CUANDO SE QUIERA  (v4.7)
+ *
+ * "Que lo pueda imprimir en otro lado, en un momento que quiera ver cómo
+ *  está la cosa."
+ *
+ * Cuánto hielo queda en cada cuarto frío y qué paños salieron hoy, con
+ * quién los sacó. No es del cierre de nadie: es una foto de cómo va el día,
+ * y se saca a media mañana igual que a las diez de la noche.
+ */
+router.post('/dia', exigirPermiso('produccion.ver'), async (req, res) => {
+  const cfg = configuracion();
+  const papel = ticketResumenDia({
+    fecha: new Date().toISOString(),
+    quien: req.usuario.nombre,
+    almacenes: existenciaParaElCorte(),
+    produccion: resumenDelDia()
+  }, { negocio: nombreNegocio() });
+
+  if (!cfg.directa) {
+    return ok(res, {
+      impreso: false, motivo: 'sin-destino',
+      renglones: recortarEspejo(papel.espejo), ancho: papel.anchoTicket
+    });
+  }
+
+  const r = await imprimirCrudo(papel, { seccion: 'produccion' });
+  if (!r.impreso) return error(res, `No se pudo imprimir: ${r.motivo}`, 502);
+  return ok(res, { impreso: true });
 });
 
 /**
@@ -598,7 +660,7 @@ router.post('/conteo/:id', exigirPermiso('existencia.ver'), async (req, res) => 
  * LOS NÚMEROS A SACAR, por la térmica.
  *
  * Los datos se vuelven a pedir aquí y no llegan del navegador: un papel que
- * dice qué paño le toca al obrero no puede salir de lo que alguien mande en
+ * dice qué paño le toca al operario no puede salir de lo que alguien mande en
  * el cuerpo de la petición.
  */
 router.post('/produccion', exigirPermiso('produccion.numeros'), async (req, res) => {

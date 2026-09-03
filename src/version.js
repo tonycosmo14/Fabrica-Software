@@ -17,9 +17,28 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '4.6';
+const VERSION_ACTUAL = '4.7';
 
 const VERSIONES = [
+  {
+    numero: '4.7',
+    nombre: 'Menos papel, más rastro',
+    fecha: '2026-09-03',
+    resumen:
+      'El corte pasa de cuatro papeles a tres, el vale deja de salir por ' +
+      'duplicado, los tanques se acomodan con flechas, y al anular una ' +
+      'sacada queda escrito quién fue y por qué.',
+    cambios: [
+      { tipo: 'importante', texto: 'AL ANULAR UNA SACADA YA QUEDA ESCRITO QUIÉN FUE. Tenías razón: si no, jamás te ibas a enterar. Y el problema era peor de lo que parecía — la anulación se guardaba ESCRIBIÉNDOLA EN LAS NOTAS del paño, así que quién lo hizo no se guardaba en ningún lado y la nota de verdad se perdía. Ahora se ve en la historia del paño (botón 👁 Historia) con nombre, fecha y motivo, y la nota original se queda donde estaba.' },
+      { tipo: 'nuevo', texto: 'LOS TANQUES SE SUBEN Y SE BAJAN con las flechas ↑ ↓, sin dar de baja nada. Antes cambiar el orden obligaba a borrar y volver a crear, que se lleva por delante el historial entero del tanque.' },
+      { tipo: 'nuevo', texto: 'AL TOCAR UN PAÑO QUE NO ES EL QUE SIGUE, EL SISTEMA LO DICE, y ofrece las tres salidas: ver su historia —que no cambia nada y no pide permiso a nadie—, ir al paño que sí toca, o desbloquearlo con el PIN de quien autoriza. Antes se abría callado en modo mirar y quien venía a sacarlo se quedaba viendo una pantalla que no dejaba tocar nada. Y mientras se mira un paño que no toca, arriba queda el aviso.' },
+      { tipo: 'importante', texto: 'NADA SALE POR DUPLICADO. Era el vale, que salía siempre de a dos. La idea era buena y la decisión no era mía: ahora sale UNO, y si quieres los dos se encienden en Sistema › Impresora.' },
+      { tipo: 'importante', texto: 'EL CORTE PASA DE CUATRO PAPELES A TRES. El del día —cuánto hielo queda y qué paños salieron— ya no sale pegado al corte: tiene su propio botón 🧾 El día en Producción de hielo, y se saca cuando quieras ver cómo va la cosa. También se puede volver a encender en Sistema › Impresora.' },
+      { tipo: 'mejora', texto: 'Y EL PAPEL DEL HIELO SE QUEDA CON LO SUYO: el cuarto frío —qué había, qué debía haber, qué se contó y qué faltó— y cuánto se vendió al público y a mayoreo. Los paños se mudaron al papel del día, CON QUIÉN LOS SACÓ: son producción del día, no del turno de caja, y estaban saliendo dos veces.' },
+      { tipo: 'mejora', texto: 'EL VALE DE RAYA AHORA SE LLAMA VALE DE SUELDO. Tienes razón, «raya» aquí no se dice. El nombre sale impreso en el papel que firma el trabajador, así que importa.' },
+      { tipo: 'mejora', texto: 'Y donde decía «obrero» ahora dice OPERARIO, en las pantallas, en los papeles y en el manual.' }
+    ]
+  },
   {
     numero: '4.6',
     nombre: 'La hoja, a tu manera',
@@ -137,7 +156,7 @@ const VERSIONES = [
       { tipo: 'mejora', texto: 'Si el turno no tuvo ningún gasto ni entrada, el segundo papel no se imprime: media hoja en blanco que dice GASTOS es papel tirado todos los días.' },
       { tipo: 'nuevo', texto: 'LAS BOLSAS DE HIELO GOURMET SON UN PRODUCTO DE VERDAD. Me preguntaste dónde se guardan y dónde se suman: ahora tienen su lugar. Cortar marquetas no es perder hielo, es TRANSFORMARLO — sale del cuarto frío y entra al inventario como bolsas, y desde ahí se venden como cualquier otra cosa, restándose solas con cada venta.' },
       { tipo: 'importante', texto: 'LA BOLSA NACE DADA DE BAJA Y SIN PRECIO, y se da de alta sola con el primer corte que le meta bolsas. Sin precio porque inventárselo sería peor: se vendería mal el primer día sin que nadie se diera cuenta — hay que ponérselo en Productos y precios. Y de baja porque un producto con existencia en cero sale como AGOTADO en la caja, y una fábrica que todavía no corta hielo tendría ese aviso puesto para siempre.' },
-      { tipo: 'nuevo', texto: 'CUÁNTO HIELO QUEDA, A LA VISTA. En Producción de hielo, grande, en el panel de la derecha: el obrero que saca el hielo es a quien más le sirve saber si el cuarto está vacío, y era justo quien nunca lo tenía delante. Y en la pantalla de vender, junto al reloj, SOLO PARA EL ADMINISTRADOR — en el mostrador, con gente esperando, un número más que leer es un número más que estorba.' },
+      { tipo: 'nuevo', texto: 'CUÁNTO HIELO QUEDA, A LA VISTA. En Producción de hielo, grande, en el panel de la derecha: el operario que saca el hielo es a quien más le sirve saber si el cuarto está vacío, y era justo quien nunca lo tenía delante. Y en la pantalla de vender, junto al reloj, SOLO PARA EL ADMINISTRADOR — en el mostrador, con gente esperando, un número más que leer es un número más que estorba.' },
       { tipo: 'mejora', texto: 'LA PANTALLA DE EXISTENCIA SALIÓ DEL INICIO Y DEL MENÚ. Lo que quedaba de ella —mirar lo que hay, anotar lo derretido o roto, y revisar los conteos viejos— vive ahora dentro de PRODUCCIÓN DE HIELO, con el botón 🧊 El cuarto frío. Es donde está el hielo y donde está la gente que lo mueve.' },
       { tipo: 'mejora', texto: 'Todo esto está explicado en el manual, en Caja, en El cuarto frío y en Productos y precios.' }
     ]
@@ -269,7 +288,7 @@ const VERSIONES = [
       'ser tres pasos en el orden real: primero los paños que se sacaron, ' +
       'luego el hielo que se cortó para gourmet, y al final cuánto quedó.',
     cambios: [
-      { tipo: 'nuevo', texto: 'EL BOTÓN AHORA DICE "ANOTAR LA EXISTENCIA" y no empieza preguntando cuánto hielo queda. EMPIEZA POR LOS PAÑOS, y el orden no es capricho: el obrero llega y canta las dos cosas juntas —los números que sacó y cuánto quedó—. Anotando el conteo primero, la producción de esa jornada todavía no está capturada y el cuadre sale mal: parece que SOBRA hielo, cuando lo que falta es el registro.' },
+      { tipo: 'nuevo', texto: 'EL BOTÓN AHORA DICE "ANOTAR LA EXISTENCIA" y no empieza preguntando cuánto hielo queda. EMPIEZA POR LOS PAÑOS, y el orden no es capricho: el operario llega y canta las dos cosas juntas —los números que sacó y cuánto quedó—. Anotando el conteo primero, la producción de esa jornada todavía no está capturada y el cuadre sale mal: parece que SOBRA hielo, cuando lo que falta es el registro.' },
       { tipo: 'nuevo', texto: 'PASO 2: ¿SE CORTÓ HIELO? Hay temporadas en que se agarran marquetas del cuarto frío y se cortan para hacer hielo gourmet en bolsas. Esas salen de la existencia sin pasar por la caja y sin haberse derretido: DEJAN DE SER MARQUETAS. Hasta hoy el sistema no tenía dónde ponerlas y aparecían dentro del FALTANTE, revueltas con lo derretido y con lo que se fue sin pagar. En temporada, el corte decía que faltan cuarenta marquetas y nadie sabía si era robo o era trabajo.' },
       { tipo: 'nuevo', texto: 'LAS BOLSAS SE ANOTAN SI SE CONTARON, y si no, se dejan vacías en vez de guardar un cero que mañana parecería un dato. Todavía no son un producto del sistema —lo serán—, pero el día que lo sean ese número va a hacer falta, y ya no se puede ir a buscar hacia atrás.' },
       { tipo: 'importante', texto: 'EL PASO 3 YA NO TE DICE CUÁNTO DEBERÍA HABER antes de que anotes tu número, y esto es un cambio de fondo: antes el cuadrito venía relleno con el número esperado. Con ese número a la vista, contar se vuelve confirmar —se aprieta aceptar, el cuadre da cero siempre— y el conteo deja de servir para lo único que sirve, que es descubrir lo que no cuadra. El número sale enseguida, en el resultado, cuando ya no puede influir en nadie. Si lo prefieres como antes, se cambia en un renglón.' },
@@ -301,7 +320,7 @@ const VERSIONES = [
       'Un paño no siempre sale de un jalón: a veces se saca una canasta y ' +
       'no se toca la siguiente hasta que esa se gasta. Ahora eso se puede ' +
       'registrar tal cual, retomarlo al día siguiente con otro turno, y ' +
-      'sale impreso en el papel del obrero.',
+      'sale impreso en el papel del operario.',
     cambios: [
       { tipo: 'nuevo', texto: 'SACAR CANASTA POR CANASTA. En la pantalla del paño cada canasta trae su casilla: desmarca las que hoy no vas a sacar y el botón cambia a «Sacar 2 canastas». Las demás quedan pendientes. Sacar el paño entero sigue siendo un solo toque, como siempre: desmarcar es la excepción.' },
       { tipo: 'importante', texto: 'Y CON ESO EL PAÑO QUEDA A MEDIAS, que quiere decir que NADIE PUEDE PASAR AL SIGUIENTE hasta terminarlo. En la lista sale con lo que falta —"faltan 3 de 4 canastas, lo empezó Chema"— en vez de con la fecha de la última vez, porque eso es lo único que hay que hacer con ese paño.' },
@@ -705,7 +724,7 @@ const VERSIONES = [
       { tipo: 'nuevo', texto: 'Y ese aviso ya sale en VENDER, con un botón "Tomar el turno": el que entra pone su PIN ahí mismo y el turno y el dinero apartado quedan a su nombre.' },
       { tipo: 'mejora', texto: 'Los tickets que se buscan desde la caja son solo los de HOY. Para el histórico completo viene un módulo aparte.' },
       { tipo: 'mejora', texto: 'Al vaciar el ticket con Esc, otro Enter acepta: la mano no tiene que soltar el teclado.' },
-      { tipo: 'importante', texto: 'Los CAJEROS ya pueden imprimir los números que siguen en los tanques. El obrero pregunta en el mostrador y ahí no siempre hay un gerente.' },
+      { tipo: 'importante', texto: 'Los CAJEROS ya pueden imprimir los números que siguen en los tanques. El operario pregunta en el mostrador y ahí no siempre hay un gerente.' },
       { tipo: 'arreglo', texto: 'El ticket fiado se imprimía diciendo FIADO pero sin el nombre del cliente, que es justo lo que lo convierte en un vale.' }
     ],
     siguiente: 'v1.8 — Historial, y borrar de verdad.'
@@ -756,7 +775,7 @@ const VERSIONES = [
     cambios: [
       { tipo: 'importante', texto: 'AVISO DE LO QUE SE ACABA: arriba a la derecha sale un triángulo con una bolita y el número de productos bajos. Al tocarlo se abre la lista completa, con cuántos quedan de cada uno y cuáles ya se acabaron.' },
       { tipo: 'importante', texto: 'LO QUE SE ACABÓ YA NO SE VENDE. El botón se ve apagado y dice "se acabó"; teclear su código tampoco lo mete. Y si pides 5 y solo hay 4, avisa antes de armar el ticket. Lo que no lleva inventario se sigue vendiendo sin tope.' },
-      { tipo: 'importante', texto: 'EL HIELO ES LA EXCEPCIÓN: tiene su propio símbolo 🧊 y AVISA, pero jamás bloquea. El número del sistema es lo que se ha capturado, no lo que hay en el cuarto frío: los obreros reportan hasta como las 3, y hasta entonces siempre va a marcar de menos. Parar la venta de hielo por un dato que todavía no llega sería parar la fábrica.' },
+      { tipo: 'importante', texto: 'EL HIELO ES LA EXCEPCIÓN: tiene su propio símbolo 🧊 y AVISA, pero jamás bloquea. El número del sistema es lo que se ha capturado, no lo que hay en el cuarto frío: los operarios reportan hasta como las 3, y hasta entonces siempre va a marcar de menos. Parar la venta de hielo por un dato que todavía no llega sería parar la fábrica.' },
       { tipo: 'nuevo', texto: 'Tú decides con cuántas marquetas avisa el hielo. Está en Productos y precios → Hielo, y ahí mismo se ve lo que hay capturado ahora.' },
       { tipo: 'importante', texto: 'MÁS PANTALLA PARA VENDER: la franja azul de arriba desaparece en la caja. El reloj, la fecha y el nombre del negocio se fueron al renglón de abajo, junto a las teclas; el menú y quién está en la caja se metieron en la fila de los botones. Son cien píxeles de alto que ahora son botones.' },
       { tipo: 'nuevo', texto: 'Atajos discretos arriba a la derecha: la existencia del cuarto frío, los números que siguen en los tanques, los gastos del cajón y terminar el turno. Si había un ticket a medias, se aparta solo antes de salir.' },
@@ -988,7 +1007,7 @@ const VERSIONES = [
     cambios: [
       { tipo: 'arreglo', texto: 'Un paño que quedaba fuera del tanque ya no se traba: ahora se puede rellenar.' },
       { tipo: 'arreglo', texto: 'Anular un registro ya funciona, aunque el paño esté terminado.' },
-      { tipo: 'nuevo', texto: 'Números a sacar: un papel con los paños que siguen en cada tanque, con fecha y hora, para imprimirlo y dárselo al obrero.' },
+      { tipo: 'nuevo', texto: 'Números a sacar: un papel con los paños que siguen en cada tanque, con fecha y hora, para imprimirlo y dárselo al operario.' },
       { tipo: 'nuevo', texto: 'Registrar lo que se sacó es ahora lo primero que se ve al entrar.' },
       { tipo: 'nuevo', texto: 'Al entrar a un paño se marca molde por molde qué pasó, y ahí mismo se saca, se rellena o se corrige.' },
       { tipo: 'importante', texto: 'Saltarse la rotación pide motivo escrito y el PIN de un gerente o del administrador. Ya no basta con estar dentro del sistema.' },
@@ -1009,13 +1028,13 @@ const VERSIONES = [
       { tipo: 'importante', texto: 'La rotación 1, 3, 5... y luego 2, 4, 6... ahora es regla: el sistema marca cuál toca y no deja sacar otro.' },
       { tipo: 'importante', texto: 'Sacar un paño que no toca requiere autorización de gerente o administrador, con motivo, y queda registrado.' },
       { tipo: 'importante', texto: 'Sacar y rellenar son un solo toque, porque los moldes siempre se vuelven a llenar. Dejar un paño fuera es la excepción y se marca aparte.' },
-      { tipo: 'nuevo', texto: 'Registrar lo que sacó un obrero: marcas los paños que te dice y se capturan todos de golpe, a su nombre.' },
-      { tipo: 'nuevo', texto: 'Un paño empezado y sin terminar queda "a medias" y es el siguiente que toca; otro obrero lo termina y quedan los dos registrados.' },
+      { tipo: 'nuevo', texto: 'Registrar lo que sacó un operario: marcas los paños que te dice y se capturan todos de golpe, a su nombre.' },
+      { tipo: 'nuevo', texto: 'Un paño empezado y sin terminar queda "a medias" y es el siguiente que toca; otro operario lo termina y quedan los dos registrados.' },
       { tipo: 'nuevo', texto: 'El agua se cambia con un botón al lado, sin entrar a ningún menú.' },
       { tipo: 'nuevo', texto: 'Rol Gerente de turno: autoriza saltarse la rotación y corrige errores. El cajero no puede.' },
       { tipo: 'nuevo', texto: 'Anular un registro equivocado: no se borra nada, queda marcado como anulado con su motivo.' },
       { tipo: 'nuevo', texto: 'Un molde que falló la última vez queda marcado en rojo. Si siempre aparece marcado, ese molde tiene un problema físico.' },
-      { tipo: 'nuevo', texto: 'Lo de hoy: marquetas y merma del día, repartidas por obrero.' },
+      { tipo: 'nuevo', texto: 'Lo de hoy: marquetas y merma del día, repartidas por operario.' },
       { tipo: 'mejora', texto: 'Se quitaron los turnos de abrir y cerrar. Cada movimiento guarda su hora y quién lo hizo.' },
       { tipo: 'mejora', texto: 'Encabezado en un solo renglón: reloj, logo y usuario a la misma altura. Se gana pantalla.' },
       { tipo: 'mejora', texto: 'El menú entra deslizándose en vez de aparecer de golpe.' },

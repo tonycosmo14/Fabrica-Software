@@ -390,7 +390,7 @@ function ticketMovimiento(mov, { copia = false, negocio = '' } = {}) {
  * adelanto de sueldo, el papel lo dice, porque el día de la raya se le
  * tiene que pagar de menos y quien lo recibe tiene derecho a leerlo.
  */
-function ticketVale(vale, { negocio = '', copia = false } = {}) {
+function ticketVale(vale, { negocio = '', copia = false, duplicado = false } = {}) {
   const cfg = configuracion();
   const t = new Ticket(cfg.anchoMm, cfg.codigoPagina);
   const esRaya = Boolean(vale.esRaya);
@@ -429,13 +429,21 @@ function ticketVale(vale, { negocio = '', copia = false } = {}) {
 
     t.separador();
     t.firma('FIRMA DE QUIEN LO RECIBE');
-    t.izquierda().linea(paraQuien);
+    if (paraQuien) t.izquierda().linea(paraQuien);
     pie(t, negocio);
     t.izquierda().cortar(cfg.avanceCorte);
   };
 
-  unaCopia('-- Se lo lleva quien recibio el dinero --');
-  unaCopia('-- Se queda en el cajon --');
+  // POR DUPLICADO SOLO SI SE PIDE  (v4.7). "No quiero nada en duplicado, o
+  // en su caso que yo lo decida en configuraciones." La idea de los dos
+  // papeles era buena y la decisión no era mía: sale UNO, y quien quiera
+  // los dos lo enciende en la configuración de la impresora.
+  if (duplicado) {
+    unaCopia('-- Se lo lleva quien recibio el dinero --');
+    unaCopia('-- Se queda en el cajon --');
+  } else {
+    unaCopia('');
+  }
   return t.bytes();
 }
 
@@ -496,14 +504,14 @@ function ticketEncomienda(e, { negocio = '', nombre = 'Encomendado', copia = fal
 }
 
 /**
- * LOS NÚMEROS A SACAR, para el obrero.
+ * LOS NÚMEROS A SACAR, para el operario.
  *
  * Este papel se lo lleva en la mano al cuarto de tanques, y vuelve escrito
  * con lo que sacó de verdad. Salía por la ventana de imprimir del navegador
  * —hoja tamaño carta, elegir impresora, vista previa— y en un cuarto de
  * máquinas eso no lo hace nadie: sale por la térmica como todo lo demás.
  *
- * Los números van GRANDES a propósito. El obrero lo lee con guantes, con la
+ * Los números van GRANDES a propósito. El operario lo lee con guantes, con la
  * mano mojada y con poca luz.
  */
 function ticketProduccion(datos, { negocio = '' } = {}) {
@@ -549,7 +557,7 @@ function ticketProduccion(datos, { negocio = '' } = {}) {
 
   t.separador();
   t.linea('Saco de verdad:');
-  t.firma('FIRMA DEL OBRERO');
+  t.firma('FIRMA DEL OPERARIO');
 
   pie(t, negocio);
   t.izquierda().cortar(cfg.avanceCorte);
@@ -603,6 +611,10 @@ function ticketResumenDia(datos, { negocio = '' } = {}) {
       const roto = uno.rotas ? ` -${uno.rotas}` : '';
       t.columnas2(`${uno.tanque} #${uno.pano}${uno.enProceso ? ' (a medias)' : ''}`,
                   `${uno.alAlmacen}${roto}`);
+      // QUIÉN LO SACÓ, en su propio renglón (v4.7). Estaba en el papel del
+      // hielo, que ahora es solo del cuarto frío; el dato tenía que
+      // mudarse con los paños, no perderse.
+      if (uno.quien) t.linea(`  ${uno.quien}`);
     }
     t.separador('.');
     t.bloqueDerecha([
@@ -906,34 +918,16 @@ function ticketHielo(corte, { negocio = '' } = {}) {
     t.centro().linea(q.faltante > 0 ? 'hielo que nadie explico' : 'mas hielo del que debia').izquierda();
   }
 
-  // ---- LOS PAÑOS: QUÉ SALIÓ Y QUIÉN LO SACÓ  (v4.4) ----
+  // LOS PAÑOS NO VAN AQUÍ  (v4.7)
   //
-  // "Quiero que me muestre más simple: qué paños salieron y quién los
-  //  sacó, y cuántas marquetas se vendieron a precio normal y cuántas a
-  //  mayoreo. Es todo, no necesito más."
+  // "Solo deja paños sacados para lo del día, y déjame toda la info de
+  //  cuarto frío, se vendió, con eso."
   //
-  // Antes iban además los pedazos uno por uno (15 x 1/8, 3 x 1/4...), las
-  // mermas por motivo y lo que se cortó para bolsas. Los tres SIGUEN
-  // contando —están restados arriba, en el cuadre— pero desglosarlos hacía
-  // un papel largo que nadie leía. El desglose está en las estadísticas,
-  // que es donde se va a buscar; este papel se lee de pie.
-  t.negrita().separadorConTitulo('PANOS SACADOS').negrita(false);
-  if (!h.panos.length) {
-    t.linea('  ninguno');
-  } else {
-    for (const uno of h.panos) {
-      t.columnas2(`${uno.tanque} #${uno.pano}${uno.enProceso ? ' (a medias)' : ''}`,
-                  String(uno.alAlmacen));
-      // Quién lo sacó va en su propio renglón: es el dato por el que se
-      // pregunta cuando un paño sale mal, y en la misma línea no cabe.
-      if (uno.quien) t.linea(`  ${uno.quien}`);
-    }
-    t.separador('.');
-    t.bloqueDerecha([
-      ['Panos', String(h.produccion.cuantos)],
-      ['MARQUETAS', String(h.produccion.alAlmacen)]
-    ]);
-  }
+  // Y tiene razón: los paños son producción del DÍA, no del turno de caja,
+  // y ya salen en el papel del día con quién los sacó. Repetirlos aquí era
+  // el mismo dato dos veces en dos papeles que se imprimen juntos. Lo que
+  // sí es de este papel es el cuarto frío: qué había, qué debía haber, qué
+  // se contó y qué faltó.
 
   // ---- CUÁNTO SE VENDIÓ, Y A QUÉ PRECIO ----
   //

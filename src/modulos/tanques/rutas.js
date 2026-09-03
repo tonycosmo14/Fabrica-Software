@@ -201,6 +201,57 @@ router.post('/:id/alta', configurar, (req, res) => {
  * Agregar paños. Acepta "cantidad" para meter varios de un golpe: borrarlos
  * y volverlos a poner uno por uno era una tortura.
  */
+/**
+ * SUBIR O BAJAR UN TANQUE EN LA LISTA  (v4.7)
+ *
+ * "Que pueda subir o bajar los tanques para cambiar el orden en el que se
+ *  muestran, sin necesidad de eliminarlos."
+ *
+ * El orden importa: es el que sigue el ojo del que va a sacar hielo, y
+ * tenía que coincidir con el orden en que están puestos en el cuarto de
+ * máquinas. Hasta hoy solo se podía cambiar dando de baja y volviendo a
+ * crear, que se lleva por delante todo el historial del tanque.
+ *
+ * Se intercambia con el vecino, no se reescribe la lista entera: así dos
+ * personas moviendo cosas a la vez no se pisan.
+ */
+router.post('/:id/mover', configurar, (req, res) => {
+  const t = bd.prepare('SELECT * FROM tanques WHERE id = ? AND activo = 1').get(req.params.id);
+  if (!t) return error(res, 'Ese tanque no existe.', 404);
+
+  const cuanto = Number(req.body?.cuanto);
+  if (cuanto !== -1 && cuanto !== 1) return error(res, 'Solo se puede mover uno arriba o abajo.');
+
+  // El vecino en esa dirección. Se busca por (orden, nombre) y no solo por
+  // `orden`, porque dos tanques pueden compartir número: los sembrados en
+  // la puesta en marcha nacen todos en cero.
+  const lista = bd.prepare(
+    'SELECT id, orden FROM tanques WHERE activo = 1 ORDER BY orden, nombre'
+  ).all();
+  const i = lista.findIndex((x) => x.id === t.id);
+  const j = i + cuanto;
+  if (j < 0 || j >= lista.length) {
+    return error(res, cuanto < 0 ? 'Ese tanque ya es el primero.' : 'Ese tanque ya es el último.');
+  }
+
+  // Se renumera la lista entera de 1 en adelante con los dos cambiados. Es
+  // lo único que deja el orden limpio cuando todos venían en cero.
+  const nueva = [...lista];
+  [nueva[i], nueva[j]] = [nueva[j], nueva[i]];
+
+  const poner = bd.prepare('UPDATE tanques SET orden = ? WHERE id = ?');
+  bd.transaction(() => {
+    nueva.forEach((x, n) => poner.run(n + 1, x.id));
+  })();
+
+  bitacora.registrar({
+    accion: 'tanque.orden', entidad: 'tanque', entidadId: t.id, ejecutorId: req.usuario.id,
+    detalle: { nombre: t.nombre, hacia: cuanto < 0 ? 'arriba' : 'abajo' }
+  });
+
+  return ok(res, { tanques: listarTanques({ incluirInactivos: true }) });
+});
+
 router.post('/:id/panos', configurar, (req, res) => {
   const t = bd.prepare('SELECT * FROM tanques WHERE id = ?').get(req.params.id);
   if (!t) return error(res, 'Ese tanque no existe.', 404);

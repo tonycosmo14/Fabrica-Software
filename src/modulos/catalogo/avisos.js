@@ -12,7 +12,7 @@
  * se vendieron 20, quedan 4. Si llega a cero, no se puede vender más,
  * porque vender lo que no existe solo genera un problema en el mostrador.
  *
- * Del hielo NO lo sabe. Los obreros sacan hielo toda la mañana y reportan
+ * Del hielo NO lo sabe. Los operarios sacan hielo toda la mañana y reportan
  * lo que sacaron hasta como las 3 de la tarde. Así que el número del
  * sistema es "lo que se ha capturado", no "lo que hay": puede decir que
  * queda poco cuando el cuarto frío está lleno.

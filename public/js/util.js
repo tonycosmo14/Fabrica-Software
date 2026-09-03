@@ -81,7 +81,7 @@ export function soloFecha(iso) {
 
 export const ETIQUETAS_ROL = {
   operario: 'Operario',
-  cajero: 'Cajero',
+  cajero: 'Encargado de caja',
   repartidor: 'Repartidor',
   gerente: 'Gerente de turno',
   admin: 'Administrador'

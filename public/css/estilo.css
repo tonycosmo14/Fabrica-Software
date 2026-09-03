@@ -1476,6 +1476,19 @@ tr.anulada { opacity: .45; text-decoration: line-through; }
 
 .tanque-fila { display: flex; align-items: stretch; gap: 14px; margin-bottom: 12px; }
 .tanque-fila .tanque-tarjeta { margin-bottom: 0; flex: 1; min-width: 0; }
+/* Las flechas de orden, en columna al lado del tanque. `.tachita` nace
+   ABSOLUTA —es la ✕ que va sobre una foto— y sin esto las dos caen una
+   encima de la otra. */
+.tanque-mover { align-self: center; display: flex; flex-direction: column; gap: 4px; }
+.tanque-mover .tachita {
+  position: static; width: 34px; min-width: 34px; height: 24px; border-radius: 8px;
+  background: var(--superficie); color: var(--texto); box-shadow: none; font-size: 14px;
+}
+.tanque-mover .tachita:hover:not([disabled]) {
+  border-color: var(--primario); color: var(--primario);
+}
+.tanque-mover .tachita[disabled] { opacity: .3; cursor: default; }
+
 .tanque-acciones {
   align-self: center;
   width: 52px; min-width: 52px; height: 52px; padding: 0; font-size: 22px;
@@ -3350,6 +3363,29 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 .hist-que.que-cambiado   { background: var(--et-operario-f);   color: var(--et-operario-t); }
 .hist-que.que-abono      { background: var(--et-operario-f);   color: var(--et-operario-t); }
 .hist-que.que-vale       { background: var(--et-admin-f);      color: var(--et-admin-t); }
+/* Quién anuló una sacada y por qué, debajo de la etiqueta: es el dato por
+   el que se abre la historia de un paño. */
+/* EL RENGLÓN ANULADO VA TACHADO, PERO LA EXPLICACIÓN NO: es justo lo que
+   se viene a leer, y tachada no se lee.
+   Y no basta con `text-decoration: none`: una raya puesta en el <tr> se
+   dibuja SOBRE todos sus descendientes y no se puede quitar desde abajo.
+   Lo único que la corta es que el hijo sea una caja en línea atómica —un
+   `inline-block`—, porque ahí la raya del padre ya no entra. */
+.anul-detalle {
+  display: inline-block; width: 100%; margin-top: 3px;
+  font-size: 11.5px; color: var(--suave); text-decoration: none;
+  /* Las celdas de esta tabla recortan con puntos suspensivos; el motivo de
+     una anulación es una frase y tiene que caber entera. */
+  white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.35;
+}
+.hist-tabla tr.anulada .anul-detalle { color: var(--texto); }
+/* La celda que lleva la explicación no recorta: el motivo de una anulación
+   es una frase, y con puntos suspensivos no sirve de nada. */
+.hist-tabla td.anul-celda {
+  white-space: normal; overflow: visible; text-overflow: clip;
+  height: auto; padding: 8px 6px; min-width: 220px;
+}
+.hist-tabla tr.anulada, tr.anulada { opacity: .75; }
 .hist-que.que-devolucion { background: var(--et-baja-f);       color: var(--et-baja-t); }
 .hist-que.que-cancelada  { background: var(--et-baja-f);       color: var(--et-baja-t); }
 .hist-que.que-par {

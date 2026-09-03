@@ -28,7 +28,7 @@ const ORDEN_ROLES = ['operario', 'cajero', 'repartidor', 'gerente', 'admin'];
  * "Repartidors" y "Administradors" no son palabras.
  */
 const PLURAL_ROL = {
-  operario: 'Operarios', cajero: 'Cajeros', repartidor: 'Repartidores',
+  operario: 'Operarios', cajero: 'Encargados de caja', repartidor: 'Repartidores',
   gerente: 'Gerentes de turno', admin: 'Administradores'
 };
 
@@ -125,7 +125,7 @@ export async function vistaUsuarios(pantalla) {
             ${u.activo ? '' : ' · <span class="etiqueta baja">de baja</span>'}
           </small>
           ${u.valesPendientes?.centavos ? `
-            <!-- El día de la raya, la pregunta que se hace mirando esta
+            <!-- El día de pago, la pregunta que se hace mirando esta
                  pantalla es "¿a quién le tengo que descontar?". Se contesta
                  de un vistazo o no se contesta. -->
             <small class="usr-vales" title="Se llevó parte de su sueldo por adelantado">
@@ -220,7 +220,7 @@ export async function vistaUsuarios(pantalla) {
    *
    * Esto NO es contabilidad. El gasto ya se contó el día que el dinero
    * salió del cajón —el sueldo es gasto de la fábrica, y se cuenta una
-   * sola vez—. Esta lista es el RECORDATORIO de que el día de la raya se
+   * sola vez—. Esta lista es el RECORDATORIO de que el día de pago se
    * le paga de menos, y nada más. Por eso el único botón que tiene dice
    * "ya se le descontó" y no mueve un peso.
    *
@@ -236,7 +236,7 @@ export async function vistaUsuarios(pantalla) {
       datos = await api.obtener(`/usuarios/${usuario.id}/adelantos`);
     } catch {
       caja.innerHTML = `
-        <h3 class="emp-sub" style="margin-top:0">Vales de raya</h3>
+        <h3 class="emp-sub" style="margin-top:0">Vales de sueldo</h3>
         <p class="ayuda" style="margin:0">No se pudieron cargar.</p>`;
       return;
     }
@@ -248,11 +248,11 @@ export async function vistaUsuarios(pantalla) {
     const lista = datos.adelantos || [];
 
     caja.innerHTML = `
-      <h3 class="emp-sub" style="margin-top:0">Vales de raya</h3>
+      <h3 class="emp-sub" style="margin-top:0">Vales de sueldo</h3>
 
       ${debe ? `
         <div class="salidas" style="margin-bottom:14px">
-          <span>El día de la raya, descontarle</span>
+          <span>El día que se le pague, descontarle</span>
           <strong>${esc(pesos(debe))}</strong>
           <small>${cuantos} ${cuantos === 1 ? 'vale' : 'vales'} sin descontar</small>
         </div>
@@ -260,7 +260,7 @@ export async function vistaUsuarios(pantalla) {
         <p class="ayuda" style="margin:10px 0 0">
           Esto <b>no mueve dinero</b>: el dinero salió del cajón el día del
           vale. Aquí solo se apaga el recordatorio, cuando ya se le pagó su
-          raya de menos.
+          sueldo de menos.
         </p>
       ` : `
         <p class="ayuda" style="margin:0">
@@ -299,7 +299,7 @@ export async function vistaUsuarios(pantalla) {
       btn.onclick = async () => {
         const ok = await confirmar({
           titulo: '¿Ya se le descontó?',
-          texto: `Se le pagó su raya con ${pesos(debe)} de menos. ` +
+          texto: `Se le pagó su sueldo con ${pesos(debe)} de menos. ` +
                  'Sus vales dejan de aparecer como pendientes.',
           ok: 'Sí, ya se le descontó'
         });
@@ -395,7 +395,7 @@ export async function vistaUsuarios(pantalla) {
           </div>
 
           <div class="tarjeta" id="vales-caja">
-            <h3 class="emp-sub" style="margin-top:0">Vales de raya</h3>
+            <h3 class="emp-sub" style="margin-top:0">Vales de sueldo</h3>
             <p class="ayuda" style="margin:0">Cargando…</p>
           </div>
 

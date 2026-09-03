@@ -224,7 +224,7 @@ function ultimaSacadaPorPano(tanqueId) {
       LEFT JOIN usuarios u ON u.id = sp.ejecutor_id
      WHERE p.tanque_id = ?
        AND sp.terminada_en IS NOT NULL
-       AND (sp.notas IS NULL OR sp.notas NOT LIKE 'ANULADA%')
+       AND sp.anulada_en IS NULL
      ORDER BY sp.pano_id, sp.terminada_en DESC
   `).all(tanqueId);
 

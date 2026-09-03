@@ -238,7 +238,7 @@ const TEMAS = [
       moldes vienen saliendo peor que sus vecinos, y cómo salió el hielo de
       hoy en toda la fábrica.</p>
       <p class="ayuda-tip">La tecla <b>F2</b> saca los <b>números a sacar</b>
-      sin buscar el botón. Con el obrero enfrente esperando, eso ahorra el
+      sin buscar el botón. Con el operario enfrente esperando, eso ahorra el
       viaje del ratón.</p>
 
       <h4>Los números que siguen</h4>
@@ -256,8 +256,39 @@ const TEMAS = [
       usuario que tiene la sesión abierta, y queda guardado siempre. Una cosa
       es quién estuvo en la grúa y otra quién lo capturó.</p>
 
-      <p class="ayuda-tip">Los obreros no capturan nada. Ellos sacan hielo y
-      reportan; quien captura es quien recibe la existencia.</p>`
+      <p class="ayuda-tip">Los operarios no capturan nada. Ellos sacan hielo y
+      reportan; quien captura es quien recibe la existencia.</p>
+
+      <h4>El orden de los tanques</h4>
+      <p>En <b>Tanques, paños y moldes</b> cada tanque tiene sus flechas
+      <b>↑ ↓</b>: con ellas se cambia el orden en que salen en pantalla, sin
+      dar de baja nada. El orden importa porque es el que sigue el ojo de
+      quien va a sacar hielo, y conviene que sea el mismo en que están
+      puestos en el cuarto de máquinas.</p>
+
+      <h4>Cuando el paño no es el que sigue</h4>
+      <p>Al tocar un paño que no toca, el sistema lo dice y ofrece las tres
+      salidas: <b>ver su historia</b> —que no cambia nada y no pide permiso
+      a nadie—, <b>ir al paño que sí toca</b>, o <b>desbloquearlo</b>, que
+      necesita el PIN de un gerente o del administrador.</p>
+      <p>Y mientras se mira la historia de un paño que no es el que sigue,
+      arriba queda el aviso. Mirar está bien; lo que no puede pasar es
+      creer que se está en el paño que toca.</p>
+
+      <h4>Quién anuló una sacada, y por qué</h4>
+      <p>Al anular la última sacada de un paño queda escrito <b>quién lo
+      hizo, cuándo y con qué motivo</b>, y sale en la <b>historia del
+      paño</b> — el botón <b>👁 Historia</b>. Antes solo decía «anulada» y
+      quién lo había hecho no se guardaba en ningún lado.</p>
+      <p class="ayuda-tip">La <b>nota</b> del paño ya no se pierde al
+      anular: si alguien había escrito "la grúa se atoró", eso sigue siendo
+      verdad después.</p>
+
+      <h4>El papel del día</h4>
+      <p>El botón <b>🧾 El día</b> saca cuánto hielo queda en cada cuarto
+      frío y qué paños salieron hoy, con quién los sacó. Se pide cuando se
+      quiera: es una foto de cómo va el día, no del cierre de nadie. Antes
+      salía pegado al corte de caja y ahí estorbaba.</p>`
   },
 
   // ==========================================================
@@ -501,7 +532,7 @@ debería quedar − contado = FALTA</pre>
       <p>Cuando queda poco hielo sale un <b>🧊</b> aparte. Ese avisa, pero
       <b>nunca impide vender</b>, y la razón importa:</p>
       <p class="ayuda-tip">El número que ve el sistema es <b>lo que se ha
-      capturado</b>, no lo que hay en el cuarto frío. Los obreros sacan hielo
+      capturado</b>, no lo que hay en el cuarto frío. Los operarios sacan hielo
       toda la mañana y reportan lo que sacaron hasta como las 3 de la tarde,
       porque están atendiendo y sacando al mismo tiempo. Así que a media
       mañana el sistema casi siempre va a marcar de menos. <b>Sigue
@@ -649,7 +680,7 @@ debería quedar − contado = FALTA</pre>
       mismo botón — nadie tiene por qué acordarse de memoria.</p>
 
       <table class="ayuda-tabla">
-        <tr><th></th><th>Vale de retiro</th><th>Vale de raya</th></tr>
+        <tr><th></th><th>Vale de retiro</th><th>Vale de sueldo</th></tr>
         <tr><td><b>Quién lo toma</b></td>
             <td>Tú, un gerente, tu papá</td><td>Un trabajador</td></tr>
         <tr><td><b>Qué es ese dinero</b></td>
@@ -660,14 +691,14 @@ debería quedar − contado = FALTA</pre>
             <td>Sí: el sueldo es gasto</td></tr>
         <tr><td><b>Cómo se salda</b></td>
             <td>Nunca: no hay nada que saldar</td>
-            <td>Con su raya de la semana</td></tr>
+            <td>Con su sueldo de la semana</td></tr>
       </table>
 
-      <p>Los dos se hacen en <b>tres toques</b>: cuál, quién y cuánto. Y de
-      los dos sale <b>el papel por duplicado</b>: uno se lo lleva quien
-      recibió el dinero y otro se queda en el cajón, los dos con su raya
-      para firmar. Con un solo papel, el día que alguien pregunte «¿y esos
-      dos mil?» solo hay una versión, y es la del que la tiene en la mano.</p>
+      <p>Los dos se hacen en <b>tres toques</b>: cuál, quién y cuánto, y de
+      los dos sale su papel con la raya para firmar.</p>
+      <p class="ayuda-tip">Sale <b>uno solo</b>. Si prefieres dos —uno para
+      quien se llevó el dinero y otro para el cajón— se enciende en
+      <b>Sistema › Impresora</b>, en «Papeles que salen de más».</p>
 
       <p class="ayuda-tip">El mismo botón <b>📤 Vale</b> está en
       <b>Vender</b>, debajo de Meter dinero y Gasto: quien llega a llevarse
@@ -680,20 +711,20 @@ debería quedar − contado = FALTA</pre>
       él, y el papel sale con los dos nombres. Lo que <b>no</b> puede hacer
       nadie es retirarse dinero a sí mismo: un retiro se lo lleva el dueño o
       un gerente, y el sistema no deja otra cosa. Si quien pidió el dinero
-      es un trabajador, eso es un vale de raya y ahí sí puede ser
+      es un trabajador, eso es un vale de sueldo y ahí sí puede ser
       cualquiera.</p>
 
-      <h4>El vale de raya se cuenta UNA sola vez</h4>
-      <p>El sueldo es gasto de la fábrica, así que el vale de raya
+      <h4>El vale de sueldo se cuenta UNA sola vez</h4>
+      <p>El sueldo es gasto de la fábrica, así que el vale de sueldo
       <b>sí es gasto</b>, y se cuenta el día que el dinero sale del cajón.
       Lo que no puede pasar es contarlo dos veces:</p>
 
-      <pre class="ayuda-formula">martes   vale de raya      $400   ← gasto (sueldo)
+      <pre class="ayuda-formula">martes   vale de sueldo    $400   ← gasto (sueldo)
 sabado   lo que le falta $1,100   ← gasto (sueldo)
                          ------
                          $1,500   ← su sueldo, contado UNA vez</pre>
 
-      <p>Por eso el sábado se le paga su raya <b>de menos</b>, y por eso
+      <p>Por eso el día de pago se le da <b>de menos</b>, y por eso
       cada quien tiene su libreta de vales en su ficha de <b>La gente de la
       fábrica</b>. Ahí sale «debe $400 de vales» junto a su nombre, y cuando
       ya se le pagó de menos, el botón <b>«ya se le descontó»</b> apaga el
@@ -799,10 +830,19 @@ sabado   lo que le falta $1,100   ← gasto (sueldo)
         <li>El <b>primero</b> es el del dinero, con espacio para la firma y
         una raya para escribir a mano lo que se entrega. Los gastos y los
         vales van solo como <b>total</b>, con cuántos son.</li>
-        <li>El <b>segundo</b> es el <b>detalle</b>: los gastos y las entradas
-        uno por uno, con sus sumas, en dos columnas para ahorrar papel.</li>
-        <li>El <b>tercero</b> es <b>el hielo</b>, que es el de abajo.</li>
+        <li>El <b>segundo</b> es el <b>detalle</b>: los gastos uno por uno,
+        los <b>vales aparte y con nombre</b>, y las entradas. Un retiro se
+        resta igual que un gasto —el dinero salió del cajón— pero no es un
+        gasto de la fábrica, y por eso va en su propia columna.</li>
+        <li>El <b>tercero</b> es <b>el hielo</b>: qué había en el cuarto
+        frío, qué debía haber, qué se contó y qué faltó, más cuánto se
+        vendió al público y cuánto a mayoreo.</li>
       </ul>
+      <p class="ayuda-tip">Eran cuatro. Los <b>paños del día</b> y el hielo
+      que queda salían pegados al corte, y son de otro momento: ahora tienen
+      su propio botón <b>🧾 El día</b> en Producción de hielo, y se sacan
+      cuando se quiera. Si prefieres que vuelvan a salir con el corte, se
+      enciende en <b>Sistema › Impresora</b>.</p>
       <p class="ayuda-tip">Son papeles distintos porque son de personas
       distintas: el primero se entrega con el cajón, el segundo se queda en
       la carpeta. Si el turno no tuvo ningún gasto ni entrada, el segundo no
@@ -1016,7 +1056,7 @@ debería haber − contado = FALTA</pre>
       aparece un 🧊.</p>
       <p class="ayuda-tip">Ese aviso <b>nunca impide vender hielo</b>, y a
       propósito. El número sale de <b>lo que se ha capturado</b>, y los
-      obreros reportan lo que sacaron hasta como las 3 de la tarde: a media
+      operarios reportan lo que sacaron hasta como las 3 de la tarde: a media
       mañana el cuarto frío puede estar lleno y el sistema marcar cero. Si el
       🧊 sale y tú sabes que sí hay, lo que falta es capturar producción.</p>
 

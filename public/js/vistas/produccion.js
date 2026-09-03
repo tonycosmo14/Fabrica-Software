@@ -4,9 +4,9 @@
  * Lo primero que se ve es lo que más se usa:
  *
  *   1. NÚMEROS A SACAR — el papel que se imprime a cada rato y se le
- *      entrega al obrero. Va primero, y tiene atajo de teclado (F2),
+ *      entrega al operario. Va primero, y tiene atajo de teclado (F2),
  *      porque es lo que más veces al día se hace desde aquí.
- *   2. REGISTRAR LO QUE SE SACÓ — el flujo de las 3 de la tarde. El obrero
+ *   2. REGISTRAR LO QUE SE SACÓ — el flujo de las 3 de la tarde. El operario
  *      llega con su papel, dice los números y se capturan todos de golpe.
  *      Va en el MISMO renglón, a la derecha: dos botones grandes uno
  *      encima del otro se comían media pantalla sin decir nada más.
@@ -28,7 +28,8 @@
  */
 import { api } from '../api.js';
 import { esc, avisar, fecha as formatoFecha, fechaCorta } from '../util.js';
-import { confirmar, menu, pedirTexto, pedirAutorizacion } from '../dialogo.js';
+import { confirmar, menu, pedirTexto, pedirAutorizacion, verTicket } from '../dialogo.js';
+import { imprimirTicket, htmlDeEspejo } from '../imprimir.js';
 
 /**
  * EL NOMBRE DE PILA, que es como se llaman entre ellos en la fábrica.
@@ -58,7 +59,7 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
                          estado.permisos.includes('produccion.registrar');
   const puedeAutorizar = estado.permisos.includes('*') ||
                          estado.permisos.includes('produccion.autorizar');
-  // Los números que siguen los imprime también el cajero: el obrero
+  // Los números que siguen los imprime también el cajero: el operario
   // pregunta en el mostrador y ahí no siempre hay un gerente.
   const puedeVerNumeros = estado.permisos.includes('*') ||
                           estado.permisos.includes('produccion.numeros');
@@ -95,7 +96,7 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
   let DESTINOS = [];
 
   // F2 SACA LOS NÚMEROS. Es lo que más veces al día se hace desde esta
-  // pantalla, y con el obrero enfrente esperando, un atajo ahorra el viaje
+  // pantalla, y con el operario enfrente esperando, un atajo ahorra el viaje
   // del ratón. F2 y no una letra suelta: una letra se dispararía mientras
   // alguien escribe un nombre en cualquier campo.
   const atajo = (ev) => {
@@ -159,10 +160,20 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
             <span class="accion-icono">🖨️</span>
             <span class="accion-texto">
               <strong>Números a sacar</strong>
-              <small>El papel para el obrero · tecla F2</small>
+              <small>El papel para el operario · tecla F2</small>
             </span>
           </button>` : ''}
 
+        <!-- EL PAPEL DEL DÍA  (v4.7). Ya no sale pegado al corte: es una
+             foto de cómo va el día y se saca cuando se quiera, no al
+             cerrar el turno de alguien. -->
+        <button id="papel-dia" class="accion-principal">
+          <span class="accion-icono">🧾</span>
+          <span class="accion-texto">
+            <strong>El día</strong>
+            <small>Cuánto hielo queda y qué paños salieron hoy</small>
+          </span>
+        </button>
       </div>
 
       <div class="pestanas-fila">
@@ -237,6 +248,7 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
     });
 
     if (puedeVerNumeros) pantalla.querySelector('#siguientes').onclick = numerosASacar;
+    pantalla.querySelector('#papel-dia').onclick = papelDelDia;
     if (!puedeRegistrar) return;
 
     pantalla.querySelector('#agua').onclick = () => {
@@ -435,7 +447,40 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
    */
   async function abrirPano(panoId) {
     const toca = datos.tanque.siguiente;
-    return detallePano(panoId, { mirar: !(!toca || toca.id === panoId) });
+    const esElQueToca = !toca || toca.id === panoId;
+    if (esElQueToca) return detallePano(panoId, { mirar: false });
+
+    // ESTE PAÑO NO ES EL QUE SIGUE  (v4.7)
+    //
+    // Antes se abría callado en modo mirar, y quien venía a sacarlo se
+    // quedaba mirando una pantalla que no dejaba tocar nada sin entender
+    // por qué. Ahora se dice, y con las dos salidas a la vista: mirar la
+    // historia —que no cambia nada y no pide permiso a nadie— o
+    // desbloquearlo, que sí lo pide.
+    const pano = datos.tanque.panos.find((p) => p.id === panoId);
+    const que = await menu({
+      titulo: `El paño ${pano?.numero ?? ''} no es el que sigue`,
+      texto: `En ${datos.tanque.nombre} toca el paño ${toca.numero}. Sacar este ` +
+             'de más lo tiene que autorizar un gerente o el administrador.',
+      opciones: [
+        { valor: 'historia', texto: '👁 Ver su historia',
+          detalle: 'Cuándo se sacó, quién y cómo salió. No cambia nada.' },
+        { valor: 'toca', texto: `→ Ir al paño ${toca.numero}`,
+          detalle: 'El que de verdad toca ahora' },
+        ...(puedeRegistrar
+          ? [{ valor: 'desbloquear', texto: '🔓 Desbloquear este paño',
+               detalle: 'Con el PIN de quien autoriza' }]
+          : [])
+      ]
+    });
+    if (!que) return;
+    if (que === 'toca') return detallePano(toca.id, { mirar: false });
+    if (que === 'desbloquear') {
+      const vale = await pedirVale(pano, toca);
+      if (!vale) return detallePano(panoId, { mirar: true });
+      return detallePano(panoId, { mirar: false, vale });
+    }
+    return detallePano(panoId, { mirar: true });
   }
 
   /** Pide el PIN para sacar un paño fuera de la rotación. Devuelve el vale. */
@@ -480,9 +525,9 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
     // La historia se pide siempre: en la vista de mirar ES la pantalla, y
     // en la de sacar es el renglón de arriba que dice cuándo fue la última
     // vez — lo primero que se pregunta antes de tocar nada.
-    const [ficha, { obreros }] = await Promise.all([
+    const [ficha, { operarios }] = await Promise.all([
       api.obtener(`/produccion/panos/${panoId}/ficha`).catch(() => null),
-      api.obtener('/produccion/obreros')
+      api.obtener('/produccion/operarios')
     ]);
 
     // CÓMO SALIÓ EL HIELO. Primero una sola respuesta para el paño entero,
@@ -519,7 +564,7 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
     // Para el operario se da por hecho que fue él, y ni se le pregunta.
     let quienId = soyElQueSaca
       ? estado.usuario.id
-      : (obreros.find((o) => o.id === estado.usuario.id)?.id || obreros[0]?.id || '');
+      : (operarios.find((o) => o.id === estado.usuario.id)?.id || operarios[0]?.id || '');
     let quienNombre = '';
 
     /** Lo que le toca a un molde: su marca propia, o la del paño. */
@@ -565,7 +610,7 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
                 : `
                   <label for="quien">¿Quién lo sacó?</label>
                   <select id="quien" class="select-angosto">
-                    ${obreros.map((o) => `
+                    ${operarios.map((o) => `
                       <option value="${esc(o.id)}" ${o.id === quienId ? 'selected' : ''}>
                         ${esc(o.nombre)}
                       </option>`).join('')}
@@ -774,7 +819,7 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
             valor: quienNombre, marcador: 'Juan', ok: 'Ese fue', largo: 40, unaLinea: true
           });
           if (nombre) quienNombre = nombre;
-          else if (!quienNombre) { quienId = obreros[0]?.id || ''; }
+          else if (!quienNombre) { quienId = operarios[0]?.id || ''; }
           dibujar();
         }
       };
@@ -952,7 +997,10 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
           <span class="pano-cabeza-ultima" title="La última vez que se sacó este paño">
             última vez: ${esc(fechaCorta(u.fecha))}${
               u.quienes.length ? ` · ${esc(u.quienes.map(nombreDePila).join(', '))}` : ''}
-          </span>` : '<span class="pano-cabeza-ultima">nunca se ha sacado</span>'}
+          </span>`
+          : ficha?.historial?.length
+            ? '<span class="pano-cabeza-ultima">su última sacada se anuló</span>'
+            : '<span class="pano-cabeza-ultima">nunca se ha sacado</span>'}
         ${vale ? '<strong class="autorizado">autorizado</strong>' : ''}
         ${mirando ? '' : '<button class="secundario chico" id="mirar">👁 Historia</button>'}
       </div>`;
@@ -975,7 +1023,22 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
       porCanasta.get(m.canasta).push(m);
     }
 
+    // LA ADVERTENCIA, MIENTRAS SE MIRA (v4.7). "Cuando esté viendo un paño
+    // su historial pero no es el que sigue, debe tener el mensaje de que no
+    // es el que sigue." Mirar no cuesta nada y por eso se deja mirar; lo
+    // que no puede pasar es creer que se está en el paño que toca.
+    const toca = datos.tanque.siguiente;
+    const esElQueToca = !toca || toca.id === pano.id;
+
     return `
+      ${esElQueToca ? '' : `
+        <div class="aviso-sin-caja" style="margin-top:12px">
+          <strong>Este paño no es el que sigue.</strong>
+          En ${esc(datos.tanque.nombre)} toca el <b>paño ${toca.numero}</b>.
+          Aquí solo se mira: para sacar este hay que desbloquearlo abajo, y
+          eso lo autoriza un gerente o el administrador.
+        </div>`}
+
       <p class="ayuda">
         Esto es historia: aquí no se cambia nada. Para sacar este paño hay que
         desbloquearlo abajo.
@@ -1011,10 +1074,16 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
                   </span>`).join('')}
               </div>
             </div>`).join('')}
-        </div>` : '<p class="vacio">Este paño nunca se ha sacado.</p>'}
+        </div>` : ficha.historial.length ? `
+        <!-- Se sacó y se anuló: decir "nunca se ha sacado" sería lo
+             contrario de lo que pasó, y justo lo que hay que ver (v4.7). -->
+        <p class="vacio">
+          Este paño no tiene ninguna sacada en pie: la última se anuló.
+          Abajo está quién y por qué.
+        </p>` : '<p class="vacio">Este paño nunca se ha sacado.</p>'}
 
-      ${ficha.historial.length > 1 ? `
-        <h3>Las veces anteriores</h3>
+      ${ficha.historial.length ? `
+        <h3>${ficha.historial.length === 1 ? 'Lo que hay registrado' : 'Las veces anteriores'}</h3>
         <div class="hist-envoltura">
           <table class="tabla hist-tabla">
             <tr><th>Cuándo</th><th>Quién</th><th class="der">Horas</th>
@@ -1025,7 +1094,17 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
                 <td>${esc(h.quienes.map(nombreDePila).join(', ') || '—')}</td>
                 <td class="der">${h.horas != null ? Math.round(h.horas) : '—'}</td>
                 <td class="der">${h.anulada ? '—' : h.mezcla.alAlmacen}</td>
-                <td>${h.anulada ? '<em>anulada</em>' : `
+                <!-- QUIÉN LA ANULÓ Y POR QUÉ (v4.7). Antes solo decía
+                     «anulada» y el motivo se había escrito dentro de las
+                     notas; quién lo hizo no se guardaba en ningún lado, así
+                     que no había forma de enterarse. -->
+                <td class="${h.anulada ? 'anul-celda' : ''}">${h.anulada ? `
+                  <span class="hist-que que-cancelada">anulada</span>
+                  <small class="anul-detalle">
+                    ${h.anuladaPor ? `por ${esc(nombreDePila(h.anuladaPor))}` : 'no se sabe quién'}${
+                      h.anuladaEn ? ` · ${esc(fechaCorta(h.anuladaEn))}` : ''}
+                    ${h.motivoAnulada ? `<br>«${esc(h.motivoAnulada)}»` : ''}
+                  </small>` : `
                   <span class="mezcla-lista">
                     ${CALIDADES.filter((c) => h.mezcla[c.clave])
                       .map((c) => `<span class="mezcla-parte ${esc(c.clave)}"
@@ -1173,7 +1252,7 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
     const tanque = datos.tanque;
     const { mediciones } = await api.obtener(
       `/clima/salmuera?tanque=${encodeURIComponent(tanque.id)}&limite=20`);
-    const { obreros } = await api.obtener('/produccion/obreros');
+    const { operarios } = await api.obtener('/produccion/operarios');
 
     const campo = (id, titulo, ayuda) => `
       <label>
@@ -1209,7 +1288,7 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
           <span class="etiqueta-chica">¿Quién la midió?</span>
           <select id="t-quien" class="select-angosto">
             <option value="">Yo mismo</option>
-            ${obreros.map((o) => `
+            ${operarios.map((o) => `
               <option value="${esc(o.id)}">${esc(o.nombre)}</option>`).join('')}
           </select>
         </label>
@@ -1282,8 +1361,35 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
   }
 
   // ==========================================================
-  // NÚMEROS A SACAR — el papel que se le entrega al obrero
+  // NÚMEROS A SACAR — el papel que se le entrega al operario
   // ==========================================================
+  /**
+   * EL PAPEL DEL DÍA  (v4.7)
+   *
+   * "El del día está genial, pero no quiero que se imprima cuando hago el
+   *  corte: que lo pueda imprimir en otro lado, en un momento que quiera
+   *  ver cómo está la cosa."
+   *
+   * Cuánto hielo queda en cada cuarto frío y qué paños salieron hoy, con
+   * quién los sacó. Sale cuando se pide, no al cerrar el turno de nadie.
+   */
+  async function papelDelDia() {
+    let r;
+    try {
+      r = await api.enviar('/impresion/dia', {});
+    } catch (e) { return avisar(e.message, 'error'); }
+
+    if (r.impreso) return avisar('El día, impreso', 'bien');
+
+    // Sin térmica lo saca el navegador, igual que todo lo demás.
+    const que = await verTicket({
+      titulo: 'El día', renglones: r.renglones, ancho: r.ancho,
+      notas: ['No hay impresora térmica configurada.'],
+      acciones: [{ valor: 'imprimir', texto: '🖨️ Imprimir' }]
+    });
+    if (que === 'imprimir') imprimirTicket(htmlDeEspejo(r.renglones, r.ancho));
+  }
+
   async function numerosASacar() {
     const r = await api.obtener('/produccion/siguientes');
 
@@ -1317,7 +1423,7 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
       </div>
 
       <p class="ayuda no-imprimir" style="margin-top:18px">
-        Imprime este papel y dáselo al obrero. Cuando regrese te dice qué sacó
+        Imprime este papel y dáselo al operario. Cuando regrese te dice qué sacó
         de verdad y lo capturas <strong>tocando cada paño</strong> en la lista
         del tanque.
       </p>
@@ -1329,7 +1435,7 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
     // PRIMERO LA TÉRMICA, que sale al instante y sin preguntar nada. La
     // ventana de "elegir impresora" del navegador solo si no hay ninguna
     // puesta: en un cuarto de máquinas nadie va a estar escogiendo bandeja
-    // ni tamaño de hoja con el obrero esperando.
+    // ni tamaño de hoja con el operario esperando.
     pantalla.querySelector('#imprimir').onclick = async (ev) => {
       const boton = ev.currentTarget;
       boton.disabled = true;

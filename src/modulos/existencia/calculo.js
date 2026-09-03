@@ -83,7 +83,7 @@ function producidoPorRangos(rangos = []) {
       JOIN sacadas_pano sp ON sp.id = s.sacada_pano_id
      WHERE ${alAlmacen('sm')}
        AND s.fecha >= ? AND s.fecha < ?
-       AND (sp.notas IS NULL OR sp.notas NOT LIKE 'ANULADA%')
+       AND sp.anulada_en IS NULL
      GROUP BY dia
   `).all(iDesde, iHasta);
 
@@ -101,7 +101,7 @@ function producidoEntreDias(desde, hasta) {
      WHERE ${alAlmacen('sm')}
        AND date(s.fecha, 'localtime') >= date(?)
        AND date(s.fecha, 'localtime') <= date(?)
-       AND (sp.notas IS NULL OR sp.notas NOT LIKE 'ANULADA%')
+       AND sp.anulada_en IS NULL
   `).get(desde, hasta).n;
 }
 
@@ -113,7 +113,7 @@ function producidoDesde(desde) {
       JOIN sacadas_pano sp ON sp.id = s.sacada_pano_id
      WHERE ${alAlmacen('sm')}
        AND s.fecha > ?
-       AND (sp.notas IS NULL OR sp.notas NOT LIKE 'ANULADA%')
+       AND sp.anulada_en IS NULL
   `).get(desde || '');
   return fila.n * DIECISEISAVOS_POR_MARQUETA;
 }
@@ -302,7 +302,7 @@ function estadoAlmacen(almacen) {
 /**
  * CUÁNTO HIELO QUEDA AHORA MISMO, para enseñarlo de reojo  (v4.1)
  *
- * Lo pide Producción —el obrero que saca el hielo es a quien más le sirve
+ * Lo pide Producción —el operario que saca el hielo es a quien más le sirve
  * saber si el cuarto está vacío— y la caja del administrador. Es un número
  * para MIRAR: contar de verdad sigue siendo otra cosa, con su cuadre.
  *

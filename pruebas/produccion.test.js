@@ -438,7 +438,7 @@ test('se puede anular la última sacada de un paño ya terminado', async () => {
 
   const sp = bd.prepare(`
     SELECT sp.id, sp.pano_id FROM sacadas_pano sp
-     WHERE sp.terminada_en IS NOT NULL AND (sp.notas IS NULL OR sp.notas NOT LIKE 'ANULADA%')
+     WHERE sp.terminada_en IS NOT NULL AND sp.anulada_en IS NULL
      ORDER BY sp.iniciada_en DESC LIMIT 1
   `).get();
 
@@ -447,8 +447,20 @@ test('se puede anular la última sacada de un paño ya terminado', async () => {
   });
   assert.equal(r.estado, 200);
 
-  const marcada = bd.prepare('SELECT notas FROM sacadas_pano WHERE id = ?').get(sp.id);
-  assert.match(marcada.notas, /^ANULADA/);
+  // QUIÉN LA ANULÓ Y POR QUÉ, en sus columnas (v4.7). Antes se escribía
+  // dentro de las notas y quién lo hizo no se guardaba en ningún lado:
+  // "si no, jamás me voy a enterar".
+  const marcada = bd.prepare('SELECT * FROM sacadas_pano WHERE id = ?').get(sp.id);
+  assert.ok(marcada.anulada_en);
+  assert.ok(marcada.anulada_por, 'con nombre y apellido');
+  assert.equal(marcada.motivo_anulacion, 'Se equivocaron de paño');
+
+  // Y sale en la ficha del paño, que es donde se va a mirar.
+  const ficha = (await llamar(`/api/produccion/panos/${sp.pano_id}/ficha`)).json.datos;
+  const renglon = ficha.historial.find((h) => h.id === sp.id);
+  assert.ok(renglon.anulada);
+  assert.equal(renglon.motivoAnulada, 'Se equivocaron de paño');
+  assert.equal(renglon.anuladaPor, 'Tony');
 });
 
 test('anular un registro equivocado deja el paño como estaba', async () => {
@@ -467,8 +479,11 @@ test('anular un registro equivocado deja el paño como estaba', async () => {
   assert.ok(despues < antes);
 
   // La sacada del paño no se borra: queda marcada como anulada.
-  const marcada = bd.prepare('SELECT notas FROM sacadas_pano WHERE id = ?').get(sp.id);
-  assert.match(marcada.notas, /^ANULADA/);
+  const marcada = bd.prepare('SELECT * FROM sacadas_pano WHERE id = ?').get(sp.id);
+  assert.ok(marcada.anulada_en);
+  // Y su nota original sigue ahí: anular la sacada no borra lo que alguien
+  // escribió sobre ese paño.
+  assert.match(marcada.notas, /^Capturado en lote/);
 
   // Y quedó anotado en la bitácora.
   const evento = bd.prepare(
@@ -479,9 +494,7 @@ test('anular un registro equivocado deja el paño como estaba', async () => {
 
 test('anular exige motivo', async () => {
   await entrarAdmin();
-  const sp = bd.prepare(
-    'SELECT id FROM sacadas_pano WHERE notas NOT LIKE \'ANULADA%\' OR notas IS NULL LIMIT 1'
-  ).get();
+  const sp = bd.prepare('SELECT id FROM sacadas_pano WHERE anulada_en IS NULL LIMIT 1').get();
   const r = await llamar(`/api/produccion/sacadas-pano/${sp.id}/anular`, {
     method: 'POST', cuerpo: {}
   });
@@ -495,9 +508,9 @@ test('anular exige motivo', async () => {
 
 test('la lista de quién lo sacó trae solo operarios', async () => {
   await entrarAdmin();
-  const { obreros } = (await llamar('/api/produccion/obreros')).json.datos;
-  assert.ok(obreros.length >= 1);
-  assert.ok(obreros.every((o) => o.rol === 'operario'),
+  const { operarios } = (await llamar('/api/produccion/operarios')).json.datos;
+  assert.ok(operarios.length >= 1);
+  assert.ok(operarios.every((o) => o.rol === 'operario'),
             'sacar paños es trabajo de operario; los demás van por "Otro"');
 });
 

@@ -115,7 +115,7 @@ export async function vistaTanques(pantalla, estado) {
           </div>` : ''}
 
         <div class="lista-tanques">
-          ${tanques.map((t) => `
+          ${tanques.map((t, i) => `
             <div class="tanque-fila">
               <button class="tanque-tarjeta" data-id="${esc(t.id)}">
                 <span class="tanque-nombre">${esc(t.nombre)}</span>
@@ -125,10 +125,25 @@ export async function vistaTanques(pantalla, estado) {
                 </span>
                 <span class="tanque-flecha">›</span>
               </button>
-              ${puedeConfigurar
-                ? `<button class="tanque-acciones" data-acciones="${esc(t.id)}"
-                           title="Más cosas que hacer con ${esc(t.nombre)}"
-                           aria-label="Más cosas que hacer con ${esc(t.nombre)}">⋯</button>`
+              ${puedeConfigurar ? `
+                <!-- SUBIR Y BAJAR EL TANQUE  (v4.7). El orden de esta lista
+                     es el que sigue el ojo del que va a sacar hielo, y tiene
+                     que coincidir con cómo están puestos en el cuarto de
+                     máquinas. Antes solo se podía cambiar dando de baja y
+                     volviendo a crear, que se lleva por delante el historial
+                     entero del tanque. -->
+                <div class="tanque-mover">
+                  <button class="tachita papel" data-subir="${esc(t.id)}"
+                          title="Subir ${esc(t.nombre)}"
+                          aria-label="Subir ${esc(t.nombre)}" ${i === 0 ? 'disabled' : ''}>↑</button>
+                  <button class="tachita papel" data-bajar="${esc(t.id)}"
+                          title="Bajar ${esc(t.nombre)}"
+                          aria-label="Bajar ${esc(t.nombre)}"
+                          ${i === tanques.length - 1 ? 'disabled' : ''}>↓</button>
+                </div>
+                <button class="tanque-acciones" data-acciones="${esc(t.id)}"
+                        title="Más cosas que hacer con ${esc(t.nombre)}"
+                        aria-label="Más cosas que hacer con ${esc(t.nombre)}">⋯</button>`
                 : ''}
             </div>`).join('') || `
             <div class="tarjeta plana" style="text-align:center;padding:34px 20px">
@@ -149,6 +164,20 @@ export async function vistaTanques(pantalla, estado) {
     pantalla.querySelectorAll('[data-acciones]').forEach((b) => {
       b.onclick = () => accionesRapidas(tanques.find((t) => t.id === b.dataset.acciones));
     });
+    pantalla.querySelectorAll('[data-subir]').forEach((b) => {
+      b.onclick = () => moverTanque(b.dataset.subir, -1);
+    });
+    pantalla.querySelectorAll('[data-bajar]').forEach((b) => {
+      b.onclick = () => moverTanque(b.dataset.bajar, +1);
+    });
+  }
+
+  /** Cambiarle el sitio a un tanque en la lista, sin tocar nada más. */
+  async function moverTanque(id, cuanto) {
+    try {
+      await api.enviar(`/tanques/${id}/mover`, { cuanto });
+      await lista();
+    } catch (e) { avisar(e.message, 'error'); }
   }
 
   /**

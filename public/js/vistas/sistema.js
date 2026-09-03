@@ -229,6 +229,10 @@ export async function vistaSistema(pantalla, estadoApp) {
         try {
           await api.actualizar('/impresion/config', {
             abrirCajon: pantalla.querySelector('#imp-cajon').checked,
+      valeDuplicado: pantalla.querySelector('#imp-vale-doble').checked,
+      corteImprimeDia: pantalla.querySelector('#imp-corte-dia').checked,
+            valeDuplicado: pantalla.querySelector('#imp-vale-doble').checked,
+            corteImprimeDia: pantalla.querySelector('#imp-corte-dia').checked,
             salidaCajon: Number(pantalla.querySelector('#imp-cajon-salida').value),
             avanceCorte: Number(pantalla.querySelector('#imp-avance').value)
           });
@@ -479,6 +483,36 @@ export async function vistaSistema(pantalla, estadoApp) {
           <b>Baja el número, imprime una prueba y mira el papel:</b> si la
           cuchilla se comió el último renglón, súbelo uno.
         </p>
+
+        <!-- QUÉ SALE POR DUPLICADO Y QUÉ NO  (v4.7). "No quiero nada en
+             duplicado, o en su caso que yo lo decida en configuraciones." -->
+        <h4 class="cfg-subtitulo">Papeles que salen de más</h4>
+        <label class="interruptor">
+          <input type="checkbox" id="imp-vale-doble" ${i.valeDuplicado ? 'checked' : ''}
+                 ${puedeConfigurar ? '' : 'disabled'}>
+          <span>
+            <strong>El vale sale por duplicado</strong>
+            <small>
+              Uno se lo lleva quien recibió el dinero y otro se queda en el
+              cajón. Apagado sale <b>uno solo</b>, que es como viene de
+              fábrica: con dos copias del mismo papel, el día que alguien
+              pregunte por un vale hay dos versiones.
+            </small>
+          </span>
+        </label>
+        <label class="interruptor">
+          <input type="checkbox" id="imp-corte-dia" ${i.corteImprimeDia ? 'checked' : ''}
+                 ${puedeConfigurar ? '' : 'disabled'}>
+          <span>
+            <strong>Al cerrar el turno, imprimir también el papel del día</strong>
+            <small>
+              Cuánto hielo queda en cada cuarto frío y qué paños salieron hoy.
+              Apagado —como viene de fábrica— ese papel se saca cuando se
+              quiera, con el botón <b>🧾 El día</b> de Producción de hielo:
+              es una foto de cómo va el día, no del cierre de nadie.
+            </small>
+          </span>
+        </label>
 
         <h4 class="cfg-subtitulo">El cajón del dinero</h4>
         <label class="interruptor">

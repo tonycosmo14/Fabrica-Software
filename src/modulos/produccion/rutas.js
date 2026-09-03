@@ -3,7 +3,7 @@
  *
  * Cómo trabaja la fábrica de verdad, y por qué el módulo está así:
  *
- *  · LA UNIDAD ES EL PAÑO. Se empieza y se termina completo. Si el obrero se
+ *  · LA UNIDAD ES EL PAÑO. Se empieza y se termina completo. Si el operario se
  *    va o se acaba el agua, el paño queda EN PROCESO y otro lo continúa.
  *
  *  · SACAR Y RELLENAR SON UN SOLO MOVIMIENTO en la práctica: los moldes
@@ -17,7 +17,7 @@
  *    con motivo, y queda registrado.
  *
  *  · NO HAY TURNOS QUE ABRIR NI CERRAR. Cada movimiento guarda su hora y
- *    quién lo hizo. Los obreros no reportan uno por uno: al final de su
+ *    quién lo hizo. Los operarios no reportan uno por uno: al final de su
  *    jornada dan los números de los paños que sacaron y el cajero los
  *    captura de golpe (ver /lote).
  */
@@ -35,7 +35,7 @@ const { tanqueConEstado, canastasFuera, horasDesde } = require('./estado');
 const vales = require('./vales');
 const calidad = require('./calidad');
 // El cuarto frío se lee desde aquí para poder enseñarlo en Producción sin
-// pedir el permiso de existencia, que el obrero no tiene.
+// pedir el permiso de existencia, que el operario no tiene.
 const { hieloQueQueda } = require('../existencia/calculo');
 const { aTexto } = require('../../lib/fracciones');
 
@@ -47,7 +47,7 @@ const registrar = exigirPermiso('produccion.registrar');
 const TIPOS_AGUA = ['purificada', 'potable'];
 
 /**
- * Quién lo hizo físicamente: puede ser otro obrero distinto de quien captura,
+ * Quién lo hizo físicamente: puede ser otro operario distinto de quien captura,
  * o alguien sin usuario —un eventual de un día, el dueño— cuyo nombre llega
  * escrito en ejecutorNombre. En ese caso el id queda vacío y el nombre se
  * copia al registro (regla 3.5); el capturista sigue siendo la sesión (3.6).
@@ -107,7 +107,7 @@ router.get('/estado', verProduccion, (req, res) => {
     destinos: calidad.DESTINOS,
     // CUÁNTO HIELO QUEDA EN EL CUARTO FRÍO  (v4.1)
     //
-    // Va aquí y no detrás del permiso de existencia a propósito: el obrero
+    // Va aquí y no detrás del permiso de existencia a propósito: el operario
     // que saca el hielo es quien más falta le hace saber si el cuarto está
     // vacío, y ese permiso no lo tiene. Es un número para mirar, no para
     // tocar — contar sigue siendo del cajero y del gerente.
@@ -161,10 +161,10 @@ router.post('/autorizar', registrar, (req, res) => {
 });
 
 /**
- * LOS NÚMEROS QUE SIGUEN, para imprimirlos y dárselos a los obreros.
+ * LOS NÚMEROS QUE SIGUEN, para imprimirlos y dárselos a los operarios.
  *
  * Permiso propio, distinto del de autorizar: el cajero es quien está en el
- * mostrador cuando el obrero llega a preguntar qué paño toca, y hacerlo
+ * mostrador cuando el operario llega a preguntar qué paño toca, y hacerlo
  * esperar a que aparezca un gerente para leerle una lista no tiene sentido.
  * Decidir que se saque uno FUERA de orden sigue siendo del gerente.
  */
@@ -172,17 +172,17 @@ router.get('/siguientes', exigirPermiso('produccion.numeros'), (req, res) => {
   return ok(res, numerosASacar(req.usuario.nombre));
 });
 
-/** Obreros a los que se les puede atribuir el trabajo. */
-router.get('/obreros', verProduccion, (req, res) => {
+/** Operarios a los que se les puede atribuir el trabajo. */
+router.get('/operarios', verProduccion, (req, res) => {
   // Solo los operarios: sacar paños es su trabajo. Cuando saca alguien más
   // —un eventual, el dueño— su nombre se escribe con la opción "Otro" y se
   // guarda tal cual; darlo de alta como usuario para un día no tiene caso.
-  const obreros = bd.prepare(`
+  const operarios = bd.prepare(`
     SELECT id, nombre, rol FROM usuarios
      WHERE activo = 1 AND rol = 'operario'
      ORDER BY nombre
   `).all();
-  return ok(res, { obreros });
+  return ok(res, { operarios });
 });
 
 // ============================================================
@@ -216,11 +216,14 @@ router.get('/panos/:id/ficha', verProduccion, (req, res) => {
   // tanque, y con eso se ve si algo viene repitiéndose.
   const sacadas = bd.prepare(`
     SELECT sp.id, sp.iniciada_en, sp.terminada_en, sp.notas, sp.motivo_orden,
+           sp.anulada_en, sp.motivo_anulacion,
            COALESCE(u.nombre, sp.ejecutor_libre, '—') AS quien,
-           COALESCE(a.nombre, '')                     AS autorizo
+           COALESCE(a.nombre, '')                     AS autorizo,
+           an.nombre                                  AS anulada_por_nombre
       FROM sacadas_pano sp
-      LEFT JOIN usuarios u ON u.id = sp.ejecutor_id
-      LEFT JOIN usuarios a ON a.id = sp.autorizada_por
+      LEFT JOIN usuarios u  ON u.id = sp.ejecutor_id
+      LEFT JOIN usuarios a  ON a.id = sp.autorizada_por
+      LEFT JOIN usuarios an ON an.id = sp.anulada_por
      WHERE sp.pano_id = ?
      ORDER BY sp.iniciada_en DESC
      LIMIT 6
@@ -244,14 +247,19 @@ router.get('/panos/:id/ficha', verProduccion, (req, res) => {
 
   const historial = sacadas.map((sp) => {
     const cuenta = cuentaDe.get(sp.id);
-    const anulada = Boolean(sp.notas && sp.notas.startsWith('ANULADA'));
+    // ANULADA: ahora con sus columnas propias, y con QUIÉN la anuló — que
+    // era el dato que faltaba: "si no, jamás me voy a enterar" (v4.7).
+    const anulada = Boolean(sp.anulada_en);
     return {
       id: sp.id,
       fecha: sp.terminada_en || sp.iniciada_en,
       empezada: sp.iniciada_en,
       terminada: Boolean(sp.terminada_en),
       anulada,
-      motivoAnulada: anulada ? sp.notas : null,
+      anuladaEn: sp.anulada_en || null,
+      anuladaPor: sp.anulada_por_nombre || null,
+      motivoAnulada: sp.motivo_anulacion || null,
+      notas: sp.notas || null,
       quienes: [...new Set([sp.quien, ...quienesDe.all(sp.id).map((f) => f.nombre)])]
         .filter((n) => n && n !== '—'),
       autorizo: sp.autorizo || null,
@@ -573,7 +581,7 @@ router.post('/panos/:id/rellenar', registrar, (req, res) => {
 // ============================================================
 
 /**
- * El obrero llega y dice: "saqué los paños 1, 3 y 5". Se capturan todos de
+ * El operario llega y dice: "saqué los paños 1, 3 y 5". Se capturan todos de
  * golpe, a su nombre. Es como funciona hoy en la fábrica.
  *
  * Aquí no se aplica la regla de rotación paño por paño: se está registrando
@@ -705,7 +713,7 @@ router.post('/lote', registrar, (req, res) => {
 router.post('/panos/:id/anular-ultima', exigirPermiso('produccion.corregir'), (req, res) => {
   const ultima = bd.prepare(`
     SELECT id FROM sacadas_pano
-     WHERE pano_id = ? AND (notas IS NULL OR notas NOT LIKE 'ANULADA%')
+     WHERE pano_id = ? AND anulada_en IS NULL
      ORDER BY iniciada_en DESC LIMIT 1
   `).get(req.params.id);
 
@@ -727,7 +735,7 @@ function anularSacadaPano(req, res) {
      WHERE sp.id = ?
   `).get(req.params.id);
   if (!sp) return error(res, 'Ese registro no existe.', 404);
-  if (sp.notas && sp.notas.startsWith('ANULADA')) return error(res, 'Ese registro ya está anulado.');
+  if (sp.anulada_en) return error(res, 'Ese registro ya está anulado.');
 
   const motivo = String(req.body?.motivo || '').trim();
   if (!motivo) return error(res, 'Escribe por qué se anula.');
@@ -735,8 +743,14 @@ function anularSacadaPano(req, res) {
   const anular = bd.transaction(() => {
     // Se marca la sacada como anulada y se retiran sus rellenados, dejando
     // el paño como estaba. Los eventos originales NO se borran.
-    bd.prepare('UPDATE sacadas_pano SET notas = ?, terminada_en = COALESCE(terminada_en, ?) WHERE id = ?')
-      .run(`ANULADA: ${motivo}`, ahora(), sp.id);
+    // La nota del paño NO se toca: si alguien escribió "la grúa se atoró",
+    // eso sigue siendo verdad después de anular la sacada.
+    bd.prepare(`
+      UPDATE sacadas_pano
+         SET anulada_en = ?, anulada_por = ?, motivo_anulacion = ?,
+             terminada_en = COALESCE(terminada_en, ?)
+       WHERE id = ?
+    `).run(ahora(), req.usuario.id, motivo, ahora(), sp.id);
 
     bd.prepare('DELETE FROM rellenados WHERE sacada_pano_id = ?').run(sp.id);
     bd.prepare(`

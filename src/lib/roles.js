@@ -11,7 +11,7 @@ const PERMISOS_POR_ROL = {
   cajero: [
     'produccion.ver',
     'produccion.registrar',
-    // Imprimir los números que siguen: el obrero pregunta en el mostrador.
+    // Imprimir los números que siguen: el operario pregunta en el mostrador.
     'produccion.numeros',
     'caja.ver',
     'caja.operar',
@@ -81,7 +81,7 @@ const PERMISOS_POR_ROL = {
 
 const ETIQUETAS_ROL = {
   operario: 'Operario',
-  cajero: 'Cajero',
+  cajero: 'Encargado de caja',
   repartidor: 'Repartidor',
   gerente: 'Gerente de turno',
   admin: 'Administrador'

@@ -79,7 +79,7 @@ function actividadDeTodos() {
   for (const f of bd.prepare(`
     SELECT ejecutor_id, COUNT(*) cuantos, MAX(iniciada_en) ultima
       FROM sacadas_pano
-     WHERE iniciada_en >= ? AND (notas IS NULL OR notas NOT LIKE 'ANULADA%')
+     WHERE iniciada_en >= ? AND anulada_en IS NULL
      GROUP BY ejecutor_id
   `).all(treintaDias)) {
     meter(f.ejecutor_id, 'panos', f.cuantos);

@@ -722,7 +722,7 @@ export async function vistaVenta(pantalla, estadoApp) {
 
   /**
    * El aviso del hielo dice de dónde salió el número, porque el número
-   * miente a media mañana: los obreros sacan hielo desde temprano y no
+   * miente a media mañana: los operarios sacan hielo desde temprano y no
    * reportan hasta como las 3. Por eso avisa y no impide vender.
    */
   function verAvisoHielo() {
@@ -744,7 +744,7 @@ export async function vistaVenta(pantalla, estadoApp) {
         <p class="ayuda" style="margin:12px 0 0">
           El aviso salta con ${h.minimoMarquetas} marqueta${h.minimoMarquetas === 1 ? '' : 's'}
           o menos. Ese número es <strong>lo que se ha capturado</strong>, no
-          lo que hay en el cuarto frío: mientras los obreros no reporten lo
+          lo que hay en el cuarto frío: mientras los operarios no reporten lo
           que sacaron, va a marcar de menos. Sigue vendiendo normal.
         </p>
         <p class="ayuda" style="margin:8px 0 0">

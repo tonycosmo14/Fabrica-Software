@@ -302,7 +302,7 @@ test('el corte parte gastos y vales, y trae los adelantos con nombre', async () 
   assert.equal(corte.adelantos[0].usuario_nombre, 'Chema');
 });
 
-test('el papel de un vale sale por duplicado; el de un gasto no', async () => {
+test('el papel de un vale sale UNA vez, salvo que se pida el duplicado', async () => {
   const { json } = await llamar('/api/caja/cortes?limite=1');
   const corte = (await llamar(`/api/caja/cortes/${json.datos.cortes[0].id}`)).json.datos.corte;
 
@@ -316,12 +316,25 @@ test('el papel de un vale sale por duplicado; el de un gasto no', async () => {
   assert.match(delVale, /VALE/i);
   assert.match(delVale, new RegExp(vale.ejecutor_nombre, 'i'),
     'el nombre de quien se lo llevó va en el papel');
-  assert.match(delVale, /Se lo lleva quien recibio el dinero/);
-  assert.match(delVale, /Se queda en el cajon/,
-    'uno se lo lleva y el otro se queda: son dos papeles');
+  assert.match(delVale, /FIRMA DE QUIEN LO RECIBE/, 'y su raya para firmar');
+
+  // DE FÁBRICA, UNO SOLO  (v4.7). "No quiero nada en duplicado, o en su
+  // caso que yo lo decida en configuraciones."
+  assert.doesNotMatch(delVale, /Se queda en el cajon/);
+
+  // Y encendiéndolo, los dos.
+  bd.prepare(`
+    INSERT INTO configuracion (clave, valor, actualizado_en)
+    VALUES ('ticket_vale_duplicado', '1', datetime('now'))
+    ON CONFLICT(clave) DO UPDATE SET valor = '1'
+  `).run();
+  const doble = await papel(vale.id);
+  assert.match(doble, /Se lo lleva quien recibio el dinero/);
+  assert.match(doble, /Se queda en el cajon/, 'uno se lo lleva y el otro se queda');
+  bd.prepare("UPDATE configuracion SET valor = '0' WHERE clave = 'ticket_vale_duplicado'").run();
 
   const delGasto = await papel(gasto.id);
-  assert.doesNotMatch(delGasto, /Se queda en el cajon/, 'un gasto lleva un solo papel');
+  assert.doesNotMatch(delGasto, /FIRMA DE QUIEN LO RECIBE/, 'un gasto lleva otro papel');
 });
 
 // ============================================================
@@ -417,7 +430,7 @@ test('si YA estaba dado de baja, el vale lo revive en vez de fallar', async () =
 test('si alguien creó a mano otro con el mismo nombre, se adopta el suyo', async () => {
   bd.prepare("UPDATE conceptos_gasto SET activo = 0, oculto = 1 WHERE id = 'gasto-vale-raya'").run();
   const alta = await llamar('/api/caja/conceptos', {
-    method: 'POST', cuerpo: { nombre: 'Vale de raya', tipo: 'salida' }
+    method: 'POST', cuerpo: { nombre: 'Vale sueldo', tipo: 'salida' }
   });
   assert.equal(alta.estado, 201);
   const suyo = alta.json.datos.concepto.id;

@@ -123,7 +123,7 @@ function produccion({ desde, hasta }) {
       JOIN sacadas s       ON s.id = sm.sacada_id
       JOIN sacadas_pano sp ON sp.id = s.sacada_pano_id
      WHERE s.fecha >= ? AND s.fecha < ?
-       AND (sp.notas IS NULL OR sp.notas NOT LIKE 'ANULADA%')
+       AND sp.anulada_en IS NULL
   `).get(desde, hasta);
 
   const m = resumir(r, r.guardadas);
@@ -163,7 +163,7 @@ function porObrero({ desde, hasta }) {
       JOIN sacadas_moldes sm ON sm.sacada_id = s.id
       LEFT JOIN usuarios u   ON u.id = sp.ejecutor_id
      WHERE s.fecha >= ? AND s.fecha < ?
-       AND (sp.notas IS NULL OR sp.notas NOT LIKE 'ANULADA%')
+       AND sp.anulada_en IS NULL
      GROUP BY COALESCE(sp.ejecutor_id, 'L:' || sp.ejecutor_libre)
      ORDER BY marquetas DESC
   `).all(desde, hasta);
@@ -402,7 +402,7 @@ function porDia(periodo) {
       JOIN sacadas s       ON s.id = sm.sacada_id
       JOIN sacadas_pano sp ON sp.id = s.sacada_pano_id
      WHERE s.fecha >= ? AND s.fecha < ?
-       AND (sp.notas IS NULL OR sp.notas NOT LIKE 'ANULADA%')
+       AND sp.anulada_en IS NULL
      GROUP BY dia
   `).all(desde, hasta).map((f) => [f.dia, f]));
 

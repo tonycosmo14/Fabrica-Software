@@ -36,8 +36,11 @@ const VALES = {
     ayuda: 'Cuando ya hay mucho efectivo junto'
   },
   raya: {
-    id: 'gasto-vale-raya', nombre: 'Vale de raya', traspaso: 0, orden: 6,
-    ayuda: 'Parte del sueldo de la semana, pedida antes'
+    // "Vales no se llama vale en raya, no sé qué es eso; sería mejor Vale
+    // sueldo." El id no cambia (regla 3.3): los vales viejos siguen
+    // colgando de él.
+    id: 'gasto-vale-raya', nombre: 'Vale sueldo', traspaso: 0, orden: 6,
+    ayuda: 'Parte de su sueldo de la semana, pedida antes'
   }
 };
 

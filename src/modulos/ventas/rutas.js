@@ -358,7 +358,7 @@ function prepararLineas(lineas, lista, listaMayoreo = null) {
 
     // No se vende lo que no hay. Solo aplica a lo que lleva cuenta de
     // piezas: el hielo pasa siempre, porque su número depende de que los
-    // obreros hayan reportado, y eso no llega hasta la tarde.
+    // operarios hayan reportado, y eso no llega hasta la tarde.
     const falta = alcanza(producto, cantidad);
     if (falta) return { error: falta, codigo: 409 };
 

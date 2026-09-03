@@ -571,7 +571,7 @@ export async function vistaProductos(pantalla, estadoApp) {
    *
    * Este aviso es distinto a todos los demás y hay que decirlo en la
    * pantalla: el número del que sale no es lo que hay en el cuarto frío,
-   * es lo que se ha capturado. Los obreros sacan hielo toda la mañana y
+   * es lo que se ha capturado. Los operarios sacan hielo toda la mañana y
    * reportan hasta como las 3 de la tarde, así que a media mañana el
    * sistema siempre va a creer que hay menos.
    *
@@ -586,7 +586,7 @@ export async function vistaProductos(pantalla, estadoApp) {
       <p class="ayuda">
         Cuando lo capturado baje de aquí, en la caja aparece un 🧊. Es solo
         un aviso: <strong>el hielo nunca se deja de vender</strong>, porque
-        el número va atrasado hasta que los obreros reportan lo que sacaron.
+        el número va atrasado hasta que los operarios reportan lo que sacaron.
       </p>
       <div class="cuadre">
         <div class="cuadre-linea ${administra ? 'campo-vivo' : ''}">

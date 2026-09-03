@@ -60,7 +60,7 @@ function armar(cuando, valores) {
       JOIN sacadas_moldes sm ON sm.sacada_id = s.id
       LEFT JOIN usuarios u  ON u.id = sp.ejecutor_id
      WHERE ${cuando}
-       AND (sp.notas IS NULL OR sp.notas NOT LIKE 'ANULADA%')
+       AND sp.anulada_en IS NULL
      GROUP BY sp.id
      ORDER BY t.nombre, MIN(s.fecha)
   `).all(...valores);

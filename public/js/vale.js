@@ -35,8 +35,8 @@ export async function hacerVale() {
     opciones: [
       { valor: 'retiro', texto: '🏦 Se llevaron dinero',
         detalle: 'El dueño o un gerente, para que no se junte mucho. Nadie queda debiendo.' },
-      { valor: 'raya', texto: '🧑‍🏭 Adelanto de sueldo',
-        detalle: 'Parte de su raya de la semana, pedida antes. El sábado se le paga de menos.' }
+      { valor: 'raya', texto: '🧑‍🏭 Vale de sueldo',
+        detalle: 'Parte de su sueldo de la semana, pedida antes. El día de pago se le da de menos.' }
     ]
   });
   if (!clase) return null;
@@ -53,10 +53,10 @@ export async function hacerVale() {
   // es un faltante. Se pregunta ANTES del importe porque es lo que se tiene
   // enfrente —la persona— y el número viene después.
   const quienId = await menu({
-    titulo: clase === 'retiro' ? '¿Quién se llevó el dinero?' : '¿A quién es el adelanto?',
+    titulo: clase === 'retiro' ? '¿Quién se llevó el dinero?' : '¿A quién es el vale?',
     texto: clase === 'retiro'
       ? 'Aunque no sea quien está en la computadora: el papel sale con los dos nombres.'
-      : 'Se le apunta en su ficha para descontárselo el día de la raya.',
+      : 'Se le apunta en su ficha para descontárselo el día que se le pague.',
     opciones: gente.map((u) => ({ valor: u.id, texto: u.nombre }))
   });
   if (!quienId) return null;
@@ -67,7 +67,7 @@ export async function hacerVale() {
     texto: '¿Cuánto se llevó?',
     ok: 'Hacer el vale',
     ayuda: clase === 'raya'
-      ? 'Sale del cajón hoy y se le descuenta de su raya de esta semana.'
+      ? 'Sale del cajón hoy y se le descuenta de su sueldo de esta semana.'
       : 'Sale del cajón, pero no es un gasto de la fábrica: el dinero cambió de sitio.'
   });
   if (!monto) return null;
@@ -117,7 +117,7 @@ async function imprimirElVale(movimientoId) {
   try {
     const r = await api.enviar(`/impresion/movimiento/${movimientoId}`, {});
     if (r.impreso) {
-      return avisar('Vale hecho. Salieron los dos papeles: que firme el suyo.', 'bien');
+      return avisar('Vale hecho. Que lo firme.', 'bien');
     }
   } catch {
     return avisar('Vale anotado, pero no se pudo imprimir. Vuelve a sacarlo con 🖨️.', 'aviso');

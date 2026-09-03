@@ -3,7 +3,7 @@
  *
  * Vive aparte de las rutas porque lo piden DOS módulos: producción, que lo
  * enseña en pantalla, e impresión, que lo saca por la térmica para que el
- * obrero se lo lleve al cuarto de tanques.
+ * operario se lo lleve al cuarto de tanques.
  *
  * Se calcula, nunca llega de fuera: un papel que dice qué paño sacar no
  * puede salir de lo que alguien mande en el cuerpo de una petición.
@@ -13,7 +13,7 @@ const { ahora } = require('../../lib/ids');
 const { tanqueConEstado } = require('./estado');
 const { siguientePano } = require('./rotacion');
 
-/** Cuántos números por tanque lleva el papel: la jornada del obrero. */
+/** Cuántos números por tanque lleva el papel: la jornada del operario. */
 const CUANTOS = 6;
 
 function numerosASacar(entregadoPor = '') {
@@ -26,7 +26,7 @@ function numerosASacar(entregadoPor = '') {
     const orden = [];
     let ultimo = estado.ultimo_pano_sacado;
 
-    // Los siguientes de la rotación, no solo el primero: el obrero se lleva
+    // Los siguientes de la rotación, no solo el primero: el operario se lleva
     // una lista para toda su jornada.
     const numeros = estado.panos.map((p) => p.numero);
     const enProceso = estado.panos.filter((p) => p.enProceso).map((p) => p.numero);
@@ -63,7 +63,7 @@ function numerosASacar(entregadoPor = '') {
       // Antes se dejaba quieta la cuenta siempre que hubiera algo a medias,
       // y eso borraba la lista entera: al dar la segunda vuelta salía otra
       // vez el mismo número, se detectaba repetido y el papel se quedaba
-      // con un solo paño. El obrero perdía la fila de toda su jornada por
+      // con un solo paño. El operario perdía la fila de toda su jornada por
       // una canasta colgada.
       if (n === siguientePano(numeros, ultimo, [])) ultimo = n;
 
