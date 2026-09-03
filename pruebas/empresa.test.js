@@ -77,7 +77,11 @@ test('el sistema arranca con los conceptos que nombró el dueño', async () => {
   for (const cual of ['amoniaco', 'sal', 'aceite']) {
     assert.ok(nombres.some((n) => n.includes(cual)), `falta ${cual}`);
   }
-  assert.ok(conceptos.every((c) => c.unidad), 'y cada uno dice en qué se compra');
+  // Cada COMPRA dice en qué se compra: "$12,000" puede ser una ganga o un
+  // robo según cuántos barriles vinieran. Los sueldos no se compran en
+  // nada y por eso no llevan unidad — inventarle una sería mentir (v4.8).
+  assert.ok(conceptos.filter((c) => c.id !== 'emp-sueldos').every((c) => c.unidad),
+    'y cada compra dice en qué se compra');
 });
 
 test('un gasto de la empresa NO toca el cajón, ni el arqueo del turno', async () => {

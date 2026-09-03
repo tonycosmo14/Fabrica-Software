@@ -240,6 +240,21 @@ function gastosDelCajon({ desde, hasta }) {
  * una fábrica de hielo la luz es la mitad del costo, y un mes sin recibo
  * daría un costo por marqueta falsamente barato.
  */
+/**
+ * LO QUE SE PAGÓ DE SUELDOS en un periodo, por las dos puertas  (v4.8)
+ *
+ * La raya sale del cajón o de fuera, y las dos son gasto de la fábrica.
+ * Aquí se suman las rayas pagadas, que es de donde salen los dos
+ * movimientos: contar los movimientos sería contar lo mismo dos veces.
+ */
+function rayaEnPeriodo({ desde, hasta }) {
+  return bd.prepare(`
+    SELECT COALESCE(SUM(pagado_centavos), 0) n
+      FROM rayas
+     WHERE anulada_en IS NULL AND date(pagada_en) >= ? AND date(pagada_en) <= ?
+  `).get(desde, hasta).n;
+}
+
 function costoPorMarqueta(periodo) {
   const rango = instantes(periodo);
   // Se divide entre lo PRODUCIDO, no entre lo que se vendió: la cáscara
@@ -283,8 +298,18 @@ function costoPorMarqueta(periodo) {
     hayReparto: totalParejo !== totalDelMes,
     completo: luz.completo,
     faltanDiasDeLuz: Math.max(luz.diasDelPeriodo - luz.dias, 0),
-    // LA RAYA NO ESTÁ AQUÍ. Se declara para que la pantalla lo diga.
-    sinLaRaya: true
+    // LA RAYA YA ESTÁ AQUÍ  (v4.8). Hasta la v4.7 no lo estaba —no había
+    // dónde anotar los sueldos— y este número decía expresamente que le
+    // faltaba lo más caro después de la luz. Ahora la raya entra por la
+    // bolsa que le toque: del cajón si el pago salió de ahí, o de los
+    // gastos de la empresa si salió de fuera. Las dos suman aquí arriba.
+    //
+    // Se sigue declarando —ahora en falso— porque la pantalla lo dice, y
+    // porque una fábrica que todavía no capture ningún sueldo tiene que
+    // poder enterarse de que le falta.
+    sinLaRaya: false,
+    // Cuánto de este mes fue sueldo, para poder decirlo.
+    rayaCentavos: rayaEnPeriodo(dias)
   };
 }
 

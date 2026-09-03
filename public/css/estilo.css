@@ -1474,6 +1474,95 @@ tr.anulada { opacity: .45; text-decoration: line-through; }
 .cfg-cabeza { text-align: left; margin-bottom: 10px; }
 .volver-produccion { display: inline-flex; width: auto; }
 
+/* ============================================================
+   LA RAYA  (v4.8)
+   "Necesito una forma más visual donde anotar cuánto gana, qué días viene,
+   a qué hora llega, a qué hora se va."
+   ============================================================ */
+.raya-lista { display: flex; flex-direction: column; gap: 10px; }
+.raya-tarjeta {
+  display: flex; align-items: center; gap: 18px; width: 100%; text-align: left;
+  padding: 14px 16px; background: var(--superficie); color: var(--texto);
+  border: 1px solid var(--borde); border-radius: var(--radio); flex-wrap: wrap;
+}
+.raya-tarjeta:hover { border-color: var(--primario); }
+.raya-quien { flex: 1 1 180px; min-width: 0; display: flex; flex-direction: column; }
+.raya-quien strong { font-size: 16px; }
+.raya-quien small { color: var(--suave); font-size: 12.5px; }
+
+.raya-dato { display: flex; flex-direction: column; line-height: 1.25; min-width: 96px; }
+.raya-dato small { font-size: 11px; color: var(--suave); }
+.raya-dato b { font-size: 17px; font-variant-numeric: tabular-nums; }
+/* Lo que debe de vales salta en ámbar: no está mal, hay que acordarse. */
+.raya-dato.debe b { color: var(--ambar); }
+
+.raya-cuando { flex: 1 1 160px; text-align: right; }
+.raya-cuando small { color: var(--suave); font-size: 12px; }
+
+.raya-sueldo { display: flex; flex-direction: column; line-height: 1.3; }
+.raya-sueldo strong { font-size: 30px; font-variant-numeric: tabular-nums; }
+.raya-sueldo small { color: var(--suave); font-size: 13px; }
+
+/* LA SEMANA, DIBUJADA COMO UNA SEMANA. Siete casillas de domingo a sábado:
+   así se ve de un vistazo quién abre el martes, que es la pregunta que se
+   hace mirando esto. Una tabla de horas no la contesta. */
+.raya-semana { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.raya-dia {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 8px 2px; border-radius: 10px; text-align: center;
+  background: var(--superficie-alt); border: 1px solid var(--borde);
+  color: var(--suave); min-width: 0;
+}
+.raya-dia.viene {
+  background: var(--et-cajero-f); border-color: var(--verde); color: var(--et-cajero-t);
+}
+.raya-dia-letra { font-size: 15px; font-weight: 800; }
+.raya-dia-nombre { font-size: 10px; text-transform: capitalize; opacity: .8; }
+.raya-dia-horas {
+  font-size: 11.5px; font-variant-numeric: tabular-nums; line-height: 1.25; font-weight: 600;
+}
+.raya-dia-total { font-size: 10px; opacity: .75; }
+.raya-dia-libre { font-size: 10px; opacity: .6; }
+
+@media (max-width: 520px) {
+  .raya-dia-nombre { display: none; }
+}
+
+/* Las rayas ya pagadas.
+
+   Tabla propia y no la del historial de ventas: aquella está hecha para
+   ocho columnas apretadas —ancho mínimo de 860 px y todo recortado con
+   puntos suspensivos— y aquí son cuatro. El motivo de una anulación
+   recortado a "porque se pag…" no sirve de nada. */
+.raya-tabla { width: 100%; }
+.raya-tabla td, .raya-tabla th { vertical-align: middle; }
+.raya-tabla th { white-space: nowrap; }
+/* El motivo de una anulación queda fuera: tiene que seguir siendo un
+   inline-block para que la línea de tachado del renglón no lo cruce. */
+.raya-tabla small:not(.anul-detalle) {
+  display: block; font-size: 11.5px; color: var(--suave); white-space: nowrap;
+}
+.raya-semana-rango { white-space: nowrap; }
+.raya-tabla tr.anulada { opacity: .6; text-decoration: line-through; }
+.raya-tabla tr.anulada .anul-detalle { color: var(--texto); }
+.raya-tabla td.anul-celda { white-space: normal; min-width: 200px; }
+
+/* Los botones del renglón. NO son .tachita: esa vive en position:absolute
+   —es la ✕ que se pone encima de una foto— y dentro de una celda se va
+   volando a la esquina de la pantalla. */
+.raya-acciones { display: flex; gap: 6px; justify-content: flex-end; }
+.raya-accion {
+  position: static;
+  width: 34px; min-width: 34px; height: 34px; padding: 0;
+  border-radius: 50%; font-size: 14px; line-height: 1;
+  background: var(--superficie-alt); color: var(--suave);
+  border: 1px solid var(--borde); box-shadow: none;
+}
+.raya-accion:hover { border-color: var(--primario); color: var(--primario); }
+.raya-accion.peligro { font-size: 17px; font-weight: 700; }
+.raya-accion.peligro:hover { border-color: var(--rojo); color: var(--rojo); }
+.raya-tabla tr.anulada .raya-accion { text-decoration: none; }
+
 .tanque-fila { display: flex; align-items: stretch; gap: 14px; margin-bottom: 12px; }
 .tanque-fila .tanque-tarjeta { margin-bottom: 0; flex: 1; min-width: 0; }
 /* Las flechas de orden, en columna al lado del tanque. `.tachita` nace

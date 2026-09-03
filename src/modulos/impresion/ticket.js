@@ -504,6 +504,103 @@ function ticketEncomienda(e, { negocio = '', nombre = 'Encomendado', copia = fal
 }
 
 /**
+ * EL PAPEL DE LA RAYA  (v4.8)
+ *
+ * "Imprimir su balance para darle su sueldo."
+ *
+ * Es el papel que se le entrega con el dinero y que firma. Lleva la cuenta
+ * entera y en el orden en que se explica de viva voz —lo que ganó, lo que
+ * se llevó adelantado, lo que queda— porque quien lo recibe la va a hacer
+ * de cabeza mientras lo lee, y si los números no salen en ese orden no le
+ * va a cuadrar aunque el total esté bien.
+ *
+ * Y dice DE DÓNDE salió el dinero. En una fábrica donde a veces se paga del
+ * cajón y a veces del dinero ya retirado, ese renglón es el que evita que
+ * el mismo pago se busque dos veces.
+ */
+function ticketRaya(raya, { negocio = '', copia = false, previa = false } = {}) {
+  const cfg = configuracion();
+  const t = new Ticket(cfg.anchoMm, cfg.codigoPagina);
+
+  if (copia) marcaCopia(t);
+
+  encabezado(t, {
+    titulo: previa ? 'Sueldo (previa)' : 'Sueldo',
+    atendio: raya.pagada_por_nombre,
+    fecha: fechaTicket(raya.pagada_en || new Date().toISOString())
+  });
+  t.separador();
+
+  // DE QUIÉN ES, en grande: es lo primero que mira quien lo recibe.
+  t.izquierda().negrita().tamano(2, 1)
+   .linea(String(raya.usuario_nombre || '?').slice(0, 22)).normal();
+  t.linea(`Del ${fechaDia(raya.desde)} al ${fechaDia(raya.hasta)}`);
+  t.separador('.');
+
+  // LA CUENTA, en el orden en que se canta.
+  t.bloqueDerecha([
+    [raya.dias_trabajados != null
+      ? `Sueldo (${raya.dias_trabajados} ${raya.dias_trabajados === 1 ? 'dia' : 'dias'})`
+      : 'Sueldo',
+     formato(raya.sueldo_centavos)],
+    raya.extras_centavos ? ['Extras', '+' + formato(raya.extras_centavos)] : null,
+    raya.vales_centavos ? ['Vales que se llevo', '-' + formato(raya.vales_centavos)] : null,
+    raya.descuentos_centavos
+      ? ['Otros descuentos', '-' + formato(raya.descuentos_centavos)] : null
+  ]);
+
+  if (raya.extras_notas) t.parrafo(`Extras: ${raya.extras_notas}`);
+  if (raya.descuentos_notas) t.parrafo(`Descuentos: ${raya.descuentos_notas}`);
+
+  // LOS VALES, UNO POR UNO. Es lo que más se pregunta al recibir menos de
+  // lo esperado, y "vales -$400" a secas no lo contesta.
+  if (raya.vales?.length) {
+    t.negrita().separadorConTitulo('SUS VALES').negrita(false);
+    for (const v of raya.vales) {
+      t.columnas2(`  ${fechaDia(v.fecha)}`, formato(v.centavos));
+    }
+  }
+
+  // LO QUE SE LLEVA, en grande. Es el número del papel.
+  t.separador();
+  t.centro().linea('SE LE PAGA');
+  t.negrita().tamano(2, 2).linea(formato(raya.pagado_centavos)).normal().izquierda();
+
+  t.separador('.');
+  if (previa) {
+    t.centro().negrita().linea('*** TODAVIA NO SE HA PAGADO ***').negrita(false);
+    t.linea('Esto es solo la cuenta').izquierda();
+  } else {
+    t.linea(raya.de_donde === 'cajon' ? 'Salio del cajon' : 'No salio del cajon');
+  }
+  if (raya.notas) t.parrafo(raya.notas);
+
+  if (raya.anulada_en) {
+    t.centro().negrita().tamano(2, 1).linea('ANULADA').normal().izquierda();
+    if (raya.motivo_anulacion) t.parrafo(raya.motivo_anulacion);
+  }
+
+  t.separador();
+  if (!previa) t.firma('RECIBI CONFORME');
+  pie(t, negocio);
+  t.izquierda().cortar(cfg.avanceCorte);
+  return t.bytes();
+}
+
+/**
+ * "26/Ago" — un día de calendario, corto, para los renglones apretados.
+ *
+ * Aguanta que le llegue con hora ("2026-08-26T14:03:00"): los vales guardan
+ * el momento exacto, y pegarle un "T12:00:00" a eso daba NaN/undefined.
+ */
+function fechaDia(dia) {
+  if (!dia) return '?';
+  const d = new Date(`${String(dia).slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return '?';
+  return `${d.getDate()}/${MESES[d.getMonth()]}`;
+}
+
+/**
  * LOS NÚMEROS A SACAR, para el operario.
  *
  * Este papel se lo lleva en la mano al cuarto de tanques, y vuelve escrito
@@ -1085,6 +1182,7 @@ function pulsoCajon(salida = 2) {
 }
 
 module.exports = {
-  ticketVenta, ticketMovimiento, ticketVale, ticketEncomienda, ticketCotizacion, ticketPrueba,
+  ticketVenta, ticketMovimiento, ticketVale, ticketEncomienda, ticketRaya,
+  ticketCotizacion, ticketPrueba,
   ticketCorte, ticketCorteMovimientos, ticketHielo, ticketCortePersona, ticketConteo, ticketProduccion, ticketResumenDia, pulsoCajon, fechaCorta, fechaTicket
 };

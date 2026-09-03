@@ -77,6 +77,13 @@ const PERMISOS_POR_ROL = {
     'estadisticas.ver'
   ],
   admin: ['*'] // el comodin abre todo
+  // LOS SUELDOS SON SOLO DEL ADMINISTRADOR  (v4.8)
+  //
+  // `raya.ver` y `raya.pagar` no los lista ningún rol a propósito: cuánto
+  // gana cada quien no es un dato de operación, y de los pocos que ni el
+  // gerente de turno debe ver. Como admin tiene el comodín, quedan suyos.
+  // El día que haga falta un contador, se le da `raya.ver` a un rol nuevo
+  // sin tocar ninguna ruta.
 };
 
 const ETIQUETAS_ROL = {

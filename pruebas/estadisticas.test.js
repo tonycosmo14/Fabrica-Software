@@ -200,7 +200,11 @@ test('el costo por marqueta es todo lo que costó entre lo que se produjo', asyn
 
   assert.equal(c.total, c.cajon + c.grandes + c.luz, 'el total es la suma de los tres');
   if (c.marquetas > 0) assert.equal(c.centavos, Math.round(c.total / c.marquetas));
-  assert.equal(c.sinLaRaya, true, 'y el sistema declara que los sueldos no están aquí');
+  // LA RAYA YA ESTÁ AQUÍ (v4.8). Hasta la v4.7 este número decía
+  // expresamente que le faltaba lo más caro después de la luz, porque no
+  // había dónde anotar los sueldos.
+  assert.equal(c.sinLaRaya, false);
+  assert.equal(typeof c.rayaCentavos, 'number', 'y dice cuánto fue de sueldos');
 });
 
 test('una compra que dura meses NO le carga todo al mes que se pagó', async () => {

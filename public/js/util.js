@@ -52,6 +52,24 @@ export function fechaCorta(iso) {
          `${d.toLocaleTimeString('es-MX', { hour: 'numeric', minute: '2-digit' })}`;
 }
 
+/**
+ * SOLO EL DÍA: "2 sep de 2026", o "2 sep" si se pide corto.
+ *
+ * Para las fechas que son DÍAS DE CALENDARIO y no instantes: la semana de
+ * una raya, el día de una compra, desde cuándo vale un sueldo. Pasarlas por
+ * `fechaCorta` les pega un "12:00 a.m." que no significa nada y que además
+ * se lee como si algo hubiera pasado a medianoche.
+ */
+export function soloDia(dia, { conAnio = false } = {}) {
+  if (!dia) return '—';
+  // Mediodía a propósito: un "2026-09-02" leído como medianoche UTC se
+  // convierte en el día anterior en cualquier huso al oeste, y aquí lo es.
+  const d = new Date(`${String(dia).slice(0, 10)}T12:00:00`);
+  return d.toLocaleDateString('es-MX',
+    conAnio ? { day: 'numeric', month: 'short', year: 'numeric' }
+            : { day: 'numeric', month: 'short' });
+}
+
 /** Solo la hora: "02:23 p.m." */
 export function soloHora(iso) {
   if (!iso) return '—';

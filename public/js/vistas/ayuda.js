@@ -1833,10 +1833,10 @@ EN REPARACION
       vales»</b>, que es lo que se pregunta uno mirando esta pantalla el día
       de la raya.</p>
 
-      <p>Cuando ya se le pagó su raya de menos, el botón <b>«ya se le
-      descontó»</b> apaga el recordatorio de todos sus vales pendientes de
-      un jalón — que es como pasa de verdad: nadie descuenta uno sí y otro
-      no de la misma semana.</p>
+      <p>Al <b>pagarle su raya</b> desde <b>La raya</b> los vales se
+      descuentan solos, todos de un jalón — no hay que venir aquí. Este
+      botón <b>«ya se le descontó»</b> queda para cuando se le pagó por
+      fuera del sistema y solo hay que apagar el recordatorio.</p>
 
       <p class="ayuda-tip">Ese botón <b>no mueve un peso</b>. El dinero
       salió del cajón el día del vale, y ahí se contó como gasto: el sueldo
@@ -1862,6 +1862,113 @@ EN REPARACION
 
       <p class="ayuda-tip">Esta pantalla es <b>solo del administrador</b>.
       Dar de alta a alguien es decidir qué va a poder tocar en la fábrica.</p>`
+  },
+
+  // ==========================================================
+  {
+    id: 'raya',
+    titulo: 'La raya: sueldos, horarios y el pago de la semana',
+    busca: 'raya sueldo sueldos pago pagar semana semanal por dia dia horario horas entra sale turno empleados operarios colaboradores vales adelanto descuento extras balance recibo firmar cajon caja fuerte gasto empresa dia de pago sabado nomina',
+    cuerpo: `
+      <p>La raya es <b>lo que se le paga a cada quien</b>. En una pantalla:
+      cuánto gana, qué días viene y de qué hora a qué hora, cuánto se llevó
+      adelantado, y el papel que firma cuando se le paga.</p>
+
+      <p class="ayuda-tip">Se llega desde el inicio, en <b>💵 La raya</b>.
+      Es <b>solo del administrador</b>: lo que gana cada quien no se anda
+      enseñando.</p>
+
+      <h4>La lista</h4>
+      <p>Todos los que trabajan, con lo que se pregunta uno el día de pago:
+      <b>Gana</b>, <b>Viene</b> (días y horas de la semana) y <b>Vales</b>
+      (lo que se llevó adelantado y no se le ha descontado). Arriba, en
+      amarillo, sale quién trae vales sin descontar, y si a alguien todavía
+      no se le ha puesto sueldo, lo dice — sin sueldo no se le puede pagar
+      desde aquí, porque el sistema no inventa números.</p>
+
+      <p>El <b>día de pago</b> se cambia con el botón de arriba. Viene en
+      <b>sábado</b>, que es lo normal aquí, pero cada quien paga cuando
+      paga.</p>
+
+      <h4>Cuánto gana</h4>
+      <p>Dos formas, y son distintas de verdad:</p>
+      <ul>
+        <li><b>A la semana</b> — gana lo mismo venga cinco días o seis.</li>
+        <li><b>Por día</b> — se multiplica por los días que se le cuenten.
+        Al pagarle se puede cambiar ese número, porque faltó un día o
+        porque entró uno extra.</li>
+      </ul>
+
+      <p class="ayuda-tip"><b>Un aumento no borra lo anterior.</b> Cada
+      sueldo se guarda con la fecha <b>desde</b> cuándo vale, y la lista de
+      abajo enseña todos los que ha tenido. Se puede dejar apuntado un
+      aumento con fecha de la semana que entra: la raya de esta semana se
+      paga todavía con el sueldo viejo, que es lo correcto.</p>
+
+      <h4>Sus días y sus horas</h4>
+      <p>La semana se dibuja como una semana: siete casillas de domingo a
+      sábado. Los días que viene salen en verde con la hora de entrada, la
+      de salida y cuántas horas son; los que no viene, en gris. Un turno
+      que cruza la medianoche —entra a las 22:00 y sale a las 6:00— se
+      cuenta bien, son ocho horas.</p>
+
+      <p>Esto es <b>su horario de costumbre</b>, no una checadora: sirve
+      para saber a quién le toca mañana y para contarle los días a quien
+      gana por día. No es un registro de si llegó tarde.</p>
+
+      <h4>El pago de la semana</h4>
+      <p>La cuenta se arma sola, y se lee como se dice de viva voz:</p>
+      <pre class="ayuda-formula">sueldo + extras − vales − descuentos = SE LE PAGA</pre>
+      <ul>
+        <li><b>Extras</b> — horas de más, un domingo que entró, una
+        gratificación. Se escribe el monto y por qué.</li>
+        <li><b>Vales</b> — todo lo que se llevó adelantado y no se le ha
+        descontado, entero. Salen listados con su fecha.</li>
+        <li><b>Descuentos</b> — lo que se le descuenta por otra cosa, con
+        su nota.</li>
+      </ul>
+
+      <p>Si la cuenta sale en <b>negativo</b> —debe más vales de lo que
+      gana— el sistema no deja pagar. Eso no se arregla con un número rojo
+      en un papel, se arregla hablando.</p>
+
+      <h4>¿De dónde sale el dinero?</h4>
+      <p>Al pagar se pregunta, y la respuesta cambia las cuentas:</p>
+      <ul>
+        <li><b>Del cajón</b> — se registra como salida de la caja abierta,
+        igual que un gasto. El <b>corte de ese turno lo resta</b>, y tiene
+        que restarlo: ese dinero ya no está en el cajón.</li>
+        <li><b>De fuera</b> — de la caja fuerte, del banco, de la bolsa.
+        Se registra como <b>gasto de la empresa</b> y el cajón <b>ni se
+        entera</b>, porque ese dinero ya salió antes, cuando se hizo el
+        retiro.</li>
+      </ul>
+
+      <p class="ayuda-tip">Las dos formas son correctas y las dos cuentan
+      igual como gasto de la fábrica: <b>los sueldos entran en el costo por
+      marqueta</b> de cualquiera de las dos maneras. Lo único que cambia es
+      de qué bolsa salió, y eso importa para que el corte cuadre.</p>
+
+      <h4>El papel que firma</h4>
+      <p>Al pagar sale su recibo por la impresora: su nombre, la semana,
+      los días, el sueldo, los extras, cada vale con su fecha, los
+      descuentos y lo que se le entregó, con la raya para firmar. Sin
+      impresora térmica se puede imprimir desde la computadora.</p>
+
+      <p>Se puede ver antes de pagar, para enseñárselo y que no haya
+      sorpresas.</p>
+
+      <h4>Lo que ya se pagó</h4>
+      <p>Abajo de su ficha quedan sus rayas pasadas: la semana, cuánto se
+      le dio, de dónde salió y quién se la pagó. El papel de cualquiera se
+      vuelve a imprimir cuando se necesite.</p>
+
+      <p class="ayuda-tip">Una raya pagada <b>se congela</b>. Si mañana le
+      suben el sueldo, la del sábado pasado sigue diciendo lo que decía: es
+      un papel que ya se firmó. Y si se pagó mal, <b>se anula con su
+      motivo</b> — se deshace el movimiento de la caja o el gasto de la
+      empresa, y sus vales vuelven a quedar pendientes. Nada se borra:
+      queda quién la anuló y por qué.</p>`
   },
 
   // ==========================================================

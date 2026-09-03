@@ -50,6 +50,7 @@ function crearApp() {
   // API
   app.use('/api/auth', require('./modulos/auth/rutas'));
   app.use('/api/usuarios', require('./modulos/usuarios/rutas'));
+  app.use('/api/raya', require('./modulos/raya/rutas'));
   app.use('/api/tanques', require('./modulos/tanques/rutas'));
   app.use('/api/produccion', require('./modulos/produccion/rutas'));
   app.use('/api/existencia', require('./modulos/existencia/rutas'));

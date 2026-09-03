@@ -17,6 +17,7 @@ import { vistaCaja } from './vistas/caja.js';
 import { vistaProduccion } from './vistas/produccion.js';
 import { vistaTanques } from './vistas/tanques.js';
 import { vistaUsuarios } from './vistas/usuarios.js';
+import { vistaRaya } from './vistas/raya.js';
 import { vistaNovedades, hayVersionNueva } from './vistas/novedades.js';
 import { vistaAyuda } from './vistas/ayuda.js';
 import { vistaPersonalizar } from './vistas/personalizar.js';
@@ -48,6 +49,9 @@ const RUTAS = {
   '#/existencia': { titulo: 'El cuarto frío',   vista: vistaExistencia, permiso: 'existencia.ver' },
   '#/config-tanques': { titulo: 'Configurar tanques', vista: vistaTanques, permiso: 'tanques.configurar' },
   '#/usuarios':  { titulo: 'Usuarios',          vista: vistaUsuarios,  permiso: 'usuarios.administrar' },
+  // LA RAYA (v4.8): cuánto gana cada quien, qué días viene y qué se le
+  // debe. Solo el administrador — los sueldos no son dato de operación.
+  '#/raya':      { titulo: 'La raya',           vista: vistaRaya,      permiso: 'raya.ver' },
   // El cajero entra con vista limitada: ve cuántas hay e imprime la hoja.
   '#/productos': { titulo: 'Productos y precios', vista: vistaProductos, permiso: 'inventario.ver', fija: true },
   '#/clientes':  { titulo: 'Clientes',           vista: vistaClientes,  permiso: 'clientes.ver', fija: true },

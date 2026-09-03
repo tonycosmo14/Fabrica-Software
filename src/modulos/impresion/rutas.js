@@ -19,7 +19,7 @@ const { listaDeMayoreo } = require('../ventas/mayoreo');
 const { configuracion, guardarAjuste, imprimirCrudo,
         tipoDeDestino, impresorasDeWindows, APARTADOS } = require('./impresora');
 const { ticketCotizacion, ticketVenta, ticketMovimiento, ticketVale, ticketEncomienda,
-        ticketPrueba, pulsoCajon, ticketProduccion,
+        ticketRaya, ticketPrueba, pulsoCajon, ticketProduccion,
         ticketCorte, ticketCorteMovimientos, ticketHielo, ticketCortePersona, ticketConteo,
         ticketResumenDia } = require('./ticket');
 
@@ -343,6 +343,56 @@ router.post('/encomienda/:id', puedeImprimir, async (req, res) => {
   // mostrador es justo lo que no se quiere.
   const r = await imprimirCrudo(papel, { seccion: 'venta' });
   if (!r.impreso) return error(res, `No se pudo imprimir: ${r.motivo}`, 502);
+  return ok(res, { impreso: true });
+});
+
+/**
+ * EL PAPEL DE LA RAYA  (v4.8)
+ *
+ * El que se le entrega con el dinero y que firma. Sin pulso de cajón: si el
+ * pago salió del cajón, ya se abrió al anotar la salida; si salió de fuera,
+ * el cajón no tiene nada que ver.
+ */
+function rayaParaPapel(id) {
+  return require('../raya/rutas').rayaCompleta(id);
+}
+
+/**
+ * EL PAPEL ANTES DE PAGAR.
+ *
+ * El mismo recibo, armado del balance que se ve en pantalla y todavía sin
+ * guardar nada. Sirve para enseñárselo antes de darle el dinero, que es
+ * cuando se aclaran las dudas — después ya solo queda discutir.
+ *
+ * Va marcado como PREVIA para que nadie lo confunda con el que se firma.
+ */
+router.get('/raya-previa/:usuarioId', exigirPermiso('raya.ver'), (req, res) => {
+  const raya = require('../raya/rutas').balanceComoRaya(req.params.usuarioId, req.query);
+  if (!raya) return error(res, 'Esa persona no existe.', 404);
+  if (raya.error) return error(res, raya.error);
+
+  const papel = ticketRaya(raya, { negocio: nombreNegocio(), previa: true });
+  return ok(res, { renglones: recortarEspejo(papel.espejo), ancho: papel.anchoTicket });
+});
+
+router.get('/raya/:id/previa', exigirPermiso('raya.ver'), (req, res) => {
+  const r = rayaParaPapel(req.params.id);
+  if (!r) return error(res, 'Esa raya no existe.', 404);
+
+  const papel = ticketRaya(r, { negocio: nombreNegocio() });
+  return ok(res, { renglones: recortarEspejo(papel.espejo), ancho: papel.anchoTicket });
+});
+
+router.post('/raya/:id', exigirPermiso('raya.ver'), async (req, res) => {
+  const r = rayaParaPapel(req.params.id);
+  if (!r) return error(res, 'Esa raya no existe.', 404);
+
+  const cfg = configuracion();
+  if (!cfg.directa) return ok(res, { impreso: false, motivo: 'sin-destino' });
+
+  const papel = ticketRaya(r, { negocio: nombreNegocio(), copia: req.body?.copia === true });
+  const salida = await imprimirCrudo(papel, { seccion: 'gasto' });
+  if (!salida.impreso) return error(res, `No se pudo imprimir: ${salida.motivo}`, 502);
   return ok(res, { impreso: true });
 });
 

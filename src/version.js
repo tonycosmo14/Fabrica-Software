@@ -17,9 +17,32 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '4.7';
+const VERSION_ACTUAL = '4.8';
 
 const VERSIONES = [
+  {
+    numero: '4.8',
+    nombre: 'La raya',
+    fecha: '2026-09-03',
+    resumen:
+      'Cuánto gana cada quien, qué días viene y a qué hora, cuántos vales ' +
+      'se llevó, y el papel que firma cuando se le paga. Con la respuesta ' +
+      'a lo del dinero: al pagar se dice DE DÓNDE salió.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'LA RAYA, pantalla nueva en el inicio (💵 La raya). Ahí está todo lo que preguntaste: cuánto gana cada quien, qué días viene, a qué hora llega y a qué hora se va, cuántos vales se llevó, y el botón para imprimirle su balance y darle su sueldo. Es SOLO DEL ADMINISTRADOR: lo que gana cada quien no se anda enseñando.' },
+      { tipo: 'importante', texto: 'LO DEL DINERO, QUE ERA TU PREGUNTA. Me dijiste que a veces el sueldo se agarra de la caja y a veces se hace el corte y luego se le da. Las dos son correctas y las dos pasan, así que el sistema NO ELIGE POR TI: al pagar pregunta DE DÓNDE SALE. Si sale DEL CAJÓN, se anota como salida de la caja abierta y el corte de ese turno lo resta, porque ese dinero ya no está ahí. Si sale DE FUERA —de la caja fuerte, del banco, de tu bolsa— se anota como gasto de la empresa y el cajón ni se entera, porque ese dinero ya salió antes cuando hiciste el retiro. De las dos maneras cuenta igual como gasto de la fábrica.' },
+      { tipo: 'importante', texto: 'Y POR ESO EL COSTO POR MARQUETA YA INCLUYE LOS SUELDOS. Hasta la versión pasada el número decía, abajo, que le faltaba la raya. Ya no le falta: ese aviso se cambió por lo que sí falta.' },
+      { tipo: 'nuevo', texto: 'CUÁNTO GANA, de dos formas: A LA SEMANA —gana lo mismo venga cinco días o seis— o POR DÍA, que se multiplica por los días que se le cuenten y ese número se puede cambiar al pagarle, porque faltó un día o porque entró uno extra. Pagamos a la semana, como me dijiste, y así viene puesto.' },
+      { tipo: 'nuevo', texto: 'UN AUMENTO NO BORRA LO ANTERIOR. Cada sueldo se guarda con la fecha desde cuándo vale, y quedan todos apuntados. Puedes dejar anotado un aumento con fecha de la semana que entra: la raya de esta semana se paga todavía con el sueldo viejo, que es lo correcto.' },
+      { tipo: 'nuevo', texto: 'SU HORARIO, DIBUJADO COMO UNA SEMANA: siete casillas de domingo a sábado. Los días que viene en verde con su hora de entrada, la de salida y cuántas horas son; los que no viene, en gris. Un turno que cruza la medianoche —entra a las 10 de la noche y sale a las 6— se cuenta bien, son ocho horas.' },
+      { tipo: 'nuevo', texto: 'EL PAPEL QUE FIRMA. Sale por la impresora al pagarle: su nombre, la semana, los días, el sueldo, los extras, CADA VALE CON SU FECHA, los descuentos y lo que se le entregó, con la raya para firmar. Se puede ver antes de pagar, para enseñárselo y que no haya sorpresas. Sin impresora térmica se imprime desde la computadora.' },
+      { tipo: 'nuevo', texto: 'LOS VALES SE DESCUENTAN SOLOS al pagarle la raya, todos de un jalón — ya no hay que ir a marcarlos a mano en su ficha. Y si debe más vales de lo que gana, el sistema NO DEJA PAGAR: eso no se arregla con un número rojo en un papel.' },
+      { tipo: 'nuevo', texto: 'EXTRAS Y DESCUENTOS, cada uno con su nota: horas de más, un domingo que entró, una gratificación; o lo que se le descuenta por otra cosa. Quedan escritos en el papel.' },
+      { tipo: 'mejora', texto: 'UNA RAYA PAGADA SE CONGELA. Si mañana le subes el sueldo, la del sábado pasado sigue diciendo lo que decía: es un papel que ya se firmó. Y si se pagó mal, SE ANULA CON SU MOTIVO — se deshace el movimiento de la caja o el gasto de la empresa, y sus vales vuelven a quedar pendientes. Nada se borra: queda quién la anuló y por qué.' },
+      { tipo: 'mejora', texto: 'EL DÍA DE PAGO se configura desde la misma pantalla. Viene en sábado.' },
+      { tipo: 'mejora', texto: 'Todo está en el manual, en «La raya: sueldos, horarios y el pago de la semana».' }
+    ]
+  },
   {
     numero: '4.7',
     nombre: 'Menos papel, más rastro',
