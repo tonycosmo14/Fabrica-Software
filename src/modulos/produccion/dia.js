@@ -16,8 +16,29 @@
 const { bd } = require('../../db/conexion');
 const calidad = require('./calidad');
 
+/**
+ * Los paños sacados ENTRE DOS INSTANTES, con lo que dio cada uno.
+ *
+ * Es el mismo cálculo que `panosDelDia` pero acotado por los dos lados, y
+ * por instante y no por día de calendario: el corte de un turno abarca de
+ * un conteo al siguiente, y esa ventana casi nunca empieza a medianoche.
+ */
+function panosEntre(desde, hasta) {
+  return armar(`sp.iniciada_en > ? AND sp.iniciada_en <= ?`, [desde || '', hasta]);
+}
+
 /** Los paños sacados en un día, con lo que dio cada uno. */
 function panosDelDia(dia = null) {
+  return armar(`date(sp.iniciada_en, 'localtime') = date(${dia ? '?' : "'now'"}, 'localtime')`,
+               dia ? [dia] : []);
+}
+
+/**
+ * El cuerpo de la consulta, que es el mismo para las dos: lo único que
+ * cambia es cómo se acota el tiempo. Copiada, se arreglaría una y la otra
+ * seguiría diciendo otra cosa.
+ */
+function armar(cuando, valores) {
   const filas = bd.prepare(`
     SELECT sp.id,
            p.numero            AS pano,
@@ -38,11 +59,11 @@ function panosDelDia(dia = null) {
       JOIN sacadas s        ON s.sacada_pano_id = sp.id
       JOIN sacadas_moldes sm ON sm.sacada_id = s.id
       LEFT JOIN usuarios u  ON u.id = sp.ejecutor_id
-     WHERE date(sp.iniciada_en, 'localtime') = date(${dia ? '?' : "'now'"}, 'localtime')
+     WHERE ${cuando}
        AND (sp.notas IS NULL OR sp.notas NOT LIKE 'ANULADA%')
      GROUP BY sp.id
      ORDER BY t.nombre, MIN(s.fecha)
-  `).all(...(dia ? [dia] : []));
+  `).all(...valores);
 
   return filas.map((f) => ({
     ...f,
@@ -61,7 +82,15 @@ function panosDelDia(dia = null) {
  * escondiendo justo el dato que sirve.
  */
 function resumenDelDia(dia = null) {
-  const panos = panosDelDia(dia);
+  return resumirPanos(panosDelDia(dia));
+}
+
+/** Lo mismo, para una ventana entre dos instantes. */
+function resumenEntre(desde, hasta) {
+  return resumirPanos(panosEntre(desde, hasta));
+}
+
+function resumirPanos(panos) {
   const suma = (campo) => panos.reduce((n, p) => n + (p[campo] || 0), 0);
 
   // OJO con el nombre de la merma: en el renglón de cada paño la columna se
@@ -86,4 +115,4 @@ function resumenDelDia(dia = null) {
   };
 }
 
-module.exports = { panosDelDia, resumenDelDia };
+module.exports = { panosDelDia, panosEntre, resumenDelDia, resumenEntre };

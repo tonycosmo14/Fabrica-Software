@@ -25,6 +25,7 @@ const { comprobarAdmin, administradores } = require('../../lib/autorizacion');
 const {
   sesionAbierta, movimientos, estadoCaja, conteoVentas, desglosePorPersona
 } = require('./calculo');
+const { cuadreDeHielo } = require('./hielo');
 
 const router = express.Router();
 
@@ -618,6 +619,11 @@ function detalleCorte(id) {
     caja,
     movimientos: movimientos(id, { incluirAnulados: true }),
     ventas: conteoVentas(id),
+    // EL CUADRE DEL HIELO de ese turno: cuánto había, cuánto se produjo,
+    // cuánto se contó y cuánto faltó. Viene `null` cuando ese turno no
+    // contó hielo — sin conteo no hay cuadre, y un papel con todo en cero
+    // haría creer que se contó y salió cero.
+    hielo: cuadreDeHielo(id),
     // Quién metió qué dentro del turno. Con una sola persona no dice nada
     // que el corte no diga ya, y por eso viene vacío: así ni la pantalla ni
     // la impresora tienen que decidir cuándo enseñarlo.

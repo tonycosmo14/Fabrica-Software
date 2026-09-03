@@ -19,13 +19,14 @@ const { listaDeMayoreo } = require('../ventas/mayoreo');
 const { configuracion, guardarAjuste, imprimirCrudo,
         tipoDeDestino, impresorasDeWindows, APARTADOS } = require('./impresora');
 const { ticketCotizacion, ticketVenta, ticketMovimiento, ticketPrueba, pulsoCajon, ticketProduccion,
-        ticketCorte, ticketCorteMovimientos, ticketCortePersona, ticketConteo,
+        ticketCorte, ticketCorteMovimientos, ticketHielo, ticketCortePersona, ticketConteo,
         ticketResumenDia } = require('./ticket');
 
 const { aTexto } = require('../../lib/fracciones');
 const { numeroDeTicket } = require('../ventas/folio');
 const { numerosASacar } = require('../produccion/siguientes');
 const { resumenDelDia } = require('../produccion/dia');
+const { cuadreDeHielo } = require('../caja/hielo');
 const { estadoAlmacen } = require('../existencia/calculo');
 const { desglosePorPersona } = require('../caja/calculo');
 
@@ -397,7 +398,8 @@ router.post('/corte/:id', exigirPermiso('caja.ver'), async (req, res) => {
       SELECT COUNT(*) FILTER (WHERE cancelada_en IS NULL) AS cobradas,
              COUNT(*) FILTER (WHERE cancelada_en IS NOT NULL) AS canceladas
         FROM ventas WHERE caja_id = ?`).get(caja.id),
-    porPersona: desglosePorPersona(caja.id)
+    porPersona: desglosePorPersona(caja.id),
+    hielo: cuadreDeHielo(caja.id)
   };
 
   const cfg = configuracion();
@@ -410,8 +412,10 @@ router.post('/corte/:id', exigirPermiso('caja.ver'), async (req, res) => {
   //   1. el corte del turno, con el dinero y SOLO EL TOTAL de gastos:
   //      es el que se firma y se entrega con el cajón
   //   2. el detalle: los gastos y las entradas, uno por uno (v4.1)
-  //   3. uno por cajero, si el turno se relevó a media noche
-  //   4. el resumen del día: cuánto hielo queda y qué paños salieron
+  //   3. EL CUADRE DEL HIELO: cuánto había, cuánto se produjo, cuánto se
+  //      contó, cuánto faltó, y de dónde salió cada número (v4.2)
+  //   4. uno por cajero, si el turno se relevó a media noche
+  //   5. el resumen del día: cuánto hielo queda ahora mismo en cada cuarto
   //
   // Van juntos porque juntos es como se leen: si el cajón cuadra pero
   // falta hielo, el problema no está en la caja. En papeles separados
@@ -421,6 +425,11 @@ router.post('/corte/:id', exigirPermiso('caja.ver'), async (req, res) => {
 
   const detalle = ticketCorteMovimientos(corte, { negocio });
   if (detalle) papeles.push(detalle);
+
+  // EL PAPEL DEL HIELO. Solo si ese turno contó: un cuadre con todo en
+  // cero haría creer que se contó y salió cero.
+  const hielo = ticketHielo(corte, { negocio });
+  if (hielo) papeles.push(hielo);
 
   if (corte.porPersona.length > 1) {
     for (const p of corte.porPersona) {

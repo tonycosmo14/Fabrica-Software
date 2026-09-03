@@ -64,6 +64,15 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
                           estado.permisos.includes('produccion.numeros');
   const puedeCorregir = estado.permisos.includes('*') ||
                         estado.permisos.includes('produccion.corregir');
+  // EL OPERARIO NO ELIGE QUIÉN SACÓ EL PAÑO: fue él.
+  //
+  // Es la misma regla que en la caja, donde el cajero no escoge quién
+  // cobró. Un operario solo entra a mover tanques, y ponerle una lista con
+  // los nombres de sus compañeros es darle la opción de anotarle el trabajo
+  // a otro — sin querer o queriendo. El gerente y el administrador sí
+  // eligen, porque ellos capturan lo que les cantan (regla 3.6: quién lo
+  // hizo y quién lo anotó son dos cosas).
+  const soyElQueSaca = estado.usuario?.rol === 'operario';
   // Configurar los tanques ya no vive en el inicio ni en el menú rápido: se
   // hace una vez en la vida —en más de treinta años no ha habido un tanque
   // nuevo— y estaba ocupando el sitio de lo que sí se usa a diario. Ahora
@@ -507,7 +516,10 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
     // Solo salen los operarios: sacar paños es su trabajo. Para el eventual
     // de un día, o el dueño, está "Otro…" y su nombre se escribe tal cual.
     // Quién lo ANOTÓ no se pregunta: es el usuario de la sesión, siempre.
-    let quienId = obreros.find((o) => o.id === estado.usuario.id)?.id || obreros[0]?.id || '';
+    // Para el operario se da por hecho que fue él, y ni se le pregunta.
+    let quienId = soyElQueSaca
+      ? estado.usuario.id
+      : (obreros.find((o) => o.id === estado.usuario.id)?.id || obreros[0]?.id || '');
     let quienNombre = '';
 
     /** Lo que le toca a un molde: su marca propia, o la del paño. */
@@ -547,16 +559,20 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
           ${porSacar.length ? `
             <div class="pano-captura">
               <div class="tarjeta">
-                <label for="quien">¿Quién lo sacó?</label>
-                <select id="quien" class="select-angosto">
-                  ${obreros.map((o) => `
-                    <option value="${esc(o.id)}" ${o.id === quienId ? 'selected' : ''}>
-                      ${esc(o.nombre)}
-                    </option>`).join('')}
-                  <option value="" ${quienId ? '' : 'selected'}>
-                    Otro… ${quienNombre ? `(${esc(quienNombre)})` : ''}
-                  </option>
-                </select>
+                ${soyElQueSaca ? `
+                  <label>Lo saca</label>
+                  <p class="quien-fijo">${esc(estado.usuario.nombre)}</p>`
+                : `
+                  <label for="quien">¿Quién lo sacó?</label>
+                  <select id="quien" class="select-angosto">
+                    ${obreros.map((o) => `
+                      <option value="${esc(o.id)}" ${o.id === quienId ? 'selected' : ''}>
+                        ${esc(o.nombre)}
+                      </option>`).join('')}
+                    <option value="" ${quienId ? '' : 'selected'}>
+                      Otro… ${quienNombre ? `(${esc(quienNombre)})` : ''}
+                    </option>
+                  </select>`}
 
                 <label style="margin-top:14px">Agua con la que se rellena</label>
                 <button class="agua-boton ${agua}" id="agua-pano">
@@ -747,7 +763,8 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
         return;
       }
 
-      pantalla.querySelector('#quien').onchange = async (e) => {
+      const selQuien = pantalla.querySelector('#quien');
+      if (selQuien) selQuien.onchange = async (e) => {
         quienId = e.target.value;
         if (!quienId) {
           const nombre = await pedirTexto({
@@ -1134,7 +1151,7 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
       <div class="salmuera">
         <span class="salmuera-etiqueta">Salmuera</span>
         ${u ? `
-          <strong class="salmuera-grados">${u.promedio}°</strong>
+          <strong class="salmuera-grados">${u.promedio} °C</strong>
           <small>${dias === 0 ? 'medida hoy'
             : dias === 1 ? 'medida ayer'
             : `medida hace ${dias} días`}</small>`
@@ -1160,16 +1177,20 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
 
     const campo = (id, titulo, ayuda) => `
       <label>
-        <span class="etiqueta-chica">${titulo}<small>${ayuda}</small></span>
-        <input id="${id}" inputmode="decimal" placeholder="-8.5" autocomplete="off">
+        <span class="etiqueta-chica">${titulo}<small>${ayuda || '°C'}</small></span>
+        <div class="campo-con-unidad">
+          <input id="${id}" inputmode="decimal" placeholder="-8.5" autocomplete="off">
+          <span class="unidad">°C</span>
+        </div>
       </label>`;
 
     pantalla.innerHTML = `
       <button class="secundario chico" id="volver">‹ ${esc(tanque.nombre)}</button>
       <h2 style="margin-top:14px">Temperatura de la salmuera · ${esc(tanque.nombre)}</h2>
       <p class="ayuda">
-        Tres tomas y el sistema saca el promedio. No hace falta hacerlo con
-        ningún horario: se anota cuando se mide, y queda de registro.
+        Tres tomas <b>en grados centígrados (°C)</b> y el sistema saca el
+        promedio. No hace falta hacerlo con ningún horario: se anota cuando
+        se mide, y queda de registro.
       </p>
 
       <div class="tarjeta">
@@ -1179,8 +1200,9 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
           ${campo('t-lejos', 'Salida más lejana', 'donde menos frío llega')}
         </div>
         <p class="ayuda">
-          En grados, y con su signo: la salmuera trabaja bajo cero, así que
-          casi siempre van con un menos delante. Se puede dejar alguna vacía.
+          En <b>grados centígrados</b>, y con su signo: la salmuera trabaja
+          bajo cero, así que casi siempre van con un menos delante. Se puede
+          dejar alguna vacía.
         </p>
 
         <label style="margin-top:10px">
@@ -1205,15 +1227,15 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
         <h3>Las anteriores</h3>
         <div class="hist-envoltura">
           <table class="tabla hist-tabla">
-            <tr><th>Cuándo</th><th class="der">Serpentines</th><th class="der">Cerca</th>
-                <th class="der">Lejos</th><th class="der">Promedio</th><th>Quién</th><th></th></tr>
+            <tr><th>Cuándo</th><th class="der">Serpentines °C</th><th class="der">Cerca °C</th>
+                <th class="der">Lejos °C</th><th class="der">Promedio</th><th>Quién</th><th></th></tr>
             ${mediciones.map((m) => `
               <tr class="${m.anulada_en ? 'anulada' : ''}">
                 <td>${esc(fechaCorta(m.fecha))}</td>
                 <td class="der">${m.serpentines ?? '—'}</td>
                 <td class="der">${m.salida_cerca ?? '—'}</td>
                 <td class="der">${m.salida_lejos ?? '—'}</td>
-                <td class="der"><strong>${m.anulada_en ? '—' : `${m.promedio}°`}</strong></td>
+                <td class="der"><strong>${m.anulada_en ? '—' : `${m.promedio} °C`}</strong></td>
                 <td>${esc(nombreDePila(m.ejecutor_nombre))}</td>
                 <td>${puedeCorregir && !m.anulada_en
                   ? `<button class="secundario chico" data-anular-medicion="${esc(m.id)}"

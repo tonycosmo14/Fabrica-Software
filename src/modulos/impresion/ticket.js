@@ -675,6 +675,128 @@ function ticketCorteMovimientos(corte, { negocio = '' } = {}) {
 }
 
 /**
+ * EL PAPEL DEL HIELO  (v4.2)
+ *
+ * El tercer papel del cierre, y el que faltaba. El corte enseñaba el dinero
+ * con todo detalle y del hielo no decía nada — cuando el hielo es el
+ * producto. Aquí va el cuadre entero, desde el conteo anterior hasta este:
+ *
+ *     lo que había + lo que se produjo = lo que TENÍA que haber
+ *     menos lo vendido, lo derretido y lo cortado
+ *     contra lo que se CONTÓ           = lo que FALTÓ o SOBRÓ
+ *
+ * Y debajo, de dónde salió cada número: qué paños se sacaron y quién,
+ * cuántos de cada pedazo se vendieron, cuánto se fue a mayoreo, y en qué
+ * se derritió lo que se derritió.
+ *
+ * Devuelve null si ese turno no contó hielo: un papel con todo en cero
+ * haría creer que se contó y salió cero.
+ */
+function ticketHielo(corte, { negocio = '' } = {}) {
+  const h = corte.hielo;
+  if (!h) return null;
+
+  const cfg = configuracion();
+  const t = new Ticket(cfg.anchoMm, cfg.codigoPagina);
+  const c = corte.caja;
+  const q = h.cuadre;
+
+  encabezado(t, {
+    titulo: `Hielo #${c.folio}`,
+    atendio: h.conteo.ejecutor_nombre || c.cajero_nombre,
+    fecha: fechaTicket(h.hasta)
+  });
+  t.separador();
+
+  t.columnas2(h.almacen || 'Cuarto frio',
+              h.primerConteo ? 'primer conteo' : `desde ${cuandoCorto(h.desde, h.hasta)}`);
+
+  // ---- EL CUADRE ----
+  t.bloqueDerecha([
+    ['Habia', aTexto(q.anterior)],
+    ['Se produjo', '+' + aTexto(q.producido)],
+    ['TENIA QUE HABER', aTexto(q.teorico)],
+    ['Se vendio', '-' + aTexto(q.vendido)],
+    q.merma ? ['Derretido o roto', '-' + aTexto(q.merma)] : null,
+    q.cortado ? ['Se corto', '-' + aTexto(q.cortado)] : null,
+    ['DEBERIA QUEDAR', aTexto(q.esperado)],
+    ['CONTADO', aTexto(q.contado)]
+  ]);
+
+  // El número que se viene a ver. Grande, como el del dinero.
+  t.centro().negrita().tamano(2, 1)
+   .linea(q.faltante === 0 ? 'CUADRO'
+     : q.faltante > 0 ? `FALTA ${aTexto(q.faltante)}` : `SOBRA ${aTexto(-q.faltante)}`)
+   .normal().izquierda();
+  if (q.faltante !== 0) {
+    t.centro().linea(q.faltante > 0 ? 'hielo que nadie explico' : 'mas hielo del que debia').izquierda();
+  }
+
+  // ---- LOS PAÑOS ----
+  t.negrita().separadorConTitulo('PANOS SACADOS').negrita(false);
+  if (!h.panos.length) {
+    t.linea('  ninguno');
+  } else {
+    for (const uno of h.panos) {
+      const roto = uno.rotas ? ` -${uno.rotas}` : '';
+      t.columnas2(`${uno.tanque} #${uno.pano}${uno.enProceso ? ' (a medias)' : ''}`,
+                  `${uno.alAlmacen}${roto}`);
+      // Quién lo sacó va en su propio renglón: es el dato por el que se
+      // pregunta cuando un paño sale mal, y en la misma línea no cabe.
+      if (uno.quien) t.linea(`  ${uno.quien}`);
+    }
+    t.separador('.');
+    t.bloqueDerecha([
+      ['Panos', String(h.produccion.cuantos)],
+      ['Al cuarto frio', String(h.produccion.alAlmacen)],
+      h.produccion.merma ? ['Rotas', String(h.produccion.merma)] : null
+    ]);
+
+    const salieron = CALIDADES.filter((x) => h.produccion[x.clave] > 0);
+    if (salieron.length) {
+      t.separador('.');
+      t.negrita().linea('COMO SALIO').negrita(false);
+      for (const x of salieron) t.columnas2(`  ${x.corto}`, String(h.produccion[x.clave]));
+    }
+  }
+
+  // ---- QUÉ PEDAZOS SE VENDIERON ----
+  if (h.pedazos.length) {
+    t.negrita().separadorConTitulo('SE VENDIO').negrita(false);
+    for (const p of h.pedazos) {
+      t.columnas2(`  ${p.piezas} x ${p.texto}`, aTexto(p.dieciseisavos));
+    }
+    t.separador('.');
+    for (const l of h.listas) {
+      t.columnas2(`  ${l.tipo === 'mayoreo' ? 'Mayoreo' : 'Publico'} (${l.lista})`,
+                  `${aTexto(l.dieciseisavos)} · ${l.tickets} tk`);
+    }
+  }
+
+  // ---- LO QUE SE DERRITIÓ ----
+  if (h.mermas.length) {
+    t.negrita().separadorConTitulo('DERRETIDO O ROTO').negrita(false);
+    for (const m of h.mermas) {
+      t.columnas2(`  ${m.motivo}`, aTexto(m.dieciseisavos));
+    }
+  }
+
+  // ---- LO QUE SE CORTÓ PARA BOLSAS ----
+  if (h.cortes.length) {
+    t.negrita().separadorConTitulo('CORTADO PARA BOLSAS').negrita(false);
+    for (const x of h.cortes) {
+      t.columnas2(`  ${x.texto}`, x.bolsas != null ? `${x.bolsas} bolsas` : 'sin contar');
+    }
+  }
+
+  t.separador();
+  t.firma(`Conto ${(h.conteo.ejecutor_nombre || '-').slice(0, 24)}`);
+  pie(t, negocio);
+  t.izquierda().cortar(cfg.avanceCorte);
+  return t.bytes();
+}
+
+/**
  * EL CORTE DE UNA SOLA PERSONA, cuando el turno se relevó.
  *
  * No es un arqueo: el dinero del cajón es uno solo y ya lo cuadra el corte
@@ -804,5 +926,5 @@ function pulsoCajon(salida = 2) {
 
 module.exports = {
   ticketVenta, ticketMovimiento, ticketCotizacion, ticketPrueba,
-  ticketCorte, ticketCorteMovimientos, ticketCortePersona, ticketConteo, ticketProduccion, ticketResumenDia, pulsoCajon, fechaCorta, fechaTicket
+  ticketCorte, ticketCorteMovimientos, ticketHielo, ticketCortePersona, ticketConteo, ticketProduccion, ticketResumenDia, pulsoCajon, fechaCorta, fechaTicket
 };

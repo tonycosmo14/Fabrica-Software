@@ -17,9 +17,29 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '4.1';
+const VERSION_ACTUAL = '4.2';
 
 const VERSIONES = [
+  {
+    numero: '4.2',
+    nombre: 'El corte del hielo',
+    fecha: '2026-09-03',
+    resumen:
+      'Faltaba lo más importante: el corte no decía si faltó hielo. Ahora ' +
+      'sale su propio papel con el cuadre entero, los paños, quién los ' +
+      'sacó y qué pedazos se vendieron. Y arreglos del uso diario.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'EL CORTE YA DICE SI FALTÓ HIELO. Tenías razón: se anotaba el conteo, se modificaba la existencia y ahí moría. El corte enseñaba el dinero con todo detalle y del hielo no decía nada — cuando el hielo es el producto. Ahora hay un tercer papel, y lo mismo en la pantalla del corte: había + se produjo = TENÍA QUE HABER, menos lo vendido, lo derretido y lo cortado = debería quedar, contra lo que se contó = FALTA o SOBRA.' },
+      { tipo: 'nuevo', texto: 'Y DEBAJO, DE DÓNDE SALIÓ CADA NÚMERO: los paños que se sacaron con su tanque y QUIÉN LOS SACÓ, cuántas marquetas entraron y cuántas se rompieron; qué pedazos se vendieron —3 octavos, 1 cuarto, 2 marquetas—; cuánto salió a mayoreo y cuánto al público; en qué se derritió lo que se derritió; y lo que se cortó para bolsas. Todo comparado desde el conteo anterior, como pediste.' },
+      { tipo: 'mejora', texto: 'LOS PEDAZOS SE AGRUPAN POR SU TAMAÑO, no por su nombre. El mismo octavo se llama "1/8" cuando el cajero toca el botón y "Hielo" cuando teclea la fracción a mano: agrupando por nombre saldrían en dos renglones distintos siendo lo mismo.' },
+      { tipo: 'importante', texto: 'UN TURNO QUE NO CONTÓ HIELO NO TIENE CUADRE, y lo dice en vez de imprimir un papel con todo en cero: eso haría creer que se contó y salió cero. Y todo esto se vuelve a ver cuando quieras desde Cortes, que es donde dijiste que ibas a estar consultando.' },
+      { tipo: 'arreglo', texto: 'EN EL CONTEO DEL CUARTO FRÍO NO SE PODÍAN PONER 3/16 NI 11/16. Había una lista con unas cuantas fracciones sueltas, y con eso no se puede decir "1 y 3/16". Ahora está el teclado de siempre, el que SUMA: se toca 1/8, luego 1/16, y quedan 3/16. O se escribe tal cual, "25 y 3/16", como se dicta.' },
+      { tipo: 'arreglo', texto: 'EL NÚMERO DEL HIELO NO SE ACTUALIZABA EN VIVO en la pantalla de vender: había que salir a Inicio y volver a entrar. Ahora baja con cada venta, y sale de la misma cuenta que los avisos de existencias — no hay dos números del mismo dato.' },
+      { tipo: 'importante', texto: 'UN OPERARIO YA NO ELIGE QUIÉN SACÓ EL PAÑO: fue él, y su nombre sale escrito. Es la misma regla que en la caja, donde el cajero no escoge quién cobró. Un operario solo entra a mover tanques, y ponerle una lista con los nombres de sus compañeros era darle la opción de anotarle el trabajo a otro. El gerente y el administrador sí eligen, porque ellos capturan lo que les cantan.' },
+      { tipo: 'mejora', texto: 'La temperatura de la salmuera dice ahora que es en GRADOS CENTÍGRADOS (°C): en el promedio, en cada casilla al capturarla y en las columnas del historial.' },
+      { tipo: 'mejora', texto: 'Todo lo nuevo está en el manual, en Caja y en Producción de hielo.' }
+    ]
+  },
   {
     numero: '4.1',
     nombre: 'El corte se lo come todo',

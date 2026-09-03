@@ -13,7 +13,7 @@
 import { api } from '../api.js';
 import { esc, avisar, fecha as formatoFecha, soloHora, rango } from '../util.js';
 import { pedirTexto, pedirImporte, confirmar, menu, pedirContrasena } from '../dialogo.js';
-import { pesos, paraEditar } from '../fracciones.js';
+import { pesos, crearTeclado, aTexto as textoFraccion, deTexto } from '../fracciones.js';
 import { cargarMarca } from '../marca.js';
 import { compartirCorte } from '../corte-imagen.js';
 
@@ -691,22 +691,19 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
 
       <div class="tarjeta">
         <form id="f">
-          <label>
-            <span class="etiqueta-chica">Marquetas contadas</span>
-            <input id="marquetas" class="campo-importe" inputmode="decimal"
-                   autocomplete="off" placeholder="14" required>
+          <!-- EL TECLADO DE FRACCIONES, el mismo de siempre: suma. Se toca
+               1/8 y luego 1/16 y quedan 3/16. Una lista de fracciones
+               sueltas no da 3/16 ni 11/16, y así es como se dictan. -->
+          <div id="teclado"></div>
+          <label for="escrito" class="etiqueta-chica" style="margin-top:12px">
+            o escríbelo tal cual
           </label>
-          <label>
-            <span class="etiqueta-chica">Y una fracción<small>si quedó una partida</small></span>
-            <select id="fraccion">
-              <option value="0">nada más</option>
-              <option value="8">y 1/2</option>
-              <option value="4">y 1/4</option>
-              <option value="2">y 1/8</option>
-              <option value="1">y 1/16</option>
-              <option value="12">y 3/4</option>
-            </select>
-          </label>
+          <input id="escrito" class="frac-escrito" inputmode="text"
+                 placeholder="14 y 5/8" autocomplete="off">
+          <p class="dialogo-error" id="malo" hidden>
+            No se entiende. Escríbelo como <strong>14 5/8</strong>, y en
+            octavos o dieciseisavos: la marqueta no se parte en tercios.
+          </p>
           <button type="submit" style="margin-top:18px">Siguiente →</button>
         </form>
       </div>
@@ -714,13 +711,35 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
       <button class="secundario chico" id="atras" style="margin-top:12px">‹ Volver a los paños</button>`;
 
     const q = (sel) => pantalla.querySelector(sel);
-    setTimeout(() => q('#marquetas').focus(), 150);
+    const escrito = q('#escrito');
+    const malo = q('#malo');
+
+    const teclado = crearTeclado(q('#teclado'), {
+      valor: cierre.marquetas || 0,
+      alCambiar: (n) => {
+        if (document.activeElement !== escrito) escrito.value = n ? textoFraccion(n) : '';
+        malo.hidden = true;
+      }
+    });
+    if (cierre.marquetas) escrito.value = textoFraccion(cierre.marquetas);
+
+    escrito.oninput = () => {
+      const n = deTexto(escrito.value);
+      malo.hidden = escrito.value.trim() === '' || n !== null;
+      if (n !== null) teclado.poner(n);
+    };
+
     q('#atras').onclick = () => pasoPanos(cierre);
     q('#f').onsubmit = (ev) => {
       ev.preventDefault();
-      const n = Number(q('#marquetas').value);
-      if (!Number.isFinite(n) || n < 0) return avisar('Escribe cuántas marquetas contaste.', 'error');
-      cierre.marquetas = Math.floor(n) * 16 + Number(q('#fraccion').value);
+      // Escrito a mano y no se entiende: no se guarda nada. Un conteo mal
+      // leído es peor que uno que no se hizo.
+      if (escrito.value.trim() && deTexto(escrito.value) === null) {
+        malo.hidden = false;
+        escrito.focus();
+        return;
+      }
+      cierre.marquetas = teclado.valor();
       pasoCortado(cierre);
     };
   }
@@ -952,6 +971,14 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
         ${c.corregido_en ? avisoCorregido(c) : ''}
       </div>
 
+      ${corte.hielo ? cuadreDelHielo(corte.hielo) : `
+        <div class="aviso-sin-caja" style="margin-top:16px">
+          <strong>Este turno no contó el hielo.</strong>
+          Sin conteo no hay cuadre: no se puede decir si faltó o sobró
+          hielo, porque nadie lo contó. Se cuenta al terminar el turno.
+        </div>`}
+
+
       <div class="ticket" id="ticket">
         <div class="ticket-cabeza">
           <strong>${esc((marca.nombreNegocio || 'Hielo LOLHA').toUpperCase())}</strong>
@@ -1103,6 +1130,123 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
 
     const siguiente = pantalla.querySelector('#siguiente-cajero');
     if (siguiente) siguiente.onclick = () => alTerminar?.();
+  }
+
+  /**
+   * EL CUADRE DEL HIELO  (v4.2)
+   *
+   * "Me modifica la existencia y no me dice si faltó o no faltó hielo."
+   * Esta es la otra mitad del corte: el dinero salía con todo detalle y el
+   * hielo —que es el producto— no decía nada.
+   *
+   * Va comparado desde el conteo anterior, no desde que abrió el turno: es
+   * la ventana del conteo, y es lo que se pidió — "todo comparado desde la
+   * última vez que se cortó".
+   */
+  function cuadreDelHielo(h) {
+    const q = h.cuadre;
+    const falta = q.faltante > 0;
+    const cuadra = q.faltante === 0;
+    const frac = (n) => esc(textoFraccion(n));
+
+    return `
+      <div class="tarjeta ${cuadra ? 'cuadre-exacto' : 'cuadre-diferencia'}"
+           style="margin-top:16px">
+        <h3 style="margin:0 0 4px">El hielo · ${esc(h.almacen || 'cuarto frío')}</h3>
+        <p class="ayuda" style="margin:0 0 14px">
+          ${h.primerConteo
+            ? 'Primer conteo: no hay con qué compararlo todavía.'
+            : `Desde el conteo anterior · ${esc(formatoFecha(h.desde))}`}
+        </p>
+
+        <div class="cuadre">
+          <div class="cuadre-linea"><span>Había</span><strong>${frac(q.anterior)}</strong></div>
+          <div class="cuadre-linea suma"><span>+ Se produjo</span><strong>${frac(q.producido)}</strong></div>
+          <div class="cuadre-linea total"><span>= Tenía que haber</span><strong>${frac(q.teorico)}</strong></div>
+          <div class="cuadre-linea vendido"><span>− Se vendió</span><strong>${frac(q.vendido)}</strong></div>
+          ${q.merma ? `
+            <div class="cuadre-linea vendido"><span>− Derretido o roto</span><strong>${frac(q.merma)}</strong></div>` : ''}
+          ${q.cortado ? `
+            <div class="cuadre-linea vendido"><span>− Se cortó para bolsas</span><strong>${frac(q.cortado)}</strong></div>` : ''}
+          <div class="cuadre-linea total"><span>= Debería quedar</span><strong>${frac(q.esperado)}</strong></div>
+          <div class="cuadre-linea contado"><span>− Se contó</span><strong>${frac(q.contado)}</strong></div>
+        </div>
+
+        <div class="salidas ${cuadra ? 'exacto' : falta ? '' : 'sobra'}">
+          <span>${cuadra ? 'Cuadró exacto' : falta ? 'Falta' : 'Sobra'}</span>
+          <strong>${cuadra ? '✓' : frac(Math.abs(q.faltante))}</strong>
+          <small>${cuadra ? 'todo el hielo que salió tiene su explicación'
+            : falta ? 'hielo que nadie explicó' : 'más hielo del que debería'}</small>
+        </div>
+
+        ${cuadra ? '' : `
+          <p class="ayuda" style="margin:14px 0 0">
+            ${falta
+              ? 'Ese hielo salió del cuarto frío sin ticket, sin anotarse como derretido y sin cortarse. Es el número que hay que vigilar.'
+              : 'Hay más hielo del que debería. Casi siempre falta capturar un paño, o el conteo anterior se quedó corto.'}
+          </p>`}
+
+        <h4 class="emp-sub">Los paños</h4>
+        ${h.panos.length ? `
+          <table class="tabla">
+            <tr><th>Tanque</th><th>Paño</th><th>Quién lo sacó</th>
+                <th class="der">Al cuarto frío</th><th class="der">Rotas</th></tr>
+            ${h.panos.map((p) => `
+              <tr>
+                <td>${esc(p.tanque)}</td>
+                <td>#${p.pano}${p.enProceso ? ' <small>a medias</small>' : ''}</td>
+                <td>${esc(p.quien || '—')}</td>
+                <td class="der"><strong>${p.alAlmacen}</strong></td>
+                <td class="der ${p.rotas ? 'malo' : ''}">${p.rotas || '—'}</td>
+              </tr>`).join('')}
+            <tr class="fuerte">
+              <td colspan="3"><strong>${h.produccion.cuantos} ${
+                h.produccion.cuantos === 1 ? 'paño' : 'paños'}</strong></td>
+              <td class="der"><strong>${h.produccion.alAlmacen}</strong></td>
+              <td class="der ${h.produccion.merma ? 'malo' : ''}">${h.produccion.merma || '—'}</td>
+            </tr>
+          </table>` : '<p class="ayuda">No se sacó ningún paño en esta ventana.</p>'}
+
+        <h4 class="emp-sub">Qué pedazos se vendieron</h4>
+        ${h.pedazos.length ? `
+          <table class="tabla">
+            <tr><th>Pedazo</th><th class="der">Cuántos</th><th class="der">En marquetas</th></tr>
+            ${h.pedazos.map((p) => `
+              <tr>
+                <td><strong>${esc(p.texto)}</strong></td>
+                <td class="der"><strong>${p.piezas}</strong></td>
+                <td class="der">${frac(p.dieciseisavos)}</td>
+              </tr>`).join('')}
+          </table>
+          <div class="cuadre" style="margin-top:10px">
+            ${h.listas.map((l) => `
+              <div class="cuadre-linea">
+                <span>${l.tipo === 'mayoreo' ? '🏷️ Mayoreo' : 'Público'} · ${esc(l.lista)}
+                  <small>${l.tickets} ${l.tickets === 1 ? 'ticket' : 'tickets'}</small></span>
+                <strong>${frac(l.dieciseisavos)}</strong>
+              </div>`).join('')}
+          </div>` : '<p class="ayuda">No se vendió hielo en esta ventana.</p>'}
+
+        ${h.mermas.length ? `
+          <h4 class="emp-sub">Lo que se derritió o se rompió</h4>
+          <div class="cuadre">
+            ${h.mermas.map((m) => `
+              <div class="cuadre-linea">
+                <span>${esc(m.motivo)}<small>${m.veces} ${m.veces === 1 ? 'vez' : 'veces'}</small></span>
+                <strong>${frac(m.dieciseisavos)}</strong>
+              </div>`).join('')}
+          </div>` : ''}
+
+        ${h.cortes.length ? `
+          <h4 class="emp-sub">Lo que se cortó para bolsas</h4>
+          <div class="cuadre">
+            ${h.cortes.map((x) => `
+              <div class="cuadre-linea">
+                <span>${esc(x.texto)} de hielo</span>
+                <strong>${x.bolsas != null ? `${x.bolsas} bolsas` : 'sin contar'}</strong>
+              </div>`).join('')}
+          </div>` : ''}
+      </div>`;
   }
 
   /**

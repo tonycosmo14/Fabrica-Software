@@ -849,6 +849,15 @@ export async function vistaVenta(pantalla, estadoApp) {
       alertas = await api.obtener('/inventario/avisos');
       pintarAvisos();
       pintarRejilla();
+
+      // Y el hielo del cuarto frío, que baja con cada venta. Sale de la
+      // MISMA cuenta que los avisos —no hay dos números del mismo dato— y
+      // solo se pinta si el servidor lo mandó al abrir, que es lo que
+      // decide si esta persona puede verlo.
+      if (ctx.cuartoFrio && alertas.hielo) {
+        ctx.cuartoFrio = { ...ctx.cuartoFrio, texto: alertas.hielo.texto };
+        pintarPista();
+      }
     } catch { /* el cajero no siempre puede ver inventario; sin aviso y ya */ }
   }
 

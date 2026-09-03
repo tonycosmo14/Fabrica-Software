@@ -799,3 +799,99 @@ test('el historial dice qué renglones tienen papel que reimprimir', async () =>
   const venta = movimientos.find((m) => m.tipo === 'venta');
   assert.equal(venta.movimiento_id, null, 'una venta no deja renglón en el cajón');
 });
+
+
+// ============================================================
+// EL PAPEL DEL HIELO  (v4.2)
+//
+// "Cuando pongo el hielo que hay en el cuarto frío y termino, simplemente
+// me modifica la existencia y no me dice si faltó o no faltó hielo."
+// El corte enseñaba el dinero con todo detalle y del hielo no decía nada,
+// cuando el hielo es el producto.
+// ============================================================
+
+test('el corte imprime el cuadre del hielo, con lo que faltó', async () => {
+  await entrarAdmin();
+  const alm = (await llamar('/api/existencia')).json.datos.almacenes[0].almacen.id;
+
+  // Un conteo anterior, para tener desde dónde comparar.
+  await llamar('/api/existencia/conteos', {
+    method: 'POST', cuerpo: { almacenId: alm, dieciseisavos: 20 * 16 } });
+
+  await llamar('/api/caja/abrir', { method: 'POST', cuerpo: { fondo: 0 } });
+  await llamar('/api/ventas', {
+    method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 16 }], pago: 300 } });
+  await llamar('/api/existencia/mermas', {
+    method: 'POST', cuerpo: { almacenId: alm, dieciseisavos: 8, motivo: 'derretida' } });
+
+  const caja = (await llamar('/api/caja')).json.datos.abierta.caja;
+  // Se cuenta 2 marquetas menos de las que deberían quedar.
+  await llamar('/api/existencia/conteos', {
+    method: 'POST',
+    cuerpo: { almacenId: alm, dieciseisavos: 20 * 16 - 16 - 8 - 2 * 16, cajaId: caja.id } });
+  const cerrar = await llamar('/api/caja/cerrar', { method: 'POST', cuerpo: {} });
+  const cajaId = cerrar.json.datos.corte.caja.id;
+
+  // El cuadre viaja con el corte, para la pantalla.
+  const h = cerrar.json.datos.corte.hielo;
+  assert.ok(h, 'el corte trae su cuadre de hielo');
+  assert.equal(h.cuadre.vendido, 16, 'una marqueta vendida');
+  assert.equal(h.cuadre.merma, 8, 'y media derretida');
+  assert.equal(h.cuadre.faltante, 2 * 16, 'faltan dos marquetas que nadie explicó');
+
+  limpiarPapel();
+  await llamar(`/api/impresion/corte/${cajaId}`, { method: 'POST', cuerpo: {} });
+  const papel = loImpreso();
+
+  assert.match(papel, /Hielo #/, 'su propio papel');
+  assert.match(papel, /TENIA QUE HABER/);
+  assert.match(papel, /DEBERIA QUEDAR/);
+  assert.match(papel, /CONTADO/);
+  assert.match(papel, /FALTA 2/, 'y el número que se viene a ver');
+  assert.match(papel, /PANOS SACADOS/);
+  assert.match(papel, /SE VENDIO/, 'qué pedazos salieron');
+  assert.match(papel, /DERRETIDO O ROTO/);
+});
+
+test('un turno que no contó hielo no imprime un cuadre en cero', async () => {
+  await entrarAdmin();
+  await llamar('/api/caja/abrir', { method: 'POST', cuerpo: { fondo: 0 } });
+  await llamar('/api/ventas', {
+    method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 16 }], pago: 300 } });
+  const cerrar = await llamar('/api/caja/cerrar', { method: 'POST', cuerpo: {} });
+
+  assert.equal(cerrar.json.datos.corte.hielo, null,
+    'sin conteo no hay cuadre: inventarlo haría creer que se contó y salió cero');
+
+  limpiarPapel();
+  await llamar(`/api/impresion/corte/${cerrar.json.datos.corte.caja.id}`, {
+    method: 'POST', cuerpo: {} });
+  assert.ok(!loImpreso().includes('Hielo #'), 'y no sale el papel');
+});
+
+test('los pedazos se agrupan por su tamaño, no por su nombre', async () => {
+  await entrarAdmin();
+  const alm = (await llamar('/api/existencia')).json.datos.almacenes[0].almacen.id;
+  await llamar('/api/existencia/conteos', {
+    method: 'POST', cuerpo: { almacenId: alm, dieciseisavos: 40 * 16 } });
+
+  await llamar('/api/caja/abrir', { method: 'POST', cuerpo: { fondo: 0 } });
+  // Tres octavos por el botón (concepto "1/8") y uno tecleado a mano
+  // (concepto "Hielo"): son el mismo pedazo y tienen que sumar juntos.
+  await llamar('/api/ventas', {
+    method: 'POST', cuerpo: { lineas: [{ codigo: '18', cantidad: 3 }], pago: 300 } });
+  await llamar('/api/ventas', {
+    method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 2 }], pago: 300 } });
+
+  const caja = (await llamar('/api/caja')).json.datos.abierta.caja;
+  const r = await llamar('/api/existencia/conteos', {
+    method: 'POST', cuerpo: { almacenId: alm, dieciseisavos: 39 * 16, cajaId: caja.id } });
+  assert.equal(r.estado, 201);
+  const corte = (await llamar('/api/caja/cerrar', { method: 'POST', cuerpo: {} }))
+    .json.datos.corte;
+
+  const octavos = corte.hielo.pedazos.find((p) => p.pedazo === 2);
+  assert.ok(octavos, 'hay un renglón de octavos');
+  assert.equal(octavos.piezas, 4, 'los tres del botón y el tecleado a mano, juntos');
+  assert.equal(octavos.texto, '1/8');
+});

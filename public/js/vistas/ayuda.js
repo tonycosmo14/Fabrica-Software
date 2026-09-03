@@ -71,6 +71,16 @@ const TEMAS = [
       en el mismo momento. Por eso el sistema lo pide junto: dices cómo salió
       el hielo, con qué agua se rellenó, y listo. Un solo registro.</p>
 
+      <h4>Quién lo sacó</h4>
+      <p>Si quien está en la computadora es un <b>operario</b>, no se le
+      pregunta: <b>fue él</b>, y su nombre sale escrito. Es la misma regla
+      que en la caja, donde el cajero no escoge quién cobró — ponerle una
+      lista con los nombres de sus compañeros sería darle la opción de
+      anotarle el trabajo a otro.</p>
+      <p>El <b>gerente</b> y el <b>administrador</b> sí eligen, porque ellos
+      capturan lo que les cantan: quien lo hizo y quien lo anotó son dos
+      cosas, y las dos quedan guardadas.</p>
+
       <h4>Todo se anota tocando el paño</h4>
       <p>Se toca el paño en la lista de su tanque y ahí está <b>todo</b>: quién
       lo sacó, cómo salió el hielo, qué se hizo con lo que salió mal, molde
@@ -176,7 +186,9 @@ const TEMAS = [
       <h4>La temperatura de la salmuera</h4>
       <p>De vez en cuando se mide la salmuera de un tanque. Se toman
       <b>tres</b> —cerca de los serpentines, en la salida más cercana y en la
-      más lejana— y el sistema saca el promedio. No hace falta ningún
+      más lejana— <b>en grados centígrados (°C)</b>, y el sistema saca el
+      promedio. Van con su signo: la salmuera trabaja bajo cero, así que casi
+      siempre llevan un menos delante. No hace falta ningún
       horario: se anota cuando se mide.</p>
       <p>Está en el panel de la derecha de Producción de hielo, con el botón
       <b>🌡 Medir</b>. Ahí mismo se ve cuándo fue la última vez de ese tanque
@@ -624,7 +636,8 @@ debería quedar − contado = FALTA</pre>
         siempre, entera: se toca cada paño y se anota como todos los días,
         con quién lo sacó, cómo salió el hielo y canasta por canasta.</li>
         <li><b>¿Cuánto hielo queda en el cuarto frío?</b> Tal como te lo
-        dictan: 14 marquetas y una fracción.</li>
+        dictan, con el teclado de siempre: los pedazos <b>se suman</b>, así
+        que 1/8 y luego 1/16 dan 3/16. O se escribe tal cual: "25 y 3/16".</li>
         <li><b>¿Se cortó hielo para bolsas?</b> Sí o no, y cuántas
         marquetas.</li>
         <li><b>¿Cuántas bolsas salieron?</b> Solo si se cortó.</li>
@@ -657,18 +670,52 @@ debería quedar − contado = FALTA</pre>
       es del <b>gerente</b> o del <b>administrador</b>: que lo hiciera el
       propio cajero sería firmarse a sí mismo la entrega.</p>
 
-      <h4>El corte sale en dos papeles</h4>
+      <h4>El corte sale en tres papeles</h4>
       <ul>
         <li>El <b>primero</b> es el del dinero, con espacio para la firma y
         una raya para escribir a mano lo que se entrega. Los gastos van solo
         como <b>total</b>, con cuántos son.</li>
         <li>El <b>segundo</b> es el <b>detalle</b>: los gastos y las entradas
         uno por uno, con sus sumas, en dos columnas para ahorrar papel.</li>
+        <li>El <b>tercero</b> es <b>el hielo</b>, que es el de abajo.</li>
       </ul>
-      <p class="ayuda-tip">Son dos porque son de dos personas distintas: el
-      primero se entrega con el cajón, el segundo se queda en la carpeta.
-      Si el turno no tuvo ningún gasto ni entrada, el segundo no se imprime:
-      media hoja en blanco que dice GASTOS es papel tirado todos los días.</p>
+      <p class="ayuda-tip">Son papeles distintos porque son de personas
+      distintas: el primero se entrega con el cajón, el segundo se queda en
+      la carpeta. Si el turno no tuvo ningún gasto ni entrada, el segundo no
+      se imprime: media hoja en blanco que dice GASTOS es papel tirado todos
+      los días.</p>
+
+      <h4>El cuadre del hielo</h4>
+      <p>El corte enseñaba el dinero con todo detalle y del hielo no decía
+      nada — cuando el hielo es el producto. Ahora, en el corte y en su
+      papel, va la cuenta entera <b>desde el conteo anterior hasta este</b>:</p>
+
+      <pre class="ayuda-formula">había + se produjo = TENÍA QUE HABER
+menos lo vendido, lo derretido y lo cortado = debería quedar
+debería quedar − lo que se contó = FALTA o SOBRA</pre>
+
+      <p><b>Falta</b> es el hielo que salió del cuarto frío <b>sin ticket,
+      sin anotarse como derretido y sin cortarse</b>. Ese es el número que
+      hay que vigilar. Si <b>sobra</b>, casi siempre falta capturar un paño
+      o el conteo anterior se quedó corto.</p>
+
+      <p>Y debajo, de dónde salió cada número:</p>
+      <ul>
+        <li><b>Los paños</b> que se sacaron, de qué tanque, <b>quién los
+        sacó</b>, cuánto entró al cuarto frío y cuántas se rompieron.</li>
+        <li><b>Qué pedazos se vendieron</b>: 3 octavos, 1 cuarto, 2
+        marquetas… agrupados por el <b>tamaño del pedazo</b> y no por el
+        nombre, porque el mismo octavo se llama "1/8" si se tocó el botón y
+        "Hielo" si se tecleó a mano.</li>
+        <li><b>Cuánto salió a mayoreo</b> y cuánto al público, con sus
+        tickets.</li>
+        <li><b>Lo que se derritió o se rompió</b>, por motivo.</li>
+        <li><b>Lo que se cortó para bolsas</b>, y cuántas bolsas salieron.</li>
+      </ul>
+      <p class="ayuda-tip">Un turno que <b>no contó hielo</b> no tiene cuadre
+      y no imprime este papel: sin conteo no se puede decir si faltó o sobró,
+      y un cuadre con todo en cero haría creer que se contó y salió cero.
+      Todo esto se vuelve a ver cuando quieras desde <b>Cortes</b>.</p>
 
       <h4>Mandar el corte por WhatsApp</h4>
       <p>Abajo del corte, <b>📲 Mandar por WhatsApp</b>. El sistema arma la
