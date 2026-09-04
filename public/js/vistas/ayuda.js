@@ -2287,16 +2287,29 @@ DEBERIA HABER ..........................  $5,500
         <li><b>A la fábrica</b> — se queda aquí adentro.</li>
       </ul>
 
-      <h4>El mapa</h4>
-      <p>Todas las neveras con ubicación puesta salen en un mapa de
-      <b>OpenStreetMap</b>, con su número. Se arrastra, se acerca, y al tocar
-      una chincheta se abre su ficha. El color dice cómo va: verde bien,
-      ámbar si lleva días sin pedir, rojo si está descompuesta.</p>
+      <h4>La lista y el mapa, lado a lado</h4>
+      <p>La pantalla va en <b>dos columnas</b>: a la izquierda la lista, con
+      cada nevera, quién la tiene, cómo va y cuándo pidió; a la derecha el
+      mapa de <b>OpenStreetMap</b> con una chincheta por nevera, con su
+      número. El mapa se queda quieto mientras la lista corre.</p>
+      <p>Cada renglón lleva dos botones:</p>
+      <ul>
+        <li><b>📍</b> — señala esa nevera en el mapa: se centra en ella y su
+        chincheta sale más grande. Si todavía no tiene ubicación, el botón
+        lleva un <b>?</b> y al tocarlo abre el mapa para ponérsela.</li>
+        <li><b>✏️</b> — cambia sus datos ahí mismo: dirección, quién responde,
+        teléfono y ubicación, sin entrar a la ficha.</li>
+      </ul>
+      <p>Tocar el renglón abre la ficha, y tocar una chincheta también. El
+      color de la chincheta dice cómo va: <b>verde</b> prestada y al día,
+      <b>ámbar</b> lleva días sin pedir, <b>rojo</b> por reparar o con una
+      falla, <b>morado</b> no se sabe dónde está, <b>azul</b> la usa la
+      fábrica. Abajo del mapa está la leyenda.</p>
 
-      <p>La ubicación se pone en <b>Cambiar los datos</b>, de dos formas:
-      <b>tocando el mapa</b> donde está la tienda, o pegando el enlace que
-      Google Maps da al compartir (sirve el corto del celular). El sistema
-      saca las coordenadas solo.</p>
+      <p>La ubicación también se pone desde <b>Cambiar los datos</b> en la
+      ficha, de dos formas: <b>tocando el mapa</b> donde está la tienda, o
+      pegando el enlace que Google Maps da al compartir (sirve el corto del
+      celular). El sistema saca las coordenadas solo.</p>
 
       <p class="ayuda-tip"><b>El mapa necesita internet; la dirección
       escrita no.</b> Por eso la dirección es la que manda y el mapa es el

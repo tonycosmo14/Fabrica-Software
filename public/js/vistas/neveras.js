@@ -37,6 +37,10 @@ export async function vistaNeveras(pantalla) {
     const p = d.pendientes;
     const conMapa = d.neveras.filter((n) => n.comodato?.latitud != null);
 
+    // EN DOS COLUMNAS  (v5.9): "la lista con sus datos a la izquierda y el
+    // mapa con las chinchetas a la derecha". El mapa se queda quieto
+    // mientras la lista corre, y cada renglón tiene su 📍 para señalar
+    // en el mapa dónde quedó esa nevera.
     pantalla.innerHTML = `
       <div class="cabecera-pantalla">
         <h2>Las neveras</h2>
@@ -50,39 +54,46 @@ export async function vistaNeveras(pantalla) {
       ${tablero(p)}
       ${resumen()}
 
-      ${conMapa.length ? `
-        <div class="tarjeta ancho-completo">
-          <h3 style="margin:0 0 4px">Dónde están</h3>
-          <p class="ayuda" style="margin:0 0 12px">
-            ${conMapa.length} de ${d.neveras.length} tienen ubicación puesta.
-            Toca una chincheta para abrir su ficha.
-          </p>
-          <div id="mapa" class="mapa-caja"></div>
-        </div>` : ''}
-
-      <div class="tarjeta ancho-completo">
-        <div class="nevera-cabeza">
-          <h3 style="margin:0">Todas</h3>
-          <button class="secundario chico" id="ver-baja">
-            ${verBaja ? 'Ocultar las de baja' : 'Ver también las de baja'}
-          </button>
+      <div class="nevera-dos">
+        <div class="tarjeta nevera-columna">
+          <div class="nevera-cabeza">
+            <h3 style="margin:0">Todas</h3>
+            <button class="secundario chico" id="ver-baja">
+              ${verBaja ? 'Ocultar las de baja' : 'Ver también las de baja'}
+            </button>
+          </div>
+          ${d.neveras.length
+            ? `<div class="nevera-lista">${d.neveras.map(tarjeta).join('')}</div>`
+            : '<p class="vacio">Todavía no hay ninguna nevera dada de alta.</p>'}
         </div>
-        ${d.neveras.length
-          ? `<div class="nevera-lista">${d.neveras.map(tarjeta).join('')}</div>`
-          : '<p class="vacio">Todavía no hay ninguna nevera dada de alta.</p>'}
+
+        <div class="tarjeta nevera-mapa">
+          <h3 style="margin:0 0 4px">Dónde están</h3>
+          <p class="ayuda" style="margin:0 0 10px">
+            ${conMapa.length
+              ? `${conMapa.length} de ${d.neveras.length} con ubicación. Toca una chincheta para abrir su ficha.`
+              : 'Ninguna tiene ubicación todavía: se pone con el ✏️ de su renglón.'}
+          </p>
+          <div id="mapa" class="mapa-caja nevera-mapa-caja"></div>
+          <div class="mapa-leyenda">
+            <span><i class="bien"></i> prestada, al día</span>
+            <span><i class="tarde"></i> lleva días sin pedir</span>
+            <span><i class="malo"></i> por reparar o con falla</span>
+            <span><i class="perdida"></i> no se sabe dónde está</span>
+            <span><i class="propio"></i> la usa la fábrica</span>
+          </div>
+        </div>
       </div>`;
 
-    if (conMapa.length) {
-      mapa(pantalla.querySelector('#mapa'), {
-        puntos: conMapa.map((n) => ({
-          id: n.id, numero: n.numero,
-          lat: n.comodato.latitud, lon: n.comodato.longitud,
-          etiqueta: `${n.numero} · ${n.comodato.quien || ''}`,
-          tono: n.ritmo.seTardo ? 'tarde' : (n.pendientes ? 'malo' : 'bien')
-        })),
-        alTocar: (id) => ficha(id)
-      });
-    }
+    const m = mapa(pantalla.querySelector('#mapa'), {
+      puntos: conMapa.map((n) => ({
+        id: n.id, numero: n.numero,
+        lat: n.comodato.latitud, lon: n.comodato.longitud,
+        etiqueta: `${n.numero} · ${n.comodato.quien || ''}`,
+        tono: tonoPin(n)
+      })),
+      alTocar: (id) => ficha(id)
+    });
 
     pantalla.querySelector('#nueva').onclick = nueva;
     pantalla.querySelector('#ajustes').onclick = ajustes;
@@ -90,6 +101,62 @@ export async function vistaNeveras(pantalla) {
     pantalla.querySelectorAll('[data-ficha]').forEach((x) => {
       x.onclick = () => ficha(x.dataset.ficha);
     });
+
+    // 📍 UBICAR: señala la chincheta en el mapa de al lado, sin irse a
+    // ninguna parte. Si no tiene ubicación, la pide en el mapa ahí mismo.
+    pantalla.querySelectorAll('[data-ubicar]').forEach((b) => {
+      b.onclick = async (e) => {
+        e.stopPropagation();
+        const n = d.neveras.find((x) => String(x.id) === b.dataset.ubicar);
+        if (!n) return;
+        if (n.comodato?.latitud != null) {
+          pantalla.querySelectorAll('.nevera-fila.senalada').forEach((f) => f.classList.remove('senalada'));
+          b.closest('.nevera-fila')?.classList.add('senalada');
+          m.resaltar(n.id);
+          if (window.innerWidth <= 900) pantalla.querySelector('#mapa')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+          await ponerUbicacionDesdeLista(n);
+        }
+      };
+    });
+
+    // ✏️ EDITAR: lo del comodato (dirección, quién, teléfono, ubicación)
+    // si está prestada; si no, los datos de la nevera.
+    pantalla.querySelectorAll('[data-editar]').forEach((b) => {
+      b.onclick = (e) => {
+        e.stopPropagation();
+        const n = d.neveras.find((x) => String(x.id) === b.dataset.editar);
+        if (!n) return;
+        if (n.comodato) editarComodato(n, n.comodato, { alTerminar: lista });
+        else editar(n);
+      };
+    });
+  }
+
+  /** El color de la chincheta: primero lo urgente, luego el estado. */
+  function tonoPin(n) {
+    if (n.pendientes || n.tono === 'malo') return 'malo';
+    if (n.tono === 'perdida') return 'perdida';
+    if (n.ritmo?.seTardo) return 'tarde';
+    return n.tono || 'bien';
+  }
+
+  /** Poner la ubicación tocando el mapa, desde el renglón. */
+  async function ponerUbicacionDesdeLista(n) {
+    const co = n.comodato;
+    if (!co) return avisar('Esta nevera no está prestada: la ubicación es de quien la tiene.', 'error');
+    const punto = await elegirEnMapa({ titulo: `¿Dónde está la nevera ${n.numero}?` });
+    if (!punto) return;
+    try {
+      await api.actualizar(`/neveras/comodatos/${co.id}`, {
+        direccion: co.direccion, responsable: co.responsable, telefono: co.telefono,
+        diasAviso: co.dias_aviso, referencias: co.referencias,
+        hastaPrevisto: co.hasta_previsto, notas: co.notas,
+        latitud: punto.lat, longitud: punto.lon
+      });
+      avisar('Ubicación guardada', 'bien');
+      lista();
+    } catch (e) { avisar(e.message, 'error'); }
   }
 
   /**
@@ -149,39 +216,40 @@ export async function vistaNeveras(pantalla) {
 
   function tarjeta(n) {
     const c = n.cuenta;
+    const tiene = n.comodato?.latitud != null;
     return `
-      <button class="nevera-tarjeta ${n.tono}" data-ficha="${esc(n.id)}">
-        <span class="nevera-numero">${esc(n.numero)}</span>
+      <div class="nevera-fila ${n.tono}">
+        <button class="nevera-tarjeta ${n.tono}" data-ficha="${esc(n.id)}">
+          <span class="nevera-numero">${esc(n.numero)}</span>
 
-        <span class="nevera-quien">
-          <b>${esc(n.comodato?.quien || n.etiqueta)}</b>
-          <small>${n.comodato?.direccion_util
-            ? esc(n.comodato.direccion_util)
-            : `${esc([n.marca, n.modelo].filter(Boolean).join(' ')) || 'sin marca'}`}</small>
+          <span class="nevera-quien">
+            <b>${esc(n.comodato?.quien || n.etiqueta)}</b>
+            <small>${n.comodato?.direccion_util
+              ? esc(n.comodato.direccion_util)
+              : `${esc([n.marca, n.modelo].filter(Boolean).join(' ')) || 'sin marca'}`}</small>
+          </span>
+
+          <span class="nevera-como">
+            <b class="nevera-estado ${n.tono}">${esc(n.corto || n.etiqueta)}</b>
+            <small>
+              ${c.sinCosto ? `vendió ${pesos(c.vendido.centavos)}`
+                : c.sePago ? `<span class="bien">a favor ${pesos(Math.abs(c.aFavor))}</span>`
+                : `<span class="malo">le falta ${pesos(Math.abs(c.aFavor))}</span>`}
+              · ${n.ritmo.dias == null ? 'sin pedidos'
+                : n.ritmo.nuncaPidio ? 'nunca ha pedido'
+                : n.ritmo.dias === 0 ? 'pidió hoy'
+                : `<span class="${n.ritmo.seTardo ? 'malo' : ''}">pidió hace ${n.ritmo.dias} d</span>`}
+            </small>
+          </span>
+        </button>
+        <span class="nevera-botones">
+          <button class="secundario chico" data-ubicar="${esc(n.id)}"
+                  title="${tiene ? 'Verla en el mapa' : 'Ponerle ubicación tocando el mapa'}">
+            ${tiene ? '📍' : '📍<small>?</small>'}
+          </button>
+          <button class="secundario chico" data-editar="${esc(n.id)}" title="Cambiar sus datos">✏️</button>
         </span>
-
-        <span class="nevera-dato">
-          <small>Estado</small>
-          <b class="nevera-estado ${n.tono}">${esc(n.corto || n.etiqueta)}</b>
-        </span>
-
-        <span class="nevera-dato der">
-          <small>${c.sinCosto ? 'Ha vendido' : (c.sePago ? 'A favor' : 'Le falta')}</small>
-          <b class="${c.sinCosto ? '' : (c.sePago ? 'bien' : 'malo')}">${
-            c.sinCosto ? pesos(c.vendido.centavos) : pesos(Math.abs(c.aFavor))}</b>
-        </span>
-
-        <span class="nevera-dato der">
-          <small>Último pedido</small>
-          <b class="${n.ritmo.seTardo ? 'malo' : ''}">${
-            n.ritmo.dias == null ? '—'
-            : n.ritmo.nuncaPidio ? 'nunca'
-            : n.ritmo.dias === 0 ? 'hoy'
-            : `hace ${n.ritmo.dias} d`}</b>
-        </span>
-
-        <span class="nevera-flecha">${n.pendientes ? '🔧' : '›'}</span>
-      </button>`;
+      </div>`;
   }
 
   // ==========================================================
@@ -673,7 +741,7 @@ export async function vistaNeveras(pantalla) {
    * compartir: nadie va a teclear una latitud a mano, y del enlace se
    * sacan las coordenadas solas.
    */
-  async function editarComodato(n, co) {
+  async function editarComodato(n, co, { alTerminar = null } = {}) {
     const direccion = await pedirTexto({
       titulo: 'La dirección', valor: co.direccion || '', opcional: true, largo: 300
     });
@@ -756,7 +824,7 @@ export async function vistaNeveras(pantalla) {
     try {
       await api.actualizar(`/neveras/comodatos/${co.id}`, cuerpo);
       avisar('Guardado', 'bien');
-      ficha(n.id);
+      if (alTerminar) alTerminar(); else ficha(n.id);
     } catch (e) { avisar(e.message, 'error'); }
   }
 

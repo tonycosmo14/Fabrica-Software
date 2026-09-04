@@ -4505,6 +4505,45 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 }
 .nevera-hecho { display: block; color: var(--verde); margin-top: 2px; }
 
+/* EN DOS COLUMNAS  (v5.9): la lista a la izquierda, el mapa pegado a la
+   derecha y quieto mientras la lista corre. En angosto se apila, mapa
+   arriba. */
+.nevera-dos { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(320px, .85fr);
+  gap: 14px; align-items: start; }
+.nevera-dos .tarjeta { max-width: none; margin: 0; }
+.nevera-mapa { position: sticky; top: 10px; }
+.nevera-mapa-caja { height: min(66vh, 620px); }
+.nevera-dos .nevera-tarjeta { grid-template-columns: 50px minmax(0, 1fr) auto; gap: 10px 12px; padding: 9px 12px; }
+.nevera-como { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; text-align: right; }
+.nevera-como small { color: var(--suave); font-size: 12px; white-space: nowrap; }
+.nevera-como small .bien { color: var(--verde); font-weight: 700; }
+.nevera-como small .malo { color: var(--rojo); font-weight: 700; }
+
+.nevera-fila { display: flex; align-items: stretch; gap: 6px; }
+.nevera-fila .nevera-tarjeta { flex: 1; min-width: 0; }
+.nevera-fila.senalada .nevera-tarjeta { border-color: var(--primario); box-shadow: 0 0 0 2px var(--primario) inset; }
+.nevera-botones { display: flex; flex-direction: column; gap: 4px; }
+.nevera-botones button { width: 44px; min-width: 0; min-height: 0; flex: 1; padding: 0; font-size: 16px; }
+.nevera-botones button small { font-size: 11px; font-weight: 800; color: var(--rojo); }
+
+.mapa-leyenda { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px;
+  font-size: 12.5px; color: var(--suave); }
+.mapa-leyenda i { display: inline-block; width: 12px; height: 12px; border-radius: 999px;
+  vertical-align: -1px; margin-right: 4px; background: var(--primario); }
+.mapa-leyenda i.bien { background: var(--verde); }
+.mapa-leyenda i.tarde { background: var(--ambar); }
+.mapa-leyenda i.malo { background: var(--rojo); }
+.mapa-leyenda i.perdida { background: var(--cal-otro); }
+.mapa-leyenda i.propio { background: var(--et-operario-t); }
+
+@media (max-width: 900px) {
+  .nevera-dos { grid-template-columns: 1fr; }
+  .nevera-mapa { position: static; order: -1; }
+  .nevera-mapa-caja { height: 300px; }
+  .nevera-como { align-items: flex-start; text-align: left; grid-column: 2 / -1; }
+  .nevera-como small { white-space: normal; }
+}
+
 /* ---------- EL MAPA ---------- */
 
 .mapa-caja { height: 380px; border-radius: 12px; overflow: hidden; }
@@ -4538,6 +4577,11 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 .mapa-pin.tarde span { background: var(--ambar); }
 .mapa-pin.malo span { background: var(--rojo); }
 .mapa-pin:hover span { transform: scale(1.12); }
+.mapa-pin.perdida span { background: var(--cal-otro); }
+.mapa-pin.propio span { background: var(--et-operario-t); }
+.mapa-pin.libre span, .mapa-pin.baja span { background: var(--suave); }
+.mapa-pin.resaltada { z-index: 3; }
+.mapa-pin.resaltada span { transform: scale(1.35); box-shadow: 0 0 0 4px rgba(255,255,255,.8), 0 3px 10px rgba(0,0,0,.5); }
 
 .mapa-mandos {
   position: absolute; top: 10px; right: 10px; z-index: 2;

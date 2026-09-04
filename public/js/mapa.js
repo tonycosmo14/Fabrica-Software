@@ -199,6 +199,10 @@ export function mapa(caja, { puntos = [], alTocar = null, alTocarMapa = null,
     });
   }
 
+  // La chincheta que se está señalando desde la lista (v5.9): sale más
+  // grande y encima de las demás.
+  let resaltada = null;
+
   /** Las chinchetas van encima, cada una en su píxel. */
   function pintarChinchetas() {
     capaChinchetas.innerHTML = conCoordenadas.map((p) => {
@@ -207,7 +211,8 @@ export function mapa(caja, { puntos = [], alTocar = null, alTocarMapa = null,
       // Fuera de la pantalla no se dibuja: con cincuenta da igual, pero
       // es lo que deja que esto aguante quinientas el día del agua.
       if (px < -40 || py < -60 || px > ancho + 40 || py > alto + 60) return '';
-      return `<button type="button" class="mapa-pin ${p.tono || ''}"
+      const brilla = resaltada != null && String(p.id) === String(resaltada);
+      return `<button type="button" class="mapa-pin ${p.tono || ''}${brilla ? ' resaltada' : ''}"
         style="left:${px}px;top:${py}px" data-punto="${p.id || ''}"
         title="${(p.etiqueta || '').replace(/"/g, '&quot;')}">
         <span>${p.numero ?? ''}</span></button>`;
@@ -301,6 +306,16 @@ export function mapa(caja, { puntos = [], alTocar = null, alTocarMapa = null,
       pintar();
     },
     get cuantas() { return conCoordenadas.length; },
+    /**
+     * SEÑALAR UNA CHINCHETA  (v5.9): la de la lista que se acaba de tocar.
+     * Se centra en ella y se dibuja más grande. Con null se apaga.
+     */
+    resaltar(id) {
+      resaltada = id;
+      const p = conCoordenadas.find((q) => String(q.id) === String(id));
+      if (p) this.ir(p.lat, p.lon, Math.max(z, 16));
+      else pintarChinchetas();
+    },
     /**
      * PONER (O MOVER) LA CHINCHETA ELEGIDA  (v5.7.1). Para el mapa donde
      * se elige la ubicación de un cliente tocando: hay una sola chincheta

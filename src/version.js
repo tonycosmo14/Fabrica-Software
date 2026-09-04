@@ -17,9 +17,25 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '5.8.1';
+const VERSION_ACTUAL = '5.9';
 
 const VERSIONES = [
+  {
+    numero: '5.9',
+    nombre: 'Las neveras en el mapa',
+    fecha: '2026-09-05',
+    resumen:
+      'La lista de neveras a la izquierda y el mapa a la derecha, como lo '
+      + 'pediste: cada renglón con su 📍 para señalarla en el mapa y su ✏️ '
+      + 'para cambiarle los datos.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'LA PANTALLA EN DOS COLUMNAS: la lista con los datos de cada nevera a la izquierda, y a la derecha el mapa de OpenStreetMap con una chincheta por nevera, con su número. El mapa se queda quieto mientras la lista corre. En pantalla angosta se apila, mapa arriba.' },
+      { tipo: 'nuevo', texto: 'EL BOTÓN 📍 DE CADA RENGLÓN señala esa nevera en el mapa: se centra en ella y su chincheta sale más grande. Si no tiene ubicación, lleva un ? y al tocarlo abre el mapa para ponérsela ahí mismo.' },
+      { tipo: 'nuevo', texto: 'EL BOTÓN ✏️ DE CADA RENGLÓN cambia sus datos sin entrar a la ficha: dirección, quién responde, teléfono y ubicación.' },
+      { tipo: 'mejora', texto: 'LAS CHINCHETAS POR ESTADO: verde prestada y al día, ámbar lleva días sin pedir, rojo por reparar o con falla, morado no se sabe dónde está, azul la usa la fábrica. Con su leyenda abajo del mapa.' },
+      { tipo: 'mejora', texto: 'El renglón dice en una línea lo que importa: cómo va (le falta o a favor) y cuándo pidió por última vez. Lo demás sigue en la ficha.' }
+    ]
+  },
   {
     numero: '5.8.1',
     nombre: 'Los QR ya se leen',

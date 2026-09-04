@@ -888,6 +888,7 @@ verdad de qué hay en cada versión. Escrita a mano se quedaba atrás.
 | **v5.7.1** | Lo que salió en la revisión | ✅ listo |
 | **v5.8** | El pedido, desde cobrar | ✅ listo |
 | **v5.8.1** | Los QR ya se leen | ✅ listo |
+| **v5.9** | Las neveras en el mapa | ✅ listo |
 
 **Lo que falta:** el instalador para Windows, y la
 importación de lo que hay en Aronium la noche antes de arrancar.
