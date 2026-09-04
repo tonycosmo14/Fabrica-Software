@@ -66,6 +66,14 @@ const AVISOS = [
     ayuda: 'Cuando lo contado no coincide con lo que debía haber. Es la señal ' +
            'de un paño sin capturar, o de hielo que se fue sin ticket.' },
 
+  { id: 'nevera_sin_pedir', nombre: 'Nevera que no ha pedido', icono: '📞', grupo: 'Las neveras',
+    ayuda: 'Las neveras que llevan más días sin pedir bolsas de los que les ' +
+           'pusiste. Sale una vez al día, no cada vez que se mira.' },
+
+  { id: 'nevera_falla', nombre: 'Nevera descompuesta', icono: '🔧', grupo: 'Las neveras',
+    ayuda: 'Cuando alguien reporta que una nevera no sirve, con lo que dijo ' +
+           'el cliente y dónde está.' },
+
   { id: 'tanque_nuevo', nombre: 'Tanque nuevo', icono: '🛢️', grupo: 'La gente y la fábrica',
     ayuda: 'Cuando se da de alta un tanque.' },
 
@@ -340,6 +348,26 @@ const SEGUN_ACCION = {
         ['Ya puede entrar', 'sí, con su PIN']
       ],
       nota: 'Si va a cobrar sueldo, ponle cuánto gana en <b>La raya</b>.'
+    };
+  },
+
+  // ---------- LAS NEVERAS ----------
+  'nevera.falla': (e) => {
+    if (!encendido('nevera_falla')) return null;
+    const d = e.detalle;
+    return {
+      aviso: 'nevera_falla',
+      asunto: `Nevera ${escapar(d.numero || '')} descompuesta` +
+              (d.quien ? ` · ${escapar(d.quien)}` : ''),
+      titulo: 'Reportaron una nevera descompuesta',
+      entradilla: `Lo anotó <b>${nombreDe(e.quien)}</b>.`,
+      grande: `Nevera ${escapar(d.numero || '?')}`,
+      color: 'rojo',
+      renglones: [
+        ['Qué tiene', escapar(d.queTiene || '—')],
+        d.quien ? ['Dónde está', escapar(d.quien)] : null
+      ].filter(Boolean),
+      nota: 'Queda marcada como «por reparar» hasta que se anote qué se le hizo.'
     };
   },
 

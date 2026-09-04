@@ -4327,3 +4327,187 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
   display: block; margin-top: 3px; max-width: 260px;
   white-space: normal; font-size: 11.5px; line-height: 1.35;
 }
+
+/* ============================================================
+   LAS NEVERAS EN COMODATO  (v5.1)
+   ============================================================ */
+
+/* Lo que pide acción hoy. Va arriba de todo y con su color. */
+.nevera-tablero { display: grid; gap: 10px; margin-bottom: 14px; }
+@media (min-width: 900px) { .nevera-tablero { grid-template-columns: 1fr 1fr; } }
+
+.nevera-alerta {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 13px 16px; border-radius: 12px;
+  border: 1px solid var(--borde); background: var(--superficie-alt);
+}
+.nevera-alerta > b { font-size: 15px; }
+.nevera-alerta > span { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.nevera-alerta.tarde { background: var(--cal-poco_hueca-f); border-color: var(--ambar); }
+.nevera-alerta.tarde > b { color: var(--ambar); }
+.nevera-alerta.malo { background: var(--et-baja-f); border-color: var(--rojo); }
+.nevera-alerta.malo > b { color: var(--rojo); }
+.nevera-alerta.perdida { background: var(--cal-otro-f); border-color: var(--cal-otro); }
+.nevera-alerta.perdida > b { color: var(--cal-otro); }
+
+.nevera-alerta > span { justify-content: flex-start; }
+.nevera-chip {
+  /* `flex: none` porque los botones de este sistema son de ancho completo
+     por defecto: sin esto, un solo chip se estiraba de orilla a orilla y
+     se leía como una barra vacía con un número en medio. */
+  flex: none; width: auto;
+  padding: 3px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 700;
+  background: var(--superficie); border: 1px solid var(--borde); color: var(--texto);
+  min-height: 0;
+}
+.nevera-chip:hover { border-color: var(--primario); color: var(--primario); }
+
+.nevera-resumen { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.nevera-cuenta {
+  padding: 4px 12px; border-radius: 999px; font-size: 13px;
+  background: var(--superficie-alt); border: 1px solid var(--borde); color: var(--suave);
+}
+.nevera-cuenta b { color: var(--texto); }
+.nevera-cuenta.bien { background: var(--cal-normal-f); border-color: var(--verde); }
+.nevera-cuenta.bien b { color: var(--verde); }
+.nevera-cuenta.malo { background: var(--et-baja-f); border-color: var(--rojo); }
+.nevera-cuenta.malo b { color: var(--rojo); }
+
+/* EL TÍTULO Y SU BOTÓN, EN UNA FILA DE VERDAD.
+   Aquí había un `float: right` en el botón, y le comía 230 px a la lista de
+   abajo: una lista es `display: flex`, y una caja flex con ancho automático
+   se ENCOGE para no meterse debajo de un flotante. Se veía como una lista
+   angosta con un hueco a la derecha, sin ninguna regla que lo explicara. */
+.nevera-cabeza {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 12px;
+}
+.nevera-cabeza > button { flex: none; width: auto; }
+
+/* La lista. Un renglón por nevera, con el número en un cuadro fijo a la
+   izquierda para que todos los datos caigan a la misma altura. */
+.nevera-lista { display: flex; flex-direction: column; gap: 8px; }
+/* La lista necesita el ancho entero: son seis columnas, y apretadas en los
+   820 px de una tarjeta normal el estado se encima con el importe. */
+.ancho-completo .nevera-tarjeta { max-width: none; }
+
+.nevera-tarjeta {
+  display: grid; align-items: center; gap: 14px; width: 100%;
+  grid-template-columns: 58px minmax(0, 2.2fr) 1fr 1fr 1fr 20px;
+  padding: 11px 14px; text-align: left; min-height: 0;
+  background: var(--superficie); border: 1px solid var(--borde);
+  border-radius: 12px; color: var(--texto); font: inherit;
+}
+.nevera-tarjeta:hover { border-color: var(--primario); }
+.nevera-tarjeta.malo { border-left: 4px solid var(--rojo); }
+.nevera-tarjeta.perdida { border-left: 4px solid var(--cal-otro); }
+.nevera-tarjeta.baja { opacity: .55; }
+
+.nevera-numero {
+  display: flex; align-items: center; justify-content: center;
+  height: 42px; border-radius: 10px;
+  background: var(--primario); color: var(--primario-texto);
+  font-size: 17px; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.nevera-tarjeta.baja .nevera-numero,
+.nevera-tarjeta.perdida .nevera-numero { background: var(--suave); }
+
+.nevera-quien { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.nevera-quien b, .nevera-quien small { overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; }
+.nevera-quien small { color: var(--suave); font-size: 12.5px; }
+
+.nevera-dato { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.nevera-dato small { color: var(--suave); font-size: 11.5px; }
+.nevera-dato.der { text-align: right; }
+.nevera-flecha { color: var(--suave); text-align: right; }
+
+.nevera-estado {
+  display: inline-block; padding: 1px 9px; border-radius: 999px;
+  font-size: 12px; font-weight: 700; white-space: nowrap;
+  background: var(--superficie-alt); color: var(--suave);
+}
+.nevera-estado.bien { background: var(--cal-normal-f); color: var(--verde); }
+.nevera-estado.malo { background: var(--et-baja-f); color: var(--rojo); }
+.nevera-estado.perdida { background: var(--cal-otro-f); color: var(--cal-otro); }
+.nevera-estado.propio { background: var(--et-operario-f); color: var(--et-operario-t); }
+.nevera-estado.baja { background: var(--superficie-alt); color: var(--suave); }
+
+/* En pantalla angosta la tarjeta se apila: seis columnas de 60 px no se
+   leen, y esta pantalla también se abre desde la tablet. */
+@media (max-width: 860px) {
+  .nevera-tarjeta { grid-template-columns: 50px 1fr auto; gap: 10px 12px; }
+  .nevera-tarjeta .nevera-dato { grid-column: 2 / -1; flex-direction: row;
+    justify-content: space-between; text-align: left; }
+  .nevera-tarjeta .nevera-flecha { display: none; }
+}
+
+.nevera-grande { margin: 0 0 4px; font-size: 26px; font-weight: 800; line-height: 1.15; }
+.nevera-grande.bien { color: var(--verde); }
+.nevera-grande.malo { color: var(--rojo); }
+
+.nevera-acciones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.nevera-acciones button, .nevera-acciones .boton-enlace {
+  width: auto; min-width: 0; min-height: 40px; padding: 8px 14px; font-size: 15px;
+}
+.nevera-hecho { display: block; color: var(--verde); margin-top: 2px; }
+
+/* ---------- EL MAPA ---------- */
+
+.mapa-caja { height: 380px; border-radius: 12px; overflow: hidden; }
+.mapa-caja.chico { height: 220px; }
+
+.mapa {
+  position: relative; overflow: hidden; touch-action: none;
+  background: #dfe6e9; cursor: grab; user-select: none;
+}
+.mapa.agarrando { cursor: grabbing; }
+.mapa-lienzo, .mapa-chinchetas { position: absolute; inset: 0; }
+.mapa-chinchetas { pointer-events: none; }
+.mapa-lienzo img { position: absolute; width: 256px; height: 256px; pointer-events: none; }
+
+/* La chincheta: un círculo con el número de la nevera y su piquito. */
+.mapa-pin {
+  position: absolute; pointer-events: auto; transform: translate(-50%, -100%);
+  width: auto; min-width: 0; min-height: 0; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: 0;
+}
+.mapa-pin span {
+  display: flex; align-items: center; justify-content: center;
+  min-width: 30px; height: 30px; padding: 0 7px;
+  border-radius: 999px; border: 2px solid #fff;
+  background: var(--primario); color: #fff;
+  font-size: 12.5px; font-weight: 800; line-height: 1;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .45);
+}
+.mapa-pin.bien span { background: var(--verde); }
+.mapa-pin.tarde span { background: var(--ambar); }
+.mapa-pin.malo span { background: var(--rojo); }
+.mapa-pin:hover span { transform: scale(1.12); }
+
+.mapa-mandos {
+  position: absolute; top: 10px; right: 10px; z-index: 2;
+  display: flex; flex-direction: column; gap: 5px;
+}
+.mapa-mandos button {
+  width: 36px; min-width: 36px; height: 36px; padding: 0; min-height: 0;
+  font-size: 17px; font-weight: 700; border-radius: 9px;
+  background: var(--superficie); color: var(--texto);
+  border: 1px solid var(--borde-fuerte); box-shadow: 0 1px 4px rgba(0, 0, 0, .2);
+}
+.mapa-mandos button:hover { border-color: var(--primario); color: var(--primario); }
+
+/* El crédito a OpenStreetMap es obligatorio: ellos pagan esos servidores. */
+.mapa-credito {
+  position: absolute; right: 0; bottom: 0; z-index: 2;
+  padding: 2px 7px; font-size: 10.5px;
+  background: rgba(255, 255, 255, .82); border-radius: 5px 0 0 0;
+}
+.mapa-credito a { color: #333; text-decoration: none; }
+
+.mapa-sinred {
+  position: absolute; inset: auto 12px 12px 12px; z-index: 2;
+  padding: 9px 12px; border-radius: 10px; font-size: 13px;
+  background: var(--superficie); border: 1px solid var(--borde); color: var(--suave);
+}

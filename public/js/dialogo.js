@@ -188,7 +188,7 @@ export function pedirCantidad({ titulo, texto = '', valor = 0, ok = 'Guardar', a
  * natural de quitar un renglón del ticket sin buscar la tachita.
  */
 export function pedirEntero({ titulo, texto = '', valor = '', marcador = '1',
-                              ok = 'Guardar', maximo = 100000 }) {
+                              ok = 'Guardar', maximo = 100000, opcional = false }) {
   return new Promise((resolver) => {
     const { caja, salir } = montar(`
       <h3 class="dialogo-titulo">${titulo}</h3>
@@ -210,6 +210,10 @@ export function pedirEntero({ titulo, texto = '', valor = '', marcador = '1',
 
     const enviar = () => {
       const v = campo.value.trim();
+      // Con `opcional`, dejarlo en blanco es una respuesta —"no sé cuántas
+      // bolsas le caben"— y se devuelve la cadena vacía. Sin él, el campo
+      // simplemente no deja seguir, que es lo que hacía siempre.
+      if (v === '' && opcional) return salir('');
       if (!/^\d+$/.test(v) || Number(v) > maximo) { campo.focus(); campo.select(); return; }
       salir(Number(v));
     };
@@ -270,7 +274,7 @@ export function pedirContrasena({ titulo, texto = '', administradores = [],
 }
 
 export function pedirImporte({ titulo, texto = '', valor = '', marcador = '0.00',
-                               ok = 'Guardar', ayuda = '' }) {
+                               ok = 'Guardar', ayuda = '', opcional = false }) {
   return new Promise((resolver) => {
     const { caja, salir } = montar(`
       <h3 class="dialogo-titulo">${titulo}</h3>
@@ -294,6 +298,9 @@ export function pedirImporte({ titulo, texto = '', valor = '', marcador = '0.00'
 
     const enviar = () => {
       const v = campo.value.trim();
+      // "No sé cuánto costó" es una respuesta válida para una nevera vieja:
+      // con `opcional` se deja pasar en blanco en vez de trabar el diálogo.
+      if (v === '' && opcional) return salir('');
       if (v === '' || Number.isNaN(Number(v))) { campo.focus(); return; }
       salir(v);
     };

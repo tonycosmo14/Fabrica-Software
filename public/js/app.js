@@ -19,6 +19,7 @@ import { vistaTanques } from './vistas/tanques.js';
 import { vistaUsuarios } from './vistas/usuarios.js';
 import { vistaRaya } from './vistas/raya.js';
 import { vistaCorreo } from './vistas/correo.js';
+import { vistaNeveras } from './vistas/neveras.js';
 import { vistaNovedades, hayVersionNueva } from './vistas/novedades.js';
 import { vistaAyuda } from './vistas/ayuda.js';
 import { vistaPersonalizar } from './vistas/personalizar.js';
@@ -54,6 +55,7 @@ const RUTAS = {
   // debe. Solo el administrador — los sueldos no son dato de operación.
   '#/raya':      { titulo: 'La raya',           vista: vistaRaya,      permiso: 'raya.ver' },
   '#/correo':    { titulo: 'Avisos por correo',  vista: vistaCorreo,    permiso: 'correo.configurar' },
+  '#/neveras':   { titulo: 'Las neveras',        vista: vistaNeveras,   permiso: 'neveras.ver' },
   // El cajero entra con vista limitada: ve cuántas hay e imprime la hoja.
   '#/productos': { titulo: 'Productos y precios', vista: vistaProductos, permiso: 'inventario.ver', fija: true },
   '#/clientes':  { titulo: 'Clientes',           vista: vistaClientes,  permiso: 'clientes.ver', fija: true },

@@ -2109,6 +2109,169 @@ DEBERIA HABER ..........................  $5,500
 
   // ==========================================================
   {
+    id: 'neveras',
+    titulo: 'Las neveras en comodato',
+    busca: 'nevera neveras congelador comodato contrato prestamo prestada cliente ' +
+           'mapa ubicacion direccion responsable whatsapp mantenimiento falla ' +
+           'reparacion cortesia regalar bolsas cubos feria evento perdida baja ' +
+           'se pago cuanto ha ganado dias sin pedir',
+    cuerpo: `
+      <p>Las neveras que se prestan a los clientes para el hielo en cubos.
+      Dónde está cada una, cómo va, cuánto ha ganado, y cuáles piden que
+      alguien vaya <b>hoy</b>.</p>
+
+      <p class="ayuda-tip">Está en <b>🧊 Las neveras</b>, desde el inicio.
+      El cajero y el gerente las <b>ven</b> y pueden <b>reportar una falla</b>
+      —el cliente la reporta en el mostrador y hay que anotarla en el
+      momento—. Prestarlas, moverlas y darlas de baja es del administrador:
+      prestar una nevera es firmar un contrato.</p>
+
+      <h4>La nevera y el préstamo son dos cosas</h4>
+      <p>Esto es lo que más importa entender, y es lo que hace que el
+      sistema sirva a los diez años:</p>
+      <ul>
+        <li><b>La nevera</b> es el fierro. Dura diez años y pasa por tres o
+        cuatro clientes. Guarda su vida entera: lo que costó, sus
+        mantenimientos, por cuántas manos ha pasado y cuánto ha ganado en
+        total.</li>
+        <li><b>El comodato</b> es el préstamo a <b>uno</b> de ellos. Guarda
+        a quién, desde cuándo, en qué dirección, quién responde y el papel
+        firmado.</li>
+      </ul>
+      <p class="ayuda-tip">Por eso, el día que recojas la nevera de Don Chuy
+      y se la pongas a la tienda de la esquina, <b>no se pierde nada</b>: la
+      nevera sigue siendo la misma y acumula lo de los dos. Guardadas como
+      una sola cosa, habría que elegir entre pisar los datos del anterior o
+      dar de alta otra nevera — y las dos son perder información.</p>
+
+      <h4>El número que decide todo</h4>
+      <pre class="ayuda-formula">lo que ha comprado de bolsas
+  − lo que costó la nevera
+  − lo que costaron sus reparaciones
+  − lo que se le ha regalado
+= ¿YA SE PAGÓ?</pre>
+
+      <p>Es el número grande de cada ficha, y es el que dice <b>qué neveras
+      valen la pena y cuáles hay que recoger</b>. Si no le has capturado lo
+      que costó, el sistema no lo inventa: dice que falta el dato.</p>
+
+      <p class="ayuda-tip"><b>Lo regalado resta, y por eso hay que
+      anotarlo.</b> Si a un cliente se le regalan veinte bolsas al mes, esa
+      nevera no está ganando lo que parece — y sin restarlo, justo la del
+      cliente al que más se le consiente sale como la mejor.</p>
+
+      <p>Solo cuentan <b>los productos marcados como de nevera</b> —las
+      bolsas de cubos— y solo dentro de las fechas de ese préstamo. Una
+      marqueta que ese mismo cliente compró para otra cosa no la pagó la
+      nevera, y lo que compró antes de tenerla tampoco.</p>
+
+      <h4>Los seis estados</h4>
+      <ul>
+        <li><b>En bodega</b> — aquí, lista para prestarse.</li>
+        <li><b>Prestada</b> — con un cliente.</li>
+        <li><b>La usa la fábrica</b> — aquí adentro, trabajando.</li>
+        <li><b>Por reparar</b> — no sirve. Se pone sola al reportar una falla.</li>
+        <li><b>No se sabe dónde está</b> — lo dijiste tú y es un estado de
+        verdad, no un error. Que no se sepa dónde está no es lo mismo que
+        haberla vendido, y esa diferencia es justo la que importa.</li>
+        <li><b>De baja</b> — se vendió, se tiró o se dio por perdida para
+        siempre. Con su motivo, y con toda su historia intacta.</li>
+      </ul>
+
+      <p class="ayuda-tip"><b>El estado lo manda el préstamo, no la mano.</b>
+      Al entregarla pasa a «prestada» sola; al recogerla vuelve a «bodega».
+      El sistema no te deja decir que está en bodega mientras siga con un
+      cliente: serían dos verdades sobre la misma nevera, y la que se ve en
+      la lista sería la equivocada.</p>
+
+      <h4>No solo a clientes</h4>
+      <p>Una nevera se puede entregar de tres maneras:</p>
+      <ul>
+        <li><b>A un cliente</b> — los de siempre, por años.</li>
+        <li><b>A un evento o feria</b> — unos días, <b>con fecha de
+        devolución</b>. El sistema avisa cuando esa fecha se pasa. No hace
+        falta dar de alta un cliente: se escribe el nombre y ya, para no
+        ensuciar el catálogo con una feria de tres días.</li>
+        <li><b>A la fábrica</b> — se queda aquí adentro.</li>
+      </ul>
+
+      <h4>El mapa</h4>
+      <p>Todas las neveras con ubicación puesta salen en un mapa de
+      <b>OpenStreetMap</b>, con su número. Se arrastra, se acerca, y al tocar
+      una chincheta se abre su ficha. El color dice cómo va: verde bien,
+      ámbar si lleva días sin pedir, rojo si está descompuesta.</p>
+
+      <p>La ubicación se pone en <b>Cambiar los datos</b>, pegando el enlace
+      que Google Maps da al compartir. El sistema saca las coordenadas solo.</p>
+
+      <p class="ayuda-tip"><b>El mapa necesita internet; la dirección
+      escrita no.</b> Por eso la dirección es la que manda y el mapa es el
+      lujo: si un día no hay señal, el mapa sale en gris y lo dice, pero las
+      direcciones y los teléfonos siguen ahí. Y el botón <b>📍 Cómo llegar</b>
+      abre Google Maps en el teléfono, que es lo que sirve para <i>ir</i>.</p>
+
+      <h4>Fallas y mantenimientos</h4>
+      <p>El botón <b>🔧 Reporta falla</b> anota lo que dijo el cliente y deja
+      la nevera marcada como <b>por reparar</b>, para que nadie la dé por
+      buena ni la vuelva a prestar. Cuando se atiende se anota qué se le
+      hizo, quién y cuánto costó — y ese costo <b>resta</b> de lo que la
+      nevera ha ganado.</p>
+
+      <p>Una limpieza o un preventivo no la marcan: la nevera sigue
+      trabajando. Y al recogerla se puede decir que volvió descompuesta,
+      para que quede marcada de una vez.</p>
+
+      <h4>El contrato</h4>
+      <p>El botón <b>📄 Contrato</b> saca el comodato en hoja tamaño carta,
+      <b>ya relleno</b> con el cliente, el responsable, la dirección, la
+      nevera y su valor, listo para firmar. Y si le faltan datos <b>te lo
+      dice antes</b>: descubrir que falta el domicilio con el cliente
+      enfrente y la pluma en la mano es la peor forma de descubrirlo.</p>
+
+      <p class="ayuda-tip"><b>El texto lo puedes cambiar sin actualizar el
+      programa.</b> El día que tu abogado corrija una frase, se pega el texto
+      nuevo y listo. Los huecos que se rellenan solos van entre llaves:
+      <code>{cliente}</code>, <code>{nevera_numero}</code>,
+      <code>{nevera_valor}</code>…</p>
+
+      <p class="ayuda-tip"><b>Y algo importante:</b> el contrato que trae de
+      fábrica está redactado siguiendo la figura del comodato y cubre lo que
+      suele cubrirse —el destino del bien, la conservación, los daños, el
+      robo, la devolución—, pero <b>no lo ha revisado un abogado</b>. Antes
+      de firmarlo con el primer cliente, que lo lea uno de Yucatán. Y ojo
+      con querer cargarlo demasiado de un lado: un contrato desequilibrado
+      se puede caer entero. Las tres cláusulas que más se miran son la pena
+      por no devolver, la responsabilidad por robo y la exclusividad.</p>
+
+      <h4>Los avisos</h4>
+      <p>Arriba de la lista sale <b>lo que pide acción hoy</b>: las que
+      llevan días sin pedir, las descompuestas, las que se pasaron de la
+      fecha de devolución y las que no se sabe dónde están. Si no hay nada,
+      no sale nada — un tablero con cuatro ceros deja de mirarse.</p>
+
+      <p><b>Los días para avisar los decides tú por cada cliente</b>, porque
+      hay unos más lentos y otros más rápidos: se ponen en su ficha, en
+      «Cambiar los datos». El que no tenga los suyos usa el general, que se
+      cambia en <b>Ajustes</b>.</p>
+
+      <p>Y hay <b>dos avisos por correo</b> nuevos (Sistema › Avisos por
+      correo): <b>«Nevera que no ha pedido»</b>, que sale una vez al día con
+      la lista y los teléfonos —es el que más vende de todos, porque dice a
+      quién llamarle hoy—, y <b>«Nevera descompuesta»</b>, en cuanto alguien
+      reporta una falla.</p>
+
+      <h4>El botón de WhatsApp</h4>
+      <p>Abre WhatsApp con el mensaje ya escrito para el responsable de esa
+      nevera. El mensaje se cambia en <b>Ajustes</b>, y <code>{responsable}</code>,
+      <code>{cliente}</code> y <code>{negocio}</code> se rellenan solos.</p>
+
+      <p class="ayuda-tip">El botón <b>abre</b> WhatsApp; tú le das enviar.
+      Mandarlo solo, sin tocar nada, requiere la API de WhatsApp Business,
+      que cuesta y hay que pedirle permiso a Meta.</p>`
+  },
+
+  // ==========================================================
+  {
     id: 'correo',
     titulo: 'Avisos por correo: que el sistema te escriba',
     busca: 'correo correos email gmail smtp aviso avisos alerta alertas notificacion notificaciones ' +

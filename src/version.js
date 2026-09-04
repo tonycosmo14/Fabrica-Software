@@ -17,9 +17,36 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '5.0';
+const VERSION_ACTUAL = '5.1';
 
 const VERSIONES = [
+  {
+    numero: '5.1',
+    nombre: 'Las neveras',
+    fecha: '2026-09-04',
+    resumen:
+      'Dónde está cada nevera, en un mapa, con su contrato, su historial ' +
+      'de fallas y el número que de verdad importa: si ya se pagó sola. Y ' +
+      'el aviso de a quién hay que llamarle hoy.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'LAS NEVERAS, pantalla nueva en el inicio (🧊 Las neveras). Todo lo que pediste: dónde está cada una con su dirección escrita, quién es el responsable con su teléfono, el documento de comodato escaneado, su historial de mantenimientos, cuántas bolsas le caben, qué ha pedido y cuándo fue la última vez.' },
+      { tipo: 'importante', texto: 'LA NEVERA Y EL PRÉSTAMO SON DOS COSAS, y es lo que hace que esto siga sirviendo dentro de diez años. La nevera es el fierro y guarda su vida entera; el comodato es el préstamo a UNO. Así, el día que recojas la de Don Chuy y se la pongas a la tienda de la esquina, no se pierde nada: la nevera acumula lo de los dos. Guardadas como una sola cosa habría que elegir entre pisar los datos del anterior o dar de alta otra nevera, y las dos son perder información.' },
+      { tipo: 'nuevo', texto: '¿YA SE PAGÓ? El número grande de cada ficha: lo que ha comprado de bolsas, MENOS lo que costó la nevera, MENOS sus reparaciones, MENOS lo que se le ha regalado. Es el que dice qué neveras valen la pena y cuáles hay que recoger.' },
+      { tipo: 'importante', texto: 'Y LO REGALADO RESTA, que era la parte fina. Si a un cliente se le regalan veinte bolsas al mes, esa nevera no está ganando lo que parece — y sin restarlo, justo la del cliente al que más se le consiente saldría como la mejor de todas. Hay botón de 🎁 Regalé bolsas, con motivo: cortesía, promoción, cambio o merma.' },
+      { tipo: 'nuevo', texto: 'EL MAPA, con OpenStreetMap como pediste. Todas las neveras con su número, se arrastra, se acerca, y al tocar una chincheta se abre su ficha. Verde va bien, ámbar lleva días sin pedir, rojo está descompuesta. La ubicación se pone pegando el enlace que Google Maps da al compartir: el sistema saca las coordenadas solo.' },
+      { tipo: 'importante', texto: 'EL MAPA NECESITA INTERNET; LA DIRECCIÓN ESCRITA NO. Por eso la dirección es la que manda y el mapa es el lujo: si un día no hay señal, el mapa lo dice y se pone en gris, pero las direcciones y los teléfonos siguen ahí. Y está escrito a mano, sin meter ninguna librería: el sistema sigue sin una sola dependencia en la pantalla.' },
+      { tipo: 'nuevo', texto: 'EL CONTRATO DE COMODATO, REDACTADO Y QUE SE RELLENA SOLO. Sale en hoja carta con el cliente, el responsable, la dirección, la nevera y su valor, listo para firmar. Si le faltan datos TE LO DICE ANTES de imprimirlo: descubrir que falta el domicilio con el cliente enfrente y la pluma en la mano es la peor forma de descubrirlo. Y el texto se puede cambiar sin actualizar el programa.' },
+      { tipo: 'importante', texto: 'OJO CON EL CONTRATO: está redactado siguiendo la figura del comodato y cubre lo que suele cubrirse —destino del bien, conservación, daños, robo, devolución— pero NO lo ha revisado un abogado. Antes de firmarlo con el primer cliente que lo lea uno de Yucatán. Y cuidado con cargarlo demasiado de un lado, que un contrato desequilibrado se puede caer entero: las tres cláusulas que más se miran están marcadas en el propio texto.' },
+      { tipo: 'nuevo', texto: 'NO SOLO A CLIENTES. Una nevera se entrega a un CLIENTE (años), a un EVENTO O FERIA (unos días, con fecha de devolución y aviso cuando se pasa, sin tener que dar de alta un cliente para tres días) o A LA FÁBRICA. Y hay un estado para «no sé dónde está», que dijiste que te pasa: no es lo mismo que haberla vendido, y esa diferencia es justo la que importa.' },
+      { tipo: 'nuevo', texto: 'FALLAS Y MANTENIMIENTOS. El botón 🔧 Reporta falla anota lo que dijo el cliente y deja la nevera marcada POR REPARAR, para que nadie la vuelva a prestar sin querer. Al atenderla se anota qué se le hizo, quién y cuánto costó — y ese costo resta de lo que la nevera ha ganado. Una limpieza no la marca: sigue trabajando.' },
+      { tipo: 'nuevo', texto: 'LOS DÍAS PARA AVISAR, POR CADA CLIENTE, como pediste: hay unos más lentos y otros más rápidos. Se ponen en su ficha; el que no tenga los suyos usa el general. Arriba de la lista sale lo que pide acción HOY: las que no han pedido, las descompuestas, las que se pasaron de la fecha y las perdidas. Si no hay nada, no sale nada.' },
+      { tipo: 'nuevo', texto: 'Y DOS AVISOS POR CORREO MÁS (ya son diecisiete): «Nevera que no ha pedido», una vez al día con la lista y los teléfonos —es el que más va a vender, porque dice a quién llamarle hoy— y «Nevera descompuesta», en cuanto alguien reporta una falla.' },
+      { tipo: 'nuevo', texto: 'BOTÓN DE WHATSAPP con el mensaje ya escrito para el responsable de esa nevera, y botón de 📍 Cómo llegar que abre Google Maps. El mensaje se cambia en Ajustes.' },
+      { tipo: 'arreglo', texto: 'ARREGLO QUE VENÍA DE ANTES Y NO SE HABÍA VISTO: un PDF de más de 1 MB en un gasto de la empresa —o sea, cualquier recibo de la CFE escaneado— reventaba con «ocurrió un error en el servidor», sin ninguna pista de por qué. El lector de archivos grandes estaba declarado DESPUÉS del general, así que el chico rechazaba el archivo antes de que el grande lo viera.' },
+      { tipo: 'arreglo', texto: 'Y en las neveras mismas, otro que cazaron las pruebas antes de que llegara: guardar los ajustes entraba por la ruta de editar una nevera, con el id «ajustes».' },
+      { tipo: 'mejora', texto: 'Todo está en el manual, en «Las neveras en comodato».' }
+    ]
+  },
   {
     numero: '5.0',
     nombre: 'Los tickets, como los dibujaste',

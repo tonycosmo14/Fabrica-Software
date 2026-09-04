@@ -28,6 +28,7 @@ function revisar() {
   if (!cola.configurado()) return { hizo: [] };
   const hizo = [];
   for (const [nombre, f] of [['inventario', inventarioBajo],
+                             ['neveras', neverasSinPedir],
                              ['dia', resumenDelDia],
                              ['mes', informeDelMes]]) {
     try { if (f()) hizo.push(nombre); }
@@ -114,7 +115,66 @@ function inventarioBajo() {
 }
 
 // ============================================================
-// 2 · EL RESUMEN DEL DÍA
+// 2 · LAS NEVERAS QUE NO HAN PEDIDO
+// ============================================================
+
+/**
+ * LAS QUE LLEVAN MÁS DÍAS SIN PEDIR DE LOS QUE SE LES PUSO.
+ *
+ * Una vez al día y no cada vez que el reloj da la vuelta: la lista de hoy
+ * es casi la misma que la de ayer —una nevera que no pidió sigue sin
+ * pedir— y un correo repetido cada cinco minutos acaba en spam con los
+ * otros dieciséis avisos detrás.
+ *
+ * Y por eso es el aviso que más vende de todos: es el único que dice a
+ * quién hay que llamarle HOY.
+ */
+function neverasSinPedir() {
+  if (!encendido('nevera_sin_pedir')) return false;
+
+  const dia = hoy();
+  if (cola.valor('aviso_nevera_sin_pedir_ultimo', '') === dia) return false;
+  cola.guardarValor('aviso_nevera_sin_pedir_ultimo', dia);
+
+  const { pendientesDeTodas } = require('../neveras/calculo');
+  const tarde = pendientesDeTodas().sinPedir;
+  if (!tarde.length) return false;
+
+  // De la que más se tardó a la que menos: la de arriba es a la que hay
+  // que llamarle primero.
+  tarde.sort((a, b) => (b.ritmo.dias || 0) - (a.ritmo.dias || 0));
+  const una = tarde.length === 1;
+
+  cola.encolar({
+    aviso: 'nevera_sin_pedir',
+    asunto: una
+      ? `${tarde[0].comodato?.quien || `Nevera ${tarde[0].numero}`} lleva ` +
+        `${tarde[0].ritmo.dias} días sin pedir`
+      : `${tarde.length} neveras llevan días sin pedir`,
+    html: correo({
+      negocio: cola.negocio(),
+      cuando: momento(),
+      titulo: una ? 'Una nevera lleva días sin pedir' : 'Hay neveras sin pedir',
+      entradilla: 'Éstas pasaron de los días que les pusiste. Son a las que ' +
+                  'hay que llamarles hoy.',
+      grande: una ? escapar(tarde[0].comodato?.quien || '') : String(tarde.length),
+      color: 'ambar',
+      renglones: tarde.slice(0, 25).map((n) => [
+        `<b>${escapar(n.numero)}</b> ${escapar(n.comodato?.quien || '')}` +
+        (n.comodato?.telefono_util ? `<br><span style="color:#5b6b78">${
+          escapar(n.comodato.telefono_util)}</span>` : ''),
+        n.ritmo.nuncaPidio ? 'nunca ha pedido' : `hace ${n.ritmo.dias} días`,
+        'ambar'
+      ]),
+      nota: (tarde.length > 25 ? `Y ${tarde.length - 25} más. ` : '') +
+            'Los días de cada una se cambian en su ficha, en Las neveras.'
+    })
+  });
+  return true;
+}
+
+// ============================================================
+// 3 · EL RESUMEN DEL DÍA
 // ============================================================
 
 /**
@@ -193,7 +253,7 @@ function enLetra(dia) {
 }
 
 // ============================================================
-// 3 · EL INFORME DEL MES
+// 4 · EL INFORME DEL MES
 // ============================================================
 
 /**
@@ -274,4 +334,4 @@ function informeDelMes() {
   return true;
 }
 
-module.exports = { revisar, inventarioBajo, resumenDelDia, informeDelMes };
+module.exports = { revisar, inventarioBajo, neverasSinPedir, resumenDelDia, informeDelMes };

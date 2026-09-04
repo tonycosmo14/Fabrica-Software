@@ -36,6 +36,20 @@ function crearApp() {
   app.use('/api/catalogo', express.json({ limit: '4mb' }),
           require('./modulos/catalogo/rutas'));
 
+  // Los papeles de un gasto —el PDF del recibo de la CFE, la foto de una
+  // factura— y los de una nevera —su foto y el comodato escaneado— llegan
+  // en el cuerpo como texto base64 y pesan más que una petición normal.
+  //
+  // ESTABAN ABAJO DEL LECTOR GENERAL Y NO FUNCIONABAN  (arreglado en la
+  // v5.1). El de 1 MB corría primero y rechazaba el archivo antes de que
+  // el de 12 MB lo viera: subir el PDF de un recibo de luz contestaba
+  // "ocurrió un error en el servidor" y no había forma de adivinar por
+  // qué. El orden de estas líneas ES la configuración.
+  app.use('/api/empresa', express.json({ limit: '12mb' }),
+          require('./modulos/empresa/rutas'));
+  app.use('/api/neveras', express.json({ limit: '12mb' }),
+          require('./modulos/neveras/rutas'));
+
   // Y la actualización, que es un ZIP con el programa entero: el que más
   // pesa de todos. Va antes del lector general por lo mismo.
   app.use('/api/sistema', express.json({ limit: '80mb' }),
@@ -69,11 +83,11 @@ function crearApp() {
   // lista, así que solo lo alcanza el comodín).
   app.use('/api/arranque', require('./modulos/arranque/rutas'));
   app.use('/api/estadisticas', require('./modulos/estadisticas/rutas'));
-  app.use('/api/empresa', express.json({ limit: '12mb' }),
-          require('./modulos/empresa/rutas'));
+  app.use('/api/empresa', require('./modulos/empresa/rutas'));
   app.use('/api/clima', require('./modulos/clima/rutas'));
   app.use('/api/versiones', require('./modulos/versiones/rutas'));
   app.use('/api/correo', require('./modulos/correo/rutas'));
+  app.use('/api/neveras', require('./modulos/neveras/rutas'));
   app.use('/api', (req, res) => error(res, 'Esa ruta de la API no existe.', 404));
 
   // Interfaz

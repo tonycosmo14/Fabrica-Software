@@ -27,7 +27,11 @@ const PERMISOS_POR_ROL = {
     // eso es decidir a quién se le fía y cuánto.
     'clientes.ver',
     'venta.credito',
-    'credito.cobrar'
+    'credito.cobrar',
+    // LAS NEVERAS  (v5.1). El cajero las VE y puede reportar una falla:
+    // el cliente la reporta en el mostrador y hay que poder anotarla en
+    // el momento. Prestarlas, moverlas y darlas de baja es otra cosa.
+    'neveras.ver'
   ],
   repartidor: ['reparto.ver', 'reparto.operar'],
 
@@ -44,6 +48,11 @@ const PERMISOS_POR_ROL = {
     'venta.registrar',
     'venta.ver',
     'venta.cancelar',
+    // LAS NEVERAS  (v5.1). El gerente y el cajero las VEN y pueden
+    // reportar una falla —el cliente la reporta en el mostrador y hay que
+    // poder anotarla en el momento—; moverlas, prestarlas y darlas de
+    // baja es del administrador, que es de quien son.
+    'neveras.ver',
     'existencia.ver',
     'existencia.contar',
     'existencia.corregir',
@@ -84,6 +93,11 @@ const PERMISOS_POR_ROL = {
   // gerente de turno debe ver. Como admin tiene el comodín, quedan suyos.
   // El día que haga falta un contador, se le da `raya.ver` a un rol nuevo
   // sin tocar ninguna ruta.
+  //
+  // Y CON `neveras.administrar`  (v5.1). Prestar una nevera es firmar un
+  // contrato y comprometer un fierro de veinte mil pesos; darla de baja
+  // es darla por perdida. Verlas y reportar una falla sí es de turno —el
+  // cliente la reporta en el mostrador—, pero moverlas no.
   //
   // LO MISMO CON `correo.configurar`  (v4.9). Ahí vive la contraseña de la
   // cuenta de correo de la fábrica, y la lista de a quién le llegan los
