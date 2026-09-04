@@ -371,3 +371,54 @@ test('las marquetas de antes del cambio se leen como normales', async () => {
     .map((c) => c.name);
   assert.ok(columnas.includes('destino'));
 });
+
+// ============================================================
+// LA HUECA ES MERMA  (v6.0)
+// "La hueca y la cáscara no se cuentan, son mermas."
+// ============================================================
+
+test('un paño hueco NO entra al cuarto frío si no se dice que se guardó', async () => {
+  await entrarAdmin();
+  const antes = await hoy();
+  const { pano } = await elQueToca();
+
+  // Sin destino: se va a donde va por omisión, que son los condensadores.
+  const r = await llamar(`/api/produccion/panos/${pano.id}/sacar`, {
+    method: 'POST', cuerpo: { tipoAgua: 'purificada', calidad: 'hueca' }
+  });
+  assert.equal(r.estado, 201);
+  assert.equal(r.json.datos.producidas, 6, 'costó lo mismo que seis selladas');
+  assert.equal(r.json.datos.marquetas, 0, 'pero no es existencia: es merma');
+
+  const d = await hoy();
+  assert.equal(d.marquetas, antes.marquetas, 'el cuarto frío no creció');
+
+  const destino = bd.prepare(`
+    SELECT sm.destino FROM sacadas_moldes sm
+      JOIN sacadas s ON s.id = sm.sacada_id
+     WHERE s.sacada_pano_id = (SELECT id FROM sacadas_pano WHERE pano_id = ? ORDER BY rowid DESC LIMIT 1)
+     LIMIT 1`).get(pano.id);
+  assert.equal(destino?.destino, 'condensadores');
+});
+
+test('la hueca que se guarda a propósito sí cuenta', async () => {
+  await entrarAdmin();
+  const antes = await hoy();
+  const { pano } = await elQueToca();
+
+  const r = await llamar(`/api/produccion/panos/${pano.id}/sacar`, {
+    method: 'POST',
+    cuerpo: { tipoAgua: 'purificada', calidad: 'hueca', destino: 'almacen' }
+  });
+  assert.equal(r.json.datos.marquetas, 6, 'se dijo «al cuarto frío», así que entra');
+  const d = await hoy();
+  assert.equal(d.marquetas - antes.marquetas, 6);
+});
+
+test('lo que cuenta como existencia son la sellada, la normal y la poco hueca', () => {
+  const calidad = require('../src/modulos/produccion/calidad');
+  const vendibles = calidad.CALIDADES.filter((c) => c.vendible).map((c) => c.clave);
+  assert.deepEqual(vendibles, ['sellada', 'normal', 'poco_hueca']);
+  const merma = calidad.CALIDADES.filter((c) => !c.vendible).map((c) => c.clave);
+  assert.deepEqual(merma, ['hueca', 'cascara', 'contaminada', 'aguada', 'otro']);
+});

@@ -113,13 +113,16 @@ const TEMAS = [
         <li><b>Un poco huecas.</b> Del 70% al 60% selladas. Con una noche más
         hubieran quedado mejor. Alguna gente se queja.</li>
         <li><b>Huecas.</b> El centro casi atraviesa la marqueta, y algunas sí
-        lo hacen. La gente se queja pero por necesidad se la lleva.</li>
+        lo hacen. <b>Es merma</b>: no cuenta como existencia. El sistema
+        pregunta a dónde fue, y por omisión va a los condensadores; solo si
+        se dice «al cuarto frío» entra a la existencia.</li>
         <li><b>Cáscaras.</b> 30% de congelación o menos: el centro atraviesa y
-        los laterales están delgados. Por lo general no se venden.</li>
-        <li><b>Aguadas.</b> No congeló nada: sale agua del molde. No es "muy
-        hueca", es que <b>no hay marqueta</b>. Por eso una aguada no cuenta
-        ni siquiera para el costo: no se puede repartir el gasto entre
-        marquetas que no existen.</li>
+        los laterales están delgados. Merma, igual que la hueca.</li>
+        <li><b>Aguadas o ahogadas.</b> No congeló nada, o se ahogó: sale agua
+        del molde. No es "muy hueca", es que <b>no hay marqueta</b>. Por eso
+        una aguada no cuenta ni siquiera para el costo, ni se resta de
+        nada: no se puede repartir el gasto entre marquetas que no
+        existen.</li>
       </ul>
 
       <p>Y dos que <b>no son de frío</b>:</p>
@@ -141,9 +144,9 @@ const TEMAS = [
       no se tocan van como el paño.</p>
 
       <h4>Qué se hace con ese hielo</h4>
-      <p>Cuando el hielo sale en <b>cáscaras</b>, <b>contaminado</b> o marcado
-      como <b>otra cosa</b>, el sistema pregunta qué se hizo con él, porque no
-      todo acaba igual:</p>
+      <p>Cuando el hielo sale <b>hueco</b>, en <b>cáscaras</b>,
+      <b>contaminado</b> o marcado como <b>otra cosa</b>, el sistema pregunta
+      qué se hizo con él, porque no todo acaba igual:</p>
       <ul>
         <li><b>A los condensadores</b> — lo normal. No se tiran del todo:
         trabajan enfriando.</li>
@@ -151,6 +154,11 @@ const TEMAS = [
         baratas. Entran a la existencia como una marqueta más.</li>
         <li><b>Se botó</b> — no se aprovechó de ninguna manera.</li>
       </ul>
+      <p class="ayuda-tip"><b>Lo que cuenta como existencia</b>, en corto:
+      las <b>selladas</b>, las <b>normales</b> y las <b>un poco huecas</b>.
+      Todo lo demás —hueca, cáscara, salada o contaminada, aguada— es merma
+      y <b>no entra al cuarto frío</b>, salvo que al sacarla se diga «al
+      cuarto frío» a propósito.</p>
       <p class="ayuda-tip">Una cáscara <b>costó lo mismo</b> que una sellada:
       la misma agua, la misma luz, el mismo molde. Por eso cuenta para el
       costo por marqueta aunque se haya ido al condensador. Lo que <b>no</b>

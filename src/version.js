@@ -17,9 +17,25 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '5.9';
+const VERSION_ACTUAL = '6.0';
 
 const VERSIONES = [
+  {
+    numero: '6.0',
+    nombre: 'La hueca es merma',
+    fecha: '2026-09-05',
+    resumen:
+      'Lo que cuenta como existencia son la sellada, la normal y la un poco '
+      + 'hueca. Hueca, cáscara, salada o contaminada y aguada son merma: no '
+      + 'entran al cuarto frío, salvo que se guarden a propósito.',
+    cambios: [
+      { tipo: 'importante', texto: 'LA HUECA YA NO CUENTA COMO EXISTENCIA. Como dijiste: "la hueca y la cáscara no se cuentan, son mermas". Antes un paño hueco entraba al cuarto frío como si fuera normal, y el conteo salía corto. Ahora al marcar hueca el sistema pregunta a dónde fue —igual que con la cáscara— y por omisión va a los condensadores.' },
+      { tipo: 'mejora', texto: 'SI UN DÍA SE GUARDA HUECA PARA VENDERLA, se dice «al cuarto frío» y entonces sí entra a la existencia. La regla es la misma para todo lo que no sea sellada, normal o un poco hueca.' },
+      { tipo: 'mejora', texto: 'LA AGUADA SE LLAMA TAMBIÉN AHOGADA, que es como se dice en la planta. Sigue sin contar para nada: ni existencia, ni costo, ni se resta de ninguna parte.' },
+      { tipo: 'mejora', texto: 'El manual dice en corto qué cuenta y qué no, en la sección de producción.' },
+      { tipo: 'importante', texto: 'LO DE ANTES NO SE TOCA: las huecas que ya estaban anotadas siguen contadas como estaban ese día. El cambio aplica a lo que se saque de hoy en adelante.' }
+    ]
+  },
   {
     numero: '5.9',
     nombre: 'Las neveras en el mapa',

@@ -66,8 +66,8 @@ const CALIDADES = [
   {
     clave: 'hueca', nombre: 'Hueca', plural: 'Huecas',
     corto: 'huecas', boton: 'hueca', icono: '◯',
-    nota: 'El centro casi atraviesa la marqueta, y algunas sí lo hacen. La ' +
-          'gente se queja pero por necesidad se la lleva.'
+    nota: 'El centro casi atraviesa la marqueta, y algunas sí lo hacen. Es ' +
+          'merma: no cuenta como existencia, salvo que se guarde a propósito.'
   },
   {
     clave: 'cascara', nombre: 'Cáscara', plural: 'Cáscaras',
@@ -83,9 +83,10 @@ const CALIDADES = [
           'frío. No se toma; a veces se vende a quien solo quiere enfriar.'
   },
   {
-    clave: 'aguada', nombre: 'Aguada, pura agua', plural: 'Aguadas',
+    clave: 'aguada', nombre: 'Aguada o ahogada, pura agua', plural: 'Aguadas',
     corto: 'aguadas', boton: 'aguada', icono: '💧',
-    nota: 'No congeló nada. Sale agua del molde: no hay marqueta que sacar.'
+    nota: 'No congeló nada, o se ahogó. Sale agua del molde: no hay ' +
+          'marqueta que sacar, ni que restar de nada.'
   },
   {
     clave: 'otro', nombre: 'Otro… (escribir qué pasó)', plural: 'Otra cosa',
@@ -107,13 +108,19 @@ const CALIDAD_POR_OMISION = 'normal';
 /**
  * NO TODO LO QUE SALE DEL MOLDE ES HIELO QUE SE PUEDA VENDER.
  *
- * Estos tres estados obligan a decir A DÓNDE FUE ese hielo, porque la
- * respuesta cambia de un día a otro y de ella depende que el conteo del
- * cuarto frío cuadre. Los otros no se preguntan: una marqueta entera
- * siempre entra al cuarto frío, y de una aguada no hay nada que mandar a
- * ningún lado.
+ * Estos estados obligan a decir A DÓNDE FUE ese hielo, porque la respuesta
+ * cambia de un día a otro y de ella depende que el conteo del cuarto frío
+ * cuadre. Los otros no se preguntan: una marqueta entera siempre entra al
+ * cuarto frío, y de una aguada no hay nada que mandar a ningún lado.
+ *
+ * LA HUECA ESTÁ AQUÍ DESDE LA v6.0, por el dueño: "la hueca y la cáscara
+ * no se cuentan, son mermas". Antes entraba al cuarto frío como una
+ * marqueta más, y el día que un paño hueco se marcaba mal, el conteo
+ * salía cinco marquetas y media corto. Ahora la hueca va por omisión a
+ * los condensadores, como la cáscara; si un día se guarda para venderla,
+ * se dice «al cuarto frío» y entonces sí cuenta.
  */
-const PIDEN_DESTINO = ['cascara', 'contaminada', 'otro'];
+const PIDEN_DESTINO = ['hueca', 'cascara', 'contaminada', 'otro'];
 
 /** Los que no dejaron ni una marqueta: el molde se abrió para nada. */
 const SIN_HIELO = ['aguada', MERMA];
