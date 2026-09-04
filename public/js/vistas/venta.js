@@ -198,6 +198,15 @@ export async function vistaVenta(pantalla, estadoApp) {
   let ultimoCambio = null;       // el resultado del último cambio de ticket
   let fiadoCobrado = null;       // a quién se le acaba de fiar, para decírselo
 
+  // LA VENTA QUE FALTÓ EN UN CORTE CERRADO  (v6.1). Caja deja aquí a qué
+  // corte va; se cobra igual que siempre, pero amarrada a ese turno.
+  let corteObjetivo = null;
+  let motivoCorte = null;
+  try {
+    const guardado = sessionStorage.getItem('pos-corte');
+    if (guardado) { corteObjetivo = JSON.parse(guardado); sessionStorage.removeItem('pos-corte'); }
+  } catch { corteObjetivo = null; }
+
   pantalla.innerHTML = armazon();
   const refs = {
     lineas:  pantalla.querySelector('#pos-lineas'),
@@ -211,6 +220,19 @@ export async function vistaVenta(pantalla, estadoApp) {
 
   document.addEventListener('keydown', alTeclado);
   const relojito = setInterval(pintarHora, 10000);
+
+  if (corteObjetivo) {
+    const dejar = pantalla.querySelector('#dejar-corte');
+    if (dejar) dejar.onclick = () => { location.hash = '#/caja'; };
+    // El porqué se pide de entrada: sin él el servidor no la acepta, y
+    // pedirlo con el cliente ya cobrado y el cambio en la mano es tarde.
+    motivoCorte = await pedirTexto({
+      titulo: `¿Por qué faltó esta venta en el corte #${corteObjetivo.folio}?`,
+      texto: 'Queda escrito en el corte y en el ticket.',
+      marcador: 'Se cobró y no se tecleó', ok: 'Seguir', largo: 200, unaLinea: true
+    });
+    if (!motivoCorte) { location.hash = '#/caja'; return; }
+  }
   // La temperatura cambia despacio: cada diez minutos sobra, y el servidor
   // además no le pregunta a internet más de una vez cada cuarto de hora.
   const termometro = setInterval(pintarClima, 10 * 60 * 1000);
@@ -325,13 +347,25 @@ export async function vistaVenta(pantalla, estadoApp) {
         <section class="pos-ticket">
           <div class="pos-ticket-cabeza">
             <span class="etiqueta-folio" id="etiqueta-folio">ticket ${esc(ctx.siguienteNumero)}</span>
-            ${ctx.caja
+            ${corteObjetivo
+              ? `<span class="etiqueta-mal">al corte #${esc(corteObjetivo.folio)} · cerrado</span>`
+              : ctx.caja
               ? `<span class="etiqueta-turno ${ctx.caja.sinDueno ? 'esperando' : ''}">
                    turno #${ctx.caja.folio}
                  </span>`
               : '<span class="etiqueta-mal">sin turno</span>'}
             <span class="etiqueta-espera" id="etiqueta-espera" hidden></span>
           </div>
+
+          ${corteObjetivo ? `
+            <div class="pos-sin-dueno" id="pos-al-corte">
+              <div class="crece">
+                <strong>La venta que faltó en el corte #${esc(corteObjetivo.folio)}</strong>
+                <small>Se apunta con la fecha de ese turno${corteObjetivo.cajero
+                  ? `, a nombre de ${esc(corteObjetivo.cajero)}` : ''}. El corte se vuelve a sacar solo.</small>
+              </div>
+              <button class="chico" id="dejar-corte" title="Volver al corte sin cobrar">✕ Volver al corte</button>
+            </div>` : ''}
 
           ${ctx.caja?.sinDueno ? `
             <div class="pos-sin-dueno" id="pos-sin-dueno">
@@ -2046,7 +2080,7 @@ export async function vistaVenta(pantalla, estadoApp) {
                las opciones que me aparecen decido si es a domicilio o lo
                pasan a buscar." Se aparta con estos precios y la venta
                nace cuando se entrega o cuando vengan por él. -->
-          ${puedeTomarPedidos && !cambiando && !cobrandoPedido && !enConfirmacion ? `
+          ${puedeTomarPedidos && !cambiando && !cobrandoPedido && !enConfirmacion && !corteObjetivo ? `
             <div class="pos-pedido-botones">
               <button class="secundario pos-fiar" id="pedido-domicilio">
                 🚚 Pedido a domicilio
@@ -2982,10 +3016,24 @@ export async function vistaVenta(pantalla, estadoApp) {
               // que el servidor le cobre SU precio, y queda de quién fue el
               // ticket aunque lo haya pagado en el momento.
               : { pago: (pago / 100).toFixed(2),
-                  ...(cliente ? { clienteId: cliente.id } : {}) })
+                  ...(cliente ? { clienteId: cliente.id } : {}) }),
+            // Al corte cerrado (v6.1): con el motivo que se pidió al
+            // entrar, y a nombre del cajero de aquel turno.
+            ...(corteObjetivo
+              ? { cajaId: corteObjetivo.id, motivoCorreccion: motivoCorte,
+                  ...(corteObjetivo.cajeroId ? { cajeroId: corteObjetivo.cajeroId } : {}) }
+              : {})
           });
 
       const venta = respuesta.venta;
+      if (respuesta.correccion) {
+        const cc = respuesta.correccion.corte;
+        const dif = cc.diferenciaAhora;
+        avisar(`Ticket ${venta.numero || venta.folio} agregado al corte #${cc.folio} · ahora ` +
+               (dif === 0 ? 'cuadra exacto' : dif > 0 ? `sobran ${pesos(dif)}` : `faltan ${pesos(-dif)}`) +
+               (respuesta.correccion.conteos.length ? ' · el cuadre del hielo también se corrigió' : ''),
+               'bien');
+      }
       mayoreoCobrado = respuesta.mayoreo || null;
       ultimoCambio = cambiando ? respuesta : null;
       cambiando = null;
@@ -3114,6 +3162,9 @@ export async function vistaVenta(pantalla, estadoApp) {
   }
 
   function nuevaVenta() {
+    // Cobrada la venta que faltó, se vuelve al corte (v6.1): esta pantalla
+    // se abrió para eso y nada más.
+    if (corteObjetivo && ventaCobrada) { location.hash = '#/caja'; return; }
     hielo = 0; articulos = []; pago = 0; ventaCobrada = null; cobrandoPedido = null;
     ultimoCambio = null; cambiando = null; cliente = null; fiar = false;
     mayoreoCobrado = null;

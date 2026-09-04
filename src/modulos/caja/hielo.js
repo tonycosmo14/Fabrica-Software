@@ -126,6 +126,26 @@ function mermasEntre({ desde, hasta, almacenId }) {
  * cuadre, y enseñar un papel de hielo con todo en cero haría creer que se
  * contó y salió cero.
  */
+/** Lo que decía el cuadre cuando se firmó, para enseñarlo junto a lo de ahora. */
+function corregidoDe(conteo, faltanteAhora) {
+  let faltanteAntes = null;
+  try {
+    const o = JSON.parse(conteo.original || 'null');
+    if (o) {
+      const esperado = conteo.existencia_anterior + o.producido - o.vendido - o.merma
+                       - o.cortado + (o.guardado || 0) - (o.recogido || 0);
+      faltanteAntes = esperado - conteo.contado;
+    }
+  } catch { faltanteAntes = null; }
+  const quien = conteo.corregido_por
+    ? bd.prepare('SELECT nombre FROM usuarios WHERE id = ?').get(conteo.corregido_por)?.nombre
+    : null;
+  return {
+    en: conteo.corregido_en, por: quien || null, motivo: conteo.motivo_correccion,
+    veces: conteo.correcciones, faltanteAntes, faltanteAhora
+  };
+}
+
 function cuadreDeHielo(cajaId) {
   const conteo = conteoDelTurno(cajaId);
   if (!conteo) return null;
@@ -167,6 +187,9 @@ function cuadreDeHielo(cajaId) {
       contado: conteo.contado,
       faltante
     },
+
+    // SI SE CORRIGIÓ (v6.1): con qué faltante se firmó y quién lo cambió.
+    corregido: conteo.corregido_en ? corregidoDe(conteo, esperado - conteo.contado) : null,
 
     panos: panosEntre(conteo.desde, conteo.fecha),
     produccion: resumenEntre(conteo.desde, conteo.fecha),

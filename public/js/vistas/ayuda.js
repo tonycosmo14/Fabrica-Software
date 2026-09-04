@@ -292,6 +292,23 @@ const TEMAS = [
       anular: si alguien había escrito "la grúa se atoró", eso sigue siendo
       verdad después.</p>
 
+      <h4>Corregir cómo salió una sacada, aunque el corte ya esté firmado</h4>
+      <p>"Marqué un paño como hueco y era ahogado: cinco marquetas y media
+      de diferencia en el corte." Anular y volver a sacar no sirve: la
+      rotación ya pasó de ese paño y la sacada nueva saldría con la fecha
+      de hoy. Lo que se corrige es <b>cómo salió</b>.</p>
+      <p>En la <b>👁 Historia</b> del paño, cada sacada lleva un <b>✏️</b>.
+      Se elige cómo salió de verdad —con su destino si lo pide— y el
+      porqué. Se cambia el estado de <b>todos sus moldes</b>, la sacada
+      queda marcada como corregida (quién, cuándo, por qué), y los
+      <b>cuadres de hielo</b> que ya la contaban se vuelven a sacar solos:
+      lo contado en el cuarto frío no se toca, lo que "debía haber" sí. En
+      el corte sale un aviso con lo que decía cuando se firmó.</p>
+      <p class="ayuda-tip">Es del gerente y del administrador (el mismo
+      permiso que anular). Lo del papel firmado <b>se guarda una sola
+      vez</b>: si se corrige dos veces, lo original sigue siendo lo del
+      papel, no lo de la primera corrección.</p>
+
       <h4>El papel del día</h4>
       <p>El botón <b>🧾 El día</b> saca cuánto hielo queda en cada cuarto
       frío y qué paños salieron hoy, con quién los sacó. Se pide cuando se
@@ -932,8 +949,15 @@ debería quedar − lo que se contó = FALTA o SOBRA</pre>
         porque ahí fue donde pasó.</li>
         <li><b>Quitarle uno que no era.</b> No se borra: queda tachado con
         su motivo y deja de contar.</li>
+        <li><b>Cobrar la venta que faltó</b> (desde la v6.1). Se cobró y no
+        se tecleó: el botón lleva a <b>Vender</b> con el corte en la mano,
+        y ahí se captura como cualquier ticket —con su mayoreo, su cliente,
+        sus bolsas—. Queda amarrado a <b>ese turno</b>, con la fecha de ese
+        turno, y con la marca de que entró después del corte y por qué. Si
+        llevaba hielo, el <b>cuadre del hielo</b> de ese turno también se
+        vuelve a sacar.</li>
       </ul>
-      <p>En los dos casos el corte <b>se vuelve a sacar solo</b> y el
+      <p>En los tres casos el corte <b>se vuelve a sacar solo</b> y el
       faltante se corrige.</p>
       <p class="ayuda-tip">Esto es <b>solo del administrador</b>, y <b>pide
       motivo</b>. Lo que se contó en el cajón <b>no se toca</b> —eso fue lo

@@ -23,7 +23,9 @@ const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
 const { puede } = require('../../lib/roles');
 const { listaActiva, preciosDe, precioDe, sugerencia } = require('./precios');
-const { sesionAbierta } = require('../caja/calculo');
+const { sesionAbierta, recalcularCorte } = require('../caja/calculo');
+const { conteoDelTurno } = require('../caja/hielo');
+const { corregirConteosQueAbarcan } = require('../existencia/correccion');
 const { apuntarAbono } = require('../clientes/abonos');
 const { marcarLoQueCompra } = require('../clientes/etiquetas');
 const { productoPorId, productoPorCodigo, cotizar,
@@ -271,6 +273,39 @@ router.post('/', vender, (req, res) => {
     : { ok: true };
   if (!credito.ok) return error(res, credito.mensaje, credito.codigo, credito.extra || {});
 
+  // ============================================================
+  // LA VENTA QUE FALTÓ EN UN CORTE YA CERRADO  (v6.1)
+  // ============================================================
+  //
+  // "Cerré el corte y faltaba una venta: una marqueta de mayoreo y veinte
+  //  bolsas. El sistema no me dejaba corregirlo."
+  //
+  // Se cobra igual que cualquiera, pero amarrada a ESE turno y con la
+  // fecha de ese turno —justo antes de que se contara el hielo, si se
+  // contó, porque ese hielo salió antes del conteo—. Solo el administrador
+  // (caja.corregir_corte), con su porqué, y el corte se vuelve a sacar
+  // solo: lo contado no se toca, lo que debía haber sí.
+  let corteCerrado = null;
+  let motivoCorreccion = null;
+  let fechaForzada = null;
+  if (req.body?.cajaId) {
+    if (!puede(req.usuario.rol, 'caja.corregir_corte')) {
+      return error(res, 'Agregar una venta a un corte cerrado es solo del administrador.', 403);
+    }
+    corteCerrado = bd.prepare('SELECT * FROM cajas WHERE id = ?').get(req.body.cajaId);
+    if (!corteCerrado) return error(res, 'Ese corte no existe.', 404);
+    if (!corteCerrado.cerrada_en) {
+      return error(res, 'Ese turno sigue abierto: cóbrala normal y entra sola.', 409);
+    }
+    motivoCorreccion = String(req.body?.motivoCorreccion || '').trim();
+    if (!motivoCorreccion) return error(res, 'Escribe por qué faltó esta venta en el corte.');
+
+    const conteo = conteoDelTurno(corteCerrado.id);
+    const tope = conteo && conteo.fecha < corteCerrado.cerrada_en ? conteo.fecha : corteCerrado.cerrada_en;
+    fechaForzada = new Date(new Date(tope).getTime() - 1000).toISOString();
+    if (fechaForzada < corteCerrado.abierta_en) fechaForzada = corteCerrado.abierta_en;
+  }
+
   // --- Pago ---
   let pago = null;
   if (req.body?.pago !== undefined && req.body.pago !== null && req.body.pago !== '') {
@@ -304,8 +339,36 @@ router.post('/', vender, (req, res) => {
     // El cliente se guarda aunque haya pagado en efectivo: es lo que
     // explica por qué ese ticket salió a precio de mayoreo.
     clienteId: clienteDelTicket?.id || null,
-    autorizadoPor: credito.autorizadoPor || null
+    autorizadoPor: credito.autorizadoPor || null,
+    // Al corte cerrado, con su fecha (v6.1).
+    cajaForzada: corteCerrado, fechaForzada, motivoCorreccion
   });
+
+  // EL CORTE SE VUELVE A SACAR SOLO, y el cuadre de hielo de ese turno
+  // también si la venta llevaba hielo.
+  let correccion = null;
+  if (corteCerrado) {
+    const r = recalcularCorte(corteCerrado.id, {
+      usuarioId: req.usuario.id,
+      motivo: `Faltaba el ticket ${venta.numero}: ${motivoCorreccion}`
+    });
+    const conteos = preparadas.lineas.some((l) => l.dieciseisavos > 0)
+      ? corregirConteosQueAbarcan(fechaForzada, {
+          usuarioId: req.usuario.id, almacenId: almacen?.id || null,
+          motivo: `Faltaba el ticket ${venta.numero}: ${motivoCorreccion}`
+        })
+      : [];
+    correccion = {
+      corte: {
+        id: corteCerrado.id, folio: corteCerrado.folio,
+        diferenciaAntes: r?.antes?.diferencia_centavos ?? null,
+        diferenciaAhora: r?.ahora?.diferencia_centavos ?? null
+      },
+      conteos: conteos.map((c) => ({
+        id: c.id, faltanteAntes: c.antes.faltante, faltanteAhora: c.ahora.faltante
+      }))
+    };
+  }
 
   bitacora.registrar({
     accion: credito.cliente ? 'venta.credito' : 'venta.registrada',
@@ -316,11 +379,13 @@ router.post('/', vender, (req, res) => {
                cliente: clienteDelTicket?.nombre,
                mayoreo: listaMayoreo?.nombre || null,
                ...(abono ? { abono, quedaADeber: aCredito } : {}),
-               autorizo: credito.autorizadoPorNombre }
+               autorizo: credito.autorizadoPorNombre,
+               ...(corteCerrado ? { trasCorte: corteCerrado.folio, motivoCorreccion } : {}) }
   });
 
   return ok(res, {
     venta: detalleVenta(venta.id),
+    correccion,
     cliente: clienteDelTicket
       ? { ...clienteDelTicket, estado: estadoCliente(clienteDelTicket) }
       : null,
@@ -468,14 +533,17 @@ function prepararLineas(lineas, lista, listaMayoreo = null) {
 function crearVenta({ lineas, total, pago, lista, almacenId, cajeroId, capturistaId,
                       formaPago = 'efectivo', notas = null, cambioDe = null,
                       clienteId = null, autorizadoPor = null,
-                      abono = null, abonoFormaPago = 'efectivo', cliente = null }) {
+                      abono = null, abonoFormaPago = 'efectivo', cliente = null,
+                      cajaForzada = null, fechaForzada = null, motivoCorreccion = null }) {
   const id = nuevoId();
-  const fecha = ahora();
+  const fecha = fechaForzada || ahora();
   const cambio = pago === null || pago === undefined ? null : pago - total;
 
   // La venta queda amarrada al turno de caja abierto en este momento. Si no
-  // hay turno abierto se cobra igual, pero queda fuera de todo corte.
-  const turno = sesionAbierta();
+  // hay turno abierto se cobra igual, pero queda fuera de todo corte. La
+  // excepción es la venta que faltó en un corte cerrado (v6.1): esa va al
+  // turno que se le diga.
+  const turno = cajaForzada || sesionAbierta();
 
   // Se declara ARRIBA de la transacción aunque se llene dentro: leerla
   // debajo obliga a comprobar el orden de ejecución para saber si está
@@ -495,12 +563,12 @@ function crearVenta({ lineas, total, pago, lista, almacenId, cajeroId, capturist
       INSERT INTO ventas (id, folio, serie, folio_anual, fecha, cajero_id, capturista_id,
                           almacen_id, lista_id, lista_nombre, total_centavos, pago_centavos,
                           cambio_centavos, forma_pago, notas, caja_id, cambio_de_venta_id,
-                          cliente_id, credito_autorizado_por)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                          cliente_id, credito_autorizado_por, tras_corte, motivo_correccion)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(id, folio, serie, folioAnual, fecha, cajeroId, capturistaId,
            almacenId, lista.id, lista.nombre, total, pago ?? null, cambio,
            formaPago, notas, turno?.id || null, cambioDe,
-           clienteId, autorizadoPor);
+           clienteId, autorizadoPor, cajaForzada ? 1 : 0, motivoCorreccion);
 
     const insertar = bd.prepare(`
       INSERT INTO venta_lineas

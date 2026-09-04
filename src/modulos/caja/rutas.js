@@ -23,8 +23,8 @@ const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
 const { comprobarAdmin, administradores } = require('../../lib/autorizacion');
 const {
-  sesionAbierta, movimientos, estadoCaja, conteoVentas, desglosePorPersona
-} = require('./calculo');
+  sesionAbierta, movimientos, estadoCaja, conteoVentas, desglosePorPersona,
+  recalcularCorte } = require('./calculo');
 const { cuadreDeHielo } = require('./hielo');
 const {
   conceptoDeVale, conceptosDeVale, esConceptoDeVale, salidasPartidas,
@@ -818,41 +818,8 @@ function detalleCorte(id) {
  *   · LO QUE DECÍA ANTES SE GUARDA, la primera vez. Un corte corregido
  *     tiene que poder enseñar las dos cifras.
  */
-function recalcularCorte(cajaId, { usuarioId, motivo }) {
-  const caja = bd.prepare('SELECT * FROM cajas WHERE id = ?').get(cajaId);
-  if (!caja) return null;
-
-  const estado = estadoCaja(caja);
-  // Manda lo ENTREGADO cuando lo hay: es el dinero que de verdad llegó a
-  // manos del dueño. Si nadie contó ni entregó todavía, no hay diferencia
-  // que enseñar — y eso es un dato, no un cero.
-  const referencia = caja.entregado_centavos ?? caja.contado_centavos ?? null;
-  const diferencia = referencia === null ? null : referencia - estado.esperado;
-
-  // Solo la PRIMERA vez: si se corrige dos veces, lo original sigue siendo
-  // lo del papel firmado, no lo de la corrección anterior.
-  const guardarOriginal = caja.esperado_original_centavos === null
-                       || caja.esperado_original_centavos === undefined;
-
-  bd.prepare(`
-    UPDATE cajas SET
-      esperado_original_centavos   = COALESCE(esperado_original_centavos, ?),
-      diferencia_original_centavos = COALESCE(diferencia_original_centavos, ?),
-      salidas_original_centavos    = COALESCE(salidas_original_centavos, ?),
-      entradas_original_centavos   = COALESCE(entradas_original_centavos, ?),
-      esperado_centavos = ?, diferencia_centavos = ?,
-      vendido_centavos = ?, entradas_centavos = ?, salidas_centavos = ?,
-      corregido_en = ?, corregido_por = ?, motivo_correccion = ?,
-      correcciones = correcciones + 1
-    WHERE id = ?
-  `).run(caja.esperado_centavos, caja.diferencia_centavos,
-         caja.salidas_centavos, caja.entradas_centavos,
-         estado.esperado, diferencia,
-         estado.vendido, estado.entradas, estado.salidas,
-         ahora(), usuarioId, motivo.slice(0, 200), caja.id);
-
-  return { guardarOriginal, antes: caja, ahora: bd.prepare('SELECT * FROM cajas WHERE id = ?').get(caja.id) };
-}
+// `recalcularCorte` vive ahora en ./calculo.js (v6.1): también lo llama
+// la venta que entra tarde a un corte cerrado.
 
 /**
  * CUÁNTO DINERO ENTREGARON DE VERDAD  (v4.1)

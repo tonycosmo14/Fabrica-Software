@@ -1271,6 +1271,20 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
               ? 'Ese hielo salió del cuarto frío sin ticket, sin anotarse como derretido y sin cortarse. Es el número que hay que vigilar.'
               : 'Hay más hielo del que debería. Casi siempre falta capturar un paño, o el conteo anterior se quedó corto.'}
           </p>`}
+
+        ${h.corregido ? `
+          <div class="aviso-sin-caja" style="margin-top:14px">
+            <strong>Este cuadre se corrigió</strong>
+            ${h.corregido.por ? `por ${esc(h.corregido.por)}` : ''}${
+              h.corregido.en ? ` · ${esc(formatoFecha(h.corregido.en))}` : ''}${
+              h.corregido.veces > 1 ? ` · ${h.corregido.veces} veces` : ''}.
+            ${h.corregido.faltanteAntes != null ? `Cuando se firmó decía
+              <b>${h.corregido.faltanteAntes === 0 ? 'cuadró exacto'
+                : h.corregido.faltanteAntes > 0 ? `faltan ${frac(h.corregido.faltanteAntes)}`
+                : `sobran ${frac(Math.abs(h.corregido.faltanteAntes))}`}</b>;
+              lo contado no se tocó.` : ''}
+            ${h.corregido.motivo ? `<br><small>«${esc(h.corregido.motivo)}»</small>` : ''}
+          </div>` : ''}
       </div>
 
       ${papelDelHielo(h)}`;
@@ -1449,6 +1463,17 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
       </div>
 
       <div class="tarjeta">
+        <h3 class="emp-sub" style="margin-top:0">Le faltó una venta</h3>
+        <p class="ayuda" style="margin:0 0 12px">
+          Se cobró y no se tecleó. Se captura en <b>Vender</b> como cualquier
+          ticket —con su mayoreo, su cliente, sus bolsas— pero queda amarrado
+          a <b>este turno</b>, con la fecha de este turno, y el corte se
+          vuelve a sacar solo. Si llevaba hielo, el cuadre del hielo también.
+        </p>
+        <button class="secundario" id="venta-que-falto">🧾 Cobrar la venta que faltó, al corte #${c.folio}</button>
+      </div>
+
+      <div class="tarjeta">
         <h3 class="emp-sub" style="margin-top:0">Agregarle algo que se olvidó</h3>
         <form id="f">
           <div class="emp-campos">
@@ -1518,6 +1543,17 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
 
     const q = (sel) => pantalla.querySelector(sel);
     q('#volver').onclick = () => verCorte(c.id);
+
+    // A VENDER, CON EL CORTE EN LA MANO (v6.1). El punto de venta lee esto
+    // al abrir y cobra contra ese turno cerrado en vez del abierto.
+    q('#venta-que-falto').onclick = () => {
+      try {
+        sessionStorage.setItem('pos-corte', JSON.stringify({
+          id: c.id, folio: c.folio, cajeroId: c.cajero_id, cajero: c.cajero_nombre || ''
+        }));
+      } catch { /* sin almacenamiento: el punto de venta lo dirá */ }
+      location.hash = '#/venta';
+    };
 
     // El catálogo de conceptos está partido en gastos y entradas: al
     // cambiar el tipo, los que no son de ese tipo estorban.

@@ -13,6 +13,7 @@
  * una suma de movimientos, no puede.
  */
 const { bd } = require('../../db/conexion');
+const { ahora } = require('../../lib/ids');
 const { salidasPartidas } = require('./vales');
 
 /** El turno de caja que está abierto ahora mismo. Solo puede haber uno. */
@@ -209,7 +210,59 @@ function desglosePorPersona(cajaId) {
     .sort((a, b) => b.efectivo - a.efectivo);
 }
 
+/**
+ * VOLVER A SACAR LAS CUENTAS DE UN CORTE YA CERRADO  (v3.9)
+ *
+ * Los totales de un corte están congelados a propósito: son el papel que
+ * se firmó. Pero cuando aparece un gasto que se había olvidado —o una
+ * venta, desde la v6.1—, dejar el papel intacto es dejar escrito un
+ * faltante que no existió, y ese faltante es exactamente lo que se viene
+ * a arreglar.
+ *
+ * Así que se vuelven a sacar de los movimientos, con dos cuidados:
+ *
+ *   · LO CONTADO NO SE TOCA. Es el dinero que había en el cajón cuando se
+ *     contó, y no lo cambia ningún ticket que aparezca después.
+ *   · LO QUE DECÍA ANTES SE GUARDA, la primera vez. Un corte corregido
+ *     tiene que poder enseñar las dos cifras.
+ */
+function recalcularCorte(cajaId, { usuarioId, motivo }) {
+  const caja = bd.prepare('SELECT * FROM cajas WHERE id = ?').get(cajaId);
+  if (!caja) return null;
+
+  const estado = estadoCaja(caja);
+  // Manda lo ENTREGADO cuando lo hay: es el dinero que de verdad llegó a
+  // manos del dueño. Si nadie contó ni entregó todavía, no hay diferencia
+  // que enseñar — y eso es un dato, no un cero.
+  const referencia = caja.entregado_centavos ?? caja.contado_centavos ?? null;
+  const diferencia = referencia === null ? null : referencia - estado.esperado;
+
+  // Solo la PRIMERA vez: si se corrige dos veces, lo original sigue siendo
+  // lo del papel firmado, no lo de la corrección anterior.
+  const guardarOriginal = caja.esperado_original_centavos === null
+                       || caja.esperado_original_centavos === undefined;
+
+  bd.prepare(`
+    UPDATE cajas SET
+      esperado_original_centavos   = COALESCE(esperado_original_centavos, ?),
+      diferencia_original_centavos = COALESCE(diferencia_original_centavos, ?),
+      salidas_original_centavos    = COALESCE(salidas_original_centavos, ?),
+      entradas_original_centavos   = COALESCE(entradas_original_centavos, ?),
+      esperado_centavos = ?, diferencia_centavos = ?,
+      vendido_centavos = ?, entradas_centavos = ?, salidas_centavos = ?,
+      corregido_en = ?, corregido_por = ?, motivo_correccion = ?,
+      correcciones = correcciones + 1
+    WHERE id = ?
+  `).run(caja.esperado_centavos, caja.diferencia_centavos,
+         caja.salidas_centavos, caja.entradas_centavos,
+         estado.esperado, diferencia,
+         estado.vendido, estado.entradas, estado.salidas,
+         ahora(), usuarioId, motivo.slice(0, 200), caja.id);
+
+  return { guardarOriginal, antes: caja, ahora: bd.prepare('SELECT * FROM cajas WHERE id = ?').get(caja.id) };
+}
+
 module.exports = {
-  sesionAbierta, vendidoEnEfectivo, vendidoSinEfectivo, vendidoAlCredito,
+  recalcularCorte, sesionAbierta, vendidoEnEfectivo, vendidoSinEfectivo, vendidoAlCredito,
   movimientos, sumaPorTipo, conteoVentas, estadoCaja, desglosePorPersona
 };

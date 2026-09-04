@@ -105,7 +105,13 @@ function producidoEntreDias(desde, hasta) {
   `).get(desde, hasta).n;
 }
 
-function producidoDesde(desde) {
+/**
+ * Todas las "desde" aceptan un `hasta` opcional (v6.1): es lo que permite
+ * volver a sacar los números de un conteo viejo —su ventana va del conteo
+ * anterior a él— cuando se corrige una sacada o entra una venta tarde.
+ * Sin `hasta`, cuentan hasta ahora, como siempre.
+ */
+function producidoDesde(desde, hasta = null) {
   const fila = bd.prepare(`
     SELECT COUNT(*) n
       FROM sacadas_moldes sm
@@ -113,8 +119,9 @@ function producidoDesde(desde) {
       JOIN sacadas_pano sp ON sp.id = s.sacada_pano_id
      WHERE ${alAlmacen('sm')}
        AND s.fecha > ?
+       AND (? IS NULL OR s.fecha <= ?)
        AND sp.anulada_en IS NULL
-  `).get(desde || '');
+  `).get(desde || '', hasta, hasta);
   return fila.n * DIECISEISAVOS_POR_MARQUETA;
 }
 
@@ -126,11 +133,11 @@ function producidoDesde(desde) {
  * mostrador de a cuarto y el mayorista que se lleva veinte marquetas. Ver
  * cuánto pesa cada uno es la mitad de saber cómo va la fábrica.
  */
-function vendidoDesde(desde, almacenId) {
-  return partidoPorLista(desde, almacenId).total;
+function vendidoDesde(desde, almacenId, hasta = null) {
+  return partidoPorLista(desde, almacenId, hasta).total;
 }
 
-function partidoPorLista(desde, almacenId) {
+function partidoPorLista(desde, almacenId, hasta = null) {
   const fila = bd.prepare(`
     SELECT
       COALESCE(SUM(CASE WHEN lp.tipo = 'mayoreo' THEN vl.dieciseisavos ELSE 0 END), 0) mayoreo,
@@ -139,9 +146,10 @@ function partidoPorLista(desde, almacenId) {
       JOIN ventas v ON v.id = vl.venta_id
       LEFT JOIN listas_precios lp ON lp.id = v.lista_id
      WHERE v.fecha > ?
+       AND (? IS NULL OR v.fecha <= ?)
        AND v.cancelada_en IS NULL
        AND v.almacen_id = ?
-  `).get(desde || '', almacenId);
+  `).get(desde || '', hasta, hasta, almacenId);
   return { ...fila, total: fila.mayoreo + fila.publico };
 }
 
@@ -153,12 +161,13 @@ function partidoPorLista(desde, almacenId) {
  * y no tiene remedio, la otra es un problema que hay que atender. Anotarlo
  * es lo que separa las dos.
  */
-function mermaDesde(desde, almacenId) {
+function mermaDesde(desde, almacenId, hasta = null) {
   const fila = bd.prepare(`
     SELECT COALESCE(SUM(dieciseisavos), 0) n
       FROM mermas_hielo
-     WHERE fecha > ? AND almacen_id = ? AND anulada_en IS NULL
-  `).get(desde || '', almacenId);
+     WHERE fecha > ? AND (? IS NULL OR fecha <= ?)
+       AND almacen_id = ? AND anulada_en IS NULL
+  `).get(desde || '', hasta, hasta, almacenId);
   return fila.n;
 }
 
@@ -170,12 +179,13 @@ function mermaDesde(desde, almacenId) {
  * lleva su propio renglón: si se revolviera con lo derretido, "lo que se
  * derrite" crecería en temporada alta sin que se hubiera derretido nada.
  */
-function cortadoDesde(desde, almacenId) {
+function cortadoDesde(desde, almacenId, hasta = null) {
   const fila = bd.prepare(`
     SELECT COALESCE(SUM(dieciseisavos), 0) n
       FROM cortes_hielo
-     WHERE fecha > ? AND almacen_id = ? AND anulado_en IS NULL
-  `).get(desde || '', almacenId);
+     WHERE fecha > ? AND (? IS NULL OR fecha <= ?)
+       AND almacen_id = ? AND anulado_en IS NULL
+  `).get(desde || '', hasta, hasta, almacenId);
   return fila.n;
 }
 
@@ -196,20 +206,22 @@ function cortadoDesde(desde, almacenId) {
  *
  * Guardar y recoger el mismo día se cancelan solos, que es lo correcto.
  */
-function guardadoDesde(desde, almacenId) {
+function guardadoDesde(desde, almacenId, hasta = null) {
   return bd.prepare(`
     SELECT COALESCE(SUM(dieciseisavos), 0) n
       FROM encomiendas
-     WHERE fecha > ? AND almacen_id = ? AND anulado_en IS NULL
-  `).get(desde || '', almacenId).n;
+     WHERE fecha > ? AND (? IS NULL OR fecha <= ?)
+       AND almacen_id = ? AND anulado_en IS NULL
+  `).get(desde || '', hasta, hasta, almacenId).n;
 }
 
-function recogidoDesde(desde, almacenId) {
+function recogidoDesde(desde, almacenId, hasta = null) {
   return bd.prepare(`
     SELECT COALESCE(SUM(dieciseisavos), 0) n
       FROM encomiendas
-     WHERE entregado_en > ? AND almacen_id = ? AND anulado_en IS NULL
-  `).get(desde || '', almacenId).n;
+     WHERE entregado_en > ? AND (? IS NULL OR entregado_en <= ?)
+       AND almacen_id = ? AND anulado_en IS NULL
+  `).get(desde || '', hasta, hasta, almacenId).n;
 }
 
 /**

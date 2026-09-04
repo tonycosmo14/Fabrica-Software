@@ -30,6 +30,7 @@ import { api } from '../api.js';
 import { esc, avisar, fecha as formatoFecha, fechaCorta } from '../util.js';
 import { confirmar, menu, pedirTexto, pedirAutorizacion, verTicket } from '../dialogo.js';
 import { imprimirTicket, htmlDeEspejo } from '../imprimir.js';
+import { aTexto } from '../fracciones.js';
 
 /**
  * EL NOMBRE DE PILA, que es como se llaman entre ellos en la fábrica.
@@ -799,6 +800,11 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
       const btnMirar = pantalla.querySelector('#mirar');
       if (btnMirar) btnMirar.onclick = () => { mirando = true; dibujar(); };
 
+      // CORREGIR CÓMO SALIÓ UNA SACADA  (v6.1): la hueca que era ahogada.
+      pantalla.querySelectorAll('[data-corregir]').forEach((b) => {
+        b.onclick = () => corregirSacada(b.dataset.corregir);
+      });
+
       if (mirando) return;
 
       // La tarjeta de captura solo existe si queda algo por sacar.
@@ -950,6 +956,39 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
       }
     }
 
+    async function corregirSacada(sacadaId) {
+      const h = (ficha?.historial || []).find((x) => x.id === sacadaId);
+      const como = await preguntarComoSalio({
+        titulo: `¿Cómo salió de verdad el paño ${pano.numero}?`,
+        texto: h ? `La sacada del ${fechaCorta(h.fecha)}. Se cambia el estado de TODOS sus moldes; ` +
+                   'lo contado en el cuarto frío no se toca, pero el cuadre de ese corte se vuelve a sacar.'
+                 : '',
+        conIgual: false
+      });
+      if (!como) return;
+
+      const motivo = await pedirTexto({
+        titulo: 'Por qué se corrige',
+        texto: 'Queda escrito en la sacada y en la bitácora.',
+        marcador: 'Se marcó hueca y era ahogada', ok: 'Corregir', largo: 200, unaLinea: true
+      });
+      if (!motivo) return;
+
+      try {
+        const r = await api.enviar(`/produccion/sacadas-pano/${sacadaId}/corregir`, {
+          calidad: como.resultado, destino: como.destino, nota: como.nota, motivo
+        });
+        const c = r.conteos?.[0];
+        avisar(`Corregido: ${r.antes.alAlmacen} → ${r.despues.alAlmacen} al cuarto frío` +
+               (c ? ` · el cuadre de hielo de ese corte pasó de ${aTexto(c.faltanteAntes)} a ${aTexto(c.faltanteAhora)} de faltante` : ''),
+               'bien');
+        // Se recarga todo: los colores de los moldes y la historia salen
+        // del servidor, y las dos cosas acaban de cambiar.
+        datos = await api.obtener(`/produccion/estado?tanque=${encodeURIComponent(tanqueActivo)}`);
+        detallePano(panoId, { mirar: true });
+      } catch (e) { avisar(e.message, 'error'); }
+    }
+
     async function anular() {
       const motivo = await pedirTexto({
         titulo: `Anular la última sacada del paño ${pano.numero}`,
@@ -1059,6 +1098,14 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
           </div>
           ${u.autorizo ? `<p class="ayuda">Se sacó fuera de la rotación, autorizado por
             <b>${esc(u.autorizo)}</b>${u.motivoOrden ? `: ${esc(u.motivoOrden)}` : ''}.</p>` : ''}
+          ${u.corregidaEn ? `<p class="ayuda">✏️ Se corrigió cómo salió${u.corregidaPor
+            ? ` (${esc(nombreDePila(u.corregidaPor))}` : ''}${u.corregidaEn
+            ? `${u.corregidaPor ? ', ' : '('}${esc(fechaCorta(u.corregidaEn))})` : ')'}${
+            u.motivoCorreccion ? `: «${esc(u.motivoCorreccion)}»` : ''}.</p>` : ''}
+          ${puedeCorregir ? `
+            <div class="acciones-centradas" style="margin-top:10px">
+              <button class="secundario chico" data-corregir="${esc(u.id)}">✏️ Corregir cómo salió</button>
+            </div>` : ''}
         </div>
 
         <div class="canastas-merma">
@@ -1087,7 +1134,7 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
         <div class="hist-envoltura">
           <table class="tabla hist-tabla">
             <tr><th>Cuándo</th><th>Quién</th><th class="der">Horas</th>
-                <th class="der">Al cuarto frío</th><th>Cómo salió</th></tr>
+                <th class="der">Al cuarto frío</th><th>Cómo salió</th>${puedeCorregir ? '<th></th>' : ''}</tr>
             ${ficha.historial.map((h) => `
               <tr class="${h.anulada ? 'anulada' : ''}">
                 <td>${esc(fechaCorta(h.fecha))}</td>
@@ -1110,7 +1157,10 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
                       .map((c) => `<span class="mezcla-parte ${esc(c.clave)}"
                                         >${h.mezcla[c.clave]} ${esc(c.corto)}</span>`).join('')}
                     ${h.mezcla.merma ? `<span class="mezcla-parte merma">${h.mezcla.merma} rotas</span>` : ''}
+                    ${h.corregidaEn ? '<small class="ayuda">✏️ corregida</small>' : ''}
                   </span>`}</td>
+                ${puedeCorregir ? `<td class="der">${h.anulada ? '' :
+                  `<button class="secundario chico" data-corregir="${esc(h.id)}" title="Corregir cómo salió">✏️</button>`}</td>` : ''}
               </tr>`).join('')}
           </table>
         </div>` : ''}

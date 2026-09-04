@@ -17,9 +17,26 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '6.0';
+const VERSION_ACTUAL = '6.1';
 
 const VERSIONES = [
+  {
+    numero: '6.1',
+    nombre: 'El administrador corrige lo que sea',
+    fecha: '2026-09-05',
+    resumen:
+      'Lo que pediste después de tu prueba real: la venta que faltó en un '
+      + 'corte cerrado se cobra al corte, y la sacada mal marcada se corrige '
+      + 'aunque el corte ya esté firmado. Todo deja rastro y el corte se '
+      + 'vuelve a sacar solo.',
+    cambios: [
+      { tipo: 'importante', texto: 'LA VENTA QUE FALTÓ EN UN CORTE CERRADO. En Historial de cortes, ⋯ Corregir, hay un botón nuevo: «Cobrar la venta que faltó». Lleva a Vender con ese corte en la mano; se captura como cualquier ticket —mayoreo, cliente, bolsas— y queda amarrado a ESE turno, con la fecha de ese turno. El corte se vuelve a sacar solo; si llevaba hielo, el cuadre del hielo también.' },
+      { tipo: 'importante', texto: 'CORREGIR CÓMO SALIÓ UNA SACADA, aunque el corte ya esté firmado. En la 👁 Historia del paño cada sacada tiene un ✏️: se dice cómo salió de verdad (la hueca que era ahogada) y por qué. Se cambia el estado de todos sus moldes, y los cuadres de hielo que ya la contaban se vuelven a sacar solos.' },
+      { tipo: 'mejora', texto: 'EL CORTE ENSEÑA LAS DOS CIFRAS. Lo contado nunca se toca —eso fue lo que había—; lo que «debía haber» sí. Lo que decía el papel cuando se firmó se guarda una sola vez, y en el corte sale un aviso: quién corrigió, cuándo, por qué y cuánto faltaba antes.' },
+      { tipo: 'mejora', texto: 'TODO DEJA RASTRO. La venta lleva la marca de que entró después del corte y su porqué; la sacada dice quién la corrigió, cuándo y por qué; la bitácora guarda la mezcla de antes y la de después.' },
+      { tipo: 'mejora', texto: 'Quién puede: cobrar al corte cerrado es solo del administrador; corregir cómo salió una sacada es del gerente y del administrador, el mismo permiso que anular.' }
+    ]
+  },
   {
     numero: '6.0',
     nombre: 'La hueca es merma',

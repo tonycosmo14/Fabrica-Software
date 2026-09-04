@@ -217,13 +217,16 @@ router.get('/panos/:id/ficha', verProduccion, (req, res) => {
   const sacadas = bd.prepare(`
     SELECT sp.id, sp.iniciada_en, sp.terminada_en, sp.notas, sp.motivo_orden,
            sp.anulada_en, sp.motivo_anulacion,
+           sp.corregida_en, sp.motivo_correccion, sp.correcciones,
            COALESCE(u.nombre, sp.ejecutor_libre, '—') AS quien,
            COALESCE(a.nombre, '')                     AS autorizo,
-           an.nombre                                  AS anulada_por_nombre
+           an.nombre                                  AS anulada_por_nombre,
+           co.nombre                                  AS corregida_por_nombre
       FROM sacadas_pano sp
       LEFT JOIN usuarios u  ON u.id = sp.ejecutor_id
       LEFT JOIN usuarios a  ON a.id = sp.autorizada_por
       LEFT JOIN usuarios an ON an.id = sp.anulada_por
+      LEFT JOIN usuarios co ON co.id = sp.corregida_por
      WHERE sp.pano_id = ?
      ORDER BY sp.iniciada_en DESC
      LIMIT 6
@@ -259,6 +262,10 @@ router.get('/panos/:id/ficha', verProduccion, (req, res) => {
       anuladaEn: sp.anulada_en || null,
       anuladaPor: sp.anulada_por_nombre || null,
       motivoAnulada: sp.motivo_anulacion || null,
+      // Si se corrigió cómo salió (v6.1): cuándo, quién y por qué.
+      corregidaEn: sp.corregida_en || null,
+      corregidaPor: sp.corregida_por_nombre || null,
+      motivoCorreccion: sp.motivo_correccion || null,
       notas: sp.notas || null,
       quienes: [...new Set([sp.quien, ...quienesDe.all(sp.id).map((f) => f.nombre)])]
         .filter((n) => n && n !== '—'),
@@ -769,6 +776,100 @@ function anularSacadaPano(req, res) {
 
   return ok(res, { anulado: true });
 }
+
+/**
+ * CORREGIR CÓMO SALIÓ UNA SACADA  (v6.1)
+ *
+ * "Marqué un paño como hueco y era ahogado. Cinco marquetas y media de
+ *  diferencia, y el sistema no me dejaba corregirlo después del corte."
+ *
+ * Anular y volver a sacar no sirve: la rotación ya pasó de ese paño, y la
+ * sacada nueva saldría con la fecha de hoy. Lo que se corrige es CÓMO
+ * SALIÓ: el estado de todos sus moldes, con su destino y su nota. La
+ * sacada guarda cuándo se corrigió, quién y por qué, y en la bitácora
+ * queda la mezcla de antes y la de después.
+ *
+ * Y como la razón de corregirlo casi siempre es un corte que salió mal,
+ * los conteos de hielo que abarcan esa sacada se vuelven a sacar solos
+ * (ver existencia/correccion.js). Lo contado no se toca; lo que "debía
+ * haber", sí.
+ */
+router.post('/sacadas-pano/:id/corregir', exigirPermiso('produccion.corregir'), (req, res) => {
+  const sp = bd.prepare(`
+    SELECT sp.*, p.numero AS pano_numero, t.nombre AS tanque_nombre
+      FROM sacadas_pano sp
+      JOIN panos p   ON p.id = sp.pano_id
+      JOIN tanques t ON t.id = p.tanque_id
+     WHERE sp.id = ?
+  `).get(req.params.id);
+  if (!sp) return error(res, 'Ese registro no existe.', 404);
+  if (sp.anulada_en) return error(res, 'Esa sacada está anulada: no hay nada que corregir.', 409);
+
+  const motivo = String(req.body?.motivo || '').trim();
+  if (!motivo) return error(res, 'Escribe por qué se corrige. Un registro no se cambia sin razón.');
+  if (!req.body?.calidad) return error(res, 'Di cómo salió de verdad.');
+
+  let como;
+  try {
+    como = calidad.interpretar({
+      resultado: req.body.calidad, destino: req.body.destino, nota: req.body.nota
+    });
+  } catch (e) { return error(res, e.message); }
+
+  const cuentaDe = bd.prepare(`
+    SELECT ${calidad.columnasMezcla('sm')}, ${calidad.columnaGuardadas('sm')} AS guardadas,
+           MIN(s.fecha) AS primera
+      FROM sacadas_moldes sm JOIN sacadas s ON s.id = sm.sacada_id
+     WHERE s.sacada_pano_id = ?
+  `);
+  const antesFila = cuentaDe.get(sp.id);
+  if (!antesFila.primera) return error(res, 'Esa sacada no tiene moldes registrados.', 409);
+  const antes = calidad.resumir(antesFila, antesFila.guardadas);
+
+  bd.transaction(() => {
+    bd.prepare(`
+      UPDATE sacadas_moldes SET resultado = ?, destino = ?, nota = ?
+       WHERE sacada_id IN (SELECT id FROM sacadas WHERE sacada_pano_id = ?)
+    `).run(como.resultado, como.destino, como.nota, sp.id);
+    bd.prepare(`
+      UPDATE sacadas_pano
+         SET corregida_en = ?, corregida_por = ?, motivo_correccion = ?,
+             correcciones = correcciones + 1
+       WHERE id = ?
+    `).run(ahora(), req.usuario.id, motivo.slice(0, 200), sp.id);
+  })();
+
+  const despuesFila = cuentaDe.get(sp.id);
+  const despues = calidad.resumir(despuesFila, despuesFila.guardadas);
+
+  // Los conteos que ya contaban esa sacada se vuelven a sacar solos.
+  const { corregirConteosQueAbarcan } = require('../existencia/correccion');
+  const conteos = corregirConteosQueAbarcan(antesFila.primera, {
+    usuarioId: req.usuario.id,
+    motivo: `Se corrigió cómo salió el paño ${sp.pano_numero}: ${motivo}`
+  });
+
+  bitacora.registrar({
+    accion: 'produccion.correccion', entidad: 'pano', entidadId: sp.pano_id,
+    ejecutorId: req.usuario.id,
+    detalle: {
+      tanque: sp.tanque_nombre, pano: sp.pano_numero, motivo,
+      antes: { alAlmacen: antes.alAlmacen, producidas: antes.producidas },
+      ahora: { resultado: como.resultado, destino: como.destino,
+               alAlmacen: despues.alAlmacen, producidas: despues.producidas },
+      conteosCorregidos: conteos.length
+    }
+  });
+
+  return ok(res, {
+    corregida: true,
+    antes, despues,
+    conteos: conteos.map((c) => ({
+      id: c.id, cajaId: c.cajaId, fecha: c.fecha,
+      faltanteAntes: c.antes.faltante, faltanteAhora: c.ahora.faltante
+    }))
+  });
+});
 
 // ============================================================
 // LO DE HOY
