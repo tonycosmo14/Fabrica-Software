@@ -559,3 +559,124 @@ test('cancelar una salida devuelve sus pedidos a la lista', async () => {
   assert.ok(pendientes.some((x) => x.id === p.id),
     'un pedido no se pierde porque el viaje no salió');
 });
+
+// ============================================================
+// ARMAR LA SALIDA DE UN JALÓN  (v6.3)
+// "Asignar cada pedido a un repartidor o vehículo, viendo si cabe y qué
+//  repartidores hay disponibles."
+// ============================================================
+
+test('para armar: los pedidos que esperan camioneta, en orden de cercanía', async () => {
+  await entrarAdmin();
+  // Tres clientes con ubicación: uno lejos, dos cerca de la fábrica.
+  const lejos = (await llamar('/api/clientes', {
+    method: 'POST', cuerpo: { nombre: 'Feria de Tetiz', latitud: 20.966, longitud: -89.933 }
+  })).json.datos.cliente;
+  const cerca = (await llamar('/api/clientes', {
+    method: 'POST', cuerpo: { nombre: 'Tienda de la esquina', latitud: 21.0170, longitud: -89.8750 }
+  })).json.datos.cliente;
+  const medio = (await llamar('/api/clientes', {
+    method: 'POST', cuerpo: { nombre: 'Doña Chuy', latitud: 21.0200, longitud: -89.8800 }
+  })).json.datos.cliente;
+
+  const pLejos = await pedido(lejos.id, [{ dieciseisavos: 16 }]);
+  const pCerca = await pedido(cerca.id, [{ dieciseisavos: 16 }]);
+  const pMedio = await pedido(medio.id, [{ dieciseisavos: 16 }]);
+  const pSin = await pedido(otra.id, [{ productoId: bolsa.id, cantidad: 2 }]);
+
+  const r = await llamar('/api/reparto/para-armar');
+  assert.equal(r.estado, 200);
+  const ids = r.json.datos.pedidos.map((p) => p.id);
+  const pos = (id) => ids.indexOf(id);
+  assert.ok(pos(pCerca.id) >= 0 && pos(pLejos.id) >= 0 && pos(pSin.id) >= 0);
+  assert.ok(pos(pCerca.id) < pos(pMedio.id), 'primero el más cercano a la fábrica');
+  assert.ok(pos(pMedio.id) < pos(pLejos.id), 'luego el que sigue desde ahí');
+  assert.ok(pos(pSin.id) > pos(pLejos.id), 'los que no tienen ubicación, al final');
+  assert.ok(r.json.datos.pedidos.every((p) => !p.salida), 'ninguno va ya en una salida');
+
+  const beto2 = r.json.datos.repartidores.find((x) => x.id === beto.id);
+  assert.ok(beto2, 'Beto está en la lista');
+  assert.ok('libre' in beto2, 'y dice si está libre');
+  assert.ok(r.json.datos.vehiculos.every((v) => 'libre' in v));
+});
+
+let armada, nico;
+test('se arma la salida con sus pedidos en orden, y avisa si no cabe', async () => {
+  await entrarAdmin();
+  // Beto puede andar todavía en una salida de las pruebas de arriba: se
+  // arma con alguien nuevo, que seguro está libre.
+  nico = await crearUsuario('Nico', 'repartidor', '6666');
+  const listos = (await llamar('/api/reparto/para-armar')).json.datos;
+  const ids = listos.pedidos.map((p) => p.id);
+  const hielo = listos.pedidos.reduce((n, p) => n + p.dieciseisavos, 0);
+
+  // Una moto a la que le cabe una sola marqueta: no cabe.
+  const moto = (await llamar('/api/reparto/vehiculos', {
+    method: 'POST', cuerpo: { nombre: 'La moto', tipo: 'moto', capacidad: 1 }
+  })).json.datos.vehiculo;
+  let r = await llamar('/api/reparto/armar', {
+    method: 'POST', cuerpo: { repartidorId: nico.id, vehiculoId: moto.id, pedidoIds: ids }
+  });
+  assert.equal(r.estado, 409, 'no cabe: se avisa ANTES de crear nada');
+  assert.equal(r.json.noCabe, true, JSON.stringify(r.json));
+  assert.equal(r.json.hielo, hielo);
+  assert.equal(bd.prepare("SELECT COUNT(*) n FROM salidas WHERE repartidor_id = ?").get(nico.id).n, 0,
+    'no se creó ninguna salida');
+
+  // Forzada, porque van a ser dos viajes.
+  r = await llamar('/api/reparto/armar', {
+    method: 'POST', cuerpo: { repartidorId: nico.id, vehiculoId: moto.id, pedidoIds: ids, forzar: true }
+  });
+  assert.equal(r.estado, 201, JSON.stringify(r.json));
+  armada = r.json.datos.salida;
+  assert.equal(armada.pedidos.length, ids.length);
+  assert.deepEqual(armada.pedidos.map((p) => p.id), ids, 'en el orden que se mandó');
+  assert.deepEqual(armada.pedidos.map((p) => p.orden), ids.map((_, i) => i + 1));
+  assert.equal(armada.cabe, false);
+
+  // La hoja de carga numera las paradas.
+  const papel = (await llamar(`/api/impresion/carga/${armada.id}/previa`)).json.datos.renglones
+    .map((x) => x.t).join('\n');
+  assert.match(papel, /1\. #/);
+  assert.match(papel, /orden de parada/);
+
+  // Y cada pedido ya dice en qué salida va.
+  const p = (await llamar(`/api/pedidos/${ids[0]}`)).json.datos.pedido;
+  assert.equal(p.salida.folio, armada.folio);
+  assert.equal(p.salida.orden, 1);
+});
+
+test('el repartidor ocupado y el vehículo tomado no se vuelven a asignar', async () => {
+  await entrarAdmin();
+  const listos = (await llamar('/api/reparto/para-armar')).json.datos;
+  const b = listos.repartidores.find((x) => x.id === nico.id);
+  assert.equal(b.libre, false, 'Nico anda en la salida que se acaba de armar');
+  assert.equal(b.salida.folio, armada.folio);
+  const moto = listos.vehiculos.find((v) => v.nombre === 'La moto');
+  assert.equal(moto.libre, false);
+  assert.equal(listos.pedidos.length, 0, 'ya no queda nada por subir');
+
+  const nuevo = await pedido(otra.id, [{ dieciseisavos: 16 }]);
+  let r = await llamar('/api/reparto/armar', {
+    method: 'POST', cuerpo: { repartidorId: nico.id, pedidoIds: [nuevo.id] }
+  });
+  assert.equal(r.estado, 409);
+  assert.equal(r.json.ocupado, true);
+
+  const leila = (await llamar('/api/reparto/para-armar')).json.datos.repartidores
+    .find((x) => x.nombre === 'Leila');
+  r = await llamar('/api/reparto/armar', {
+    method: 'POST', cuerpo: { repartidorId: leila.id, vehiculoId: moto.id, pedidoIds: [nuevo.id] }
+  });
+  assert.equal(r.estado, 409);
+  assert.equal(r.json.vehiculoTomado, true);
+
+  // Se cambia el orden de las paradas mientras no salga.
+  const alReves = [...armada.pedidos.map((p) => p.id)].reverse();
+  r = await llamar(`/api/reparto/${armada.id}/orden`, { method: 'PUT', cuerpo: { pedidoIds: alReves } });
+  assert.equal(r.estado, 200);
+  assert.deepEqual(r.json.datos.salida.pedidos.map((p) => p.id), alReves);
+
+  // Se limpia: se cancela la salida para no estorbar a lo que sigue.
+  await llamar(`/api/reparto/${armada.id}/cancelar`, { method: 'POST', cuerpo: { motivo: 'prueba' } });
+});

@@ -170,13 +170,132 @@ router.get('/', ver, (req, res) => ok(res, {
   estados: calculo.ESTADOS,
   // Quién puede llevarse una camioneta. El reparto es de los repartidores,
   // pero en una fábrica chica el gerente también sale un día.
-  repartidores: bd.prepare(`
-    SELECT id, nombre, rol FROM usuarios
-     WHERE activo = 1 AND rol IN ('repartidor','gerente','admin','cajero')
-     ORDER BY CASE rol WHEN 'repartidor' THEN 0 ELSE 1 END, nombre
-  `).all(),
-  vehiculos: bd.prepare('SELECT * FROM vehiculos WHERE activo = 1 ORDER BY nombre').all()
+  repartidores: calculo.repartidoresDisponibles(),
+  vehiculos: calculo.vehiculosDisponibles()
 }));
+
+// ============================================================
+// ARMAR UNA SALIDA DE UN JALÓN  (v6.3)
+// ============================================================
+//
+// "Asignar cada pedido a un repartidor o vehículo. El que asigna debe
+//  considerar si cabe en el vehículo y qué repartidores hay disponibles."
+//
+// Lo que hace falta para decidir, en una sola llamada: los pedidos que
+// esperan camioneta (ya en el orden sugerido de visita), quién está libre
+// y qué vehículo está libre, con lo que le cabe.
+
+router.get('/para-armar', ver, (req, res) => {
+  const hasta = texto(req.query.hasta, 10);
+  const pendientes = calculo.pedidosPorSubir({ hasta });
+  return ok(res, {
+    pedidos: calculo.ordenSugerido(pendientes),
+    repartidores: calculo.repartidoresDisponibles(),
+    vehiculos: calculo.vehiculosDisponibles(),
+    fabrica: calculo.FABRICA
+  });
+});
+
+/**
+ * Crea la salida y le cuelga sus pedidos en el orden que se le manda.
+ *
+ * Cuerpo: { repartidorId, vehiculoId, pedidoIds: [...], forzar, notas }
+ *
+ * Avisa ANTES de crear nada si el repartidor ya anda en otra salida, si el
+ * vehículo ya lo tiene otra, o si el hielo no cabe. Lo último se puede
+ * forzar —a veces se sabe que van dos viajes— pero hay que decirlo.
+ */
+router.post('/armar', operar, (req, res) => {
+  const repartidor = bd.prepare('SELECT * FROM usuarios WHERE id = ? AND activo = 1')
+    .get(req.body?.repartidorId ?? null);
+  if (!repartidor) return error(res, '¿Quién se la lleva? Elige al repartidor.');
+
+  const ocupado = calculo.repartidoresDisponibles().find((r) => r.id === repartidor.id);
+  if (ocupado && !ocupado.libre) {
+    return error(res, `${repartidor.nombre} ya anda en la salida #${ocupado.salida.folio} ` +
+                      `(${ocupado.salida.texto.toLowerCase()}). Ciérrala o elige a otro.`, 409,
+                 { ocupado: true, salida: ocupado.salida });
+  }
+
+  const vehiculo = req.body?.vehiculoId
+    ? bd.prepare('SELECT * FROM vehiculos WHERE id = ? AND activo = 1').get(req.body.vehiculoId)
+    : null;
+  if (req.body?.vehiculoId && !vehiculo) return error(res, 'Ese vehículo no existe.');
+  if (vehiculo) {
+    const tomado = calculo.vehiculosDisponibles().find((v) => v.id === vehiculo.id);
+    if (tomado && !tomado.libre) {
+      return error(res, `${vehiculo.nombre} ya lo tiene la salida #${tomado.salida.folio} ` +
+                        `de ${tomado.salida.repartidor || '—'}.`, 409,
+                   { vehiculoTomado: true, salida: tomado.salida });
+    }
+  }
+
+  const ids = Array.isArray(req.body?.pedidoIds) ? req.body.pedidoIds.map(String) : [];
+  if (!ids.length) return error(res, 'Elige al menos un pedido para subir.');
+  if (ids.length > 200) return error(res, 'Son demasiados pedidos para una salida.');
+
+  const elegidos = [];
+  for (const id of ids) {
+    const p = pedidosCalculo.completo(id);
+    if (!p || p.estado !== 'pendiente') {
+      return error(res, `El pedido ${p ? `#${p.folio}` : id} ya no está pendiente.`, 409);
+    }
+    if (p.tipo === 'recoger') {
+      return error(res, `El pedido #${p.folio} lo van a pasar a buscar: no sube a la camioneta.`, 409);
+    }
+    if (p.salida) {
+      return error(res, `El pedido #${p.folio} ya va en la salida #${p.salida.folio}.`, 409);
+    }
+    elegidos.push(p);
+  }
+
+  // ¿CABE? Se avisa antes de crear nada: una salida creada y cancelada
+  // deja rastro, y aquí todavía no ha pasado nada.
+  const hielo = elegidos.reduce((n, p) => n + p.dieciseisavos, 0);
+  const capacidad = vehiculo?.capacidad_marquetas ? vehiculo.capacidad_marquetas * 16 : null;
+  if (capacidad && hielo > capacidad && req.body?.forzar !== true) {
+    return error(res,
+      `No cabe: son ${aTexto(hielo)} de hielo y a ${vehiculo.nombre} le caben ` +
+      `${vehiculo.capacidad_marquetas} marquetas. Quita pedidos, cambia de vehículo, o fuérzalo si van a ser dos viajes.`,
+      409, { noCabe: true, hielo, capacidad, textoHielo: aTexto(hielo) });
+  }
+
+  const id = nuevoId();
+  const guardar = bd.transaction(() => {
+    const folio = bd.prepare('SELECT COALESCE(MAX(folio), 0) n FROM salidas').get().n + 1;
+    bd.prepare(`
+      INSERT INTO salidas (id, folio, fecha, vehiculo_id, repartidor_id, estado,
+                           notas, ejecutor_id, capturista_id)
+      VALUES (?, ?, ?, ?, ?, 'cargando', ?, ?, ?)
+    `).run(id, folio, ahora(), vehiculo?.id || null, repartidor.id,
+           texto(req.body?.notas, 300), req.usuario.id, req.usuario.id);
+    const colgar = bd.prepare(
+      'INSERT INTO salida_pedidos (id, salida_id, pedido_id, orden) VALUES (?, ?, ?, ?)');
+    elegidos.forEach((p, i) => colgar.run(nuevoId(), id, p.id, i + 1));
+    return folio;
+  });
+  const folio = guardar();
+
+  bitacora.registrar({
+    accion: 'salida.abierta', entidad: 'salida', entidadId: id,
+    ejecutorId: req.usuario.id,
+    detalle: { folio, repartidor: repartidor.nombre, vehiculo: vehiculo?.nombre || null,
+               pedidos: elegidos.map((p) => p.folio),
+               hielo: aTexto(hielo), forzada: Boolean(capacidad && hielo > capacidad) }
+  });
+  return ok(res, { salida: calculo.completa(id) }, 201);
+});
+
+/** Cambiar el orden de las paradas de una salida que todavía no sale. */
+router.put('/:id/orden', operar, (req, res) => {
+  const s = bd.prepare('SELECT * FROM salidas WHERE id = ?').get(req.params.id);
+  if (!s) return error(res, 'Esa salida no existe.', 404);
+  if (s.estado !== 'cargando') return error(res, 'Ya salió: el orden ya no se cambia.', 409);
+  const ids = Array.isArray(req.body?.pedidoIds) ? req.body.pedidoIds.map(String) : [];
+  const poner = bd.prepare('UPDATE salida_pedidos SET orden = ? WHERE salida_id = ? AND pedido_id = ?');
+  bd.transaction(() => ids.forEach((pid, i) => poner.run(i + 1, s.id, pid)))();
+  return ok(res, { salida: calculo.completa(s.id) });
+});
 
 /** Las que esperan que alguien en la caja les reciba el dinero. */
 router.get('/por-recibir', ver, (req, res) =>
@@ -249,8 +368,10 @@ router.post('/:id/pedidos', operar, (req, res) => {
   }
   if (otra) return ok(res, { salida: calculo.completa(s.id) });
 
-  bd.prepare('INSERT INTO salida_pedidos (id, salida_id, pedido_id) VALUES (?, ?, ?)')
-    .run(nuevoId(), s.id, p.id);
+  const ultimo = bd.prepare(
+    'SELECT COALESCE(MAX(orden), 0) n FROM salida_pedidos WHERE salida_id = ?').get(s.id).n;
+  bd.prepare('INSERT INTO salida_pedidos (id, salida_id, pedido_id, orden) VALUES (?, ?, ?, ?)')
+    .run(nuevoId(), s.id, p.id, ultimo + 1);
   return ok(res, { salida: calculo.completa(s.id) }, 201);
 });
 

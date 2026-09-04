@@ -28,6 +28,8 @@ import { esc, avisar, fechaCorta } from '../util.js';
 import { confirmar, pedirTexto, pedirEntero, menu, verTicket, armarDialogo } from '../dialogo.js';
 import { pesos, aTexto, crearTeclado } from '../fracciones.js';
 import { imprimirTicket, htmlDeEspejo } from '../imprimir.js';
+import { armarSalida } from '../armar-salida.js';
+import { mapa } from '../mapa.js';
 
 const FORMAS = {
   efectivo: { texto: 'Efectivo', emoji: '💵' },
@@ -158,21 +160,30 @@ export async function vistaReparto(pantalla, estado) {
   function panelCargando(s) {
     return `
       <section class="tarjeta">
-        <h3>Los pedidos que lleva</h3>
+        <h3>Las paradas <small class="ayuda">en el orden en que se visitan</small></h3>
         ${s.pedidos.length
           ? `<ul class="rep-lista">
-              ${s.pedidos.map((p) => `
+              ${s.pedidos.map((p, i) => `
                 <li>
+                  <span class="armar-num">${p.orden}</span>
                   <span class="crece">
                     <strong>#${p.folio} ${esc(p.cliente_nombre || '—')}</strong>
-                    <small>${p.lineas.map((l) => `${esc(l.texto)} ${esc(l.concepto)}`).join(' · ')}</small>
+                    <small>${p.lineas.map((l) => `${esc(l.texto)} ${esc(l.concepto)}`).join(' · ')}${
+                      p.horario ? ` · 🕗 ${esc(p.horario)}` : ''}${
+                      p.latitud == null ? ' · <i>sin ubicación</i>' : ''}</small>
                   </span>
                   <span class="rep-precio">${pesos(p.total)}</span>
-                  ${opera ? `<button class="secundario chico" data-quita-pedido="${p.id}">✖️</button>` : ''}
+                  ${opera ? `
+                    <span class="armar-mover">
+                      <button class="secundario chico" data-orden-sube="${i}" ${i === 0 ? 'disabled' : ''}>▲</button>
+                      <button class="secundario chico" data-orden-baja="${i}" ${i === s.pedidos.length - 1 ? 'disabled' : ''}>▼</button>
+                    </span>
+                    <button class="secundario chico" data-quita-pedido="${p.id}">✖️</button>` : ''}
                 </li>`).join('')}
              </ul>`
           : '<p class="ayuda">Todavía no lleva ninguno.</p>'}
         ${opera ? '<button class="secundario chico" id="colgar">+ Colgarle pedidos</button>' : ''}
+        ${mapaRuta(s)}
       </section>
 
       <section class="tarjeta">
@@ -231,21 +242,47 @@ export async function vistaReparto(pantalla, estado) {
     return `
       ${resumenCarga(s)}
       <section class="tarjeta">
-        <h3>Va cargada con</h3>
+        <h3>Va cargada con <small class="ayuda">en orden de parada</small></h3>
         <ul class="rep-lista">
           ${s.pedidos.map((p) => `
-            <li><span class="crece">#${p.folio} ${esc(p.cliente_nombre || '—')}</span>
+            <li><span class="armar-num">${p.orden}</span>
+                <span class="crece">#${p.folio} ${esc(p.cliente_nombre || '—')}${
+                  p.horario ? ` <small>🕗 ${esc(p.horario)}</small>` : ''}</span>
                 <span class="rep-precio">${pesos(p.total)}</span></li>`).join('')}
           ${s.carga.map((l) => `
             <li><span class="ped-cuanto">${esc(l.texto)}</span>
                 <span class="crece">${esc(l.concepto)} <small>(suelto)</small></span></li>`).join('')}
         </ul>
       </section>
+      ${mapaRuta(s) ? `<section class="tarjeta">${mapaRuta(s)}</section>` : ''}
       ${opera ? `
         <div class="rep-acciones">
           <button id="regreso">🏠 Ya regresó</button>
           <button class="secundario" id="imprimir-carga">🖨️ Hoja de carga</button>
         </div>` : ''}`;
+  }
+
+  /**
+   * LA RUTA EN EL MAPA  (v6.3): una chincheta por parada, con su número,
+   * y la fábrica marcada. Solo si alguna parada tiene ubicación.
+   */
+  function mapaRuta(s) {
+    if (!s.pedidos.some((p) => p.latitud != null && p.longitud != null)) return '';
+    return `
+      <p class="ayuda" style="margin:12px 0 6px">La ruta: cada chincheta es una parada, con su número. 🏭 es la fábrica.</p>
+      <div id="mapa-ruta" class="mapa-caja chico"></div>`;
+  }
+
+  function pintarMapaRuta(s) {
+    const caja = pantalla.querySelector('#mapa-ruta');
+    if (!caja) return;
+    const puntos = s.pedidos
+      .filter((p) => p.latitud != null && p.longitud != null)
+      .map((p) => ({ id: p.id, numero: p.orden, lat: p.latitud, lon: p.longitud,
+                     etiqueta: `${p.orden}. ${p.cliente_nombre || ''}`,
+                     tono: p.estado === 'entregado' ? 'bien' : '' }));
+    puntos.push({ id: '__fabrica', numero: '🏭', lat: 21.0167, lon: -89.8744, etiqueta: 'La fábrica', tono: 'propio' });
+    mapa(caja, { puntos });
   }
 
   // ---- CUADRÁNDOLA ----
@@ -407,6 +444,17 @@ export async function vistaReparto(pantalla, estado) {
         recargar();
       };
     });
+    // MOVER UNA PARADA  (v6.3): se manda el orden entero, que es lo que es.
+    const mover = async (i, j) => {
+      const ids = s.pedidos.map((p) => p.id);
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+      try { await api.actualizar(`/reparto/${s.id}/orden`, { pedidoIds: ids }); recargar(); }
+      catch (e) { avisar(e.message, 'error'); }
+    };
+    cada('[data-orden-sube]', (b) => { b.onclick = () => mover(Number(b.dataset.ordenSube), Number(b.dataset.ordenSube) - 1); });
+    cada('[data-orden-baja]', (b) => { b.onclick = () => mover(Number(b.dataset.ordenBaja), Number(b.dataset.ordenBaja) + 1); });
+    pintarMapaRuta(s);
+
     cada('[data-entrego]', (b) => { b.onclick = () => entregado(s, b.dataset.entrego); });
     cada('[data-no-entrego]', (b) => { b.onclick = () => noEntregado(s, b.dataset.noEntrego); });
     cada('[data-contar]', (b) => { b.onclick = () => contar(s, b.dataset.contar); });
@@ -418,12 +466,32 @@ export async function vistaReparto(pantalla, estado) {
   }
 
   async function nuevaSalida() {
+    // CON PEDIDOS ESPERANDO, SE ARMA DE UN JALÓN  (v6.3): quién, en qué,
+    // cuáles y en qué orden, viendo si cabe. Sin pedidos, se abre vacía
+    // para subirle solo lo suelto.
+    let hay = false;
+    try { hay = (await api.obtener('/reparto/para-armar')).pedidos.length > 0; } catch { hay = false; }
+    if (hay) {
+      const s = await armarSalida();
+      if (!s) return;
+      abierta = s;
+      pintarFicha();
+      return;
+    }
+    return salidaVacia();
+  }
+
+  async function salidaVacia() {
     if (!d.repartidores.length) {
       return avisar('Nadie puede llevarse la camioneta: da de alta un repartidor primero', 'error');
     }
     const quien = await menu({
       titulo: '¿Quién se la lleva?',
-      opciones: d.repartidores.map((r) => ({ valor: r.id, texto: r.nombre, detalle: r.rol }))
+      texto: 'No hay pedidos esperando: la salida va solo con lo suelto.',
+      opciones: d.repartidores.map((r) => ({
+        valor: r.id, texto: r.nombre,
+        detalle: r.libre === false ? `en la salida #${r.salida.folio}, ${r.salida.texto.toLowerCase()}` : r.rol
+      }))
     });
     if (!quien) return;
 

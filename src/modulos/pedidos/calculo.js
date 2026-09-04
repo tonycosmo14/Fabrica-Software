@@ -89,6 +89,17 @@ function completo(id) {
 
   p.lineas = lineasDe(p.id);
   p.tipoTexto = TIPOS[p.tipo] || TIPOS.domicilio;
+  // EN QUÉ CAMIONETA VA  (v6.3), si ya va en una viva. Se consulta aquí
+  // mismo y no en reparto/calculo, que a su vez lee de este archivo.
+  p.salida = bd.prepare(`
+    SELECT s.id, s.folio, s.estado, sp.orden, u.nombre AS repartidor_nombre,
+           v.nombre AS vehiculo_nombre
+      FROM salida_pedidos sp
+      JOIN salidas s ON s.id = sp.salida_id
+      LEFT JOIN usuarios  u ON u.id = s.repartidor_id
+      LEFT JOIN vehiculos v ON v.id = s.vehiculo_id
+     WHERE sp.pedido_id = ? AND s.estado IN ('cargando','en_ruta','regreso')
+  `).get(p.id) || null;
   p.total = p.lineas.reduce((n, l) => n + l.precio_centavos, 0);
   p.dieciseisavos = p.lineas.reduce((n, l) => n + l.dieciseisavos, 0);
   // Qué áreas toca este pedido. Lo usa la nota para saber si hay que

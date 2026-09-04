@@ -2724,11 +2724,35 @@ DEBERIA HABER ..........................  $5,500
       Esto es lo segundo.</p>
 
       <h4>1 · Armarla</h4>
-      <p>En <b>🚚 El reparto</b>, «+ Salida»: se elige <b>quién se la lleva</b> y
-      <b>en qué</b>. Después se le cuelgan los pedidos —salen todos los
-      pendientes con casillas, se desmarca lo que no sube y se cuelgan de un
-      botón— y se le sube <b>lo suelto</b>: hielo y productos de más, para
-      vender en la calle a quien se atraviese.</p>
+      <p>Desde <b>🚚 El reparto</b> («+ Salida») o desde <b>Los pedidos</b>
+      («Armar una salida con estos pedidos», o el <b>🚚 Subir</b> de una
+      tarjeta), sale <b>un solo cuadro con todo lo que hace falta para
+      decidir</b>:</p>
+      <ul>
+        <li><b>Los pedidos</b> que esperan camioneta, con casilla, en el
+        <b>orden sugerido de visita</b>: del más cercano en adelante, saliendo
+        de la fábrica y siguiendo desde la última parada. Los que no tienen
+        ubicación van al final. Se mueven con ▲▼.</li>
+        <li><b>Quién se la lleva</b>: cada repartidor dice si está
+        <b>libre</b> o en qué salida anda (cargando, en la calle, por
+        cuadrar); el ocupado sale apagado. Lo de "no vino" el sistema no lo
+        sabe: se ve a la gente y se elige a quien sí está.</li>
+        <li><b>En qué</b>: cada vehículo con lo que le cabe y si ya lo tiene
+        otra salida.</li>
+        <li><b>La cuenta en vivo</b>: cuánto hielo sube contra lo que cabe, y
+        cuánto vale. Si no cabe, avisa antes de crear nada; se puede forzar
+        cuando se sabe que van a ser dos viajes.</li>
+      </ul>
+      <p>Ya armada, en su ficha las paradas salen <b>numeradas</b> y en un
+      <b>mapa</b> con una chincheta por parada y la fábrica marcada; el orden
+      se sigue moviendo con ▲▼ mientras no salga. La <b>hoja de carga</b> lleva
+      el mismo número de parada delante de cada pedido. Después se le sube
+      <b>lo suelto</b>: hielo y productos de más, para vender en la calle a
+      quien se atraviese. Cada tarjeta en Los pedidos dice en qué salida va y
+      qué parada es.</p>
+      <p class="ayuda-tip">Si no hay pedidos esperando, «+ Salida» abre una
+      vacía, solo con lo suelto, como antes. Y colgar pedidos de uno en uno
+      sigue estando en la ficha.</p>
       <p class="ayuda-tip">Lo de <b>mayoreo</b> no sube suelto. El precio de
       mayoreo es de alguien; en la calle no hay a quién cobrárselo. Eso va
       como pedido, con su cliente.</p>

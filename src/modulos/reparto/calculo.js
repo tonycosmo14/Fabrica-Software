@@ -95,19 +95,126 @@ function cargaDe(salidaId) {
 
 /** Los pedidos que lleva, con todo lo suyo. */
 function pedidosDe(salidaId) {
+  // En el orden de las paradas (v6.3); los que no tienen orden, al final
+  // por folio, como siempre.
   const filas = bd.prepare(`
-    SELECT sp.pedido_id, sp.no_entregado_motivo
+    SELECT sp.pedido_id, sp.no_entregado_motivo, sp.orden
       FROM salida_pedidos sp
       JOIN pedidos pe ON pe.id = sp.pedido_id
      WHERE sp.salida_id = ?
-     ORDER BY pe.folio
+     ORDER BY CASE WHEN sp.orden IS NULL THEN 1 ELSE 0 END, sp.orden, pe.folio
   `).all(salidaId);
   return filas
-    .map((f) => {
+    .map((f, i) => {
       const p = pedidos.completo(f.pedido_id);
-      return p ? { ...p, noEntregadoMotivo: f.no_entregado_motivo } : null;
+      return p ? { ...p, noEntregadoMotivo: f.no_entregado_motivo, orden: f.orden ?? i + 1 } : null;
     })
     .filter(Boolean);
+}
+
+// ============================================================
+// ARMAR LA SALIDA: QUIÉN ESTÁ LIBRE, QUÉ CABE, EN QUÉ ORDEN  (v6.3)
+// ============================================================
+
+/** La fábrica, de donde salen todas. */
+const FABRICA = { lat: 21.0167, lon: -89.8744 };
+
+/** Distancia aproximada en metros entre dos puntos, de sobra para ordenar. */
+function metros(a, b) {
+  const r = 6371000;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLon = ((b.lon - a.lon) * Math.PI) / 180;
+  const x = dLon * Math.cos(((a.lat + b.lat) / 2 * Math.PI) / 180);
+  return Math.round(r * Math.sqrt(dLat * dLat + x * x));
+}
+
+/**
+ * EL ORDEN SUGERIDO DE LAS PARADAS.
+ *
+ * Del más cercano en adelante, saliendo de la fábrica y siguiendo desde
+ * la última parada (el vecino más cercano). No es la ruta perfecta —eso
+ * es un problema famoso por no tener solución rápida— pero con diez
+ * paradas en un pueblo es la que un repartidor con experiencia haría, y
+ * quien arma la salida la puede mover.
+ *
+ * Los pedidos sin ubicación van al final, en el orden en que llegaron:
+ * no hay con qué acomodarlos.
+ */
+function ordenSugerido(lista) {
+  const con = lista.filter((p) => p.latitud != null && p.longitud != null)
+    .map((p) => ({ p, punto: { lat: Number(p.latitud), lon: Number(p.longitud) } }));
+  const sin = lista.filter((p) => !(p.latitud != null && p.longitud != null));
+
+  const ruta = [];
+  let aqui = FABRICA;
+  while (con.length) {
+    let mejor = 0;
+    let dist = Infinity;
+    for (let i = 0; i < con.length; i++) {
+      const d = metros(aqui, con[i].punto);
+      if (d < dist) { dist = d; mejor = i; }
+    }
+    const [sig] = con.splice(mejor, 1);
+    ruta.push({ ...sig.p, metrosDesdeAnterior: dist });
+    aqui = sig.punto;
+  }
+  return [...ruta, ...sin.map((p) => ({ ...p, metrosDesdeAnterior: null }))];
+}
+
+/**
+ * QUIÉN PUEDE LLEVARSE UNA SALIDA AHORA, y en qué anda cada uno.
+ *
+ * "Considerar qué repartidores hay disponibles: en ruta, no vino." Lo que
+ * el sistema sabe de cierto es lo primero: si anda en la calle o tiene
+ * una salida a medio armar o por cuadrar. Lo de "no vino" no lo sabe
+ * nadie más que quien está en la puerta, y por eso no se inventa: se
+ * enseña a todos y quien arma decide.
+ */
+function repartidoresDisponibles() {
+    const gente = bd.prepare(`
+      SELECT id, nombre, rol FROM usuarios
+       WHERE activo = 1 AND rol IN ('repartidor','gerente','admin','cajero')
+       ORDER BY CASE rol WHEN 'repartidor' THEN 0 ELSE 1 END, nombre
+    `).all();
+    const vivas = bd.prepare(`
+      SELECT id, folio, estado, repartidor_id FROM salidas
+       WHERE estado IN ('cargando','en_ruta','regreso')
+    `).all();
+    return gente.map((u) => {
+      const suya = vivas.find((s) => s.repartidor_id === u.id) || null;
+      return {
+        ...u,
+        libre: !suya,
+        salida: suya ? { id: suya.id, folio: suya.folio, estado: suya.estado,
+                         texto: (ESTADOS[suya.estado] || ESTADOS.cargando).texto } : null
+      };
+    });
+}
+
+/** Los vehículos, con si alguna salida viva ya los tiene tomados. */
+function vehiculosDisponibles() {
+  const vehiculos = bd.prepare('SELECT * FROM vehiculos WHERE activo = 1 ORDER BY nombre').all();
+  const vivas = bd.prepare(`
+    SELECT s.id, s.folio, s.estado, s.vehiculo_id, u.nombre AS repartidor_nombre
+      FROM salidas s LEFT JOIN usuarios u ON u.id = s.repartidor_id
+     WHERE s.estado IN ('cargando','en_ruta','regreso')
+  `).all();
+  return vehiculos.map((v) => {
+    const con = vivas.find((s) => s.vehiculo_id === v.id) || null;
+    return {
+      ...v,
+      libre: !con,
+      salida: con ? { id: con.id, folio: con.folio, estado: con.estado,
+                      repartidor: con.repartidor_nombre,
+                      texto: (ESTADOS[con.estado] || ESTADOS.cargando).texto } : null
+    };
+  });
+}
+
+/** Los pedidos a domicilio pendientes que todavía no van en ninguna. */
+function pedidosPorSubir({ hasta = null } = {}) {
+  return pedidos.lista({ estado: 'pendiente', tipo: 'domicilio', hasta })
+    .filter((p) => !p.salida);
 }
 
 /**
@@ -251,5 +358,6 @@ function salidaDelPedido(pedidoId) {
 
 module.exports = {
   ESTADOS, prorrata, cargaDe, pedidosDe, completa, lista, porRecibir,
-  cuantasAbiertas, salidaDelPedido, ajuste
+  cuantasAbiertas, salidaDelPedido, ajuste,
+  ordenSugerido, repartidoresDisponibles, vehiculosDisponibles, pedidosPorSubir, metros, FABRICA
 };

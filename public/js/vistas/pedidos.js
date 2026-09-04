@@ -33,6 +33,7 @@ import { esc, avisar } from '../util.js';
 import { confirmar, pedirTexto, menu, verTicket } from '../dialogo.js';
 import { pesos } from '../fracciones.js';
 import { imprimirTicket, htmlDeEspejo } from '../imprimir.js';
+import { armarSalida } from '../armar-salida.js';
 
 const FORMAS = {
   efectivo: { texto: 'Efectivo', emoji: '💵' },
@@ -174,7 +175,10 @@ export async function vistaPedidos(pantalla, estado) {
 
     return `
       <div class="ped-acciones">
-        <button id="imprimir-todas">🖨️ Imprimir las notas de entrega</button>
+        ${puede('reparto.operar') && sinCamioneta().length ? `
+          <button id="armar-salida">🚚 Armar una salida con ${
+            sinCamioneta().length === 1 ? 'este pedido' : `estos ${sinCamioneta().length} pedidos`}</button>` : ''}
+        <button class="${puede('reparto.operar') && sinCamioneta().length ? 'secundario' : ''}" id="imprimir-todas">🖨️ Imprimir las notas de entrega</button>
         <span class="ayuda">
           Una por cada pedido a domicilio, con su QR. Los que vienen a buscar
           (🏪) no llevan nota: se cobran en Vender cuando lleguen.
@@ -204,6 +208,11 @@ export async function vistaPedidos(pantalla, estado) {
 
         <div class="ped-datos">
           <span class="etiqueta">${p.tipo === 'recoger' ? '🏪 lo recogen' : '🚚 a domicilio'}</span>
+          ${p.tipo === 'recoger' ? '' : p.salida
+            ? `<span class="etiqueta etiqueta-bien" title="${esc(p.salida.vehiculo_nombre || '')}">
+                 📦 salida #${p.salida.folio} · ${esc(p.salida.repartidor_nombre || '—')}
+                 · parada ${p.salida.orden}</span>`
+            : '<span class="etiqueta etiqueta-flojo">sin camioneta</span>'}
           <span class="etiqueta ${atrasado ? 'etiqueta-mal' : ''}">${esc(cuando(p.para_cuando))}</span>
           <span class="etiqueta">${forma.emoji} ${forma.texto}</span>
           ${p.horario ? `<span class="etiqueta">🕗 ${esc(p.horario)}</span>` : ''}
@@ -228,6 +237,8 @@ export async function vistaPedidos(pantalla, estado) {
           <div class="ped-botones">
             <button class="secundario chico" data-ver="${p.id}">👁️ ${p.tipo === 'recoger' ? 'Apartado' : 'Nota'}</button>
             <button class="secundario chico" data-nota="${p.id}">🖨️</button>
+            ${p.tipo !== 'recoger' && !p.salida && puede('reparto.operar')
+              ? `<button class="secundario chico" data-subir="${p.id}" title="Subirlo a una salida">🚚 Subir</button>` : ''}
             ${puede('pedidos.entregar')
               ? `<button class="chico" data-entregar="${p.id}">✅ Entregado</button>` : ''}
             ${puede('pedidos.tomar')
@@ -247,6 +258,14 @@ export async function vistaPedidos(pantalla, estado) {
     const todas = pantalla.querySelector('#imprimir-todas');
     if (todas) todas.onclick = imprimirTodas;
 
+    // ARMAR LA SALIDA DESDE AQUÍ  (v6.3): con todos los que esperan
+    // camioneta, o con uno solo desde su tarjeta.
+    const armar = pantalla.querySelector('#armar-salida');
+    if (armar) armar.onclick = () => armarDesdeAqui();
+    pantalla.querySelectorAll('[data-subir]').forEach((b) => {
+      b.onclick = () => armarDesdeAqui([b.dataset.subir]);
+    });
+
     pantalla.querySelectorAll('[data-ver]').forEach((b) => {
       b.onclick = () => verNota(b.dataset.ver);
     });
@@ -259,6 +278,17 @@ export async function vistaPedidos(pantalla, estado) {
     pantalla.querySelectorAll('[data-cancelar]').forEach((b) => {
       b.onclick = () => cancelar(b.dataset.cancelar);
     });
+  }
+
+  /** Los de domicilio pendientes que todavía no van en ninguna salida. */
+  function sinCamioneta() {
+    return (datos?.pedidos || []).filter((p) => p.tipo !== 'recoger' && !p.salida);
+  }
+
+  async function armarDesdeAqui(soloIds = null) {
+    const salida = await armarSalida({ hasta, marcados: soloIds });
+    if (!salida) return;
+    await pintar();
   }
 
   async function imprimirPreparacion() {

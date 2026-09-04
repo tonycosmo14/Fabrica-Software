@@ -17,9 +17,25 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '6.2';
+const VERSION_ACTUAL = '6.3';
 
 const VERSIONES = [
+  {
+    numero: '6.3',
+    nombre: 'Los pedidos, a su camioneta',
+    fecha: '2026-09-05',
+    resumen:
+      'Asignar los pedidos a un repartidor y un vehículo desde un solo '
+      + 'cuadro: quién está libre, qué le cabe, y las paradas en orden de '
+      + 'cercanía, con su mapa.',
+    cambios: [
+      { tipo: 'importante', texto: 'ARMAR LA SALIDA DE UN JALÓN. Desde Los pedidos («Armar una salida con estos pedidos») o desde El reparto («+ Salida») sale un cuadro con todo: los pedidos que esperan camioneta con casilla, quién se la lleva, en qué, y la cuenta en vivo de cuánto hielo sube contra lo que cabe.' },
+      { tipo: 'nuevo', texto: 'QUIÉN ESTÁ LIBRE. Cada repartidor dice si está libre o en qué salida anda (cargando, en la calle, por cuadrar), y el ocupado sale apagado. Cada vehículo dice lo que le cabe y si ya lo tiene otra salida. Lo de "no vino" el sistema no lo sabe: se elige a quien sí está.' },
+      { tipo: 'nuevo', texto: 'LAS PARADAS EN ORDEN. El sistema sugiere el orden de visita por cercanía —del más cercano en adelante, saliendo de la fábrica— y se mueve con ▲▼. Los pedidos sin ubicación van al final. La hoja de carga lleva el número de parada delante de cada pedido.' },
+      { tipo: 'nuevo', texto: 'LA RUTA EN EL MAPA. En la ficha de la salida, una chincheta por parada con su número y la fábrica marcada. Es el mapa de siempre, el de las neveras.' },
+      { tipo: 'mejora', texto: 'Si no cabe, avisa ANTES de crear nada, y se puede forzar cuando se sabe que van a ser dos viajes. Cada tarjeta en Los pedidos dice en qué salida va y qué parada es; las que no tienen camioneta lo dicen y llevan su botón 🚚 Subir.' }
+    ]
+  },
   {
     numero: '6.2',
     nombre: 'El precio especial de una vez',

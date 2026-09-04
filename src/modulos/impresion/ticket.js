@@ -1755,9 +1755,11 @@ function ticketCarga(s, { negocio = '' } = {}) {
   }
 
   if (s.pedidos.length) {
-    t.separadorConTitulo(`PEDIDOS (${s.pedidos.length})`);
+    t.separadorConTitulo(`PEDIDOS (${s.pedidos.length}) - en orden de parada`);
     for (const p of s.pedidos) {
-      t.negrita().linea(`#${p.folio} ${String(p.cliente_nombre || '?').slice(0, t.ancho - 8)}`)
+      // EL NÚMERO DE PARADA (v6.3) va primero: es lo que se sigue en la
+      // calle. El folio queda para buscar la nota.
+      t.negrita().linea(`${p.orden}. #${p.folio} ${String(p.cliente_nombre || '?').slice(0, t.ancho - 12)}`)
        .negrita(false);
       for (const l of p.lineas) {
         const cuanto = l.dieciseisavos > 0
