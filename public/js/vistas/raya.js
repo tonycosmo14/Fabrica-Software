@@ -45,7 +45,7 @@ export async function vistaRaya(pantalla) {
       <div class="ancho-completo">
         <div class="emp-cabecera">
           <div class="emp-titulo">
-            <h2>La raya</h2>
+            <h2>Sueldos</h2>
             <p class="ayuda">
               Lo que gana cada quien, qué días viene y qué se le debe.
               Se paga cada <b>${esc(d.dias[d.diaDePago])}</b>.
@@ -144,7 +144,7 @@ export async function vistaRaya(pantalla) {
 
     pantalla.innerHTML = `
       <div class="ancho-completo">
-        <button class="secundario chico" id="volver">‹ La raya</button>
+        <button class="secundario chico" id="volver">‹ Sueldos</button>
         <h2 style="margin-top:14px">${esc(d.usuario.nombre)}</h2>
         <p class="ayuda">${esc(ETIQUETAS_ROL[d.usuario.rol] || d.usuario.rol)}</p>
 

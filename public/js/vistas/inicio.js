@@ -20,13 +20,17 @@ const ACCESOS = [
   { emoji: '🛒', titulo: 'Vender',       ruta: '#/venta',     permiso: 'venta.registrar',      desde: null   },
   { emoji: '💵', titulo: 'Caja',         ruta: '#/caja',      permiso: 'caja.ver',             desde: null   },
   { emoji: '👥', titulo: 'Usuarios',     ruta: '#/usuarios',  permiso: 'usuarios.administrar', desde: null   },
-  { emoji: '💵', titulo: 'La raya',      ruta: '#/raya',      permiso: 'raya.ver',             desde: null   },
+  // SUELDOS, no "La raya"  (v5.2.1). Era el mismo billete que Caja, y dos
+  // apartados con el mismo icono se confunden desde el otro lado del
+  // mostrador. Y "raya" es como se le dice aquí a la lista de la semana,
+  // pero quien entra por primera vez no sabe qué va a encontrar.
+  { emoji: '💰', titulo: 'Sueldos',      ruta: '#/raya',      permiso: 'raya.ver',             desde: null   },
   { emoji: '🧊', titulo: 'Las neveras', ruta: '#/neveras',   permiso: 'neveras.ver',          desde: null   },
   { emoji: '💧', titulo: 'La planta de agua', ruta: '#/agua', permiso: 'agua.ver',            desde: null   },
   { emoji: '✉️', titulo: 'Avisos',       ruta: '#/correo',    permiso: 'correo.configurar',    desde: null   },
   { emoji: '🏷️', titulo: 'Productos y precios', ruta: '#/productos', permiso: 'inventario.ver', desde: null },
   { emoji: '🧾', titulo: 'Clientes',      ruta: '#/clientes',  permiso: 'clientes.ver',         desde: null   },
-  { emoji: '🔎', titulo: 'Historial',     ruta: '#/historial', permiso: 'historial.ver',        desde: null   },
+  { emoji: '📋', titulo: 'Historial',     ruta: '#/historial', permiso: 'historial.ver',        desde: null   },
   { emoji: '🏦', titulo: 'Cuentas de la empresa', ruta: '#/empresa', permiso: 'empresa.ver',    desde: null   },
   { emoji: '📊', titulo: 'Los números',   ruta: '#/estadisticas', permiso: 'estadisticas.ver', desde: null },
   { emoji: '🎨', titulo: 'Personalizar', ruta: '#/personalizar', permiso: 'sistema.configurar', desde: null },

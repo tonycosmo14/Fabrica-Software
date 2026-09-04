@@ -3,14 +3,25 @@
  *
  * La fábrica ya trabaja; el sistema apenas llega. El día del arranque hay
  * que decirle al sistema cómo está el mundo REAL a esa hora: qué paños
- * llevan horas congelando, cuál fue el último que se sacó, cuánto hielo
- * hay, cuánto dinero. Este módulo es ese día.
+ * llevan horas congelando, cuál fue el último que se sacó y cuánto hielo
+ * hay en el cuarto frío. Este módulo es ese día.
  *
- * Tres de las cuatro cosas YA tienen su herramienta y aquí solo se
- * enlazan: el hielo se fija con el primer conteo, los productos con su
- * conteo, y el dinero se mete como entrada al abrir el turno. Lo ÚNICO
- * nuevo de verdad es el estado de los paños, porque la rotación y las
- * horas de congelación no se podían capturar de ningún modo.
+ * LO QUE CAMBIÓ EN LA v5.2.1, DESPUÉS DE USARLO DE VERDAD
+ *
+ *   · EL HIELO SE CAPTURA AQUÍ. Antes había un enlace a "ir a contar el
+ *     cuarto frío", y ahí no se podía: contar solo existía dentro del
+ *     cierre de turno. O sea que el paso 5 mandaba a un sitio donde no se
+ *     podía hacer el paso 5.
+ *   · EL DINERO YA NO SE PREGUNTA. La caja empieza en CERO — ese fue el
+ *     acuerdo— así que preguntar cuánto hay solo servía para meter un
+ *     número que después no cuadraba con nada.
+ *   · LO QUE SE BORRA VIVE EN `limpieza.js`, clasificado tabla por tabla,
+ *     con una prueba que revienta si aparece una sin clasificar. La lista
+ *     vieja era de la v2.8 y se había quedado a medias.
+ *
+ * Lo demás sigue igual: los productos se cuentan en su pantalla, y lo
+ * único que no se podía capturar en ningún lado —el estado de los paños y
+ * la rotación— se captura aquí.
  *
  * CÓMO SE FIJA UN PAÑO SIN MENTIR (regla 3.2: estado derivado, jamás
  * guardado): no se escribe ningún estado. Se registra el EVENTO real que
@@ -33,6 +44,7 @@ const { respaldar } = require('../../db/respaldar');
 const { tanqueConEstado } = require('../produccion/estado');
 const { ordenIntercalado, siguientePano } = require('../produccion/rotacion');
 const bitacora = require('../../lib/bitacora');
+const limpieza = require('./limpieza');
 
 const router = express.Router();
 
@@ -108,6 +120,12 @@ router.get('/estado', soloAdmin, (req, res) => {
   const conteo = bd.prepare(
     'SELECT COUNT(*) n FROM conteos'
   ).get().n;
+  const ultimoConteo = bd.prepare(`
+    SELECT c.contado, c.fecha, a.nombre AS almacen
+      FROM conteos c LEFT JOIN almacenes a ON a.id = c.almacen_id
+     WHERE c.anulado_en IS NULL
+     ORDER BY c.fecha DESC LIMIT 1
+  `).get() || null;
   const productosSinConteo = bd.prepare(`
     SELECT COUNT(*) n FROM productos p
      WHERE p.activo = 1 AND p.lleva_inventario = 1
@@ -127,9 +145,17 @@ router.get('/estado', soloAdmin, (req, res) => {
     terminada: constancia(),
     tanques,
     hieloContado: conteo > 0,
+    ultimoConteo,
     productosSinConteo,
     movimientos,
-    cuadres
+    cuadres,
+    // LO QUE SE VA A BORRAR, CON SUS CUENTAS, antes de apretar el botón.
+    // Ver "3 cortes de caja · 48 ventas" es lo que hace que la decisión
+    // sea una decisión y no un salto al vacío.
+    porBorrar: limpieza.loQueSeVaABorrar(bd),
+    seQueda: Object.values(limpieza.SE_QUEDA),
+    almacenes: bd.prepare(
+      'SELECT id, nombre FROM almacenes WHERE activo = 1 ORDER BY orden, nombre').all()
   });
 });
 
@@ -161,15 +187,10 @@ router.post('/cerrar-pruebas', soloAdmin, (req, res) => {
 
   const respaldo = respaldar('antes-de-produccion');
 
-  const TABLAS = [
-    // el orden respeta las referencias: primero los hijos
-    'venta_lineas', 'ventas',
-    'sacadas_moldes', 'sacadas', 'rellenados', 'sacadas_pano',
-    'turnos_produccion',
-    'conteos', 'mermas_hielo',
-    'movimientos_caja', 'abonos', 'cajas',
-    'movimientos_inventario'
-  ];
+  // La lista vive en `limpieza.js`, clasificada y probada. Aquí solo se
+  // recorre: así una tabla nueva no se puede quedar fuera sin que alguien
+  // lo haya decidido a propósito.
+  const TABLAS = limpieza.MOVIMIENTOS.map((m) => m.tabla);
 
   const borradas = {};
   bd.transaction(() => {

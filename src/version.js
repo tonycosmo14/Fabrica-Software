@@ -17,9 +17,30 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '5.2';
+const VERSION_ACTUAL = '5.2.1';
 
 const VERSIONES = [
+  {
+    numero: '5.2.1',
+    nombre: 'La puesta en marcha, arreglada',
+    fecha: '2026-09-04',
+    resumen:
+      'Lo que se rompió al revisarla de verdad: el hielo del cuarto frío no '
+      + 'se podía capturar, el botón de limpiar dejaba dentro los cortes, y '
+      + 'preguntaba por un dinero que empieza en cero.',
+    cambios: [
+      { tipo: 'arreglo', texto: 'YA SE PUEDE PONER EL HIELO QUE HAY. La puesta en marcha decía «ve a contar el cuarto frío» y del otro lado NO se podía contar: contar solo existía dentro del cierre de turno. El paso mandaba a un sitio donde el paso no se podía hacer. Ahora se captura ahí mismo, con el mismo teclado de fracciones del cierre —"114 y 1/2"— y se puede volver a anotar hasta que quede bien.' },
+      { tipo: 'arreglo', texto: 'Y EL ARREGLO DE FONDO: contar el cuarto frío contestaba «ese cuarto frío no existe» cuando no se le decía cuál, aunque hubiera uno solo. Los cortes de hielo, que son de la misma familia, siempre cayeron al único que hay; el conteo se había quedado sin esa red porque el único sitio que lo llamaba siempre se lo mandaba.' },
+      { tipo: 'importante', texto: 'AHORA SÍ DEJA TODO LIMPIO. El botón de borrar las pruebas era de la v2.8 y borraba trece tablas de las veintiocho que hay hoy: SE QUEDABAN DENTRO los cortes de caja, los cortes de hielo, los gastos de la empresa, los recibos de la luz, los vales, las encomiendas y las lecturas de la planta. Decía «te dejo limpio» y no era cierto, y esos números de prueba iban a salir mezclados con los meses buenos del negocio para siempre.' },
+      { tipo: 'nuevo', texto: 'Y AHORA TE ENSEÑA QUÉ SE VA A BORRAR, CONTADO, antes de apretar: «48 ventas · 3 cortes de caja · 7 gastos de la empresa». Al lado, lo que se queda. La lista que se ve es exactamente la que se ejecuta, así que ya no puede pasar que el texto prometa una cosa y el botón haga otra.' },
+      { tipo: 'importante', texto: 'LA LÍNEA ES: se borra lo que PASÓ, se queda lo que ES. Se borra una venta, un corte, una sacada, un gasto, una lectura — los de las pruebas son hechos que no pasaron. Se quedan los tanques, los productos, los precios, la gente, los clientes, LAS NEVERAS CON DÓNDE ESTÁ CADA UNA y los equipos de la planta con la pieza que traen puesta: eso costó trabajo capturar y sigue siendo verdad mañana.' },
+      { tipo: 'importante', texto: 'Y PARA QUE NO SE VUELVA A QUEDAR VIEJA, cada tabla está clasificada a mano y hay una prueba que revienta cuando aparece una nueva sin clasificar. O sea: el día que agregue un módulo, el sistema me obliga a decidir si lo que guarda se borra o se queda. Olvidarse ya no es una opción silenciosa.' },
+      { tipo: 'arreglo', texto: 'YA NO PREGUNTA CUÁNTO DINERO HAY. Quedamos en que la caja empieza en cero, así que ese paso solo servía para meter un número que después no cuadraba con nada. En su lugar dice lo que hay que saber: el primer cajero entra con su PIN, eso abre su turno, y desde ahí el arqueo cuadra solo.' },
+      { tipo: 'mejora', texto: 'LA PANTALLA ES UN FORMULARIO, no una lista de enlaces a otras pantallas. Lo que se puede capturar ahí, se captura ahí. Un enlace es una promesa de que del otro lado hay algo; si no lo hay, es peor que nada.' },
+      { tipo: 'mejora', texto: '«LA RAYA» AHORA SE LLAMA SUELDOS, y tiene su propio icono (💰). Tenía el mismo billete que Caja, y dos apartados con el mismo dibujo se confunden desde el otro lado del mostrador. De paso quedaron todos distintos: Producción 🏭, Caja 💵, Sueldos 💰, Neveras 🧊, Agua 💧, Clientes 🧾, Historial 📋 — y el menú de la izquierda ya usa los mismos que el inicio, que antes no coincidían.' },
+      { tipo: 'nuevo', texto: 'El manual, al día: qué se borra, qué se queda y por qué las neveras y las piezas puestas no se tocan.' }
+    ]
+  },
   {
     numero: '5.2',
     nombre: 'El agua: la máquina',

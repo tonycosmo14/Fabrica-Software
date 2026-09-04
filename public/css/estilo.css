@@ -3813,6 +3813,38 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 .arr-paso a { color: var(--acento); font-weight: 600; }
 .arr-tabla select { padding: 6px 8px; font-size: 14px; }
 .arr-tabla td { vertical-align: middle; }
+
+/* LA PUESTA EN MARCHA, YA COMO FORMULARIO  (v5.2.1) */
+
+/* Se borra / se queda, una junto a la otra: la decisión se toma
+   comparando, no leyendo dos párrafos separados. */
+.arr-limpieza {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+  margin: 10px 0 0; padding: 12px 14px;
+  background: var(--superficie-alt); border: 1px solid var(--borde);
+  border-radius: 12px;
+}
+@media (max-width: 620px) { .arr-limpieza { grid-template-columns: 1fr; } }
+.arr-columna { min-width: 0; }
+.arr-lista { margin: 6px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.7; }
+.arr-lista li { color: var(--suave); }
+.arr-lista b { color: var(--texto); font-variant-numeric: tabular-nums; }
+.etiqueta-chica.malo { color: var(--rojo); }
+.etiqueta-chica.bueno { color: var(--verde); }
+/* Lo que se queda va como una frase corrida, no como lista: son veintitantas
+   cosas y en viñetas la tarjeta se hacía más alta que la pantalla, cuando lo
+   único que hay que leer ahí es «no pierdo lo que configuré». */
+.arr-queda { margin: 6px 0 0; font-size: 13px; line-height: 1.7; color: var(--suave); }
+
+/* El teclado de fracciones y el campo escrito, lado a lado. */
+.arr-hielo {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 260px);
+  gap: 16px; align-items: start; margin-top: 12px;
+}
+@media (max-width: 780px) { .arr-hielo { grid-template-columns: 1fr; } }
+.arr-hielo-lado { display: flex; flex-direction: column; }
+.arr-hielo-lado input, .arr-hielo-lado select { margin: 4px 0 0; }
+.arr-hielo-lado button { width: auto; }
 .arranque-acceso { display: flex; align-items: center; gap: 12px; }
 
 /* ============================================================

@@ -52,9 +52,12 @@ const RUTAS = {
   '#/existencia': { titulo: 'El cuarto frío',   vista: vistaExistencia, permiso: 'existencia.ver' },
   '#/config-tanques': { titulo: 'Configurar tanques', vista: vistaTanques, permiso: 'tanques.configurar' },
   '#/usuarios':  { titulo: 'Usuarios',          vista: vistaUsuarios,  permiso: 'usuarios.administrar' },
-  // LA RAYA (v4.8): cuánto gana cada quien, qué días viene y qué se le
-  // debe. Solo el administrador — los sueldos no son dato de operación.
-  '#/raya':      { titulo: 'La raya',           vista: vistaRaya,      permiso: 'raya.ver' },
+  // SUELDOS (v4.8, renombrado en la v5.2.1): cuánto gana cada quien, qué
+  // días viene y qué se le debe. Solo el administrador — los sueldos no
+  // son dato de operación. El permiso y las tablas siguen diciendo `raya`
+  // a propósito: renombrarlos sería mover media base de datos para que la
+  // pantalla se llame distinto.
+  '#/raya':      { titulo: 'Sueldos',           vista: vistaRaya,      permiso: 'raya.ver' },
   '#/correo':    { titulo: 'Avisos por correo',  vista: vistaCorreo,    permiso: 'correo.configurar' },
   '#/neveras':   { titulo: 'Las neveras',        vista: vistaNeveras,   permiso: 'neveras.ver' },
   // LA PLANTA DE AGUA (v5.2): el operario la ve y anota la vuelta;

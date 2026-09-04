@@ -1878,7 +1878,7 @@ DEBERIA HABER ..........................  $5,500
       vales»</b>, que es lo que se pregunta uno mirando esta pantalla el día
       de la raya.</p>
 
-      <p>Al <b>pagarle su raya</b> desde <b>La raya</b> los vales se
+      <p>Al <b>pagarle su semana</b> desde <b>Sueldos</b> los vales se
       descuentan solos, todos de un jalón — no hay que venir aquí. Este
       botón <b>«ya se le descontó»</b> queda para cuando se le pagó por
       fuera del sistema y solo hay que apagar el recordatorio.</p>
@@ -1912,14 +1912,15 @@ DEBERIA HABER ..........................  $5,500
   // ==========================================================
   {
     id: 'raya',
-    titulo: 'La raya: sueldos, horarios y el pago de la semana',
+    titulo: 'Sueldos: cuánto gana cada quien y el pago de la semana',
     busca: 'raya sueldo sueldos pago pagar semana semanal por dia dia horario horas entra sale turno empleados operarios colaboradores vales adelanto descuento extras balance recibo firmar cajon caja fuerte gasto empresa dia de pago sabado nomina',
     cuerpo: `
-      <p>La raya es <b>lo que se le paga a cada quien</b>. En una pantalla:
+      <p>Aquí está <b>lo que se le paga a cada quien</b> — lo que en la fábrica
+      se le dice «la raya». En una pantalla:
       cuánto gana, qué días viene y de qué hora a qué hora, cuánto se llevó
       adelantado, y el papel que firma cuando se le paga.</p>
 
-      <p class="ayuda-tip">Se llega desde el inicio, en <b>💵 La raya</b>.
+      <p class="ayuda-tip">Se llega desde el inicio, en <b>💰 Sueldos</b>.
       Es <b>solo del administrador</b>: lo que gana cada quien no se anda
       enseñando.</p>
 
@@ -2717,27 +2718,46 @@ DEBERIA HABER ..........................  $5,500
   {
     id: 'arranque',
     titulo: 'La puesta en marcha y el cuadre',
-    busca: 'puesta en marcha arranque empezar producción real borrar pruebas cuadrar realidad rotación paños congelando fondo inicial primer conteo apagón',
+    busca: 'puesta en marcha arranque empezar producción real borrar pruebas limpiar cortes cuadrar realidad rotación paños congelando primer conteo cuanto hielo hay cuarto frio apagón se borra se queda',
     cuerpo: `
       <p>La fábrica ya trabajaba cuando llegó el sistema. La <b>puesta en
       marcha</b> (🚀 en Sistema, solo el administrador) es el día en que se
       le dice cómo está el mundo real, en orden y una sola vez:</p>
       <ul>
-        <li><b>Borrar las pruebas</b> — todo lo capturado en el ensayo se
-        borra para que los números empiecen limpios. Se quedan usuarios,
-        tanques, productos, precios, clientes y toda la bitácora. Antes se
-        hace un respaldo solo, y pide escribir BORRAR PRUEBAS más la
-        contraseña. El primer ticket real vuelve a ser el <b>#1</b>.</li>
+        <li><b>Los tanques</b> — que estén como son, con sus paños,
+        canastas y moldes.</li>
+        <li><b>Dejarlo completamente limpio</b> — todo lo capturado en el
+        ensayo se borra para que los números empiecen de cero. La pantalla
+        <b>enseña antes qué se va a borrar, contado</b> —«48 ventas, 3
+        cortes de caja, 7 gastos»— y qué se queda. Antes se hace un
+        respaldo solo, y pide escribir BORRAR PRUEBAS más la contraseña. El
+        primer ticket real vuelve a ser el <b>#1</b>.</li>
         <li><b>Los paños</b> — cuáles llevan horas congelando (y desde
         cuándo) y cuáles están fuera. "Sin tocar" no escribe nada.</li>
         <li><b>La rotación</b> — cuál fue el último paño que se sacó; el
         sistema contesta "entonces toca el N".</li>
-        <li><b>El hielo</b> — el primer conteo del cuarto frío fija cuánto
-        hay, sin cuadrar contra nada.</li>
+        <li><b>El hielo</b> — cuánto hay <b>ahorita</b> en el cuarto frío,
+        con su teclado de fracciones, ahí mismo. Es el primer conteo: fija
+        el punto de partida y no cuadra contra nada. Se puede volver a
+        anotar todas las veces que haga falta hasta que quede bien.</li>
         <li><b>Los productos</b> — su primer conteo cada uno.</li>
-        <li><b>El dinero</b> — el cajero entra con su PIN y registra una
-        entrada "Fondo inicial" con lo que haya en el cajón.</li>
       </ul>
+
+      <h4>Qué se borra y qué se queda</h4>
+      <p>La línea es simple: <b>se borra lo que PASÓ</b> —una venta, un
+      corte, una sacada, un gasto, una lectura de la planta— porque los de
+      las pruebas son hechos que no pasaron. <b>Se queda lo que ES</b>:
+      tanques, productos, precios, la gente, los clientes, las neveras y
+      los equipos de la planta, que costaron trabajo capturar y siguen
+      siendo verdad mañana.</p>
+      <p class="ayuda-tip">Dos que parecen movimiento y no lo son, y por eso
+      se quedan: <b>dónde está cada nevera</b> y <b>qué pieza trae puesta
+      cada equipo</b>. Borrarlas dejaría cincuenta neveras sin dueño y la
+      planta entera «sin capturar» al día siguiente.</p>
+
+      <p class="ayuda-tip"><b>El dinero no se pregunta:</b> la caja empieza
+      en cero. El primer cajero entra con su PIN —eso abre su turno— y desde
+      ahí el arqueo cuadra solo.</p>
 
       <p class="ayuda-tip">Los paños fijados aquí <b>no inventan
       marquetas</b>: la producción y las estadísticas solo cuentan lo que de
@@ -2751,10 +2771,9 @@ DEBERIA HABER ..........................  $5,500
       que nadie anotó. Cada cuadre exige su <b>motivo</b>, queda firmado en
       la bitácora con el antes y el después, y la pantalla dice cuántas
       veces se ha usado.</p>
-      <p class="ayuda-tip">El hielo, los productos y el dinero no tienen
-      botón de cuadre, a propósito: <b>los conteos y movimientos de siempre
-      son el cuadre</b>, y son los que destapan un faltante en vez de
-      taparlo.</p>`
+      <p class="ayuda-tip">El hielo y los productos no tienen botón de
+      cuadre, a propósito: <b>los conteos de siempre son el cuadre</b>, y
+      son los que destapan un faltante en vez de taparlo.</p>`
   },
 
   // ==========================================================

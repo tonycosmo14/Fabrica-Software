@@ -383,8 +383,20 @@ router.get('/conteos', verExistencia, (req, res) => {
 // ============================================================
 
 router.post('/conteos', contar, (req, res) => {
+  // SIN ALMACÉN, EL ÚNICO QUE HAY  (arreglado en la v5.2.1).
+  //
+  // Esto contestaba "ese cuarto frío no existe" cuando no se le mandaba
+  // uno, aunque hubiera exactamente uno activo — y no había forma de
+  // adivinar por qué, porque el cuarto frío sí existía. Los cortes de
+  // hielo, que son de la misma familia, siempre cayeron al primero; el
+  // conteo se quedó sin esa red porque el único sitio que lo llamaba
+  // (el cierre de turno) siempre lo manda.
+  //
+  // Se notó al capturar el hielo desde la puesta en marcha, que es la
+  // primera vez que alguien cuenta el cuarto frío fuera de un turno.
   const almacen = bd.prepare('SELECT * FROM almacenes WHERE id = ? AND activo = 1')
-    .get(req.body?.almacenId ?? null);
+    .get(req.body?.almacenId ?? null) || (
+      req.body?.almacenId ? null : almacenesActivos()[0]);
   if (!almacen) return error(res, 'Ese cuarto frío no existe.', 404);
 
   const contado = leerCantidad(req.body);

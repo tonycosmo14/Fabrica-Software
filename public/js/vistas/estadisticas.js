@@ -350,7 +350,7 @@ export async function vistaEstadisticas(pantalla) {
             este mes, salgan del cajón o de fuera. Hasta la versión pasada no
             estaban y este número se quedaba corto.`
           : `<b>Ojo: este mes no hay ningún sueldo capturado.</b> Los sueldos
-            se pagan en <b>La raya</b>, y desde ahí entran solos a esta cuenta.
+            se pagan en <b>Sueldos</b>, y desde ahí entran solos a esta cuenta.
             Mientras no se paguen desde el sistema, lo que de verdad cuesta
             una marqueta es más que esto.`}
           Estos números sirven para <b>comparar y vigilar</b> — no para sacar

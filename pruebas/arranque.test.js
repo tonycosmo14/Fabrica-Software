@@ -1,5 +1,5 @@
 /**
- * LA PUESTA EN MARCHA  (v2.8)
+ * LA PUESTA EN MARCHA  (v2.8, ampliada en la v5.2.1)
  *
  * Lo que importa probar:
  *  · que sembrar un paño NO fabrica marquetas (las estadísticas quedan en
@@ -8,6 +8,15 @@
  *  · que cerrar-pruebas borra los movimientos, deja lo configurado y la
  *    bitácora, y solo funciona UNA vez
  *  · que nadie más que el administrador entra aquí
+ *
+ * Y desde la v5.2.1, lo que se rompió al usarlo de verdad:
+ *  · QUE NO SE QUEDE NINGUNA TABLA SIN CLASIFICAR. La lista de borrado era
+ *    de la v2.8 y se había quedado con trece tablas de las veintiocho: los
+ *    cortes de caja, los de hielo, los gastos y los recibos de la luz se
+ *    quedaban dentro. La prueba de aquí abajo revienta en cuanto alguien
+ *    cree una tabla y no diga si es historia o es la fábrica.
+ *  · QUE SE PUEDA CONTAR EL HIELO SIN DECIR EL ALMACÉN, que era lo que
+ *    impedía capturar el cuarto frío desde esta pantalla.
  */
 const test = require('node:test');
 const assert = require('node:assert');
@@ -15,6 +24,8 @@ const { fabricaDePrueba } = require('./ayudante');
 
 const { llamar, entrarAdmin, entrarPorNombre, crearUsuario, bd, preparar } =
   fabricaDePrueba('arranque');
+
+const limpieza = require('../src/modulos/arranque/limpieza');
 
 let tanque, panos;
 
@@ -197,6 +208,92 @@ test('cerrar las pruebas borra el ensayo, deja lo configurado, y es de una vez',
     method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 16 }], pago: 500 } });
   const v = bd.prepare('SELECT folio FROM ventas ORDER BY fecha DESC LIMIT 1').get();
   assert.equal(v.folio, 1, 'el ticket #1 de la vida real');
+});
+
+// ============================================================
+// LO QUE SE BORRA Y LO QUE SE QUEDA
+// ============================================================
+
+test('no hay ni una tabla sin clasificar', () => {
+  // ESTA PRUEBA ES LA QUE IMPORTA DE TODO EL ARCHIVO.
+  //
+  // No comprueba un comportamiento: comprueba que nadie se olvidó. La
+  // lista de borrado se escribió en la v2.8 y se quedó ahí mientras
+  // entraban quince tablas nuevas — cortes de hielo, gastos, recibos de la
+  // CFE, vales, neveras, planta de agua—, y ninguna se borraba. El botón
+  // decía "te dejo limpio" y dejaba los cortes de prueba dentro.
+  //
+  // Si esto revienta, no la arregles borrando el assert: ve a
+  // `limpieza.js` y di si la tabla nueva guarda algo que PASÓ (se borra) o
+  // algo que ES (se queda).
+  const sueltas = limpieza.sinClasificar(bd);
+  assert.deepEqual(sueltas, [],
+    `Sin clasificar en limpieza.js: ${sueltas.join(', ')}. ` +
+    '¿Lo que guardan es historia del negocio o es cómo está armada la fábrica?');
+});
+
+test('los cortes de hielo también se borran: eran los que se quedaban', async () => {
+  await entrarAdmin();
+  await llamar('/api/existencia/cortes', {
+    method: 'POST', cuerpo: { dieciseisavos: 32, bolsas: 40 } });
+  assert.ok(bd.prepare('SELECT COUNT(*) n FROM cortes_hielo').get().n >= 1);
+
+  const admin = (await llamar('/api/arranque/cerrar-pruebas',
+    { method: 'POST', cuerpo: {} })).json.administradores[0];
+  await llamar('/api/arranque/cerrar-pruebas', {
+    method: 'POST',
+    cuerpo: { autorizacion: { usuarioId: admin.id, contrasena: 'clavelarga1' } } });
+
+  assert.equal(bd.prepare('SELECT COUNT(*) n FROM cortes_hielo').get().n, 0);
+});
+
+test('el estado dice qué se va a borrar, contado, antes de apretar', async () => {
+  await entrarAdmin();
+  await llamar('/api/ventas', {
+    method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 16 }], pago: 500 } });
+
+  const d = (await llamar('/api/arranque/estado')).json.datos;
+  const ventas = d.porBorrar.find((g) => g.grupo === 'Las ventas');
+  assert.ok(ventas && ventas.cuantos >= 1, 'las ventas tienen que salir contadas');
+  // Y lo que se queda también se enseña: la decisión se toma comparando.
+  assert.ok(d.seQueda.length > 5);
+});
+
+// ============================================================
+// EL HIELO DEL CUARTO FRÍO
+// ============================================================
+
+test('se puede contar el cuarto frío sin decir cuál, cuando solo hay uno', async () => {
+  // Esto contestaba "ese cuarto frío no existe" y era lo que impedía
+  // capturar el hielo desde la puesta en marcha. El cuarto frío SÍ existía.
+  await entrarAdmin();
+  const r = await llamar('/api/existencia/conteos', {
+    method: 'POST', cuerpo: { dieciseisavos: 1832, notas: 'PUESTA EN MARCHA' } });
+  assert.equal(r.estado, 201, r.json?.error);
+
+  const c = bd.prepare('SELECT * FROM conteos ORDER BY fecha DESC LIMIT 1').get();
+  assert.equal(c.contado, 1832, '114 marquetas y media, con su fracción');
+  assert.ok(c.almacen_id, 'se le puso el único almacén activo');
+});
+
+test('un almacén que de verdad no existe sigue fallando', async () => {
+  // La red de seguridad es para cuando NO se manda almacén, no para
+  // tragarse uno inventado: eso escondería un error de la pantalla.
+  await entrarAdmin();
+  const r = await llamar('/api/existencia/conteos', {
+    method: 'POST', cuerpo: { almacenId: 'no-existe', dieciseisavos: 16 } });
+  assert.equal(r.estado, 404);
+});
+
+test('el estado trae el último conteo, para poder corregirlo', async () => {
+  await entrarAdmin();
+  await llamar('/api/existencia/conteos', {
+    method: 'POST', cuerpo: { dieciseisavos: 640 } });
+
+  const d = (await llamar('/api/arranque/estado')).json.datos;
+  assert.equal(d.hieloContado, true);
+  assert.equal(d.ultimoConteo.contado, 640);
+  assert.ok(d.almacenes.length >= 1, 'y los almacenes, para poder elegir');
 });
 
 test('tras dar por hecha la puesta en marcha, cerrar-pruebas muere para siempre', async () => {
