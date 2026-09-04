@@ -198,6 +198,11 @@ export async function vistaVenta(pantalla, estadoApp) {
   let ultimoCambio = null;       // el resultado del último cambio de ticket
   let fiadoCobrado = null;       // a quién se le acaba de fiar, para decírselo
 
+  // EL PRECIO ESPECIAL DEL HIELO SUELTO  (v6.2): total del renglón, con su
+  // porqué. Los artículos lo llevan cada uno en `a.precioEspecial`.
+  let hieloEspecial = null;        // { centavos, motivo } o null
+  const puedePrecioEspecial = tiene('venta.precio_especial');
+
   // LA VENTA QUE FALTÓ EN UN CORTE CERRADO  (v6.1). Caja deja aquí a qué
   // corte va; se cobra igual que siempre, pero amarrada a ese turno.
   let corteObjetivo = null;
@@ -621,16 +626,32 @@ export async function vistaVenta(pantalla, estadoApp) {
   }
 
   /** Lo que cuesta un renglón de artículos, sea de mayoreo o no. */
-  function precioArticulo(a) {
+  /** Lo que diría la lista por ese renglón, sin precio especial. */
+  function precioDeLista(a) {
     return a.producto.mayoreo
       ? precioMayoreo(a.producto.dieciseisavos * a.cantidad)
       : a.producto.precio_centavos * a.cantidad;
   }
 
+  function precioArticulo(a) {
+    // Precio especial de una vez (v6.2): por pieza, salvo en el hielo de
+    // mayoreo, donde es el total del renglón —como en el servidor—.
+    if (a.precioEspecial) {
+      return a.producto.tipo === 'hielo'
+        ? a.precioEspecial.centavos
+        : a.precioEspecial.centavos * a.cantidad;
+    }
+    return precioDeLista(a);
+  }
+
+  function precioHieloEnTicket() {
+    return hieloEspecial ? hieloEspecial.centavos : precioHielo(hielo);
+  }
+
   function total() {
     // Un pedido cargado se cobra a lo que dice su papel, no a lo de hoy.
     if (cobrandoPedido) return cobrandoPedido.total;
-    return precioHielo(hielo) + articulos.reduce((t, a) => t + precioArticulo(a), 0);
+    return precioHieloEnTicket() + articulos.reduce((t, a) => t + precioArticulo(a), 0);
   }
 
   function hayAlgo() { return Boolean(cobrandoPedido) || hielo > 0 || articulos.length > 0; }
@@ -657,7 +678,7 @@ export async function vistaVenta(pantalla, estadoApp) {
     // marquetas" pide una cosa, no cinco. El de MAYOREO no, porque se cobra
     // con otra lista: mezclarlo con el de público sería cobrar mal.
     if (p.tipo === 'hielo' && !p.mayoreo) {
-      hielo += p.dieciseisavos * cuantos;
+      hielo += p.dieciseisavos * cuantos; hieloEspecial = null;
       ultimoAgregado = p;
       pintarTodo();
       tono('bien');
@@ -739,7 +760,7 @@ export async function vistaVenta(pantalla, estadoApp) {
       valor: hielo, ok: 'Poner esta cantidad'
     });
     if (n === null || n === undefined) { enfocar(); return; }
-    hielo = n;
+    hielo = n; hieloEspecial = null;
     pintarTodo();
     enfocar();
   }
@@ -1491,7 +1512,10 @@ export async function vistaVenta(pantalla, estadoApp) {
             ${desglose(hielo) !== aTexto(hielo)
               ? `<small>${esc(desglose(hielo))}</small>` : ''}
           </div>
-          <div class="pos-importe">${pesos(precioHielo(hielo))}</div>
+          <button class="pos-importe pos-importe-tocable ${hieloEspecial ? 'especial' : ''}"
+                  data-precio-hielo title="Tocar para poner un precio especial">
+            ${hieloEspecial ? `<s>${pesos(precioHielo(hielo))}</s> ` : ''}${pesos(precioHieloEnTicket())}
+          </button>
           <button class="tachita" data-quita-hielo aria-label="Quitar el hielo">×</button>
         </div>`);
     }
@@ -1505,8 +1529,12 @@ export async function vistaVenta(pantalla, estadoApp) {
             ${esc(a.producto.nombre)}
             ${a.producto.mayoreo
               ? `<small>${esc(listaMayoreo()?.nombre || 'sin lista de mayoreo')}</small>` : ''}
+            ${a.precioEspecial ? `<small class="especial">precio especial · ${esc(a.precioEspecial.motivo)}</small>` : ''}
           </div>
-          <div class="pos-importe">${pesos(precioArticulo(a))}</div>
+          <button class="pos-importe pos-importe-tocable ${a.precioEspecial ? 'especial' : ''}"
+                  data-precio="${i}" title="Tocar para poner un precio especial">
+            ${a.precioEspecial ? `<s>${pesos(precioDeLista(a))}</s> ` : ''}${pesos(precioArticulo(a))}
+          </button>
           <button class="tachita" data-quita="${i}" aria-label="Quitar">×</button>
         </div>`);
     }
@@ -1560,7 +1588,7 @@ export async function vistaVenta(pantalla, estadoApp) {
     if (quitarCambio) quitarCambio.onclick = () => { cambiando = null; pintarTodo(); enfocar(); };
 
     const quitaHielo = refs.lineas.querySelector('[data-quita-hielo]');
-    if (quitaHielo) quitaHielo.onclick = () => { hielo = 0; pintarTodo(); enfocar(); };
+    if (quitaHielo) quitaHielo.onclick = () => { hielo = 0; hieloEspecial = null; pintarTodo(); enfocar(); };
 
     // Quitar al cliente devuelve los precios de público en el acto: se
     // confundió de persona, y el ticket no se puede quedar con su precio.
@@ -1588,6 +1616,74 @@ export async function vistaVenta(pantalla, estadoApp) {
     });
     const otroHielo = refs.lineas.querySelector('[data-cambia-hielo]');
     if (otroHielo) otroHielo.onclick = () => ponerOtroHielo();
+
+    // TOCAR EL IMPORTE PONE UN PRECIO ESPECIAL  (v6.2).
+    refs.lineas.querySelectorAll('[data-precio]').forEach((b) => {
+      b.onclick = () => precioEspecialDe(Number(b.dataset.precio));
+    });
+    const precioHieloBtn = refs.lineas.querySelector('[data-precio-hielo]');
+    if (precioHieloBtn) precioHieloBtn.onclick = () => precioEspecialHielo();
+  }
+
+  /**
+   * EL PRECIO ESPECIAL DE UNA VEZ  (v6.2)
+   *
+   * "Vendí 20 bolsas a $12 en vez de $20. ¿Cómo doy un descuento de una
+   *  sola vez?"
+   *
+   * Se toca el importe del renglón, se teclea el precio por pieza y se dice
+   * por qué. No es una lista ni un descuento en porcentaje: es ESTE ticket.
+   * Quien tiene el permiso lo pone y ya; quien no, al cobrar se le pide el
+   * PIN de un responsable, igual que el crédito por encima del límite.
+   */
+  async function precioEspecialDe(indice) {
+    if (fase !== 'venta' || cobrandoPedido || cambiando) return;
+    const a = articulos[indice];
+    if (!a) return;
+    const esHielo = a.producto.tipo === 'hielo';
+    const deLista = esHielo ? precioDeLista(a) : precioDeLista(a) / Math.max(a.cantidad, 1);
+
+    const importe = await pedirImporte({
+      titulo: esHielo ? `Precio especial por ${a.producto.nombre}` : `Precio especial por pieza · ${a.producto.nombre}`,
+      texto: `De lista ${pesos(deLista)}${esHielo ? ' el renglón' : ' cada una'}. `
+           + 'Déjalo en blanco para volver al precio de lista.',
+      valor: a.precioEspecial ? (a.precioEspecial.centavos / 100).toFixed(2) : '',
+      ok: 'Poner este precio', opcional: true
+    });
+    if (importe === null) { enfocar(); return; }
+    if (importe === '' || importe === undefined) { a.precioEspecial = null; pintarTodo(); enfocar(); return; }
+
+    const motivo = await pedirTexto({
+      titulo: '¿Por qué se cobra distinto?',
+      texto: 'Queda en el ticket y en el historial, con quién lo autorizó.',
+      valor: a.precioEspecial?.motivo || '',
+      marcador: 'Se llevó veinte, cliente de siempre…', ok: 'Listo', largo: 200, unaLinea: true
+    });
+    if (!motivo) { enfocar(); return; }
+
+    a.precioEspecial = { centavos: Math.round(Number(importe) * 100), motivo };
+    pintarTodo(); enfocar();
+  }
+
+  async function precioEspecialHielo() {
+    if (fase !== 'venta' || cobrandoPedido || cambiando || hielo <= 0) return;
+    const importe = await pedirImporte({
+      titulo: `Precio especial por ${aTexto(hielo)}`,
+      texto: `De lista ${pesos(precioHielo(hielo))} todo el hielo. Déjalo en blanco para volver a la lista.`,
+      valor: hieloEspecial ? (hieloEspecial.centavos / 100).toFixed(2) : '',
+      ok: 'Poner este precio', opcional: true
+    });
+    if (importe === null) { enfocar(); return; }
+    if (importe === '' || importe === undefined) { hieloEspecial = null; pintarTodo(); enfocar(); return; }
+    const motivo = await pedirTexto({
+      titulo: '¿Por qué se cobra distinto?',
+      texto: 'Queda en el ticket y en el historial, con quién lo autorizó.',
+      valor: hieloEspecial?.motivo || '',
+      marcador: 'Estaba un poco hueca…', ok: 'Listo', largo: 200, unaLinea: true
+    });
+    if (!motivo) { enfocar(); return; }
+    hieloEspecial = { centavos: Math.round(Number(importe) * 100), motivo };
+    pintarTodo(); enfocar();
   }
 
   function pintarRejilla() {
@@ -1945,7 +2041,7 @@ export async function vistaVenta(pantalla, estadoApp) {
     // propio renglón y su propia lista, y echarlo al montón le cambiaba el
     // precio al de público sin avisar. Repetir "1m" tiene que repetir 1m.
     if (ultimoAgregado.tipo === 'hielo' && !ultimoAgregado.mayoreo) {
-      hielo += ultimoAgregado.dieciseisavos;
+      hielo += ultimoAgregado.dieciseisavos; hieloEspecial = null;
       pintarTodo();
       tono('bien');
       return;
@@ -2965,14 +3061,22 @@ export async function vistaVenta(pantalla, estadoApp) {
     enfocar();
   }
 
-  async function registrar(autorizacion = null) {
+  async function registrar(autorizacion = null, autorizacionPrecio = null) {
     if (fase !== 'cambio' && fase !== 'guardando') return;
     fase = 'guardando';
     pintarPista();
 
     const lineas = [];
-    if (hielo > 0) lineas.push({ dieciseisavos: hielo });
-    for (const a of articulos) lineas.push({ productoId: a.producto.id, cantidad: a.cantidad });
+    if (hielo > 0) {
+      lineas.push({ dieciseisavos: hielo,
+        ...(hieloEspecial ? { precioEspecial: (hieloEspecial.centavos / 100).toFixed(2),
+                              motivoPrecio: hieloEspecial.motivo } : {}) });
+    }
+    for (const a of articulos) {
+      lineas.push({ productoId: a.producto.id, cantidad: a.cantidad,
+        ...(a.precioEspecial ? { precioEspecial: (a.precioEspecial.centavos / 100).toFixed(2),
+                                 motivoPrecio: a.precioEspecial.motivo } : {}) });
+    }
 
     try {
       const respuesta = cobrandoPedido
@@ -3022,7 +3126,8 @@ export async function vistaVenta(pantalla, estadoApp) {
             ...(corteObjetivo
               ? { cajaId: corteObjetivo.id, motivoCorreccion: motivoCorte,
                   ...(corteObjetivo.cajeroId ? { cajeroId: corteObjetivo.cajeroId } : {}) }
-              : {})
+              : {}),
+            ...(autorizacionPrecio ? { autorizacionPrecio } : {})
           });
 
       const venta = respuesta.venta;
@@ -3078,7 +3183,19 @@ export async function vistaVenta(pantalla, estadoApp) {
           responsables: e.responsables || [],
           motivoSugerido: 'Cliente de siempre, siempre paga'
         });
-        if (auth) return registrar(auth);
+        if (auth) return registrar(auth, autorizacionPrecio);
+      }
+      // El precio especial lo autoriza un responsable con su PIN (v6.2).
+      if (e.requierePrecio && !autorizacionPrecio) {
+        const motivos = [hieloEspecial?.motivo, ...articulos.map((a) => a.precioEspecial?.motivo)]
+          .filter(Boolean);
+        const auth = await pedirAutorizacion({
+          titulo: 'El precio especial lo autoriza un responsable',
+          texto: e.message,
+          responsables: e.responsables || [],
+          motivoSugerido: motivos[0] || ''
+        });
+        if (auth) return registrar(autorizacion, auth);
       }
       fase = 'cambio';
       pintarCobro();
@@ -3167,7 +3284,7 @@ export async function vistaVenta(pantalla, estadoApp) {
     if (corteObjetivo && ventaCobrada) { location.hash = '#/caja'; return; }
     hielo = 0; articulos = []; pago = 0; ventaCobrada = null; cobrandoPedido = null;
     ultimoCambio = null; cambiando = null; cliente = null; fiar = false;
-    mayoreoCobrado = null;
+    mayoreoCobrado = null; hieloEspecial = null;
     fase = 'venta';
     refs.cobro.hidden = true;
     limpiarImpresion();
@@ -3520,7 +3637,7 @@ export async function vistaVenta(pantalla, estadoApp) {
       texto: 'Para las cantidades que no tienen botón. Se suma a lo que ya lleva el ticket.',
       valor: 0, ok: 'Agregar al ticket'
     });
-    if (n) { hielo += n; pintarTodo(); tono('bien'); }
+    if (n) { hielo += n; hieloEspecial = null; pintarTodo(); tono('bien'); }
     enfocar();
   };
 

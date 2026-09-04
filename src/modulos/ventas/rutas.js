@@ -208,6 +208,28 @@ router.post('/', vender, (req, res) => {
   const preparadas = prepararLineas(lineas, lista, listaMayoreo);
   if (preparadas.error) return error(res, preparadas.error, preparadas.codigo || 400);
 
+  // ---- EL PRECIO ESPECIAL LO PONE UN RESPONSABLE  (v6.2) ----
+  //
+  // Quien tiene el permiso lo pone y ya. Quien no, lo pide con el PIN de
+  // uno que sí, igual que el crédito por encima del límite. Queda escrito
+  // en cada renglón quién dijo que sí.
+  let precioAutorizadoPor = null;
+  if (preparadas.lineas.some((l) => l.precioLista !== null)) {
+    if (puede(req.usuario.rol, 'venta.precio_especial')) {
+      precioAutorizadoPor = req.usuario.id;
+    } else {
+      const auth = req.body?.autorizacionPrecio;
+      if (!auth) {
+        return error(res, 'Un precio especial lo tiene que autorizar un responsable.', 403,
+                     { requierePrecio: true, permiso: 'venta.precio_especial',
+                       responsables: responsables() });
+      }
+      const comprobado = comprobarAutorizacion(auth, 'venta.precio_especial');
+      if (comprobado.error) return error(res, comprobado.error, 403, { requierePrecio: true });
+      precioAutorizadoPor = comprobado.usuario.id;
+    }
+  }
+
   // --- Forma de pago ---
   // Se valida contra una lista cerrada: el arqueo del cajón solo cuenta lo
   // que dice 'efectivo', así que una forma de pago inventada sacaría dinero
@@ -341,7 +363,9 @@ router.post('/', vender, (req, res) => {
     clienteId: clienteDelTicket?.id || null,
     autorizadoPor: credito.autorizadoPor || null,
     // Al corte cerrado, con su fecha (v6.1).
-    cajaForzada: corteCerrado, fechaForzada, motivoCorreccion
+    cajaForzada: corteCerrado, fechaForzada, motivoCorreccion,
+    // Quién dijo que sí al precio especial (v6.2).
+    precioAutorizadoPor
   });
 
   // EL CORTE SE VUELVE A SACAR SOLO, y el cuadre de hielo de ese turno
@@ -380,7 +404,11 @@ router.post('/', vender, (req, res) => {
                mayoreo: listaMayoreo?.nombre || null,
                ...(abono ? { abono, quedaADeber: aCredito } : {}),
                autorizo: credito.autorizadoPorNombre,
-               ...(corteCerrado ? { trasCorte: corteCerrado.folio, motivoCorreccion } : {}) }
+               ...(corteCerrado ? { trasCorte: corteCerrado.folio, motivoCorreccion } : {}),
+               ...(precioAutorizadoPor ? {
+                 precioEspecial: preparadas.lineas.filter((l) => l.precioLista !== null)
+                   .map((l) => `${l.concepto}: ${formato(l.centavos)} (lista ${formato(l.precioLista)}) — ${l.motivoPrecio}`)
+               } : {}) }
   });
 
   return ok(res, {
@@ -510,6 +538,26 @@ function prepararLineas(lineas, lista, listaMayoreo = null) {
       };
     }
 
+    // EL PRECIO ESPECIAL DE UNA VEZ  (v6.2). Viene por pieza en los
+    // productos y como total del renglón en el hielo suelto. Lo de lista
+    // se guarda al lado: es lo que permite decir mañana que fue un
+    // descuento y no el precio de entonces.
+    let centavos = c.centavos;
+    let precioLista = null;
+    let motivoPrecio = null;
+    if (l.precioEspecial !== undefined && l.precioEspecial !== null && l.precioEspecial !== '') {
+      let especial;
+      try { especial = aCentavos(l.precioEspecial); }
+      catch { return { error: 'El precio especial no es un importe válido.' }; }
+      if (especial < 0) return { error: 'El precio especial no puede ser negativo.' };
+      motivoPrecio = String(l.motivoPrecio || '').trim().slice(0, 200);
+      if (!motivoPrecio) {
+        return { error: 'Un precio especial lleva su porqué: escribe por qué se cobra distinto.' };
+      }
+      precioLista = c.centavos;
+      centavos = producto && producto.tipo !== 'hielo' ? especial * cantidad : especial;
+    }
+
     preparadas.push({
       productoId: producto?.id || null,
       esMayoreo: Boolean(producto?.mayoreo),
@@ -517,10 +565,11 @@ function prepararLineas(lineas, lista, listaMayoreo = null) {
       dieciseisavos: c.dieciseisavos,
       // Cuántas piezas: el inventario descuenta por esto, no por renglones.
       cantidad,
-      centavos: c.centavos,
-      desglose: c.desglose
+      centavos,
+      desglose: c.desglose,
+      precioLista, motivoPrecio
     });
-    total += c.centavos;
+    total += centavos;
   }
 
   return { lineas: preparadas, total };
@@ -534,7 +583,8 @@ function crearVenta({ lineas, total, pago, lista, almacenId, cajeroId, capturist
                       formaPago = 'efectivo', notas = null, cambioDe = null,
                       clienteId = null, autorizadoPor = null,
                       abono = null, abonoFormaPago = 'efectivo', cliente = null,
-                      cajaForzada = null, fechaForzada = null, motivoCorreccion = null }) {
+                      cajaForzada = null, fechaForzada = null, motivoCorreccion = null,
+                      precioAutorizadoPor = null }) {
   const id = nuevoId();
   const fecha = fechaForzada || ahora();
   const cambio = pago === null || pago === undefined ? null : pago - total;
@@ -573,12 +623,16 @@ function crearVenta({ lineas, total, pago, lista, almacenId, cajeroId, capturist
     const insertar = bd.prepare(`
       INSERT INTO venta_lineas
         (id, venta_id, concepto, dieciseisavos, precio_centavos, desglose,
-         producto_id, cantidad)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         producto_id, cantidad, precio_lista_centavos, motivo_precio, precio_autorizado_por)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     for (const l of lineas) {
+      const especial = l.precioLista !== null && l.precioLista !== undefined;
       insertar.run(nuevoId(), id, l.concepto, l.dieciseisavos, l.centavos,
-                   l.desglose, l.productoId, l.cantidad ?? 1);
+                   l.desglose, l.productoId, l.cantidad ?? 1,
+                   especial ? l.precioLista : null,
+                   especial ? (l.motivoPrecio || null) : null,
+                   especial ? precioAutorizadoPor : null);
     }
 
     // LO QUE DEJÓ EN EL MOSTRADOR, aquí dentro (v5.3). Si el abono se
@@ -631,8 +685,12 @@ function detalleVenta(id) {
   `).get(id);
   if (!venta) return null;
 
-  venta.lineas = bd.prepare('SELECT * FROM venta_lineas WHERE venta_id = ?').all(id)
-    .map((l) => ({ ...l, texto: aTexto(l.dieciseisavos) }));
+  venta.lineas = bd.prepare(`
+    SELECT vl.*, pa.nombre AS precio_autorizado_nombre
+      FROM venta_lineas vl
+      LEFT JOIN usuarios pa ON pa.id = vl.precio_autorizado_por
+     WHERE vl.venta_id = ?
+  `).all(id).map((l) => ({ ...l, texto: aTexto(l.dieciseisavos) }));
 
   // LO QUE DEJÓ EN EL MOSTRADOR  (v5.3). Se saca de los abonos amarrados a
   // este ticket, no de una columna guardada: si mañana se anula ese abono

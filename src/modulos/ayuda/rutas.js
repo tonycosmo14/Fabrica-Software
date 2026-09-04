@@ -36,6 +36,7 @@ const ACCIONES = [
   { grupo: 'Venta',      permiso: 'venta.registrar',      texto: 'Cobrar' },
   { grupo: 'Venta',      permiso: 'venta.ver',            texto: 'Buscar y ver tickets' },
   { grupo: 'Venta',      permiso: 'venta.cancelar',       texto: 'Cancelar una venta' },
+  { grupo: 'Venta',      permiso: 'venta.precio_especial', texto: 'Poner un precio especial de una vez (o autorizarlo con su PIN)' },
 
   { grupo: 'Caja',       permiso: 'caja.ver',             texto: 'Ver la caja y los cortes' },
   { grupo: 'Caja',       permiso: 'caja.operar',          texto: 'Abrir el turno, anotar gastos y cerrar' },

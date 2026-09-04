@@ -403,7 +403,7 @@ debería quedar − contado = FALTA</pre>
   {
     id: 'venta',
     titulo: 'Punto de venta: cobrar',
-    busca: 'venta cobrar ticket precio fracción cambio devolución billete folio cancelar imprimir teclado enter f10 f2 f3 f4 código rápido categorías nueva venta espera pendiente aviso bolita se acabó agotado poco hielo inventario bajo atajos gastos historial reloj cotización cotizar precio papel sujetos a cambio temperatura clima grados afuera termómetro encomendado encomendar apartado guardado papelito guardar hielo cliente pasa por él vale',
+    busca: 'venta cobrar ticket precio fracción cambio devolución billete folio cancelar imprimir teclado enter f10 f2 f3 f4 código rápido categorías nueva venta espera pendiente aviso bolita se acabó agotado poco hielo inventario bajo atajos gastos historial reloj cotización cotizar precio papel sujetos a cambio temperatura clima grados afuera termómetro encomendado encomendar apartado guardado papelito guardar hielo cliente pasa por él vale precio especial descuento una vez de lista tachado autoriza PIN',
     cuerpo: `
       <p>Es la pantalla que se abre al entrar, porque es la que se usa casi
       todo el día. A la izquierda lo que lleva el cliente, a la derecha los
@@ -538,6 +538,21 @@ debería quedar − contado = FALTA</pre>
       <p class="ayuda-tip">Refrescar la pantalla <b>ya no</b> se queda el
       turno. Antes sí pasaba, y el que acababa de entregar se lo volvía a
       quedar sin darse cuenta.</p>
+
+      <h4>Un precio especial, de una sola vez</h4>
+      <p>"Vendí 20 bolsas a $12 en vez de $20." No es una lista ni un
+      descuento en porcentaje: es <b>este ticket</b>. Se <b>toca el
+      importe</b> del renglón, se teclea el precio <b>por pieza</b> (en el
+      hielo suelto, el total del renglón) y se dice <b>por qué</b>. El
+      renglón queda con lo de lista tachado al lado, y el ticket lo dice:
+      «precio especial, de lista $400».</p>
+      <p>Quien tiene el permiso —gerente y administrador— lo pone y ya. El
+      cajero también lo puede poner, pero al cobrar se le pide el <b>PIN de
+      un responsable</b>, igual que el crédito por encima del límite. En
+      cada renglón queda escrito quién dijo que sí.</p>
+      <p class="ayuda-tip">Para volver al precio de lista se toca el importe
+      otra vez y se deja en blanco. Y si cambia la cantidad de hielo, su
+      precio especial se quita solo: era por ESA cantidad.</p>
 
       <h4>Dejarlo a crédito</h4>
       <p>En la pantalla de cobro, <b>🧾 Dejarlo a crédito</b>. Solo a los que

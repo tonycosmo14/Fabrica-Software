@@ -891,6 +891,7 @@ verdad de qué hay en cada versión. Escrita a mano se quedaba atrás.
 | **v5.9** | Las neveras en el mapa | ✅ listo |
 | **v6.0** | La hueca es merma | ✅ listo |
 | **v6.1** | El administrador corrige lo que sea | ✅ listo |
+| **v6.2** | El precio especial de una vez | ✅ listo |
 
 **Lo que falta:** el instalador para Windows, y la
 importación de lo que hay en Aronium la noche antes de arrancar.

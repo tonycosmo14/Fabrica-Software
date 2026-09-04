@@ -17,9 +17,24 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '6.1';
+const VERSION_ACTUAL = '6.2';
 
 const VERSIONES = [
+  {
+    numero: '6.2',
+    nombre: 'El precio especial de una vez',
+    fecha: '2026-09-05',
+    resumen:
+      '"Vendí 20 bolsas a $12 en vez de $20": se toca el importe del renglón, '
+      + 'se pone el precio y se dice por qué. Queda en el ticket con lo de '
+      + 'lista y quién lo autorizó.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'EL PRECIO ESPECIAL EN EL RENGLÓN. En Vender se toca el importe de cualquier renglón y se teclea el precio por pieza (en el hielo suelto, el total). Pide el porqué. El renglón queda con lo de lista tachado al lado.' },
+      { tipo: 'nuevo', texto: 'EL TICKET LO DICE: «precio especial ($12 c/u), de lista $400». Y en el historial cada renglón guarda lo que decía la lista ese día, el motivo y quién lo autorizó. Sin eso, al mes nadie sabe si $12 era un descuento o el precio de entonces.' },
+      { tipo: 'importante', texto: 'QUIÉN PUEDE: el gerente y el administrador lo ponen y ya. El cajero también lo puede poner, pero al cobrar se le pide el PIN de un responsable, igual que el crédito por encima del límite. Permiso nuevo: «Poner un precio especial de una vez».' },
+      { tipo: 'mejora', texto: 'Para volver al precio de lista se toca el importe y se deja en blanco. Si cambia la cantidad de hielo, su precio especial se quita solo: era por esa cantidad.' }
+    ]
+  },
   {
     numero: '6.1',
     nombre: 'El administrador corrige lo que sea',

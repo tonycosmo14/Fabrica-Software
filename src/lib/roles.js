@@ -106,6 +106,9 @@ const PERMISOS_POR_ROL = {
     'venta.credito',
     'credito.cobrar',
     'credito.autorizar',
+    // EL PRECIO ESPECIAL DE UNA VEZ  (v6.2): "20 bolsas a $12 en vez de
+    // $20". El gerente lo pone; el cajero lo pide con el PIN de uno.
+    'venta.precio_especial',
     'reparto.ver',
     'reparto.operar',
     // CERRAR UNA SALIDA QUE NO CUADRÓ  (v5.7). No es contar billetes: es

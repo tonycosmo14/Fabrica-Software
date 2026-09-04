@@ -301,7 +301,19 @@ function ticketVenta(venta, { copia = false, negocio = '' } = {}) {
     for (const l of otras) {
       const cuantas = Number(l.cantidad) > 1 ? `${l.cantidad}   ` : '';
       t.punteado(`${cuantas}${l.concepto}`, formato(l.precio_centavos));
+      // PRECIO ESPECIAL (v6.2): se dice a cuánto era de lista. Sin eso el
+      // papel de $12 parece el precio del día, y al mes nadie se explica.
+      if (l.precio_lista_centavos != null) {
+        const n = Math.max(Number(l.cantidad) || 1, 1);
+        const cadaUno = n > 1 ? ` (${formato(Math.round(l.precio_centavos / n))} c/u)` : '';
+        t.linea(`  precio especial${cadaUno}, de lista ${formato(l.precio_lista_centavos)}`);
+      }
     }
+  }
+  const hieloEspecial = lineasHielo.find((l) => l.precio_lista_centavos != null);
+  if (hieloEspecial) {
+    t.linea(`  hielo a precio especial, de lista ${formato(
+      lineasHielo.reduce((n, l) => n + (l.precio_lista_centavos ?? l.precio_centavos), 0))}`);
   }
 
   t.separador();

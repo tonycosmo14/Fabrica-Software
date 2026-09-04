@@ -15,6 +15,7 @@ const assert = require('node:assert');
 const { fabricaDePrueba } = require('./ayudante');
 
 const { llamar, entrarAdmin, entrarPorNombre, bd, preparar } = fabricaDePrueba('venta');
+const ADMIN_PIN = require('./ayudante').ADMIN.pin;
 
 let tanqueId, almacenId;
 
@@ -355,4 +356,94 @@ test('la bitácora deja constancia de cada venta', () => {
   const n = bd.prepare("SELECT COUNT(*) n FROM bitacora WHERE accion = 'venta.registrada'").get().n;
   const ventas = bd.prepare('SELECT COUNT(*) n FROM ventas').get().n;
   assert.equal(n, ventas);
+});
+
+// ============================================================
+// EL PRECIO ESPECIAL DE UNA VEZ  (v6.2)
+// "Vendí 20 bolsas a $12 en vez de $20."
+// ============================================================
+
+let bolsaEspecial;
+test('se da de alta una bolsa de $20 para probar el precio especial', async () => {
+  await entrarAdmin();
+  const cat = (await llamar('/api/catalogo/categorias', {
+    method: 'POST', cuerpo: { nombre: 'Bolsas especiales' }
+  })).json.datos.categoria;
+  bolsaEspecial = (await llamar('/api/catalogo/productos', {
+    method: 'POST',
+    cuerpo: { nombre: 'Bolsa de 3 kg', categoriaId: cat.id, precio: '20', codigo: 'B3E' }
+  })).json.datos.producto;
+  assert.ok(bolsaEspecial?.id);
+});
+
+test('el gerente pone el precio especial y queda escrito lo de lista y el porqué', async () => {
+  await entrarAdmin();
+  const r = await llamar('/api/ventas', {
+    method: 'POST',
+    cuerpo: {
+      lineas: [{ productoId: bolsaEspecial.id, cantidad: 20,
+                 precioEspecial: '12', motivoPrecio: 'Se llevó veinte, cliente de siempre' }],
+      pago: 240
+    }
+  });
+  assert.equal(r.estado, 201, JSON.stringify(r.json));
+  const v = r.json.datos.venta;
+  assert.equal(v.total_centavos, 24000, '20 × $12');
+  const l = v.lineas[0];
+  assert.equal(l.precio_centavos, 24000);
+  assert.equal(l.precio_lista_centavos, 40000, 'lo que decía la lista: 20 × $20');
+  assert.match(l.motivo_precio, /cliente de siempre/);
+  assert.ok(l.precio_autorizado_nombre, 'quién dijo que sí');
+
+  // Y el ticket lo dice: a cuánto salió y de lista cuánto era.
+  const papel = (await llamar(`/api/impresion/venta/${v.id}/previa`)).json.datos.renglones
+    .map((x) => x.t).join('\n');
+  assert.match(papel, /precio especial/);
+  assert.match(papel, /de lista \$400/);
+});
+
+test('sin porqué no hay precio especial', async () => {
+  const r = await llamar('/api/ventas', {
+    method: 'POST',
+    cuerpo: { lineas: [{ productoId: bolsaEspecial.id, cantidad: 2, precioEspecial: '12' }], pago: 100 }
+  });
+  assert.equal(r.estado, 400);
+  assert.match(r.json.error, /porqu/);
+});
+
+test('el cajero lo pide con el PIN de un responsable, igual que el crédito', async () => {
+  await entrarPorNombre('Rosa', '4444');
+  const cuerpo = {
+    lineas: [{ productoId: bolsaEspecial.id, cantidad: 2, precioEspecial: '12', motivoPrecio: 'Estaban chicas' }],
+    pago: 100
+  };
+  let r = await llamar('/api/ventas', { method: 'POST', cuerpo });
+  assert.equal(r.estado, 403);
+  assert.equal(r.json.requierePrecio, true);
+  assert.ok(Array.isArray(r.json.responsables) && r.json.responsables.length);
+
+  const admin = r.json.responsables.find((x) => x.rol === 'admin') || r.json.responsables[0];
+  r = await llamar('/api/ventas', { method: 'POST', cuerpo: {
+    ...cuerpo, autorizacionPrecio: { usuarioId: admin.id, pin: '0000', motivo: 'no' }
+  } });
+  assert.equal(r.estado, 403, 'con el PIN equivocado no pasa');
+
+  r = await llamar('/api/ventas', { method: 'POST', cuerpo: {
+    ...cuerpo, autorizacionPrecio: { usuarioId: admin.id, pin: ADMIN_PIN, motivo: 'Estaban chicas' }
+  } });
+  assert.equal(r.estado, 201, JSON.stringify(r.json));
+  assert.equal(r.json.datos.venta.total_centavos, 2400);
+  assert.equal(r.json.datos.venta.lineas[0].precio_autorizado_nombre, admin.nombre);
+  await entrarAdmin();
+});
+
+test('el hielo suelto también: el precio especial es el total del renglón', async () => {
+  await entrarAdmin();
+  const r = await llamar('/api/ventas', {
+    method: 'POST',
+    cuerpo: { lineas: [{ dieciseisavos: 16, precioEspecial: '200', motivoPrecio: 'Estaba hueca' }], pago: 200 }
+  });
+  assert.equal(r.estado, 201, JSON.stringify(r.json));
+  assert.equal(r.json.datos.venta.total_centavos, 20000);
+  assert.ok(r.json.datos.venta.lineas[0].precio_lista_centavos > 20000, 'de lista era más');
 });

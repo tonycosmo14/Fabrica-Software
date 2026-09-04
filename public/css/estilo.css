@@ -5031,3 +5031,13 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
    normal porque no es algo que se agregó, es algo que ya estaba pedido. */
 .pos-linea-pedido-cabeza { background: var(--superficie-alt); border-radius: 10px; }
 .pos-linea-pedido-cabeza .pos-desc small { display: block; color: var(--suave); }
+
+/* EL PRECIO ESPECIAL  (v6.2): el importe del renglón se toca, y cuando es
+   especial sale con lo de lista tachado al lado. */
+.pos-importe-tocable { background: none; border: 0; padding: 0; font: inherit; color: inherit;
+  text-align: right; min-width: 0; min-height: 0; width: auto; cursor: pointer;
+  border-radius: 6px; }
+.pos-importe-tocable:hover { background: var(--superficie-alt); }
+.pos-importe-tocable s { color: var(--suave); font-weight: 400; font-size: .85em; margin-right: 4px; }
+.pos-importe-tocable.especial { color: var(--ambar); font-weight: 800; }
+.pos-desc small.especial { color: var(--ambar); }
