@@ -17,9 +17,22 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '6.3';
+const VERSION_ACTUAL = '6.4';
 
 const VERSIONES = [
+  {
+    numero: '6.4',
+    nombre: 'Los de siempre y los de una vez',
+    fecha: '2026-09-05',
+    resumen:
+      'Dos pestañas nuevas en Clientes: ⭐ De siempre y 🕓 De una vez. '
+      + 'Sale solo de los tickets, sin marcar nada a mano.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'LOS DE SIEMPRE Y LOS DE UNA VEZ. Como pediste: los clientes de verdad frecuentes separados de los de una entrega. Es «de siempre» quien lleva 4 tickets o más en los últimos 30 días (uno por semana); los demás son de una vez. El número se configura.' },
+      { tipo: 'mejora', texto: 'CADA RENGLÓN DICE SU RITMO: «3 tickets en 30 días · último hace 2 d», y el de siempre lleva su ⭐. En la ficha sale igual. El que deja de comprar se mueve solo a «de una vez» con los días: es lo que avisa que algo pasó con él.' },
+      { tipo: 'mejora', texto: 'Al armar una salida, la lista de pedidos cabe con quién se la lleva y los botones a la vista, sin desplazar de más.' }
+    ]
+  },
   {
     numero: '6.3',
     nombre: 'Los pedidos, a su camioneta',

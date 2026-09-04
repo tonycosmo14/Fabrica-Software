@@ -96,6 +96,11 @@ router.get('/', verClientes, (req, res) => {
   const columna = COLUMNA_COMPRA[String(req.query.compra || '')];
   if (columna) clientes = clientes.filter((c) => c[columna] === 1);
 
+  // LOS DE SIEMPRE Y LOS DE UNA VEZ  (v6.4): sale de los tickets.
+  const ritmo = String(req.query.ritmo || '');
+  if (ritmo === 'frecuente') clientes = clientes.filter((c) => c.estado.ritmo.frecuente);
+  else if (ritmo === 'ocasional') clientes = clientes.filter((c) => !c.estado.ritmo.frecuente);
+
   const busca = String(req.query.busca || '').trim().toLowerCase();
   if (busca) {
     clientes = clientes.filter((c) =>
@@ -108,6 +113,8 @@ router.get('/', verClientes, (req, res) => {
   // poder decir "Agua (14)" aunque ahorita se esté mirando la de bolsas.
   const todos = clientesConEstado({ incluirBajas: req.query.incluirBajas === '1' });
   const porLinea = {
+    frecuentes: todos.filter((c) => c.estado.ritmo.frecuente).length,
+    ocasionales: todos.filter((c) => !c.estado.ritmo.frecuente).length,
     marqueta: todos.filter((c) => c.compra_marqueta === 1).length,
     bolsa: todos.filter((c) => c.compra_bolsa === 1).length,
     agua: todos.filter((c) => c.compra_agua === 1).length,

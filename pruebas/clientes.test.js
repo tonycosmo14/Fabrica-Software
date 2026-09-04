@@ -1012,3 +1012,43 @@ test('la pestaña de cada cliente se marca sola con lo que compra', async () => 
   assert.equal(d.compra_agua, 1);
   assert.equal(d.compra_marqueta, 1);
 });
+
+// ============================================================
+// LOS DE SIEMPRE Y LOS DE UNA VEZ  (v6.4)
+// ============================================================
+
+test('un cliente nuevo es de una vez; con cuatro tickets en 30 días es de siempre', async () => {
+  await entrarAdmin();
+  const chuy = (await llamar('/api/clientes', {
+    method: 'POST', cuerpo: { nombre: 'Don Chuy' }
+  })).json.datos.cliente;
+  assert.equal(chuy.estado.ritmo.frecuente, false);
+  assert.equal(chuy.estado.ritmo.tickets30, 0);
+  assert.equal(chuy.estado.ritmo.tope, 4, 'cuatro de fábrica: uno por semana');
+
+  for (let i = 0; i < 4; i++) {
+    const r = await llamar('/api/ventas', {
+      method: 'POST', cuerpo: { lineas: [{ dieciseisavos: 16 }], pago: 500, clienteId: chuy.id }
+    });
+    assert.equal(r.estado, 201);
+  }
+  const f = await ficha(chuy.id);
+  assert.equal(f.cliente.estado.ritmo.tickets30, 4);
+  assert.equal(f.cliente.estado.ritmo.frecuente, true);
+  assert.equal(f.cliente.estado.ritmo.diasSinComprar, 0, 'compró hoy');
+
+  // Las pestañas: sale en «de siempre» y no en «de una vez».
+  const siempre = (await llamar('/api/clientes?ritmo=frecuente')).json.datos;
+  assert.ok(siempre.clientes.some((c) => c.id === chuy.id));
+  const unaVez = (await llamar('/api/clientes?ritmo=ocasional')).json.datos;
+  assert.ok(!unaVez.clientes.some((c) => c.id === chuy.id));
+  assert.equal(siempre.porLinea.frecuentes + siempre.porLinea.ocasionales, siempre.porLinea.todos,
+    'todos están en una de las dos');
+});
+
+test('el número de tickets que hace a uno «de siempre» se configura', async () => {
+  bd.prepare("UPDATE configuracion SET valor = '20' WHERE clave = 'clientes_frecuente_tickets'").run();
+  const siempre = (await llamar('/api/clientes?ritmo=frecuente')).json.datos;
+  assert.equal(siempre.clientes.length, 0, 'con veinte, nadie llega');
+  bd.prepare("UPDATE configuracion SET valor = '4' WHERE clave = 'clientes_frecuente_tickets'").run();
+});

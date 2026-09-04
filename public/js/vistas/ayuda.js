@@ -1206,8 +1206,21 @@ debería haber − contado = FALTA</pre>
       negocio, teléfono, dirección) y <b>su crédito y su precio</b> (el
       límite, el plazo y qué lista de mayoreo se le cobra).</p>
 
+      <h4>Los de siempre y los de una vez</h4>
+      <p>"Separar los clientes de verdad frecuentes —los de todos los días—
+      de los de una entrega de una vez." Arriba de la lista, las dos
+      primeras pestañas: <b>⭐ De siempre</b> y <b>🕓 De una vez</b>. No se
+      marca a mano: <b>sale de los tickets</b>. Es «de siempre» quien lleva
+      <b>4 tickets o más en los últimos 30 días</b> (uno por semana); los
+      demás son de una vez. El número se cambia en la configuración
+      (<i>clientes_frecuente_tickets</i>).</p>
+      <p>Cada renglón dice su ritmo —«3 tickets en 30 días · último hace 2
+      d»— y el de siempre lleva su ⭐. En la ficha sale igual. Un cliente que
+      deja de comprar se mueve solo a «de una vez» conforme pasan los días,
+      que es justo lo que avisa que algo pasó con él.</p>
+
       <h4>Las tres pestañas: qué le compra cada quien</h4>
-      <p>Arriba de la lista hay cuatro pestañas: <b>Todos</b>,
+      <p>Después vienen las de <b>qué le compra</b>: <b>Todos</b>,
       <b>🧊 Marquetas</b>, <b>🧊 Bolsas</b> y <b>💧 Agua</b>. Cada una enseña
       solo los suyos, con su cuenta al lado.</p>
       <p>Lo que decide en qué pestaña sale es <b>lo que le has vendido</b>, y

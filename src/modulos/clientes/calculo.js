@@ -79,6 +79,43 @@ function diasDebiendo(clienteId) {
  * Cómo va un cliente. Es lo que la pantalla necesita para pintar su ficha
  * y lo que la caja necesita para decidir si le puede fiar.
  */
+/**
+ * EL RITMO: ¿ES DE SIEMPRE O DE UNA VEZ?  (v6.4)
+ *
+ * "Separar los clientes de verdad frecuentes —los de todos los días— de
+ *  los de una entrega de una vez."
+ *
+ * Sale de los tickets, no de una marca a mano: cuántas veces se le ha
+ * vendido en los últimos 30 días y cuándo fue la última. Es "de siempre"
+ * a partir de tantos tickets como diga `clientes_frecuente_tickets`
+ * (cuatro, de fábrica: uno por semana). El de una vez es el que no llega.
+ */
+function cuantosParaSerDeSiempre() {
+  const f = bd.prepare("SELECT valor FROM configuracion WHERE clave = 'clientes_frecuente_tickets'").get();
+  const n = Number(f?.valor);
+  return Number.isInteger(n) && n > 0 ? n : 4;
+}
+
+function ritmoDe(clienteId, tope = cuantosParaSerDeSiempre()) {
+  const fila = bd.prepare(`
+    SELECT COUNT(CASE WHEN fecha >= datetime('now', '-30 days') THEN 1 END) AS tickets30,
+           COUNT(*) AS tickets,
+           MAX(fecha) AS ultima
+      FROM ventas
+     WHERE cliente_id = ? AND cancelada_en IS NULL
+  `).get(clienteId);
+  const dias = fila.ultima
+    ? Math.floor((Date.now() - new Date(fila.ultima).getTime()) / 86400000) : null;
+  return {
+    tickets30: fila.tickets30,
+    tickets: fila.tickets,
+    ultimaCompra: fila.ultima || null,
+    diasSinComprar: dias,
+    frecuente: fila.tickets30 >= tope,
+    tope
+  };
+}
+
 function estadoCliente(cliente) {
   const cargado = cargadoA(cliente.id);
   const abonado = abonadoPor(cliente.id);
@@ -99,7 +136,8 @@ function estadoCliente(cliente) {
     // nada vencido: no se puede llegar tarde a una cita que nadie puso.
     diasDebiendo: dias,
     vencido: Boolean(cliente.dias_plazo) && saldo > 0 && dias > cliente.dias_plazo,
-    desdeCuandoDebe: desdeCuandoDebe(cliente.id)
+    desdeCuandoDebe: desdeCuandoDebe(cliente.id),
+    ritmo: ritmoDe(cliente.id)
   };
 }
 
@@ -205,5 +243,6 @@ function resumenCartera() {
 
 module.exports = {
   cargadoA, abonadoPor, saldoDe, diasDebiendo, desdeCuandoDebe,
-  estadoCliente, cabeElCredito, cuentaCorriente, clientesConEstado, resumenCartera
+  estadoCliente, cabeElCredito, cuentaCorriente, clientesConEstado, resumenCartera,
+  ritmoDe, cuantosParaSerDeSiempre
 };

@@ -55,6 +55,10 @@ import { ubicacionDe, elegirEnMapa } from '../ubicacion.js';
  */
 const LINEAS = [
   { clave: '', nombre: 'Todos', emoji: '👥', cuenta: 'todos' },
+  // LOS DE SIEMPRE Y LOS DE UNA VEZ  (v6.4): por el ritmo con que compran,
+  // que sale de los tickets. Un filtro más, no otra lista.
+  { clave: 'frecuente', nombre: 'De siempre', emoji: '⭐', cuenta: 'frecuentes', tipo: 'ritmo' },
+  { clave: 'ocasional', nombre: 'De una vez', emoji: '🕓', cuenta: 'ocasionales', tipo: 'ritmo' },
   { clave: 'marqueta', nombre: 'Marquetas', emoji: '🧊', cuenta: 'marqueta' },
   { clave: 'bolsa', nombre: 'Bolsas', emoji: '🧊', cuenta: 'bolsa' },
   { clave: 'agua', nombre: 'Agua', emoji: '💧', cuenta: 'agua' }
@@ -86,7 +90,10 @@ export async function vistaClientes(pantalla, estadoApp) {
     if (verBajas) query.set('incluirBajas', '1');
     if (soloDeben) query.set('deben', '1');
     if (busca) query.set('busca', busca);
-    if (linea) query.set('compra', linea);
+    if (linea) {
+      const l = LINEAS.find((x) => x.clave === linea);
+      query.set(l?.tipo === 'ritmo' ? 'ritmo' : 'compra', linea);
+    }
 
     datos = await api.obtener(`/clientes?${query}`);
     listas = datos.listas || [];
@@ -195,6 +202,17 @@ export async function vistaClientes(pantalla, estadoApp) {
                   style="background:${colorDe(c.negocio || c.nombre)}">${esc(inicial)}</span>`;
   }
 
+  /** "3 tickets en 30 días · último hace 2 d", como se diría. */
+  function textoRitmo(r) {
+    if (!r) return '';
+    const cuantos = r.tickets30 === 0 ? 'nada en 30 días'
+      : `${r.tickets30} ticket${r.tickets30 === 1 ? '' : 's'} en 30 días`;
+    const ultimo = r.diasSinComprar == null ? 'nunca ha comprado'
+      : r.diasSinComprar === 0 ? 'compró hoy'
+      : `último hace ${r.diasSinComprar} d`;
+    return `${cuantos} · ${ultimo}`;
+  }
+
   function fila(c) {
     const e = c.estado;
     return `
@@ -207,8 +225,10 @@ export async function vistaClientes(pantalla, estadoApp) {
           <small>
             ${c.negocio ? esc(c.nombre) : c.telefono ? esc(c.telefono) : 'sin negocio'}
             ${c.activo ? '' : ' · dado de baja'}
+            ${e.ritmo ? ` · ${textoRitmo(e.ritmo)}` : ''}
           </small>
         </span>
+        ${e.ritmo?.frecuente ? '<span class="etiqueta-mayoreo" title="De siempre: le compra seguido">⭐</span>' : ''}
         ${c.lista_id ? '<span class="etiqueta-mayoreo" title="Tiene su propio precio">🏷️</span>' : ''}
         <span class="cliente-saldo ${e.vencido ? 'vencido' : e.saldo > 0 ? 'debe' : ''}">
           ${e.saldo > 0 ? pesos(e.saldo) : e.saldo < 0 ? 'a favor' : '—'}
@@ -335,6 +355,12 @@ export async function vistaClientes(pantalla, estadoApp) {
           .filter(Boolean).join(' · ') || 'Todavía no le ha comprado nada'}
         <small>· se marca solo con lo que compra, y es lo que decide en qué pestaña sale</small>
       </p>
+      ${cuenta?.ritmo || c.estado?.ritmo ? `
+        <p class="ayuda cli-compra">
+          ${(cuenta?.ritmo || c.estado.ritmo).frecuente ? '⭐ <b>De siempre</b>' : '🕓 <b>De una vez</b>'}
+          · ${textoRitmo(cuenta?.ritmo || c.estado.ritmo)}
+          <small>· es «de siempre» con ${(cuenta?.ritmo || c.estado.ritmo).tope} tickets o más en 30 días; sale solo de las ventas</small>
+        </p>` : ''}
 
       <h4 class="cfg-subtitulo">Quién es y dónde está</h4>
       <div class="cuadre cfg-cliente-datos cli-rejilla">
