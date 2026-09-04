@@ -4756,3 +4756,10 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 }
 .cli-linea.si b { color: var(--verde); }
 .cli-linea:disabled { cursor: default; }
+
+/* El botón grande cuando no hay nada que cobrar pero sí a quién abonarle
+   (v5.5). Verde de "entra dinero", igual que el de meter al cajón: es
+   dinero que entra, no una venta. */
+.pos-cobrar.pos-cobrar-abono {
+  background: var(--verde); border-color: var(--verde);
+}

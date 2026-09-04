@@ -845,3 +845,109 @@ test('una coordenada imposible no se guarda', async () => {
   })).json.datos.cliente;
   assert.equal(c.latitud, null, 'fuera del planeta no se guarda');
 });
+
+// ============================================================
+// EL RECIBO DE UN ABONO  (v5.5)
+//
+// El cliente entrega dinero y hasta la v5.5 se iba con las manos vacías.
+// Lo que importa probar es que el papel diga lo que decía EL DÍA QUE SE
+// IMPRIMIÓ, no lo que el cliente debe hoy: si no, una reimpresión de la
+// semana que viene lo contradice y el que pierde es quien tiene el papel.
+// ============================================================
+
+test('el recibo dice lo que debía, lo que dejó y lo que le queda', async () => {
+  await entrarAdmin();
+  const c = (await llamar('/api/clientes', {
+    method: 'POST', cuerpo: { nombre: 'Don Recibo' }
+  })).json.datos.cliente;
+
+  await fiar(c.id, 16);                                    // se lleva $264
+  const a = await llamar(`/api/clientes/${c.id}/abonos`, {
+    method: 'POST', cuerpo: { monto: 100 }                 // deja $100
+  });
+
+  const previa = await llamar(`/api/impresion/abono/${a.json.datos.abonoId}/previa`);
+  assert.equal(previa.estado, 200, previa.json?.error);
+  const papel = previa.json.datos.renglones.map((x) => x.t).join('\n');
+
+  assert.match(papel, /RECIBO DE ABONO/);
+  assert.match(papel, /Don Recibo/);
+  assert.match(papel, /\$100/, 'lo que dejó, en grande');
+  assert.match(papel, /Debia:\s*\$264/);
+  assert.match(papel, /LE QUEDA:\s*\$164/);
+});
+
+test('reimprimir un recibo viejo sigue diciendo lo de ese día', async () => {
+  // Es la razón de calcular el saldo anterior a partir de la fecha del
+  // abono en vez de guardar un número: sin eso, el segundo abono cambiaría
+  // el papel del primero.
+  await entrarAdmin();
+  const c = (await llamar('/api/clientes', {
+    method: 'POST', cuerpo: { nombre: 'Doña Historia' }
+  })).json.datos.cliente;
+
+  await fiar(c.id, 16);                                    // debe $264
+  const primero = (await llamar(`/api/clientes/${c.id}/abonos`, {
+    method: 'POST', cuerpo: { monto: 100 } })).json.datos.abonoId;
+  await llamar(`/api/clientes/${c.id}/abonos`, { method: 'POST', cuerpo: { monto: 50 } });
+
+  const papel = (await llamar(`/api/impresion/abono/${primero}/previa`))
+    .json.datos.renglones.map((x) => x.t).join('\n');
+  assert.match(papel, /Debia:\s*\$264/, 'lo que debía ANTES del primer abono');
+  assert.match(papel, /LE QUEDA:\s*\$164/, 'y no los $114 de hoy');
+});
+
+test('el recibo avisa cuando pagó de más', async () => {
+  await entrarAdmin();
+  const c = (await llamar('/api/clientes', {
+    method: 'POST', cuerpo: { nombre: 'Don Generoso' }
+  })).json.datos.cliente;
+
+  await fiar(c.id, 4);                                     // debe $70
+  const a = (await llamar(`/api/clientes/${c.id}/abonos`, {
+    method: 'POST', cuerpo: { monto: 100 } })).json.datos.abonoId;
+
+  const papel = (await llamar(`/api/impresion/abono/${a}/previa`))
+    .json.datos.renglones.map((x) => x.t).join('\n');
+  assert.match(papel, /A SU FAVOR: \$30/,
+    'un saldo a favor es dinero suyo: el papel tiene que decirlo');
+});
+
+test('un recibo anulado sale marcado, con su motivo', async () => {
+  await entrarAdmin();
+  const c = (await llamar('/api/clientes', {
+    method: 'POST', cuerpo: { nombre: 'Don Anulado' }
+  })).json.datos.cliente;
+
+  await fiar(c.id, 16);
+  const a = (await llamar(`/api/clientes/${c.id}/abonos`, {
+    method: 'POST', cuerpo: { monto: 100 } })).json.datos.abonoId;
+  await llamar(`/api/clientes/abonos/${a}/anular`, {
+    method: 'POST', cuerpo: { motivo: 'El billete era falso' } });
+
+  const papel = (await llamar(`/api/impresion/abono/${a}/previa`))
+    .json.datos.renglones.map((x) => x.t).join('\n');
+  assert.match(papel, /ANULADO/);
+  assert.match(papel, /billete era falso/);
+});
+
+test('el cajero puede recibir un abono; el operario no', async () => {
+  // Es lo que hace que se pueda cobrar desde la caja sin llamar a nadie.
+  await entrarAdmin();
+  const c = (await llamar('/api/clientes', {
+    method: 'POST', cuerpo: { nombre: 'Doña Turno' }
+  })).json.datos.cliente;
+  await fiar(c.id, 16);
+
+  await entrarPorNombre('Mari', '7777');                   // cajero
+  const suyo = await llamar(`/api/clientes/${c.id}/abonos`, {
+    method: 'POST', cuerpo: { monto: 50 } });
+  assert.equal(suyo.estado, 201);
+
+  await entrarPorNombre('Chema', '5555');                  // operario
+  const ajeno = await llamar(`/api/clientes/${c.id}/abonos`, {
+    method: 'POST', cuerpo: { monto: 50 } });
+  assert.equal(ajeno.estado, 403);
+
+  await entrarAdmin();
+});

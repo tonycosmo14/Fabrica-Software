@@ -1216,6 +1216,36 @@ debería haber − contado = FALTA</pre>
       además se ve contra qué se está aplicando. Y si lo paga todo, no es
       crédito: cóbraselo normal.</p>
 
+      <h4>Recibir un abono sin salirse de la caja</h4>
+      <p>Cuando el cliente pasa a pagar lo que debe, ya no hay que ir a
+      Clientes:</p>
+      <ol class="instrucciones">
+        <li><em>F6</em> y se elige al cliente, <b>sin nada en el ticket</b>.
+        Ahí mismo se ve <b>cuánto debe</b>, junto a su nombre.</li>
+        <li>El botón grande deja de decir «Cobrar» y dice <b>«Abonar a su
+        cuenta»</b>. <em>F10</em> o tocarlo.</li>
+        <li>Sale cuánto debe, se escribe lo que está dejando —o
+        <b>Todo</b>— y la cuenta de abajo se rehace sola.</li>
+        <li><b>Recibir</b>, y <b>sale su recibo impreso</b>.</li>
+      </ol>
+      <p class="ayuda-tip">Si no debe nada, lo dice y no deja abonarle: un
+      abono a quien está al corriente le deja un saldo a favor que nadie
+      pidió, y encontrarlo después cuesta más que el minuto que se ahorró.</p>
+      <p>Si fue por transferencia, hay su botón: <b>ese dinero no entra al
+      cajón</b> —no pasó por ahí— pero la deuda baja igual.</p>
+
+      <h4>El recibo del abono</h4>
+      <p>Sale solo al recibir, y a propósito: el cliente acaba de entregar
+      dinero y tiene que irse con algo en la mano. Lleva los tres números
+      que se discuten cuando una cuenta no cuadra:</p>
+      <pre class="ayuda-formula">debía  −  abonó  =  le queda</pre>
+      <p class="ayuda-tip">Y dice lo que decía <b>el día que se imprimió</b>,
+      no lo que debe hoy. Si vuelve a imprimirse la semana que viene, después
+      de otros dos abonos, sigue diciendo lo mismo — si no, el papel que
+      tiene el cliente en la mano y el sistema se contradirían.</p>
+      <p>Si pagó de más, el recibo lo dice: <b>A SU FAVOR</b>. Ese es dinero
+      suyo que se quedó en la fábrica y tiene que estar escrito.</p>
+
       <h4>Dar crédito en la caja</h4>
       <ol class="instrucciones">
         <li>Se marca lo que se lleva, como cualquier venta.</li>

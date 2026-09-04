@@ -50,6 +50,7 @@ const FASES = {
   avisos:    { enter: 'nada',                     esc: 'volver a vender' },
   movimientos: { enter: 'nada',                   esc: 'volver a vender' },
   clientes:  { enter: 'nada',                     esc: 'volver al cobro' },
+  abono:     { enter: 'recibe el abono',          esc: 'volver al ticket' },
   cobrada:   { enter: 'imprime el ticket',        esc: 'siguiente venta' }
 };
 
@@ -62,6 +63,8 @@ export async function vistaVenta(pantalla, estadoApp) {
   // Ver clientes basta para ponerle nombre al ticket: el precio de mayoreo
   // no es fiar, es cobrarle lo suyo a quien lo tiene.
   const puedeVerClientes = tiene('clientes.ver');
+  // Recibir un abono al crédito, desde la caja (v5.5).
+  const puedeCobrarCredito = tiene('credito.cobrar');
   const puedeRepartirNumeros = tiene('produccion.numeros');
   // Devolver saca dinero del cajón por algo que ya se cobró: eso lo revisa
   // un gerente, no se hace solo desde el mostrador.
@@ -1089,7 +1092,11 @@ export async function vistaVenta(pantalla, estadoApp) {
           <div class="pos-desc">
             <span class="cliente-num">#${cliente.numero ?? '—'}</span> ${esc(cliente.nombre)}
             <small>${lista ? `precio de ${esc(lista.nombre)}`
-                    : fiar ? 'va a su crédito' : 'cliente'}</small>
+                    : fiar && hayAlgo() ? 'va a su crédito' : 'cliente'}${
+              // CUÁNTO DEBE, aquí mismo (v5.5). Es lo primero que se
+              // pregunta cuando llega alguien de crédito, y hasta hoy había
+              // que salirse a Clientes a mirarlo.
+              cliente.saldo > 0 ? ` · <b class="malo">debe ${pesos(cliente.saldo)}</b>` : ''}</small>
           </div>
           <button class="tachita" data-quita-cliente aria-label="Quitar el cliente">×</button>
         </div>`);
@@ -1158,11 +1165,25 @@ export async function vistaVenta(pantalla, estadoApp) {
            <strong>${pesos(t)}</strong>
          </div>`;
 
-    pantalla.querySelector('#cobrar').disabled = !hayAlgo();
+    // EL TICKET VACÍO CON UN CLIENTE PUESTO NO ES UN TICKET VACÍO  (v5.5).
+    //
+    // "Que la cajera pueda abonar al crédito sin salir de vender. Se
+    //  selecciona al cliente y se le da cobrar sin ningún producto."
+    //
+    // Es exactamente eso: sin nada que cobrar pero con alguien elegido, el
+    // botón grande deja de ser "Cobrar $0" —que no hacía nada— y se
+    // convierte en el de recibir su abono. El gesto es el mismo de siempre
+    // y no hay un botón más que aprender.
+    const soloAbono = !hayAlgo() && !cambiando && Boolean(cliente) && puedeCobrarCredito;
+    const btnCobrar = pantalla.querySelector('#cobrar');
+    btnCobrar.disabled = !hayAlgo() && !soloAbono;
+    btnCobrar.classList.toggle('pos-cobrar-abono', soloAbono);
     const btnCotizar = pantalla.querySelector('#cotizar');
     if (btnCotizar) btnCotizar.disabled = !hayAlgo() || Boolean(cambiando);
-    pantalla.querySelector('#cobrar').querySelector('span').textContent =
-      cambiando ? 'Hacer el cambio' : 'Cobrar';
+    btnCobrar.querySelector('span').textContent =
+      cambiando ? 'Hacer el cambio'
+      : soloAbono ? 'Abonar a su cuenta'
+      : 'Cobrar';
 
     const etiqueta = pantalla.querySelector('#etiqueta-espera');
     etiqueta.hidden = enEspera.length === 0;
@@ -1497,6 +1518,8 @@ export async function vistaVenta(pantalla, estadoApp) {
     }
     if (fase === 'venta')   return agregarPorCodigo();
     if (fase === 'cobro')   return calcularCambio();
+    // Enter recibe el abono en efectivo, que es como llega casi siempre.
+    if (fase === 'abono')   return recibirAbono('efectivo');
     if (fase === 'cambio')  return registrar();
     if (fase === 'cobrada') return imprimir();
   }
@@ -1514,6 +1537,7 @@ export async function vistaVenta(pantalla, estadoApp) {
       return;
     }
     if (fase === 'cobro')   { cerrarCobro(); return; }
+    if (fase === 'abono')   { abonoCredito = 0; cerrarCobro(); return; }
     if (fase === 'cambio')  {
       // Se arrepintió de fiarle, pero sigue siendo él: se le cobra, y a
       // su precio. Quitarle el nombre aquí le subiría el precio sin avisar.
@@ -1568,7 +1592,11 @@ export async function vistaVenta(pantalla, estadoApp) {
   // COBRAR
   // ==========================================================
   function irACobro() {
-    if (!hayAlgo()) return;
+    // SIN NADA QUE COBRAR PERO CON CLIENTE: se le recibe un abono (v5.5).
+    if (!hayAlgo()) {
+      if (!cambiando && cliente && puedeCobrarCredito) return pintarAbonoCredito();
+      return;
+    }
 
     // UN TICKET CON MAYOREO NO SE COBRA SIN NOMBRE. En vez de dejar que el
     // servidor lo rechace al final, la caja lo pide aquí, que es el momento
@@ -1592,7 +1620,7 @@ export async function vistaVenta(pantalla, estadoApp) {
     // seleccionar". Un cliente pegado al ticket es la forma de cobrarle a
     // uno el precio del anterior.
     cliente = null;
-    fiar = false; abonoMostrador = 0;
+    fiar = false; abonoMostrador = 0; abonoCredito = 0;
     refs.cobro.hidden = true;
     // Se repinta el ticket: al soltar al cliente cambian los precios de
     // mayoreo, y un renglón que dice $220 cuando ya vale $240 es peor que
@@ -1708,6 +1736,167 @@ export async function vistaVenta(pantalla, estadoApp) {
     refs.cobro.querySelector('#salir-cobro').onclick = cerrarCobro;
   }
 
+  // ==========================================================
+  // RECIBIR UN ABONO, SIN SALIRSE DE LA CAJA  (v5.5)
+  //
+  // "Que la cajera pueda abonar al crédito de un cliente sin necesidad de
+  //  salir de la pantalla vender."
+  //
+  // Antes había que salirse a Clientes, buscarlo otra vez y apuntárselo
+  // ahí. Con gente en el mostrador eso son tres pantallas para recibir un
+  // billete, y lo que pasa de verdad es que se apunta "al rato" — y al rato
+  // ya no se acuerda nadie de cuánto era.
+  //
+  // No hay ruta nueva por debajo: se llama al mismo apunte de abono de
+  // siempre, el que ya mete el dinero al cajón y hace que el corte cuadre.
+  // Lo único nuevo es llegar a él desde aquí.
+  // ==========================================================
+  let abonoCredito = 0;      // lo que va a dejar, en centavos
+
+  function pintarAbonoCredito() {
+    const debe = cliente.saldo || 0;
+
+    fase = 'abono';
+    abonoCredito = abonoCredito || debe;      // lo normal es que pague todo
+    refs.cobro.hidden = false;
+
+    // NO DEBE NADA: se dice y ya. Cobrarle un abono a quien está al
+    // corriente es dejarle un saldo a favor que nadie pidió, y encontrarlo
+    // después cuesta más que el minuto que se ahorró.
+    if (debe <= 0) {
+      refs.cobro.innerHTML = `
+        <div class="pos-cobro-caja pos-aviso-caja">
+          <div class="pos-aviso-grande">✅</div>
+          <h3 style="margin:0 0 4px">${esc(cliente.nombre)} no debe nada</h3>
+          <p class="ayuda" style="margin:0 0 14px">Está al corriente.</p>
+          <button class="pos-confirmar" id="salir-cobro">
+            <span>Está bien</span><small>Esc</small>
+          </button>
+        </div>`;
+      setTimeout(() => refs.cobro.querySelector('#salir-cobro')?.focus(), 0);
+      refs.cobro.querySelector('#salir-cobro').onclick = cerrarCobro;
+      pintarPista();
+      return;
+    }
+
+    const queda = Math.max(0, debe - abonoCredito);
+    const aFavor = Math.max(0, abonoCredito - debe);
+
+    refs.cobro.innerHTML = `
+      <div class="pos-cobro-caja">
+        <div class="pos-cobro-total">
+          <span>Abono de</span>
+          <strong class="pos-fiado-nombre">${esc(cliente.nombre)}</strong>
+        </div>
+        ${cliente.negocio ? `<p class="ayuda" style="margin:-12px 0 14px;text-align:center">
+          ${esc(cliente.negocio)}</p>` : ''}
+
+        <div class="pos-cambio grande pos-fiado">
+          <span>Debe</span><strong>${pesos(debe)}</strong>
+        </div>
+
+        <div class="pos-abona" style="margin-top:14px">
+          <label class="etiqueta-chica" for="abona-cred">¿Cuánto está dejando?</label>
+          <div class="pos-abona-fila">
+            <input id="abona-cred" class="campo-importe" inputmode="decimal"
+                   autocomplete="off" value="${(abonoCredito / 100).toFixed(2)}">
+            <button class="secundario chico" id="abona-todo">Todo</button>
+          </div>
+          <small class="ayuda" id="abona-cred-malo" hidden></small>
+        </div>
+
+        <div class="cuadre" style="margin-top:12px">
+          <div class="cuadre-linea"><span>Debe</span><strong>${pesos(debe)}</strong></div>
+          <div class="cuadre-linea resta">
+            <span>− Deja</span><strong>${pesos(abonoCredito)}</strong>
+          </div>
+          <div class="cuadre-linea total">
+            <span>= Le queda</span><strong>${pesos(queda)}</strong>
+          </div>
+          ${aFavor ? `
+            <div class="cuadre-linea">
+              <span>Y a su favor</span><strong class="bueno">${pesos(aFavor)}</strong>
+            </div>` : ''}
+        </div>
+
+        <button class="pos-confirmar" id="confirmar" style="margin-top:14px">
+          <span>Recibir ${pesos(abonoCredito)}</span><small>Enter</small>
+        </button>
+        <button class="secundario" id="abona-transf" style="margin-top:10px;width:100%">
+          Fue por transferencia
+        </button>
+        <button class="secundario" id="salir-cobro" style="margin-top:10px;width:100%">
+          <span class="tecla-dice">Esc · </span>volver
+        </button>
+      </div>`;
+
+    const campo = refs.cobro.querySelector('#abona-cred');
+    const malo = refs.cobro.querySelector('#abona-cred-malo');
+
+    const leer = () => {
+      const escrito = campo.value.trim().replace(/[$,\s]/g, '');
+      if (escrito === '') { abonoCredito = 0; malo.hidden = true; return false; }
+      const n = Number(escrito);
+      if (!Number.isFinite(n) || n <= 0) {
+        malo.textContent = 'Eso no es una cantidad.';
+        malo.hidden = false;
+        return false;
+      }
+      abonoCredito = Math.round(n * 100);
+      malo.hidden = true;
+      return true;
+    };
+
+    campo.onchange = () => { if (leer()) pintarAbonoCredito(); };
+    campo.onblur = () => { if (leer()) pintarAbonoCredito(); };
+    campo.onkeydown = (ev) => {
+      if (ev.key !== 'Enter') return;
+      // El enter de la pantalla confirma; aquí solo quiere decir "ya está
+      // el número". Sin stopPropagation cobraría lo tecleado a medias.
+      ev.preventDefault(); ev.stopPropagation();
+      if (leer()) pintarAbonoCredito();
+    };
+
+    refs.cobro.querySelector('#abona-todo').onclick = () => {
+      abonoCredito = debe; pintarAbonoCredito();
+    };
+    setTimeout(() => refs.cobro.querySelector('#confirmar')?.focus(), 0);
+    refs.cobro.querySelector('#confirmar').onclick = () => recibirAbono('efectivo');
+    refs.cobro.querySelector('#abona-transf').onclick = () => recibirAbono('transferencia');
+    refs.cobro.querySelector('#salir-cobro').onclick = cerrarCobro;
+    pintarPista();
+  }
+
+  async function recibirAbono(formaPago) {
+    if (!abonoCredito || abonoCredito <= 0) {
+      return avisar('Escribe cuánto está dejando.', 'error');
+    }
+    const quien = cliente;
+    try {
+      const r = await api.enviar(`/clientes/${quien.id}/abonos`, {
+        monto: (abonoCredito / 100).toFixed(2), formaPago
+      });
+      tono('cobrado');
+
+      // EL PAPEL SALE SOLO, y aquí sí a propósito: el cliente acaba de
+      // entregar dinero y se va con algo en la mano. Es lo contrario del
+      // ticket de venta, que no se imprime hasta que alguien lo pide.
+      try { await api.enviar(`/impresion/abono/${r.abonoId}`, {}); }
+      catch { /* sin impresora se sigue: el abono ya quedó apuntado */ }
+
+      avisar(r.deMas > 0
+        ? `Recibido. Le quedan ${pesos(r.deMas)} a su favor.`
+        : r.saldo > 0 ? `Recibido. Le quedan ${pesos(r.saldo)}`
+        : 'Recibido. Queda al corriente.', 'bien');
+      if (r.sinTurno) {
+        avisar('No hay turno de caja abierto: ese dinero no entra en ningún corte', 'error');
+      }
+      abonoCredito = 0;
+      cerrarCobro();
+      refrescarAvisos();
+    } catch (e) { avisar(e.message, 'error'); }
+  }
+
   /**
    * EL PANEL DEL CRÉDITO.
    *
@@ -1727,6 +1916,13 @@ export async function vistaVenta(pantalla, estadoApp) {
    */
   function pintarFiado() {
     const t = total();
+
+    // CON EL TICKET VACÍO NO HAY NADA QUE DEJAR A CRÉDITO  (v5.5). Si
+    // alguien toca "A crédito" en la lista sin haber capturado nada, lo
+    // que quiere es la cuenta de ese cliente: se le enseña su abono, que
+    // es lo único que se puede hacer ahí.
+    if (t <= 0) { fiar = false; return pintarAbonoCredito(); }
+
     // Lo que de verdad se le va a quedar a deber de este ticket.
     const queda = Math.max(0, t - abonoMostrador);
     const saldoDespues = cliente.saldo + queda;

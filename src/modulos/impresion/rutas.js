@@ -21,7 +21,7 @@ const { configuracion, guardarAjuste, imprimirCrudo,
 const { ticketCotizacion, ticketVenta, ticketMovimiento, ticketVale, ticketEncomienda,
         ticketRaya, ticketPrueba, pulsoCajon, ticketProduccion,
         ticketCorte, ticketCorteMovimientos, ticketHielo, ticketCortePersona, ticketConteo,
-        ticketResumenDia } = require('./ticket');
+        ticketResumenDia, ticketAbono } = require('./ticket');
 
 const { aTexto } = require('../../lib/fracciones');
 const { numeroDeTicket } = require('../ventas/folio');
@@ -348,6 +348,71 @@ router.post('/encomienda/:id', puedeImprimir, async (req, res) => {
   // SIN PULSO DE CAJÓN: no entró dinero. Abrirlo por un papel que no
   // cobra nada es abrirlo por nada, y el cajón abierto sin motivo en el
   // mostrador es justo lo que no se quiere.
+  const r = await imprimirCrudo(papel, { seccion: 'venta' });
+  if (!r.impreso) return error(res, `No se pudo imprimir: ${r.motivo}`, 502);
+  return ok(res, { impreso: true });
+});
+
+// ============================================================
+// EL RECIBO DE UN ABONO  (v5.5)
+//
+// El cliente entrega dinero y hasta hoy se iba con las manos vacías. Este
+// papel es su comprobante, y el que se saca otra vez el día que la cuenta
+// no cuadre.
+//
+// SIN PULSO DE CAJÓN: el cajón ya se abrió al recibir el dinero, si es que
+// se recibió en efectivo. Abrirlo otra vez al imprimir sería abrirlo dos
+// veces por el mismo billete.
+// ============================================================
+
+/** El abono con lo que hace falta para el papel: quién, cuánto y qué debía. */
+function abonoParaPapel(id) {
+  const a = bd.prepare(`
+    SELECT ab.*, c.nombre AS cliente_nombre, c.negocio AS cliente_negocio,
+           u.nombre AS capturista_nombre, e.nombre AS ejecutor_nombre
+      FROM abonos ab
+      LEFT JOIN clientes c ON c.id = ab.cliente_id
+      LEFT JOIN usuarios u ON u.id = ab.capturista_id
+      LEFT JOIN usuarios e ON e.id = ab.ejecutor_id
+     WHERE ab.id = ?
+  `).get(id);
+  if (!a) return null;
+
+  // LO QUE DEBÍA ANTES DE ESTE ABONO, calculado y no guardado (regla 3.2):
+  // es lo de hoy más este abono, menos lo que haya entrado después. Así una
+  // reimpresión de la semana que viene sigue diciendo lo que decía el papel
+  // original, y no lo que debe hoy.
+  const cargos = bd.prepare(`
+    SELECT COALESCE(SUM(total_centavos), 0) n FROM ventas
+     WHERE cliente_id = ? AND forma_pago = 'credito' AND cancelada_en IS NULL
+       AND fecha <= ?
+  `).get(a.cliente_id, a.fecha).n;
+  const abonosAntes = bd.prepare(`
+    SELECT COALESCE(SUM(centavos), 0) n FROM abonos
+     WHERE cliente_id = ? AND anulado_en IS NULL AND fecha < ?
+  `).get(a.cliente_id, a.fecha).n;
+
+  a.saldoAntes = Math.max(0, cargos - abonosAntes);
+  return a;
+}
+
+router.get('/abono/:id/previa', exigirPermiso('clientes.ver'), (req, res) => {
+  const a = abonoParaPapel(req.params.id);
+  if (!a) return error(res, 'Ese abono no existe.', 404);
+  const papel = ticketAbono(a, { negocio: nombreNegocio() });
+  return ok(res, { renglones: recortarEspejo(papel.espejo), ancho: papel.anchoTicket });
+});
+
+router.post('/abono/:id', puedeImprimir, async (req, res) => {
+  const a = abonoParaPapel(req.params.id);
+  if (!a) return error(res, 'Ese abono no existe.', 404);
+
+  const cfg = configuracion();
+  if (!cfg.directa) return ok(res, { impreso: false, motivo: 'sin-destino' });
+
+  const papel = ticketAbono(a, {
+    negocio: nombreNegocio(), copia: req.body?.copia === true
+  });
   const r = await imprimirCrudo(papel, { seccion: 'venta' });
   if (!r.impreso) return error(res, `No se pudo imprimir: ${r.motivo}`, 502);
   return ok(res, { impreso: true });

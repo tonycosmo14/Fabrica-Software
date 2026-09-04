@@ -17,9 +17,28 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '5.4';
+const VERSION_ACTUAL = '5.5';
 
 const VERSIONES = [
+  {
+    numero: '5.5',
+    nombre: 'Cobrar la deuda desde la caja',
+    fecha: '2026-09-04',
+    resumen:
+      'La cajera recibe un abono sin salirse de vender, ve cuánto debe cada '
+      + 'cliente, y el que paga se va con su recibo en la mano.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'ABONAR AL CRÉDITO SIN SALIRSE DE VENDER. Se elige al cliente con F6 sin nada en el ticket, y el botón grande deja de decir «Cobrar» para decir «Abonar a su cuenta». Es el mismo gesto de siempre —F10— y no hay un botón más que aprender.' },
+      { tipo: 'importante', texto: 'ANTES ERAN TRES PANTALLAS PARA RECIBIR UN BILLETE: terminar lo que estabas haciendo, irte a Clientes, buscarlo otra vez y apuntárselo ahí. Con gente en el mostrador eso no se hace — se apunta «al rato», y al rato ya nadie se acuerda de cuánto era.' },
+      { tipo: 'nuevo', texto: 'Y AHORA SE VE CUÁNTO DEBE JUNTO A SU NOMBRE, en el renglón del ticket. Es lo primero que se pregunta cuando llega alguien de crédito, y hasta hoy había que salirse a buscarlo.' },
+      { tipo: 'nuevo', texto: 'EL PANEL: cuánto debe en grande, cuánto está dejando —con un botón de «Todo», que es lo más común—, y la cuenta rehaciéndose sola: debe − deja = le queda. Con su botón aparte para cuando fue por transferencia, que no entra al cajón.' },
+      { tipo: 'importante', texto: 'SI NO DEBE NADA, LO DICE Y NO DEJA ABONARLE. Cobrarle un abono a quien está al corriente le deja un saldo a favor que nadie pidió, y encontrarlo tres meses después cuesta más que el minuto que se ahorró.' },
+      { tipo: 'nuevo', texto: 'EL RECIBO DE ABONO, IMPRESO, y sale solo al recibir. Hasta hoy el cliente entregaba dinero y se iba con las manos vacías. Lleva los tres números que se discuten cuando una cuenta no cuadra: debía − abonó = le queda, con el abono en grande y la línea para firmar.' },
+      { tipo: 'importante', texto: 'Y EL RECIBO DICE LO QUE DECÍA EL DÍA QUE SE IMPRIMIÓ, no lo que debe hoy. Si se reimprime la semana que viene después de otros dos abonos, sigue diciendo lo mismo — si no, el papel que tiene el cliente en la mano y el sistema se contradirían, y el que pierde siempre es quien tiene el papel.' },
+      { tipo: 'nuevo', texto: 'Si pagó de más, el recibo lo dice: A SU FAVOR. Ese es dinero suyo que se quedó en la fábrica, y tiene que estar escrito en algún lado.' },
+      { tipo: 'mejora', texto: 'Por debajo no hay nada nuevo: se llama al mismo apunte de abono de siempre, el que ya mete el dinero al cajón y hace que el corte cuadre. Lo único que cambió es que ahora se llega desde la caja.' }
+    ]
+  },
   {
     numero: '5.4',
     nombre: 'Los clientes, por lo que compran',

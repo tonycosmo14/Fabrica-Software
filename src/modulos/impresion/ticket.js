@@ -660,6 +660,76 @@ function ticketEncomienda(e, { negocio = '', nombre = 'Encomendado', copia = fal
 }
 
 /**
+ * EL RECIBO DE UN ABONO  (v5.5)
+ *
+ * El cliente acaba de entregar dinero. Hasta hoy no se llevaba nada a
+ * cambio: la deuda bajaba en la pantalla y él salía con las manos vacías.
+ *
+ * Este papel es la mitad de esa operación. Lleva los tres números que se
+ * discuten cuando una cuenta no cuadra, en el orden en que se los
+ * explicaría uno:
+ *
+ *     debía  −  abonó  =  le queda
+ *
+ * Y el ABONÓ va en grande, porque es lo único que este papel demuestra.
+ *
+ * Sin folio a propósito: no es una venta, no lleva número de ticket y no
+ * entra en la serie del año. Lo que lo identifica es la fecha, el nombre y
+ * quién lo recibió.
+ */
+function ticketAbono(a, { negocio = '', copia = false } = {}) {
+  const cfg = configuracion();
+  const t = new Ticket(cfg.anchoMm, cfg.codigoPagina, cfg.tamanoLetra);
+
+  if (copia) marcaCopia(t);
+
+  encabezado(t, {
+    titulo: 'RECIBO DE ABONO',
+    atendio: a.capturista_nombre || a.ejecutor_nombre,
+    fecha: fechaTicket(a.fecha)
+  });
+
+  t.izquierda().linea('De:');
+  t.negrita().tamano(2, 1).parrafo(String(a.cliente_nombre || '?').slice(0, 40));
+  t.normal();
+  if (a.cliente_negocio) t.parrafo(a.cliente_negocio);
+
+  t.saltos(1);
+  t.izquierda().negrita().tamano(3, 2).linea(formato(a.centavos)).normal();
+  if (a.forma_pago === 'transferencia') t.linea('por transferencia');
+
+  t.separador();
+  t.bloqueDerecha([
+    ['Debia:', formato(a.saldoAntes)],
+    ['Abono:', `-${formato(a.centavos)}`],
+    ['LE QUEDA:', formato(Math.max(0, a.saldoAntes - a.centavos))]
+  ]);
+
+  // PAGAR DE MÁS NO ES UN ERROR, PERO HAY QUE DECIRLO. Si no, el papel
+  // diría "le queda $0" y el cliente perdería la cuenta de su saldo a
+  // favor — que es dinero suyo que está en la fábrica.
+  if (a.centavos > a.saldoAntes) {
+    t.separador();
+    t.centro().negrita()
+     .linea(`A SU FAVOR: ${formato(a.centavos - a.saldoAntes)}`)
+     .negrita(false).izquierda();
+  }
+
+  if (a.anulado_en) {
+    t.separador();
+    t.centro().negrita().tamano(2, 1).linea('ANULADO').normal();
+    if (a.motivo_anulacion) t.parrafo(a.motivo_anulacion);
+    t.izquierda();
+  } else {
+    t.firma('RECIBIO');
+  }
+
+  pie(t, negocio);
+  t.izquierda().cortar(cfg.avanceCorte);
+  return t.bytes();
+}
+
+/**
  * EL PAPEL DE LA RAYA  (v4.8)
  *
  * "Imprimir su balance para darle su sueldo."
@@ -1392,7 +1462,7 @@ function pulsoCajon(salida = 2) {
 }
 
 module.exports = {
-  ticketVenta, ticketMovimiento, ticketVale, ticketEncomienda, ticketRaya,
+  ticketVenta, ticketMovimiento, ticketVale, ticketEncomienda, ticketRaya, ticketAbono,
   ticketCotizacion, ticketPrueba,
   ticketCorte, ticketCorteMovimientos, ticketHielo, ticketCortePersona, ticketConteo, ticketProduccion, ticketResumenDia, pulsoCajon, fechaCorta, fechaTicket
 };
