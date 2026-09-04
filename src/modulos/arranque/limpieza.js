@@ -86,6 +86,22 @@ const MOVIMIENTOS = [
   { tabla: 'pedido_lineas', grupo: 'Los pedidos' },
   { tabla: 'pedidos', grupo: 'Los pedidos', cuenta: true },
 
+  // --- El reparto (v5.7) ---
+  //
+  // Un viaje es un movimiento como una venta: pasó una vez y ya pasó. Si
+  // quedaran, el primer día real habría camionetas en la calle que nunca
+  // salieron, y con dinero que nadie va a entregar.
+  //
+  // EL ORDEN DE ESTA LISTA NO ES EL DE LAS LLAVES FORÁNEAS, y aquí no
+  // puede serlo: una venta apunta a su salida y una salida apunta a la
+  // venta de lo que vendió suelto. Es un círculo, y ningún orden lo
+  // resuelve. Da igual porque esta base no obliga las llaves foráneas
+  // —nunca lo ha hecho— y el borrado va entero dentro de una transacción.
+  // El día que se enciendan, esto necesita `defer_foreign_keys`.
+  { tabla: 'salida_carga', grupo: 'Las salidas de reparto' },
+  { tabla: 'salida_pedidos', grupo: 'Las salidas de reparto' },
+  { tabla: 'salidas', grupo: 'Las salidas de reparto', cuenta: true },
+
   // --- El inventario ---
   { tabla: 'movimientos_inventario', grupo: 'El inventario' },
   { tabla: 'avisos_inventario', grupo: 'El inventario' },
@@ -145,6 +161,9 @@ const SE_QUEDA = {
   comodatos: 'dónde está cada nevera y con quién',
   agua_equipos: 'los equipos de la planta de agua',
   agua_piezas: 'qué pieza trae puesta cada equipo',
+  // Una camioneta es un fierro, igual que una nevera: existe el día antes
+  // y el día después de arrancar. Lo que se borra son sus viajes.
+  vehiculos: 'los vehículos del reparto',
 
   // Y lo que nunca se toca
   configuracion: 'todos los ajustes',

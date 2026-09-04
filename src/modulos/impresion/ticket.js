@@ -1629,6 +1629,191 @@ function ticketPreparacion(prep, { negocio = '', quien = '' } = {}) {
 }
 
 /**
+ * LA HOJA DE CARGA  (v5.7)
+ *
+ * Lo que sube a la camioneta, para el que la sube y para el que la
+ * revisa. Va en el orden en que se carga —primero el hielo, que es lo que
+ * pesa y lo que se derrite— y NO lleva precios: en el patio, con el
+ * camión abierto, un renglón de dinero es un renglón que estorba.
+ *
+ * Los pedidos van por cliente y no sumados: lo que se sube a la camioneta
+ * son ocho bultos con ocho nombres, y quien carga tiene que poder contar
+ * ocho.
+ */
+function ticketCarga(s, { negocio = '' } = {}) {
+  const cfg = configuracion();
+  const t = new Ticket(cfg.anchoMm, cfg.codigoPagina, cfg.tamanoLetra);
+
+  encabezado(t, {
+    titulo: `CARGA ${s.folio}`,
+    tituloGrande: true,
+    atendio: s.repartidor_nombre,
+    fecha: fechaTicket(s.fecha)
+  });
+
+  if (s.vehiculo_nombre) t.izquierda().linea(s.vehiculo_nombre);
+
+  // LO QUE PESA, EN GRANDE. Es el número que decide si cabe, y es lo
+  // primero que se mira parado junto al camión.
+  if (s.hielo.subio > 0) {
+    t.separador();
+    renglonGrande(t, `${aTexto(s.hielo.subio).replace(' ', ' · ')} de hielo`,
+                  { alinear: 'izquierda' });
+    if (!s.cabe) {
+      t.centro().negrita()
+       .linea(`OJO: LE CABEN ${s.capacidad_marquetas}`).negrita(false).izquierda();
+    }
+  }
+
+  if (s.pedidos.length) {
+    t.separadorConTitulo(`PEDIDOS (${s.pedidos.length})`);
+    for (const p of s.pedidos) {
+      t.negrita().linea(`#${p.folio} ${String(p.cliente_nombre || '?').slice(0, t.ancho - 8)}`)
+       .negrita(false);
+      for (const l of p.lineas) {
+        const cuanto = l.dieciseisavos > 0
+          ? aTexto(l.dieciseisavos).replace(' ', ' · ') : String(l.cantidad);
+        t.linea(`   ${cuanto}  ${String(l.concepto).slice(0, t.ancho - 12)}`);
+      }
+    }
+  }
+
+  if (s.carga.length) {
+    t.separadorConTitulo('SUELTO (para vender en la calle)');
+    for (const l of s.carga) {
+      t.linea(`${l.texto}  ${String(l.concepto).slice(0, t.ancho - 8)}`);
+    }
+  }
+
+  if (s.notas) { t.separador(); t.parrafo(s.notas); }
+
+  t.firma('CARGO');
+  pie(t, negocio);
+  t.izquierda().cortar(cfg.avanceCorte);
+  return t.bytes();
+}
+
+/**
+ * LA LIQUIDACIÓN  (v5.7)
+ *
+ * ============================================================
+ * ES EL PAPEL QUE FIRMA EL REPARTIDOR
+ * ============================================================
+ *
+ * "Cuando el repartidor regrese, tenemos que liquidarle todas las cuentas
+ *  de lo que repartió."
+ *
+ * Lleva las dos cuentas del viaje, cada una en la forma en que se explica
+ * de viva voz:
+ *
+ *     LO QUE SUBIÓ − lo vendido − lo que volvió = LA MERMA
+ *     LO QUE DEBÍA TRAER − lo que entregó       = LA DIFERENCIA
+ *
+ * La del dinero va al final y en grande, porque es la que se discute con
+ * el papel en la mano; y la firma va debajo de esa, no de la otra.
+ */
+function ticketLiquidacion(s, { negocio = '', copia = false } = {}) {
+  const cfg = configuracion();
+  const t = new Ticket(cfg.anchoMm, cfg.codigoPagina, cfg.tamanoLetra);
+
+  if (copia) marcaCopia(t);
+
+  encabezado(t, {
+    titulo: `LIQUIDACION ${s.folio}`,
+    tituloGrande: true,
+    atendio: s.repartidor_nombre,
+    fecha: fechaTicket(s.recibido_en || s.regreso_en || s.fecha)
+  });
+
+  if (s.vehiculo_nombre) t.izquierda().linea(s.vehiculo_nombre);
+  if (s.recibido_por_nombre) t.linea(`Recibio: ${s.recibido_por_nombre}`);
+
+  // ---- LOS PEDIDOS ----
+  t.separadorConTitulo('LO QUE LLEVABA');
+  for (const p of s.pedidos) {
+    const marca = p.estado === 'entregado' ? 'OK ' : '-- ';
+    t.punteado(`${marca}#${p.folio} ${String(p.cliente_nombre || '?').slice(0, 24)}`,
+               formato(p.total));
+    if (p.estado !== 'entregado' && p.noEntregadoMotivo) {
+      t.parrafo(p.noEntregadoMotivo, { sangria: 4 });
+    }
+  }
+
+  // ---- LA MERCANCÍA ----
+  if (s.hielo.suelto > 0) {
+    t.separadorConTitulo('EL HIELO SUELTO');
+    t.bloquePunteado([
+      { etiqueta: 'Subio', valor: aTexto(s.hielo.suelto) },
+      { etiqueta: 'Vendio', valor: aTexto(
+        s.carga.reduce((n, l) => n + l.vendidoDieciseisavos, 0)) },
+      { etiqueta: 'Volvio', valor: aTexto(
+        s.carga.reduce((n, l) => n + l.regresoDieciseisavos, 0)) },
+      { etiqueta: 'SE DERRITIO', valor: aTexto(s.hielo.merma), raya: true, negrita: true }
+    ]);
+    if (s.hielo.mermaAlta) {
+      t.centro().negrita()
+       .linea(`${s.hielo.porcientoMerma}% — lo normal es ${s.hielo.mermaNormal}%`)
+       .negrita(false).izquierda();
+    }
+  }
+
+  const piezas = s.carga.filter((l) => l.dieciseisavos === 0);
+  if (piezas.length) {
+    t.separadorConTitulo('LO DEMAS QUE LLEVABA');
+    for (const l of piezas) {
+      t.punteado(l.concepto,
+        `${l.vendidoCantidad} vend. / ${l.regresoCantidad} vol.`
+        + (l.mermaCantidad ? ` / ${l.mermaCantidad} merma` : ''));
+    }
+  }
+
+  // ---- EL DINERO ----
+  t.separadorConTitulo('EL DINERO');
+  t.bloquePunteado([
+    s.dinero.pedidosEfectivo
+      ? { etiqueta: 'Pedidos de contado', valor: formato(s.dinero.pedidosEfectivo) } : null,
+    s.dinero.suelto ? { etiqueta: 'Vendido suelto', valor: formato(s.dinero.suelto) } : null,
+    { etiqueta: 'DEBIA TRAER', valor: formato(s.dinero.esperadoAlRecibir ?? s.dinero.esperado),
+      raya: true, negrita: true },
+    s.dinero.recibido !== null
+      ? { etiqueta: 'Entrego', valor: formato(s.dinero.recibido) } : null
+  ].filter(Boolean));
+
+  // LO QUE NO VIENE EN LA BOLSA, dicho aparte y a propósito: si estuviera
+  // en la misma columna, alguien le pediría al repartidor el dinero de lo
+  // que se fue a crédito.
+  if (s.dinero.credito || s.dinero.transferencia) {
+    t.separador();
+    t.linea('No viene en efectivo:');
+    t.bloqueDerecha([
+      s.dinero.credito ? ['A credito:', formato(s.dinero.credito)] : null,
+      s.dinero.transferencia ? ['Transferencia:', formato(s.dinero.transferencia)] : null
+    ].filter(Boolean));
+  }
+
+  if (s.dinero.diferencia !== null) {
+    if (s.dinero.diferencia === 0) {
+      renglonResultado(t, 'CUADRO');
+    } else {
+      renglonResultado(t, s.dinero.diferencia < 0
+        ? `FALTA ${formato(-s.dinero.diferencia)}`
+        : `SOBRA ${formato(s.dinero.diferencia)}`);
+    }
+  }
+
+  if (s.motivo_diferencia) { t.separador(); t.parrafo(s.motivo_diferencia); }
+
+  if (s.estado === 'liquidada') {
+    t.linea(`Cerro: ${s.liquidada_por_nombre || '—'}`);
+  }
+
+  t.firma('ENTREGO');
+  pie(t, negocio);
+  t.izquierda().cortar(cfg.avanceCorte);
+  return t.bytes();
+}
+
+/**
  * SOLO EL PULSO DEL CAJÓN, sin papel de por medio.
  *
  * Va aparte del ticket a propósito. El ticket solo sale si el cajero lo
@@ -1646,5 +1831,6 @@ function pulsoCajon(salida = 2) {
 module.exports = {
   ticketVenta, ticketMovimiento, ticketVale, ticketEncomienda, ticketRaya, ticketAbono,
   ticketCotizacion, ticketPrueba, ticketPedido, ticketPreparacion,
+  ticketCarga, ticketLiquidacion,
   ticketCorte, ticketCorteMovimientos, ticketHielo, ticketCortePersona, ticketConteo, ticketProduccion, ticketResumenDia, pulsoCajon, fechaCorta, fechaTicket
 };

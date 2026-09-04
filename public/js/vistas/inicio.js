@@ -31,6 +31,7 @@ const ACCESOS = [
   // (producción y neveras), y un tercero igual no se distingue de lejos.
   // Un pedido es una caja que espera a que la lleven, y así se lee.
   { emoji: '📦', titulo: 'Los pedidos',   ruta: '#/pedidos',  permiso: 'pedidos.ver',          desde: null   },
+  { emoji: '🚚', titulo: 'El reparto',    ruta: '#/reparto',  permiso: 'reparto.ver',          desde: null   },
   { emoji: '✉️', titulo: 'Avisos',       ruta: '#/correo',    permiso: 'correo.configurar',    desde: null   },
   { emoji: '🏷️', titulo: 'Productos y precios', ruta: '#/productos', permiso: 'inventario.ver', desde: null },
   { emoji: '🧾', titulo: 'Clientes',      ruta: '#/clientes',  permiso: 'clientes.ver',         desde: null   },

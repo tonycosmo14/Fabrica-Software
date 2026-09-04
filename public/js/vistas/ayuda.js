@@ -2623,6 +2623,107 @@ DEBERIA HABER ..........................  $5,500
 
   // ==========================================================
   {
+    id: 'reparto',
+    titulo: 'El reparto: la salida, el regreso y la liquidación',
+    busca: 'reparto repartidor salida salidas camioneta vehiculo vehiculos moto triciclo '
+         + 'carga cargar hoja de carga suelto liquidar liquidacion cuadrar cuadre merma '
+         + 'derretido derretida regreso regresar entregar entregado no entregado dinero '
+         + 'efectivo falta sobra diferencia recibir capacidad marquetas ruta viaje',
+    cuerpo: `
+      <p>Un <b>pedido</b> es lo que alguien pidió. Una <b>salida</b> es la
+      camioneta cargada con varios de ellos, más lo suelto, dando la vuelta.
+      Esto es lo segundo.</p>
+
+      <h4>1 · Armarla</h4>
+      <p>En <b>🚚 El reparto</b>, «+ Salida»: se elige <b>quién se la lleva</b> y
+      <b>en qué</b>. Después se le cuelgan los pedidos —salen todos los
+      pendientes con casillas, se desmarca lo que no sube y se cuelgan de un
+      botón— y se le sube <b>lo suelto</b>: hielo y productos de más, para
+      vender en la calle a quien se atraviese.</p>
+      <p class="ayuda-tip">Lo de <b>mayoreo</b> no sube suelto. El precio de
+      mayoreo es de alguien; en la calle no hay a quién cobrárselo. Eso va
+      como pedido, con su cliente.</p>
+
+      <h4>2 · Que salga</h4>
+      <p>Al tocar <b>«Que salga»</b> se imprime la <b>hoja de carga</b>: lo que
+      sube al camión, pedido por pedido y con su nombre, para el que lo sube y
+      para el que lo revisa. No lleva precios a propósito — en el patio, con
+      el camión abierto, un renglón de dinero estorba.</p>
+      <p>Si le pusiste al vehículo <b>cuántas marquetas le caben</b>, avisa
+      cuando la carga se pasa. Sobrecargarla es la forma más común de que el
+      hielo llegue derretido.</p>
+      <p class="ayuda-tip">Ya en la calle <b>no se le agrega ni se le baja
+      nada</b>: lo que se le pusiera después no subió al camión, y el cuadre
+      saldría con mercancía que nunca existió.</p>
+
+      <h4>3 · El regreso</h4>
+      <p>Se toca <b>«Ya regresó»</b> y se captura lo que pasó:</p>
+      <ul>
+        <li><b>Cada pedido</b>: ✅ entregado —y <b>cómo pagó de verdad</b>, que
+        en la puerta el cliente cambia de opinión— o ↩️ volvió, <b>con su
+        motivo</b>. El que vuelve queda pendiente otra vez y aparece en el
+        reparto de mañana.</li>
+        <li><b>Lo suelto</b>: cuánto vendió y cuánto volvió.</li>
+      </ul>
+
+      <h4>La merma sale sola</h4>
+      <p>No se teclea nunca. Se cuenta lo que se puede contar con las manos y
+      la merma es la resta:</p>
+      <p class="ayuda-tip"><b>lo que subió − lo vendido − lo que volvió = lo que
+      se derritió</b></p>
+      <p>Es a propósito: teclear la merma es pedirle a alguien que confiese, y
+      lo que se confiesa se redondea. Así el número es el que es, y la
+      conversación deja de ser «¿cuánto se te derritió?» para ser «volvieron
+      dos, ¿verdad?».</p>
+      <p>El hielo derretido se carga solo al cuarto frío como <b>merma
+      derretida</b>, igual que cualquier otra, y una sola vez.</p>
+
+      <h4>4 · El dinero, en Vender</h4>
+      <p>Cuando el repartidor vuelve, a quien le entrega el dinero es a
+      <b>quien esté en la caja</b>. Por eso se recibe en <b>🛒 Vender</b>, con
+      el botón <b>🚚</b> de arriba: lleva un numerito con cuántos están
+      esperando.</p>
+      <p>Ahí sale <b>cuánto debía traer</b>, se teclea lo que entregó y se
+      apunta. Si hay dos camionetas esperando, se elige de cuál es el dinero.
+      Al recibirlo se imprime la <b>liquidación</b>, que es el papel que él
+      firma.</p>
+      <p class="ayuda-tip">Solo se le pide el <b>efectivo</b>. Lo que se fue a
+      crédito o por transferencia no viene en su bolsa, y sale escrito aparte
+      en su papel para que nadie se lo cobre.</p>
+
+      <h4>Si no cuadra</h4>
+      <p>Se apunta igual —el dinero ya está en la mano de la cajera—, sale un
+      <b>correo en el momento</b> y la salida <b>queda abierta</b>.</p>
+      <p>Cerrarla, escribiendo qué pasó, es del <b>gerente o el dueño</b>. La
+      cajera recibe y ya: eso es contar billetes. Cerrar una salida
+      descuadrada es decidir quién se come la diferencia, y esa decisión tiene
+      dueño.</p>
+      <p class="ayuda-tip">Mientras no se cierre, <b>el corte del turno va a
+      salir corto</b>, y así tiene que ser: el hueco es real. Taparlo con un
+      movimiento de caja lo escondería justo del papel donde se busca.</p>
+
+      <h4>Por qué el dinero no se cuenta dos veces</h4>
+      <p>Cada pedido entregado en efectivo crea <b>su venta</b>, y una venta en
+      efectivo ya cuenta en el arqueo del turno. Recibirle el dinero al
+      repartidor <b>no mete una entrada al cajón</b>: si lo hiciera, ese mismo
+      dinero se contaría dos veces y la caja sobraría todos los días.</p>
+      <p>Lo que se guarda al recibir es <b>cuánto entregó</b>, para poder
+      restarlo de lo que debía traer.</p>
+
+      <h4>El repartidor no se cuadra a sí mismo</h4>
+      <p>Ve su salida —es su hoja de trabajo— y puede marcar lo que entregó.
+      Lo que <b>no</b> puede es armar cargas, tomar pedidos ni recibirse su
+      propio dinero. La persona a la que se le cuadra no puede ser la que
+      cuadra.</p>
+
+      <h4>Los vehículos</h4>
+      <p>Se dan de alta una vez y se usan años, como los tanques: nombre
+      («La camioneta blanca»), qué es, y cuántas marquetas le caben. Nada se
+      borra — uno de baja se queda con todos sus viajes.</p>`
+  },
+
+  // ==========================================================
+  {
     id: 'correo',
     titulo: 'Avisos por correo: que el sistema te escriba',
     busca: 'correo correos email gmail smtp aviso avisos alerta alertas notificacion notificaciones ' +

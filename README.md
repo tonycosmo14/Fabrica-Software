@@ -3,7 +3,7 @@
 Sistema para la fábrica de hielo de Hunucmá, Yucatán.
 Se construye **por versiones**: cada versión es un pedazo terminado, probado y usable.
 
-**Versión actual: v2.2**
+**Versión actual: v5.7**
 
 ---
 
@@ -808,43 +808,83 @@ versión nueva le aparece un punto rojo en el menú.
 
 ## Camino de versiones
 
+Esta tabla se genera de `src/version.js`, que es la única fuente de
+verdad de qué hay en cada versión. Escrita a mano se quedaba atrás.
+
 | Versión | Contenido | Estado |
 |---|---|---|
-| **v0.1** | Cimientos, usuarios, roles, PIN, migraciones, novedades | ✅ listo |
-| **v0.1.1** | Ajustes para que se vea bien en PC, PIN con teclado físico | ✅ listo |
-| **v0.1.2** | Arranque con doble clic, icono en el escritorio, instalable en el celular | ✅ listo |
-| **v0.1.3** | Se instala sin compilador: base de datos incluida en Node | ✅ listo |
-| **v0.1.4** | Marca Hielo LOLHA, modo oscuro, asistente de primer arranque | ✅ listo |
-| **v0.2** | Configurador de tanques, paños, canastas y moldes | ✅ listo |
-| **v0.2.1** | Personalizar (logo propio), diálogos del sistema, quitar paños | ✅ listo |
-| **v0.2.2** | Encabezado con logo y reloj, atajos, recuperación de acceso | ✅ listo |
-| **v0.3** | Producción: sacar, rellenar, estados, reloj de congelación | ✅ listo |
-| **v0.4** | Producción con el flujo real: rotación, paño como unidad, captura en lote | ✅ listo |
-| **v0.5** | Números a sacar imprimibles, autorización con PIN, arreglos | ✅ listo |
-| **v0.5.1** | Autorización al primer toque con vales, ajustes de formulario | ✅ listo |
-| **v0.6** | Respaldos automáticos dentro y fuera de la PC | ✅ listo |
-| **v0.7** | La Existencia: conteo del cuarto frío y cuadre del día | ✅ listo |
-| **v0.8** | Punto de venta, conteo con fracciones, vendido vs faltante | ✅ listo |
-| **v0.9** | La Caja: turnos, gastos, arqueo y corte imprimible | ✅ listo |
-| **v0.9.1** | Manual de ayuda dentro del sistema | ✅ listo |
-| **v1.0** | Caja táctil: catálogo, teclado rápido, ticket corto | ✅ listo |
-| **v1.1** | Impresión ESC/POS desde el servidor, relevo de turno, reimpresión | ✅ listo |
-| **v1.2** | Ventas en espera y cambios de ticket | ✅ listo |
+| **v0.1** | Cimientos | ✅ listo |
+| **v0.1.1** | Se ve bien en la PC | ✅ listo |
+| **v0.1.2** | Se abre con doble clic | ✅ listo |
+| **v0.1.3** | Se instala sin pelear | ✅ listo |
+| **v0.1.4** | Hielo LOLHA | ✅ listo |
+| **v0.2** | Tanques | ✅ listo |
+| **v0.2.1** | Personalizar y mejor acabado | ✅ listo |
+| **v0.2.2** | Encabezado, reloj y atajos | ✅ listo |
+| **v0.3** | Producción | ✅ listo |
+| **v0.4** | Producción como trabaja la fábrica | ✅ listo |
+| **v0.5** | Los números a sacar | ✅ listo |
+| **v0.5.1** | Autoriza primero, decide después | ✅ listo |
+| **v0.6** | Respaldos automáticos | ✅ listo |
+| **v0.7** | La Existencia | ✅ listo |
+| **v0.8** | Punto de venta | ✅ listo |
+| **v0.9** | La Caja | ✅ listo |
+| **v0.9.1** | Manual de ayuda | ✅ listo |
+| **v1.0** | La caja de verdad | ✅ listo |
+| **v1.1** | Impresión de verdad y relevo de turno | ✅ listo |
+| **v1.2** | Dos clientes a la vez y cambios de ticket | ✅ listo |
 | **v1.3** | Productos con foto, costo e inventario | ✅ listo |
-| **v1.4** | Editar sin formularios, recuperar bajas, márgenes | ✅ listo |
-| **v1.5** | Avisos de inventario, no vender lo que no hay, más pantalla para vender | ✅ listo |
-| **v1.6** | Clientes registrados, crédito y cobranza | ✅ listo |
-| **v1.6.1** | Sin etiquetas de teclado en el celular; pruebas sin copy-paste | ✅ listo |
-| **v1.7** | Ajustes de la primera prueba a fondo: cantidades, F1, dinero sin decimales | ✅ listo |
-| **v1.8** | Historial con filtros, y borrar de verdad | ✅ listo |
-| **v1.9** | Precios de mayoreo, corte en dos columnas y compartir por WhatsApp | ✅ listo |
-| **v2.0** | Mayoreo tecleado, historial con acciones, mermas y listas de un renglón | ✅ listo |
-| **v2.0.1** | La impresora de red: basta con su dirección IP | ✅ listo |
-| **v2.0.2** | Zona horaria, el enter de vaciar, y elegir la impresora de una lista | ✅ listo |
-| **v2.1** | El cajón del dinero, sonido, devoluciones completas e impresoras por apartado | ✅ listo |
-| **v2.2** | El número del año en el ticket, y actualizar desde un ZIP | ✅ listo |
-| v2.3 | Estadísticas, gráficas, recibos de CFE y gastos grandes de la empresa | siguiente |
-| v2.4 | Reparto, pedidos y neveras en comodato | |
-| v2.5 | Planta de agua: garrafones, botellas y depósitos | |
-| v2.6 | Mantenimiento: compresores, ósmosis, membranas, horario punta | |
-| — | Identificación por huella en la caja (fase propia) | |
+| **v1.4** | Editar sin formularios | ✅ listo |
+| **v1.5** | La caja avisa y la pantalla rinde | ✅ listo |
+| **v1.6** | Clientes y crédito | ✅ listo |
+| **v1.6.1** | Sin teclas en el celular | ✅ listo |
+| **v1.7** | La caja obedece | ✅ listo |
+| **v1.8** | Historial, y borrar de verdad | ✅ listo |
+| **v1.9** | Mayoreo, papel y WhatsApp | ✅ listo |
+| **v2.0** | La caja de diario | ✅ listo |
+| **v2.0.1** | La impresora de red | ✅ listo |
+| **v2.0.2** | Tres que estorbaban | ✅ listo |
+| **v2.1** | El cajón, el sonido y las devoluciones | ✅ listo |
+| **v2.2** | El número del año, y actualizar solo | ✅ listo |
+| **v2.3** | Como se construye un ticket | ✅ listo |
+| **v2.4** | Listas que se pueden leer | ✅ listo |
+| **v2.5** | Los gastos de siempre y el turno relevado | ✅ listo |
+| **v2.6** | El ticket chico | ✅ listo |
+| **v2.7** | Las cuentas de la empresa | ✅ listo |
+| **v2.7.1** | Los arreglos del estreno | ✅ listo |
+| **v2.8** | El día del arranque | ✅ listo |
+| **v2.9** | Los números | ✅ listo |
+| **v2.9.1** | Que los números cuadren | ✅ listo |
+| **v3.0** | Cómo salió el hielo | ✅ listo |
+| **v3.1** | Lo que faltaba del hielo, y la pantalla ordenada | ✅ listo |
+| **v3.2** | Las canastas que quedaron pendientes | ✅ listo |
+| **v3.3** | Configurar tanques, donde le toca | ✅ listo |
+| **v3.4** | Anotar la existencia, en el orden en que se canta | ✅ listo |
+| **v3.5** | Lo que estaba roto y lo que estorbaba | ✅ listo |
+| **v3.6** | Las dos temperaturas | ✅ listo |
+| **v3.7** | El recibo de luz completo, y el IVA que nos deben | ✅ listo |
+| **v3.8** | La gente y los clientes, con cara | ✅ listo |
+| **v3.9** | Corregir un corte, y el historial de un vistazo | ✅ listo |
+| **v4.0** | Una sola manera de anotar el hielo | ✅ listo |
+| **v4.1** | El corte se lo come todo | ✅ listo |
+| **v4.2** | El corte del hielo | ✅ listo |
+| **v4.3** | Los vales | ✅ listo |
+| **v4.4** | El corte en dos columnas | ✅ listo |
+| **v4.5** | Lo encomendado | ✅ listo |
+| **v4.6** | La hoja, a tu manera | ✅ listo |
+| **v4.7** | Menos papel, más rastro | ✅ listo |
+| **v4.8** | La raya | ✅ listo |
+| **v4.9** | Que el sistema te escriba | ✅ listo |
+| **v5.0** | Los tickets, como los dibujaste | ✅ listo |
+| **v5.1** | Las neveras | ✅ listo |
+| **v5.2** | El agua: la máquina | ✅ listo |
+| **v5.2.1** | La puesta en marcha, arreglada | ✅ listo |
+| **v5.2.2** | El ticket de mayoreo y la palabra crédito | ✅ listo |
+| **v5.3** | Paga una parte y debe la otra | ✅ listo |
+| **v5.4** | Los clientes, por lo que compran | ✅ listo |
+| **v5.5** | Cobrar la deuda desde la caja | ✅ listo |
+| **v5.6** | Los pedidos | ✅ listo |
+| **v5.7** | La salida y la liquidación | ✅ listo |
+
+**Lo que falta:** el instalador para Windows, y la
+importación de lo que hay en Aronium la noche antes de arrancar.

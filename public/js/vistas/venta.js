@@ -51,6 +51,7 @@ const FASES = {
   movimientos: { enter: 'nada',                   esc: 'volver a vender' },
   clientes:  { enter: 'nada',                     esc: 'volver al cobro' },
   abono:     { enter: 'recibe el abono',          esc: 'volver al ticket' },
+  reparto:   { enter: 'recibe el dinero',        esc: 'volver al ticket' },
   cobrada:   { enter: 'imprime el ticket',        esc: 'siguiente venta' }
 };
 
@@ -67,6 +68,8 @@ export async function vistaVenta(pantalla, estadoApp) {
   const puedeCobrarCredito = tiene('credito.cobrar');
   // Apartar un pedido en vez de cobrarlo (v5.6).
   const puedeTomarPedidos = tiene('pedidos.tomar');
+  // Recibirle el dinero al repartidor cuando vuelve (v5.7).
+  const puedeRecibirReparto = tiene('reparto.operar');
   const puedeRepartirNumeros = tiene('produccion.numeros');
   // Devolver saca dinero del cajón por algo que ya se cobró: eso lo revisa
   // un gerente, no se hace solo desde el mostrador.
@@ -170,6 +173,12 @@ export async function vistaVenta(pantalla, estadoApp) {
   // Lo que el cliente deja en el momento cuando se lo lleva a crédito
   // (v5.3). En centavos, y cero quiere decir "se lo lleva todo a crédito".
   let abonoMostrador = 0;
+  // Las salidas que ya volvieron y esperan que alguien les cuente el
+  // dinero. Se rellena sola con el contador del botón 🚚 (v5.7).
+  let porRecibir = [];
+  // La salida que se está recibiendo y cuánto dinero se contó, en centavos.
+  let recibiendo = null;
+  let efectivoContado = null;
   let volverDeClientes = 'cobro';   // a dónde regresa Esc en la lista de clientes
   let cobrarAlElegir = false;       // se abrió camino al cobro: al elegir, se sigue
 
@@ -219,6 +228,11 @@ export async function vistaVenta(pantalla, estadoApp) {
   // contador solo apareciera después de la primera venta, la muchacha que
   // abre a las siete no vería que hay dos papelitos esperando.
   pintarMarcaEncomiendas();
+  // Y cuántos repartidores están esperando a que les cuenten el dinero
+  // (v5.7). Por lo mismo: si el numerito solo apareciera después de la
+  // primera venta, un repartidor podría irse a su casa con el dinero en la
+  // bolsa sin que nadie se enterara de que estaba ahí parado.
+  pintarMarcaReparto();
 
   // ==========================================================
   // EL ARMAZÓN: izquierda el ticket, derecha los botones
@@ -265,6 +279,17 @@ export async function vistaVenta(pantalla, estadoApp) {
             ${puedeVerCaja ? `
               <button class="pos-chico" id="ver-movimientos"
                       title="Gastos y dinero metido">💵</button>` : ''}
+            <!-- EL REPARTIDOR QUE VUELVE  (v5.7). Con su contador, como las
+                 encomiendas: es el recordatorio de que alguien está
+                 esperando a que le cuenten el dinero. Vive AQUÍ y no en la
+                 pantalla del reparto porque quien lo recibe es quien está
+                 en la caja, y no se va a salir de su pantalla con gente
+                 enfrente. -->
+            ${puedeRecibirReparto ? `
+              <button class="pos-chico pos-chico-contador" id="reparto"
+                      title="Recibirle el dinero al repartidor">
+                🚚<span class="pos-contador" id="marca-reparto" hidden></span>
+              </button>` : ''}
             ${puedeOperarCaja ? `
               <button class="pos-chico" id="terminar-turno"
                       title="Terminar turno y contar">🔒</button>` : ''}
@@ -1051,6 +1076,7 @@ export async function vistaVenta(pantalla, estadoApp) {
     } catch { /* el cajero no siempre puede ver inventario; sin aviso y ya */ }
 
     pintarMarcaEncomiendas();
+    pintarMarcaReparto();
   }
 
   /**
@@ -1075,6 +1101,253 @@ export async function vistaVenta(pantalla, estadoApp) {
           : `Hielo pagado que se guarda para el cliente (${nombreEncomienda.toLowerCase()})`;
       }
     } catch { marca2.hidden = true; }
+  }
+
+  /**
+   * CUÁNTOS REPARTIDORES ESTÁN ESPERANDO  (v5.7)
+   *
+   * El mismo numerito que las encomiendas, y por la misma razón: un
+   * repartidor que volvió y a quien nadie le recibió el dinero se va a su
+   * casa con él en la bolsa, y mañana ya nadie se acuerda de cuánto era.
+   */
+  async function pintarMarcaReparto() {
+    const marca3 = pantalla.querySelector('#marca-reparto');
+    if (!marca3) return;
+    try {
+      const r = await api.obtener('/reparto/por-recibir');
+      porRecibir = r.salidas || [];
+      marca3.textContent = porRecibir.length > 9 ? '9+' : String(porRecibir.length || '');
+      marca3.hidden = !porRecibir.length;
+      const boton = pantalla.querySelector('#reparto');
+      if (boton) {
+        boton.title = porRecibir.length
+          ? `${porRecibir.length} repartidor${porRecibir.length === 1 ? '' : 'es'} esperando a que le${porRecibir.length === 1 ? '' : 's'} reciban el dinero`
+          : 'Recibirle el dinero al repartidor';
+      }
+    } catch { marca3.hidden = true; }
+  }
+
+  /**
+   * RECIBIRLE EL DINERO AL REPARTIDOR  (v5.7)
+   *
+   * ============================================================
+   * POR QUÉ ESTO VIVE AQUÍ Y NO EN LA PANTALLA DEL REPARTO
+   * ============================================================
+   *
+   * "Las liquidaciones se deben poder hacer en el módulo vender, porque
+   *  cuando el repartidor regrese, a quien le va a entregar el dinero es a
+   *  quien esté en caja. Debe de ser fácil que la cajera simplemente
+   *  reciba el dinero que le están dando."
+   *
+   * Y lo que hace aquí es EXACTAMENTE eso: mira cuánto debía traer, cuenta
+   * lo que le dan y lo escribe. No cierra nada, no ajusta nada y no decide
+   * nada. Si el número no cuadra, se apunta igual —el dinero ya está en la
+   * mano— sale el correo, y la salida queda abierta para que un
+   * responsable la cierre diciendo qué pasó.
+   */
+  function pintarReparto() {
+    fase = 'reparto';
+    refs.cobro.hidden = false;
+
+    if (!porRecibir.length) {
+      refs.cobro.innerHTML = `
+        <div class="pos-cobro-caja pos-aviso-caja">
+          <div class="pos-aviso-grande">🚚</div>
+          <h3 style="margin:0 0 4px">Nadie está esperando</h3>
+          <p class="ayuda" style="margin:0 0 14px">
+            Aquí salen las salidas que ya volvieron y todavía no entregan su
+            dinero.
+          </p>
+          <button class="pos-confirmar" id="salir-cobro">
+            <span>Está bien</span><small>Esc</small>
+          </button>
+        </div>`;
+      setTimeout(() => refs.cobro.querySelector('#salir-cobro')?.focus(), 0);
+      refs.cobro.querySelector('#salir-cobro').onclick = cerrarCobro;
+      pintarPista();
+      return;
+    }
+
+    // CON UNA SOLA, NO SE PREGUNTA CUÁL. Es lo que pasa casi siempre, y un
+    // menú de un elemento es un toque de más con alguien esperando.
+    if (!recibiendo) {
+      if (porRecibir.length === 1) recibiendo = porRecibir[0];
+      else return pintarCualReparto();
+    }
+
+    const s = recibiendo;
+    if (efectivoContado === null) efectivoContado = s.dinero.esperado;
+    const diferencia = efectivoContado - s.dinero.esperado;
+
+    refs.cobro.innerHTML = `
+      <div class="pos-cobro-caja">
+        <div class="pos-cobro-total">
+          <span>Salida #${s.folio} de</span>
+          <strong class="pos-fiado-nombre">${esc(s.repartidor_nombre || '—')}</strong>
+        </div>
+
+        <div class="pos-cambio grande">
+          <span>Debe traer</span><strong>${pesos(s.dinero.esperado)}</strong>
+        </div>
+
+        <div class="cuadre" style="margin-top:12px">
+          ${s.dinero.pedidosEfectivo ? `
+            <div class="cuadre-linea">
+              <span>${s.entregados} pedido${s.entregados === 1 ? '' : 's'} de contado</span>
+              <strong>${pesos(s.dinero.pedidosEfectivo)}</strong>
+            </div>` : ''}
+          ${s.dinero.suelto ? `
+            <div class="cuadre-linea">
+              <span>Vendió suelto</span><strong>${pesos(s.dinero.suelto)}</strong>
+            </div>` : ''}
+        </div>
+
+        ${s.dinero.credito || s.dinero.transferencia ? `
+          <p class="ayuda" style="margin:10px 0 0">
+            No viene en su bolsa:
+            ${s.dinero.credito ? `${pesos(s.dinero.credito)} a crédito` : ''}
+            ${s.dinero.credito && s.dinero.transferencia ? ' · ' : ''}
+            ${s.dinero.transferencia ? `${pesos(s.dinero.transferencia)} por transferencia` : ''}.
+          </p>` : ''}
+
+        <div class="pos-abona" style="margin-top:14px">
+          <label class="etiqueta-chica" for="rep-efectivo">¿Cuánto te entregó?</label>
+          <div class="pos-abona-fila">
+            <input id="rep-efectivo" class="campo-importe" inputmode="decimal"
+                   autocomplete="off" value="${(efectivoContado / 100).toFixed(2)}">
+            <button class="secundario chico" id="rep-justo">Justo</button>
+          </div>
+          <small class="ayuda" id="rep-malo" hidden></small>
+        </div>
+
+        <div class="pos-cambio ${diferencia === 0 ? '' : 'pos-fiado'}" style="margin-top:12px">
+          <span>${diferencia === 0 ? 'Cuadra' : diferencia < 0 ? 'Falta' : 'Sobra'}</span>
+          <strong>${diferencia === 0 ? '$0' : pesos(Math.abs(diferencia))}</strong>
+        </div>
+
+        ${diferencia !== 0 ? `
+          <p class="ayuda" style="margin:10px 0 0">
+            Se apunta igual —el dinero ya está en tu mano—, se avisa por correo
+            y la salida queda abierta para que la cierre un responsable.
+          </p>` : ''}
+
+        <button class="pos-confirmar" id="confirmar" style="margin-top:14px">
+          <span>Recibir ${pesos(efectivoContado)}</span><small>Enter</small>
+        </button>
+        ${porRecibir.length > 1 ? `
+          <button class="secundario" id="rep-otra" style="margin-top:10px;width:100%">
+            Es otro repartidor
+          </button>` : ''}
+        <button class="secundario" id="salir-cobro" style="margin-top:10px;width:100%">
+          <span class="tecla-dice">Esc · </span>volver
+        </button>
+      </div>`;
+
+    const campo = refs.cobro.querySelector('#rep-efectivo');
+    const malo = refs.cobro.querySelector('#rep-malo');
+
+    const leer = () => {
+      const escrito = campo.value.trim().replace(/[$,\s]/g, '');
+      // VACÍO ES CERO Y ES UNA RESPUESTA: hay viajes en los que todo se fue
+      // a crédito y el repartidor vuelve sin un peso.
+      if (escrito === '') { efectivoContado = 0; malo.hidden = true; return true; }
+      const n = Number(escrito);
+      if (!Number.isFinite(n) || n < 0) {
+        malo.textContent = 'Eso no es una cantidad.';
+        malo.hidden = false;
+        return false;
+      }
+      efectivoContado = Math.round(n * 100);
+      malo.hidden = true;
+      return true;
+    };
+
+    campo.onchange = () => { if (leer()) pintarReparto(); };
+    campo.onblur = () => { if (leer()) pintarReparto(); };
+    campo.onkeydown = (ev) => {
+      if (ev.key !== 'Enter') return;
+      // Igual que en el abono: el enter de la pantalla confirma, y aquí
+      // solo quiere decir "ya está el número". Sin stopPropagation
+      // recibiría lo tecleado a medias.
+      ev.preventDefault(); ev.stopPropagation();
+      if (leer()) pintarReparto();
+    };
+
+    refs.cobro.querySelector('#rep-justo').onclick = () => {
+      efectivoContado = s.dinero.esperado; pintarReparto();
+    };
+    const otra = refs.cobro.querySelector('#rep-otra');
+    if (otra) otra.onclick = () => {
+      recibiendo = null; efectivoContado = null; pintarCualReparto();
+    };
+    setTimeout(() => refs.cobro.querySelector('#confirmar')?.focus(), 0);
+    refs.cobro.querySelector('#confirmar').onclick = recibirReparto;
+    refs.cobro.querySelector('#salir-cobro').onclick = cerrarCobro;
+    pintarPista();
+  }
+
+  /** Cuando hay dos camionetas esperando, se elige de cuál es el dinero. */
+  function pintarCualReparto() {
+    fase = 'reparto';
+    refs.cobro.hidden = false;
+    refs.cobro.innerHTML = `
+      <div class="pos-cobro-caja pos-historial">
+        <h3 style="margin:0 0 12px">¿De quién es el dinero?</h3>
+        ${porRecibir.map((s) => `
+          <div class="ticket-fila" data-salida="${esc(s.id)}" tabindex="0">
+            <div class="crece">
+              <strong>#${s.folio} ${esc(s.repartidor_nombre || '—')}</strong>
+              <small>${s.entregados} entregado${s.entregados === 1 ? '' : 's'}
+                ${s.vehiculo_nombre ? `· ${esc(s.vehiculo_nombre)}` : ''}</small>
+            </div>
+            <strong>${pesos(s.dinero.esperado)}</strong>
+          </div>`).join('')}
+        <button class="secundario" id="salir-cobro" style="margin-top:12px;width:100%">
+          <span class="tecla-dice">Esc · </span>volver
+        </button>
+      </div>`;
+
+    refs.cobro.querySelectorAll('[data-salida]').forEach((b) => {
+      b.onclick = () => {
+        recibiendo = porRecibir.find((x) => x.id === b.dataset.salida) || null;
+        efectivoContado = null;
+        pintarReparto();
+      };
+    });
+    refs.cobro.querySelector('#salir-cobro').onclick = cerrarCobro;
+    pintarPista();
+  }
+
+  async function recibirReparto() {
+    if (fase !== 'reparto' || !recibiendo) return;
+    const s = recibiendo;
+    const cuanto = efectivoContado ?? 0;
+    fase = 'guardando';
+    pintarPista();
+
+    try {
+      const r = await api.enviar(`/reparto/${s.id}/recibir`,
+                                 { efectivo: (cuanto / 100).toFixed(2) });
+      if (r.cuadro) {
+        avisar(`Cuadró. Salida #${s.folio} liquidada.`, 'bien');
+      } else {
+        const falta = r.diferencia < 0;
+        avisar(`Recibido. ${falta ? 'FALTAN' : 'Sobran'} ${pesos(Math.abs(r.diferencia))}: `
+             + 'la salida queda abierta y ya se avisó.', 'error');
+      }
+      // El papel que firma el repartidor sale solo: es lo único que
+      // demuestra cuánto entregó, y pedirlo en otro toque es que un día no
+      // salga.
+      try { await api.enviar(`/impresion/liquidacion/${s.id}`, {}); } catch { /* sin térmica */ }
+
+      recibiendo = null; efectivoContado = null;
+      await pintarMarcaReparto();
+      cerrarCobro();
+    } catch (e) {
+      avisar(e.message, 'error');
+      fase = 'reparto';
+      pintarReparto();
+    }
   }
 
   function pintarLineas() {
@@ -1532,6 +1805,8 @@ export async function vistaVenta(pantalla, estadoApp) {
     if (fase === 'cobro')   return calcularCambio();
     // Enter recibe el abono en efectivo, que es como llega casi siempre.
     if (fase === 'abono')   return recibirAbono('efectivo');
+    // Y el dinero del repartidor, con el número ya contado.
+    if (fase === 'reparto') return recibirReparto();
     if (fase === 'cambio')  return registrar();
     if (fase === 'cobrada') return imprimir();
   }
@@ -1550,6 +1825,7 @@ export async function vistaVenta(pantalla, estadoApp) {
     }
     if (fase === 'cobro')   { cerrarCobro(); return; }
     if (fase === 'abono')   { abonoCredito = 0; cerrarCobro(); return; }
+    if (fase === 'reparto') { cerrarCobro(); return; }
     if (fase === 'cambio')  {
       // Se arrepintió de fiarle, pero sigue siendo él: se le cobra, y a
       // su precio. Quitarle el nombre aquí le subiría el precio sin avisar.
@@ -1633,6 +1909,9 @@ export async function vistaVenta(pantalla, estadoApp) {
     // uno el precio del anterior.
     cliente = null;
     fiar = false; abonoMostrador = 0; abonoCredito = 0;
+    // Y suelta también el reparto que se estaba recibiendo (v5.7): si no,
+    // el siguiente toque al botón abriría la salida de antes.
+    recibiendo = null; efectivoContado = null;
     refs.cobro.hidden = true;
     // Se repinta el ticket: al soltar al cliente cambian los precios de
     // mayoreo, y un renglón que dice $220 cuando ya vale $240 es peor que
@@ -2947,6 +3226,16 @@ export async function vistaVenta(pantalla, estadoApp) {
   if (irNumeros) irNumeros.onclick = () => salirA('#/tanques');
   const irTurno = pantalla.querySelector('#terminar-turno');
   if (irTurno) irTurno.onclick = () => salirA('#/caja');
+  // EL REPARTIDOR QUE VUELVE  (v5.7). Se relee la lista al tocarlo y no se
+  // confía en la que se pintó hace rato: entre medio pudo llegar otro
+  // camión, o alguien pudo recibirle el dinero desde otra caja.
+  const btnReparto = pantalla.querySelector('#reparto');
+  if (btnReparto) btnReparto.onclick = async () => {
+    if (cambiando) { avisar('Termina el cambio primero', 'error'); return; }
+    recibiendo = null; efectivoContado = null;
+    await pintarMarcaReparto();
+    pintarReparto();
+  };
   const verMovs = pantalla.querySelector('#ver-movimientos');
   if (verMovs) verMovs.onclick = () => verMovimientos();
 

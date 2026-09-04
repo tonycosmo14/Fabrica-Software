@@ -45,13 +45,23 @@ const PERMISOS_POR_ROL = {
     // regresar.
     'pedidos.ver',
     'pedidos.tomar',
-    'pedidos.entregar'
+    'pedidos.entregar',
+    // EL REPARTO  (v5.7). Arma la carga, la saca, captura el regreso y
+    // —lo importante— RECIBE EL DINERO: cuando el repartidor vuelve, a
+    // quien se lo entrega es a quien esté en caja. Lo que NO puede es
+    // cerrar una salida que no cuadró: eso ya no es contar billetes.
+    'reparto.ver',
+    'reparto.operar'
   ],
 
-  // EL REPARTIDOR VE LOS PEDIDOS Y LOS ENTREGA  (v5.6), pero no los toma:
-  // un pedido nace de una llamada al mostrador. Si pudiera crearlos en la
-  // calle, saldría hielo del cuarto frío contra un pedido que nadie pidió.
-  repartidor: ['reparto.ver', 'reparto.operar', 'pedidos.ver', 'pedidos.entregar'],
+  // EL REPARTIDOR VE, PERO NO SE CUADRA A SÍ MISMO  (v5.6 y v5.7).
+  //
+  // Ve sus pedidos y su salida —hace falta: es su hoja de trabajo— y puede
+  // marcar entregado lo que entregó. Lo que no puede es tomar pedidos (uno
+  // nace de una llamada al mostrador; si los creara en la calle saldría
+  // hielo contra un pedido que nadie pidió) ni recibirse el dinero a sí
+  // mismo. La persona a la que se le cuadra no puede ser la que cuadra.
+  repartidor: ['reparto.ver', 'pedidos.ver', 'pedidos.entregar'],
 
   // El gerente de turno: todo lo del cajero, más autorizar lo que se sale
   // de la regla (sacar un paño fuera de orden) y corregir errores.
@@ -97,6 +107,11 @@ const PERMISOS_POR_ROL = {
     'credito.cobrar',
     'credito.autorizar',
     'reparto.ver',
+    'reparto.operar',
+    // CERRAR UNA SALIDA QUE NO CUADRÓ  (v5.7). No es contar billetes: es
+    // decidir qué pasa con el dinero que falta. Esa decisión tiene dueño,
+    // y no es quien estaba en la caja cuando el camión volvió.
+    'reparto.cuadrar',
     // LOS PEDIDOS  (v5.6). Todo lo del cajero. Cancelar uno también, que
     // va con `pedidos.tomar`: quien puede prometer puede desprometer.
     'pedidos.ver',
@@ -131,6 +146,10 @@ const PERMISOS_POR_ROL = {
   // el límite de TDS es el que decide si el agua se embotella o no: los
   // dos son decisiones del dueño, no del turno. Medir y reportar sí es de
   // turno, y por eso `agua.ver` y `agua.anotar` sí los tienen todos.
+  //
+  // Y CON `vehiculos.administrar`  (v5.7). Una camioneta es un fierro de la
+  // empresa, como una nevera: darla de alta o de baja no es de turno. Usar
+  // la que ya está dada de alta sí lo es, y para eso basta `reparto.operar`.
   //
   // LO MISMO CON `correo.configurar`  (v4.9). Ahí vive la contraseña de la
   // cuenta de correo de la fábrica, y la lista de a quién le llegan los

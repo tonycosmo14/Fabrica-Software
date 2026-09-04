@@ -37,17 +37,14 @@ const { exigirPermiso } = require('../../middleware/sesion');
 const bitacora = require('../../lib/bitacora');
 const calculo = require('./calculo');
 
-const { prepararLineas, crearVenta, detalleVenta } = require('../ventas/rutas');
+const { prepararLineas } = require('../ventas/rutas');
 const { listaDeMayoreo } = require('../ventas/mayoreo');
 const { listaActiva } = require('../ventas/precios');
-const { cabeElCredito } = require('../clientes/calculo');
-
-// EL CUARTO FRÍO DEL QUE SALE. Igual que en una venta de mostrador: si
-// nadie lo dice, sale del que recibe la producción, que es el único que
-// tiene hielo a estas horas.
-const almacenDeSalida = () => bd.prepare(
-  'SELECT * FROM almacenes WHERE activo = 1 AND recibe_produccion = 1 ORDER BY orden LIMIT 1'
-).get() || null;
+// ENTREGAR VIVE APARTE (v5.7). Lo llaman dos sitios: esta pantalla, de uno
+// en uno, y el cuadre de una salida, donde se capturan los ocho de un
+// viaje seguidos. Copiado en dos lados, el día que se arregle uno se
+// quedaría el otro.
+const { entregarPedido, FORMAS } = require('./entrega');
 
 const router = express.Router();
 
@@ -59,8 +56,6 @@ const texto = (v, largo = 300) => {
   const t = String(v ?? '').trim();
   return t ? t.slice(0, largo) : null;
 };
-
-const FORMAS = ['efectivo', 'transferencia', 'credito'];
 
 // ============================================================
 // VER
@@ -183,84 +178,14 @@ router.post('/', tomar, (req, res) => {
  * cotizar. Es lo que promete el papel que el cliente tiene enfrente.
  */
 router.post('/:id/entregar', entregar, (req, res) => {
-  const p = calculo.completo(req.params.id);
-  if (!p) return error(res, 'Ese pedido no existe.', 404);
-  if (p.estado === 'entregado') return error(res, 'Ese pedido ya se había entregado.');
-  if (p.estado === 'cancelado') return error(res, 'Ese pedido está cancelado.');
-
-  const formaPago = FORMAS.includes(req.body?.formaPago) ? req.body.formaPago : p.forma_pago;
-
-  const cliente = bd.prepare('SELECT * FROM clientes WHERE id = ?').get(p.cliente_id);
-  if (!cliente) return error(res, 'El cliente de ese pedido ya no existe.', 409);
-
-  // ============================================================
-  // EL LÍMITE DE CRÉDITO AQUÍ AVISA, NO FRENA
-  // ============================================================
-  //
-  // En el mostrador, pasarse del límite se detiene y se pide autorización:
-  // el hielo todavía está del lado de acá y no se ha entregado nada.
-  //
-  // Aquí es al revés. Cuando esto se toca, el repartidor YA dejó los
-  // garrafones en la tienda y ya vino de regreso. Negarse a apuntarlo no
-  // devuelve la mercancía: solo deja la entrega sin registrar, y entonces
-  // el cliente debe dinero que no está escrito en ningún lado — que es
-  // exactamente el problema que este módulo vino a resolver.
-  //
-  // Así que se apunta, y se avisa. Quien está en la caja se entera en el
-  // momento, y el que decide qué hacer es el gerente, con el dato delante.
-  let avisoCredito = null;
-  if (formaPago === 'credito') {
-    const cabe = cabeElCredito(cliente, p.total);
-    if (!cabe.alcanza) avisoCredito = cabe.motivo;
-  }
-
-  const lista = listaActiva();
-  if (!lista) return error(res, 'No hay ninguna lista de precios activa.', 409);
-
-  const lineas = p.lineas.map((l) => ({
-    concepto: l.concepto,
-    dieciseisavos: l.dieciseisavos,
-    centavos: l.precio_centavos,
-    desglose: l.desglose,
-    productoId: l.producto_id,
-    cantidad: l.cantidad
-  }));
-
-  const venta = crearVenta({
-    lineas,
-    total: p.total,
-    // A crédito no lleva pago: el cliente no pagó nada. De contado se
-    // guarda pagado justo — el repartidor trajo el dinero exacto de ese
-    // ticket, y el cambio lo dio él en la calle.
-    pago: formaPago === 'credito' ? null : p.total,
-    lista,
-    almacenId: almacenDeSalida()?.id || null,
-    cajeroId: req.body?.cajeroId || req.usuario.id,
-    capturistaId: req.usuario.id,
-    formaPago,
-    notas: `Pedido ${p.folio}`,
-    clienteId: p.cliente_id
+  const r = entregarPedido({
+    pedidoId: req.params.id,
+    formaPago: req.body?.formaPago,
+    usuario: req.usuario,
+    ejecutorId: req.body?.cajeroId || null
   });
-
-  bd.prepare(`
-    UPDATE pedidos SET estado = 'entregado', venta_id = ?, entregado_en = ?,
-                       entregado_por = ?, forma_pago = ?
-     WHERE id = ?
-  `).run(venta.id, ahora(), req.usuario.id, formaPago, p.id);
-
-  bitacora.registrar({
-    accion: 'pedido.entregado', entidad: 'pedido', entidadId: p.id,
-    ejecutorId: req.usuario.id,
-    detalle: { folio: p.folio, cliente: p.cliente_nombre, total: p.total,
-               formaPago, venta: venta.folio,
-               ...(avisoCredito ? { avisoCredito } : {}) }
-  });
-
-  return ok(res, {
-    pedido: calculo.completo(p.id),
-    venta: detalleVenta(venta.id),
-    avisoCredito
-  });
+  if (r.error) return error(res, r.error, r.codigo || 400);
+  return ok(res, r);
 });
 
 // ============================================================

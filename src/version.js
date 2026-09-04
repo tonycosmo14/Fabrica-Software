@@ -17,9 +17,33 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '5.6';
+const VERSION_ACTUAL = '5.7';
 
 const VERSIONES = [
+  {
+    numero: '5.7',
+    nombre: 'La salida y la liquidación',
+    fecha: '2026-09-04',
+    resumen:
+      'La camioneta sale con lo que le toca, y al volver se cuadra: qué '
+      + 'llegó, qué se derritió y cuánto dinero trae. La cajera lo recibe '
+      + 'sin salirse de vender.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'LA SALIDA: se elige quién se la lleva y en qué, se le cuelgan los pedidos del día con casillas —todos de un botón, no de uno en uno— y se le sube lo suelto para vender en la calle. Sale su hoja de carga impresa, sin precios: en el patio, con el camión abierto, un renglón de dinero estorba.' },
+      { tipo: 'nuevo', texto: 'AVISA CUANDO NO LE CABE. A cada vehículo se le pone cuántas marquetas le caben, y si la carga se pasa lo dice antes de salir. Sobrecargar la camioneta es la forma más común de que el hielo llegue derretido.' },
+      { tipo: 'importante', texto: 'AL VOLVER, EL CUADRE. Se marca qué pedido llegó a su puerta —y cómo pagó de verdad, que en la puerta el cliente cambia de opinión— y qué volvió sin entregar, con su motivo. El que vuelve queda PENDIENTE otra vez y aparece en el reparto de mañana: no se pierde porque el camión ya llegó.' },
+      { tipo: 'importante', texto: 'LA MERMA SE CALCULA, NO SE TECLEA. Se cuenta lo que se puede contar con las manos —cuánto volvió y cuánto se vendió— y lo que se derritió sale solo de la resta. Teclearla sería pedirle a alguien que confiese, y lo que se confiesa se redondea. El hielo derretido se carga al cuarto frío como merma, una sola vez.' },
+      { tipo: 'nuevo', texto: 'Y AVISA SI SE DERRITIÓ DE MÁS: se pone qué porcentaje es normal en un viaje (8% de entrada) y por encima de eso llega un correo. Suele ser una lona rota, una hielera que ya no cierra, o una ruta que se está haciendo muy larga para el calor que hace.' },
+      { tipo: 'nuevo', texto: 'EL DINERO SE RECIBE EN VENDER, con el botón 🚚 y su numerito: es donde está quien lo va a contar, y no se va a salir de su pantalla con gente enfrente. Sale cuánto debía traer, se teclea lo que entregó y se apunta. Con dos camionetas esperando, se elige de cuál es el dinero.' },
+      { tipo: 'importante', texto: 'LA CAJERA RECIBE; NO CIERRA. Si el dinero no cuadra se apunta igual —ya está en su mano—, sale el correo al momento y la salida queda ABIERTA. Cerrarla con su motivo es del gerente o del dueño: eso ya no es contar billetes, es decidir quién se come la diferencia, y esa decisión tiene dueño.' },
+      { tipo: 'importante', texto: 'Y EL REPARTIDOR NO SE CUADRA A SÍ MISMO. Ve su salida —es su hoja de trabajo— y puede marcar lo que entregó, pero no arma cargas ni se recibe su propio dinero. La persona a la que se le cuadra no puede ser la que cuadra.' },
+      { tipo: 'importante', texto: 'EL DINERO NO SE CUENTA DOS VECES, y era lo más fácil de hacer al revés. Cada pedido entregado en efectivo ya crea su venta, y una venta en efectivo ya cuenta en el arqueo del turno; apuntar además una entrada al cajón por lo que trae el repartidor haría que la caja sobrara todos los días. Y si falta, el turno sale corto — así tiene que ser: el hueco es real, y taparlo lo escondería del único papel donde se busca.' },
+      { tipo: 'nuevo', texto: 'SOLO SE LE PIDE EL EFECTIVO. Lo que se fue a crédito o por transferencia no viene en su bolsa, y sale escrito aparte en su papel para que nadie se lo cobre.' },
+      { tipo: 'nuevo', texto: 'LA LIQUIDACIÓN IMPRESA, que firma el repartidor: qué llevaba, qué llegó, qué se derritió y la cuenta del dinero con el resultado en grande. Sale sola al recibirle.' },
+      { tipo: 'nuevo', texto: 'LOS VEHÍCULOS se dan de alta una vez y se usan años, como los tanques. Nada se borra: uno de baja se queda con todos sus viajes.' },
+      { tipo: 'mejora', texto: 'Y una venta que salió del reparto queda marcada con su salida. Sin eso, en el historial el ticket de un pedido repartido y el de una venta de mostrador se ven iguales, y «cuánto vendió el reparto este mes» no se puede contestar.' }
+    ]
+  },
   {
     numero: '5.6',
     nombre: 'Los pedidos',

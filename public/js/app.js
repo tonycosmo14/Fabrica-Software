@@ -22,6 +22,7 @@ import { vistaCorreo } from './vistas/correo.js';
 import { vistaNeveras } from './vistas/neveras.js';
 import { vistaAgua } from './vistas/agua.js';
 import { vistaPedidos } from './vistas/pedidos.js';
+import { vistaReparto } from './vistas/reparto.js';
 import { vistaNovedades, hayVersionNueva } from './vistas/novedades.js';
 import { vistaAyuda } from './vistas/ayuda.js';
 import { vistaPersonalizar } from './vistas/personalizar.js';
@@ -68,6 +69,10 @@ const RUTAS = {
   // Se TOMAN en Vender —ahí están los precios y el teclado de fracciones—
   // y aquí se preparan, se imprimen y se marcan entregados.
   '#/pedidos':   { titulo: 'Los pedidos',        vista: vistaPedidos,   permiso: 'pedidos.ver' },
+  // EL REPARTO (v5.7): lo que sale, lo que anda en la calle y lo que hay
+  // que cuadrar. El DINERO se recibe en Vender, que es donde está quien lo
+  // cuenta.
+  '#/reparto':   { titulo: 'El reparto',         vista: vistaReparto,   permiso: 'reparto.ver' },
   // El cajero entra con vista limitada: ve cuántas hay e imprime la hoja.
   '#/productos': { titulo: 'Productos y precios', vista: vistaProductos, permiso: 'inventario.ver', fija: true },
   '#/clientes':  { titulo: 'Clientes',           vista: vistaClientes,  permiso: 'clientes.ver', fija: true },

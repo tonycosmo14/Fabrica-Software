@@ -66,6 +66,15 @@ const AVISOS = [
     ayuda: 'Cuando lo contado no coincide con lo que debía haber. Es la señal ' +
            'de un paño sin capturar, o de hielo que se fue sin ticket.' },
 
+  { id: 'reparto_descuadre', nombre: 'Reparto que no cuadró', icono: '🚚', grupo: 'El dinero',
+    ayuda: 'Cuando el repartidor entrega menos (o más) dinero del que dicen sus ' +
+           'entregas. Llega en cuanto la cajera lo recibe, no al día siguiente.' },
+
+  { id: 'reparto_merma', nombre: 'Se derritió de más en un viaje', icono: '🧊', grupo: 'Lo que se acaba',
+    ayuda: 'Cuando el hielo que se derritió en la camioneta pasa del porcentaje ' +
+           'que pusiste como normal. Suele ser el aviso de una lona rota o de una ' +
+           'ruta que se está haciendo demasiado larga.' },
+
   { id: 'nevera_sin_pedir', nombre: 'Nevera que no ha pedido', icono: '📞', grupo: 'Las neveras',
     ayuda: 'Las neveras que llevan más días sin pedir bolsas de los que les ' +
            'pusiste. Sale una vez al día, no cada vez que se mira.' },
@@ -153,6 +162,79 @@ function mirar(evento) {
   } catch (e) {
     console.error('  No se pudo armar el aviso:', e.message);
   }
+}
+
+/**
+ * LAS CARTAS DE UNA SALIDA QUE SE ACABA DE RECIBIR.
+ *
+ * Puede mandar una, dos o ninguna. La del dinero solo si no cuadró; la del
+ * hielo solo si se derritió más de lo normal.
+ */
+function cartasDelReparto(e, { descuadre }) {
+  const d = e.detalle;
+  const cartas = [];
+
+  if (descuadre && encendido('reparto_descuadre')) {
+    const dif = Number(d.diferencia || 0);
+    const falto = dif < 0;
+    cartas.push({
+      aviso: 'reparto_descuadre',
+      asunto: `Reparto #${escapar(d.folio)} · ${falto ? 'FALTÓ' : 'sobró'} `
+            + `${formato(Math.abs(dif))} · ${escapar(d.repartidor || '')}`,
+      titulo: falto ? 'Faltó dinero en un reparto' : 'Sobró dinero en un reparto',
+      entradilla: `Se lo recibió <b>${escapar(d.recibio || '—')}</b> a `
+                + `<b>${escapar(d.repartidor || '—')}</b>.`,
+      grande: dinero(Math.abs(dif)),
+      color: falto ? 'rojo' : 'ambar',
+      renglones: [
+        ['Debía traer', dinero(d.esperado)],
+        ['Entregó', dinero(d.recibido)],
+        [falto ? 'Faltó' : 'Sobró', dinero(Math.abs(dif)), falto ? 'rojo' : 'ambar'],
+        ['Pedidos entregados', escapar(String(d.entregados ?? 0))],
+        Number(d.sinEntregar) ? ['Volvieron sin entregar', escapar(String(d.sinEntregar))] : null
+      ].filter(Boolean),
+      // Es lo que hay que saber al leerlo desde el teléfono: nadie cerró
+      // nada todavía, y el turno va a salir corto hasta que se cierre.
+      nota: 'La salida queda ABIERTA hasta que un responsable la cierre con su '
+          + 'motivo. Mientras tanto, el corte del turno va a salir con ese hueco.'
+    });
+  }
+
+  // LA MERMA VA APARTE, y sale aunque el dinero haya cuadrado: son dos
+  // cosas distintas. Un viaje puede traer el dinero exacto y haber
+  // perdido media carga en el camino.
+  const porciento = Number(d.porcientoMerma || 0);
+  const normal = Number(d.mermaNormal || 8);
+  if (porciento > normal && encendido('reparto_merma')) {
+    cartas.push({
+      aviso: 'reparto_merma',
+      asunto: `Reparto #${escapar(d.folio)} · se derritió el ${porciento}% del hielo suelto`,
+      titulo: 'Se derritió de más en un viaje',
+      entradilla: `Lo llevaba <b>${escapar(d.repartidor || '—')}</b>.`,
+      grande: `${porciento}%`,
+      color: 'ambar',
+      renglones: [
+        ['Se derritió', escapar(d.mermaTexto || '—')],
+        ['Lo normal es hasta', `${normal}%`]
+      ],
+      nota: 'Suele ser una lona rota, una hielera que ya no cierra, o una ruta '
+          + 'que se está haciendo demasiado larga para el calor que hace.'
+    });
+  }
+
+  if (!cartas.length) return null;
+
+  // Igual que la vuelta de la planta de agua: la primera se devuelve para
+  // que la encole `mirar()` y las demás se encolan aquí, sin cambiarle la
+  // forma al archivo entero por los dos eventos que pueden dar más de una.
+  for (const otra of cartas.slice(1)) {
+    cola.encolar({
+      aviso: otra.aviso,
+      asunto: otra.asunto,
+      html: correo({ negocio: cola.negocio(), cuando: momento(), ...otra })
+    });
+  }
+  return cartas[0];
 }
 
 function leerDetalle(d) {
@@ -393,6 +475,16 @@ const SEGUN_ACCION = {
       nota: 'Queda marcada como «por reparar» hasta que se anote qué se le hizo.'
     };
   },
+
+  // ---------- EL REPARTO ----------
+  //
+  // DOS AVISOS DISTINTOS PARA EL MISMO MOMENTO, y salen los dos si los dos
+  // aplican: que falte dinero y que se haya derretido medio camión son dos
+  // problemas con dos arreglos distintos. Juntarlos haría que el del
+  // dinero —que es el que se atiende hoy— se leyera como un renglón de un
+  // informe.
+  'salida.descuadrada': (e) => cartasDelReparto(e, { descuadre: true }),
+  'salida.recibida': (e) => cartasDelReparto(e, { descuadre: false }),
 
   // ---------- LA PLANTA DE AGUA ----------
   //

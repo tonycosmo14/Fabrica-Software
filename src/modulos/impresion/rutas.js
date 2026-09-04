@@ -22,7 +22,7 @@ const { ticketCotizacion, ticketVenta, ticketMovimiento, ticketVale, ticketEncom
         ticketRaya, ticketPrueba, pulsoCajon, ticketProduccion,
         ticketCorte, ticketCorteMovimientos, ticketHielo, ticketCortePersona, ticketConteo,
         ticketResumenDia, ticketAbono, ticketPedido,
-        ticketPreparacion } = require('./ticket');
+        ticketPreparacion, ticketCarga, ticketLiquidacion } = require('./ticket');
 
 const { aTexto } = require('../../lib/fracciones');
 const { numeroDeTicket } = require('../ventas/folio');
@@ -509,6 +509,62 @@ router.post('/preparacion', verPedidos, async (req, res) => {
   if (!cfg.directa) return ok(res, { impreso: false, motivo: 'sin-destino' });
 
   const papel = ticketPreparacion(prep, { negocio: nombreNegocio(), quien: req.usuario.nombre });
+  const r = await imprimirCrudo(papel, { seccion: 'venta' });
+  if (!r.impreso) return error(res, `No se pudo imprimir: ${r.motivo}`, 502);
+  return ok(res, { impreso: true });
+});
+
+/* ============================================================
+ * LOS PAPELES DE UNA SALIDA  (v5.7)
+ *
+ * LA HOJA DE CARGA — antes de salir, para el que sube la mercancía.
+ * LA LIQUIDACIÓN   — al volver, y la firma el repartidor.
+ *
+ * Ninguno abre el cajón. La carga porque todavía no ha entrado un peso;
+ * la liquidación porque el dinero de cada pedido ya entró con SU venta, y
+ * abrir el cajón otra vez aquí haría creer que entró dos veces.
+ * ============================================================ */
+
+const reparto = require('../reparto/calculo');
+const verReparto = exigirPermiso('reparto.ver');
+
+router.get('/carga/:id/previa', verReparto, (req, res) => {
+  const s = reparto.completa(req.params.id);
+  if (!s) return error(res, 'Esa salida no existe.', 404);
+  const papel = ticketCarga(s, { negocio: nombreNegocio() });
+  return ok(res, { renglones: recortarEspejo(papel.espejo), ancho: papel.anchoTicket });
+});
+
+router.post('/carga/:id', verReparto, async (req, res) => {
+  const s = reparto.completa(req.params.id);
+  if (!s) return error(res, 'Esa salida no existe.', 404);
+
+  const cfg = configuracion();
+  if (!cfg.directa) return ok(res, { impreso: false, motivo: 'sin-destino' });
+
+  const r = await imprimirCrudo(ticketCarga(s, { negocio: nombreNegocio() }),
+                                { seccion: 'venta' });
+  if (!r.impreso) return error(res, `No se pudo imprimir: ${r.motivo}`, 502);
+  return ok(res, { impreso: true });
+});
+
+router.get('/liquidacion/:id/previa', verReparto, (req, res) => {
+  const s = reparto.completa(req.params.id);
+  if (!s) return error(res, 'Esa salida no existe.', 404);
+  const papel = ticketLiquidacion(s, { negocio: nombreNegocio() });
+  return ok(res, { renglones: recortarEspejo(papel.espejo), ancho: papel.anchoTicket });
+});
+
+router.post('/liquidacion/:id', verReparto, async (req, res) => {
+  const s = reparto.completa(req.params.id);
+  if (!s) return error(res, 'Esa salida no existe.', 404);
+
+  const cfg = configuracion();
+  if (!cfg.directa) return ok(res, { impreso: false, motivo: 'sin-destino' });
+
+  const papel = ticketLiquidacion(s, {
+    negocio: nombreNegocio(), copia: req.body?.copia === true
+  });
   const r = await imprimirCrudo(papel, { seccion: 'venta' });
   if (!r.impreso) return error(res, `No se pudo imprimir: ${r.motivo}`, 502);
   return ok(res, { impreso: true });

@@ -50,6 +50,11 @@ const ACCIONES = [
   { grupo: 'Pedidos',    permiso: 'pedidos.tomar',        texto: 'Apartar un pedido y cancelarlo' },
   { grupo: 'Pedidos',    permiso: 'pedidos.entregar',     texto: 'Marcar un pedido entregado (ahí nace su venta)' },
 
+  { grupo: 'Reparto',    permiso: 'reparto.ver',          texto: 'Ver las salidas y lo que llevan' },
+  { grupo: 'Reparto',    permiso: 'reparto.operar',       texto: 'Armar la carga, sacarla, capturar el regreso y recibir el dinero' },
+  { grupo: 'Reparto',    permiso: 'reparto.cuadrar',      texto: 'Cerrar una salida que no cuadró, con su motivo' },
+  { grupo: 'Reparto',    permiso: 'vehiculos.administrar', texto: 'Dar de alta y de baja vehículos' },
+
   { grupo: 'Inventario', permiso: 'inventario.ver',       texto: 'Ver lo que queda de cada producto' },
   { grupo: 'Inventario', permiso: 'inventario.mover',     texto: 'Registrar entradas, salidas y conteos' },
   { grupo: 'Inventario', permiso: 'productos.administrar', texto: 'Dar de alta productos y categorías' },
