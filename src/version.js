@@ -17,9 +17,28 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '5.7';
+const VERSION_ACTUAL = '5.7.1';
 
 const VERSIONES = [
+  {
+    numero: '5.7.1',
+    nombre: 'Lo que salió en la revisión',
+    fecha: '2026-09-05',
+    resumen:
+      'La barra de abajo en un renglón, la contraseña sin dedazos, Esc que '
+      + 'vuelve en todas partes, un solo botón para lo que sale del cajón, y la '
+      + 'ubicación del cliente pegando el enlace del celular o tocando el mapa.',
+    cambios: [
+      { tipo: 'arreglo', texto: 'LA BARRA DE ABAJO DE VENDER, EN UN SOLO RENGLÓN. Se partía en dos cuando no cabía. Ya no repite F2, F3, F4, F6 ni F10 —cada una está escrita en su botón— y solo dice lo que no se ve en ningún lado: qué hacen Enter y Esc en ese momento. Y ya no se envuelve: si algo no cabe se recorta, empezando por el nombre del negocio.' },
+      { tipo: 'arreglo', texto: 'LA CONTRASEÑA Y EL PIN SE ESCRIBEN DOS VECES, TAPADOS. Se pedían con el cuadro pelón del navegador: en texto visible, una sola vez y sin avisar de nada. Un dedazo se guardaba tal cual y después «no me detecta la contraseña» — porque la guardada no era la que se creía haber escrito. Ahora van con puntitos, dos veces, y solo se aceptan si las dos coinciden.' },
+      { tipo: 'arreglo', texto: 'ESC VUELVE ATRÁS EN TODAS LAS PANTALLAS. Cerraba los diálogos y funcionaba en Vender, pero en las fichas —un tanque, una salida, un corte— no hacía nada aunque tuvieran su botón de «‹ Volver». Ahora ese botón también escucha la tecla. Y dos ventanas del reparto que se habían armado aparte tampoco cerraban con Esc: ya sí.' },
+      { tipo: 'mejora', texto: 'UN SOLO BOTÓN PARA LO QUE SALE DEL CAJÓN. «Gasto» y «Vale» enseñaban las mismas opciones —el retiro a la caja fuerte y el vale de sueldo salían en las dos listas— y eran un botón de más en una columna que ya iba alta. Ahora es «− Sale dinero»: los vales son dos renglones de esa misma lista, con su papel firmado como siempre.' },
+      { tipo: 'arreglo', texto: 'EL ENLACE DE GOOGLE MAPS YA SE ACEPTA, EL CORTO Y EL LARGO. El que da «Compartir» en el celular es corto (maps.app.goo.gl) y no trae las coordenadas adentro; están en el largo al que ese manda. Seguirlo no lo puede hacer la pantalla, pero el servidor sí: lo sigue y saca las coordenadas de ahí. Solo sigue enlaces de Google, a propósito.' },
+      { tipo: 'nuevo', texto: 'Y LA UBICACIÓN TAMBIÉN SE PONE TOCANDO EL MAPA. El mismo mapa de las neveras, con una chincheta que va a donde se toque. Arranca donde ya estaba el cliente, o en Hunucmá. Con esto la nota de entrega ya sale con su QR, que era lo que faltaba.' },
+      { tipo: 'mejora', texto: '«QUÉ LE COMPRA» YA NO SE MARCA A MANO. Eran tres botones que nadie entendía y que solo decidían en qué pestaña de Clientes sale cada quien. Ahora se marcan solos con cada venta y cada pedido: el que se lleva un garrafón es cliente del agua desde ese momento. La ficha solo lo enseña, para que se entienda por qué está donde está.' },
+      { tipo: 'mejora', texto: 'Dar de baja a alguien pregunta con el cuadro del sistema, no con el del navegador.' }
+    ]
+  },
   {
     numero: '5.7',
     nombre: 'La salida y la liquidación',

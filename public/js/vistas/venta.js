@@ -334,13 +334,15 @@ export async function vistaVenta(pantalla, estadoApp) {
           ${puedeOperarCaja ? `
             <div class="pos-dinero">
               <button class="pos-btn-entrada" id="meter">＋ Meter dinero</button>
-              <button class="pos-btn-salida" id="gasto">− Gasto</button>
-              <!-- EL VALE, AQUÍ TAMBIÉN (v4.4). Quien llega a llevarse el
-                   efectivo llega al mostrador, no a la pantalla de Caja.
-                   Ni verde ni rojo: el dinero sale, pero no se gastó. -->
-              <button class="pos-btn-vale" id="vale"
-                      title="Alguien se llevó efectivo del cajón: sale su papel firmado">
-                📤 Vale
+              <!-- UN SOLO BOTÓN PARA TODO LO QUE SALE  (v5.7.1). Antes había
+                   "Gasto" y "Vale" aparte, y los dos enseñaban las mismas
+                   opciones: el retiro a la caja fuerte y el vale de sueldo
+                   salían en las dos listas. Ahora el vale es un renglón más
+                   de esta lista —con su papel firmado, como siempre— y la
+                   columna se ahorra un botón. -->
+              <button class="pos-btn-salida" id="gasto"
+                      title="Un gasto, o alguien que se llevó efectivo con su vale">
+                − Sale dinero
               </button>
             </div>` : ''}
 
@@ -1624,15 +1626,14 @@ export async function vistaVenta(pantalla, estadoApp) {
       ${hieloDelCuarto()}
       ${marca.nombreNegocio
         ? `<span class="pos-marca">${esc(marca.nombreNegocio)}</span>` : ''}
+      <!-- SOLO LAS TECLAS QUE NO SE VEN EN NINGÚN BOTÓN  (v5.7.1). F2, F3,
+           F4, F6 y F10 ya están escritas en su botón, y repetirlas aquí
+           hacía que la barra se partiera en dos renglones. Enter y Esc
+           cambian de significado según dónde se esté, y por eso se quedan:
+           son las únicas que hay que explicar. -->
       <span class="pos-teclas">
         <span><kbd>Enter</kbd> ${esc(f.enter)}</span>
         <span><kbd>Esc</kbd> ${esc(f.esc)}</span>
-        ${fase === 'venta' ? `
-          <span><kbd>F10</kbd> cobrar</span>
-          <span><kbd>F2</kbd> nueva venta</span>
-          <span><kbd>F3</kbd> tickets</span>
-          <span><kbd>F4</kbd> cambio</span>
-          ${puedeVerClientes ? '<span><kbd>F6</kbd> cliente</span>' : ''}` : ''}
       </span>`;
     pintarHora();
     pintarClima();
@@ -3329,14 +3330,6 @@ export async function vistaVenta(pantalla, estadoApp) {
     pantalla.querySelector('#meter').onclick = () => movimiento('entrada');
     pantalla.querySelector('#encomiendas').onclick = () => verEncomiendas();
     pantalla.querySelector('#gasto').onclick = () => movimiento('salida');
-    pantalla.querySelector('#vale').onclick = async () => {
-      await hacerVale();
-      // El vale cambió lo que hay en el cajón; los avisos de la pista lo
-      // leen de ahí. Y el foco vuelve al código, que es donde vive la mano
-      // del cajero.
-      refrescarAvisos();
-      enfocar();
-    };
   }
 
   /**
@@ -3363,14 +3356,27 @@ export async function vistaVenta(pantalla, estadoApp) {
     let conceptoId = null;
     let concepto = '';
 
-    if (conceptos.length) {
+    // LOS VALES VAN POR SU PROPIO CAMINO  (v5.7.1). Los conceptos marcados
+    // como vale no se listan como un gasto más: un vale pide QUIÉN se llevó
+    // el dinero y sale con su papel para firmar, y un gasto no. Aquí solo
+    // se ofrecen como dos renglones más de la misma lista, y al tocarlos
+    // se entra al flujo del vale de siempre.
+    const sinVales = conceptos.filter((c) => !c.es_vale);
+
+    if (sinVales.length || esSalida) {
       const elegido = await menu({
-        titulo: esSalida ? 'Gasto o retiro' : 'Meter dinero al cajón',
+        titulo: esSalida ? 'Sale dinero del cajón' : 'Meter dinero al cajón',
         texto: esSalida
-          ? '¿En qué se usó? Toca el de siempre, o escribe uno.'
+          ? '¿En qué se usó, o quién se lo llevó?'
           : '¿De dónde viene? Toca el de siempre, o escribe uno.',
         opciones: [
-          ...conceptos.map((c) => ({
+          ...(esSalida ? [
+            { valor: '__vale_retiro', texto: '🏦 Se llevaron dinero',
+              detalle: 'El dueño o un gerente, con su papel firmado. Nadie queda debiendo.' },
+            { valor: '__vale_raya', texto: '🧑‍🏭 Vale de sueldo',
+              detalle: 'Parte de su sueldo, pedida antes. Se le descuenta el día de pago.' }
+          ] : []),
+          ...sinVales.map((c) => ({
             valor: c.id,
             texto: c.nombre,
             detalle: c.ayuda || ''
@@ -3380,6 +3386,16 @@ export async function vistaVenta(pantalla, estadoApp) {
         ]
       });
       if (!elegido) { enfocar(); return; }
+
+      if (elegido === '__vale_retiro' || elegido === '__vale_raya') {
+        await hacerVale(elegido === '__vale_retiro' ? 'retiro' : 'raya');
+        // El vale cambió lo que hay en el cajón; los avisos de la pista lo
+        // leen de ahí. Y el foco vuelve al código, que es donde vive la
+        // mano del cajero.
+        refrescarAvisos();
+        enfocar();
+        return;
+      }
 
       if (elegido !== '__otro') {
         conceptoId = elegido;

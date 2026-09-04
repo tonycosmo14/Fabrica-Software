@@ -19,6 +19,7 @@ const { ok, error } = require('../../lib/respuestas');
 const { leerPesos } = require('../../lib/dinero');
 const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
+const { resolverEnlace } = require('../../lib/enlaces-mapa');
 const { comprobarAdmin, administradores } = require('../../lib/autorizacion');
 const { sesionAbierta } = require('../caja/calculo');
 const { apuntarAbono } = require('./abonos');
@@ -122,6 +123,23 @@ router.get('/', verClientes, (req, res) => {
 });
 
 /** Un cliente con su cuenta corriente: es la ficha completa. */
+/**
+ * SEGUIR UN ENLACE DE GOOGLE MAPS  (v5.7.1)
+ *
+ * El enlace corto del celular no trae las coordenadas: hay que seguirlo
+ * hasta el largo, y eso solo lo puede hacer el servidor. Va ANTES de las
+ * rutas con /:id para que "ubicacion" no se lea como el id de alguien.
+ */
+router.post('/ubicacion', verClientes, async (req, res) => {
+  const enlace = String(req.body?.enlace || '').trim().slice(0, 2000);
+  if (!enlace) return error(res, 'Pega el enlace.');
+  const punto = await resolverEnlace(enlace);
+  if (!punto) {
+    return error(res, 'De ese enlace no salieron coordenadas. Prueba con «Tocar en el mapa».', 404);
+  }
+  return ok(res, punto);
+});
+
 router.get('/:id', verClientes, (req, res) => {
   const c = clientePorId(req.params.id);
   if (!c) return error(res, 'Ese cliente no existe.', 404);

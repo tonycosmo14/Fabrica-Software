@@ -91,6 +91,29 @@ const RUTAS = {
   '#/novedades': { titulo: 'Qué hay de nuevo',  vista: vistaNovedades }
 };
 
+/**
+ * ESC ES «VOLVER» EN TODAS LAS PANTALLAS  (v5.7.1)
+ *
+ * "El botón de Esc no en todo me regresa atrás o me cierra ventanas."
+ *
+ * Los diálogos ya lo cerraban, y la caja tiene su propio Esc. Lo que no lo
+ * tenía eran las fichas —la de un tanque, una salida, un cliente— que
+ * tienen su botón de «‹ Volver» pero no escuchaban la tecla. Aquí se
+ * escucha una sola vez por todos: si no hay un diálogo abierto y la
+ * pantalla tiene un botón de volver a la vista, Esc lo aprieta.
+ */
+document.addEventListener('keydown', (ev) => {
+  if (ev.key !== 'Escape') return;
+  // Un diálogo abierto se cierra solo; la caja tiene su propia tecla.
+  if (document.querySelector('.dialogo')) return;
+  if (location.hash === '#/venta') return;
+  const volver = pantalla.querySelector('#volver');
+  if (volver && !volver.disabled && volver.offsetParent !== null) {
+    ev.preventDefault();
+    volver.click();
+  }
+});
+
 function puede(permiso) {
   return !permiso || estado.permisos.includes('*') || estado.permisos.includes(permiso);
 }

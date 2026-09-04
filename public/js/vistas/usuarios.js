@@ -17,7 +17,7 @@
  */
 import { api } from '../api.js';
 import { esc, avisar, fecha, fechaCorta, colorDe, ETIQUETAS_ROL } from '../util.js';
-import { confirmar } from '../dialogo.js';
+import { confirmar, pedirClaveNueva } from '../dialogo.js';
 import { pesos } from '../fracciones.js';
 
 /** El orden en que se enseñan los grupos: como se cuenta la fábrica. */
@@ -455,7 +455,9 @@ export async function vistaUsuarios(pantalla) {
     pintarVales(usuario);
 
     pantalla.querySelector('#cambiar-pin').onclick = async () => {
-      const pin = prompt('Nuevo PIN (4 a 6 dígitos):');
+      const pin = await pedirClaveNueva({
+        titulo: `PIN nuevo para ${usuario.nombre}`, tipo: 'pin', ok: 'Cambiar el PIN'
+      });
       if (!pin) return;
       try { await api.enviar(`/usuarios/${usuario.id}/pin`, { pin }); avisar('PIN cambiado', 'bien'); }
       catch (e) { avisar(e.message, 'error'); }
@@ -463,7 +465,11 @@ export async function vistaUsuarios(pantalla) {
 
     const btnContrasena = pantalla.querySelector('#cambiar-contrasena');
     if (btnContrasena) btnContrasena.onclick = async () => {
-      const contrasena = prompt('Nueva contraseña (mínimo 8 caracteres):');
+      const contrasena = await pedirClaveNueva({
+        titulo: `Contraseña nueva para ${usuario.nombre}`,
+        texto: 'Es la que se usa para entrar desde la PC y para lo que no se puede deshacer.',
+        ok: 'Cambiar la contraseña'
+      });
       if (!contrasena) return;
       try { await api.enviar(`/usuarios/${usuario.id}/contrasena`, { contrasena }); avisar('Contraseña cambiada', 'bien'); }
       catch (e) { avisar(e.message, 'error'); }
@@ -471,7 +477,11 @@ export async function vistaUsuarios(pantalla) {
 
     pantalla.querySelector('#baja').onclick = async () => {
       const accion = usuario.activo ? 'baja' : 'alta';
-      if (usuario.activo && !confirm(`¿Dar de baja a ${usuario.nombre}?`)) return;
+      if (usuario.activo && !await confirmar({
+        titulo: `¿Dar de baja a ${usuario.nombre}?`,
+        texto: 'Deja de aparecer para entrar. Nada se borra: se puede volver a dar de alta.',
+        ok: 'Dar de baja', peligro: true
+      })) return;
       try {
         await api.enviar(`/usuarios/${usuario.id}/${accion}`, {});
         avisar(usuario.activo ? 'Usuario dado de baja' : 'Usuario reactivado', 'bien');

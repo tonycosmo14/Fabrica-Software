@@ -45,6 +45,7 @@ const { listaActiva } = require('../ventas/precios');
 // viaje seguidos. Copiado en dos lados, el día que se arregle uno se
 // quedaría el otro.
 const { entregarPedido, FORMAS } = require('./entrega');
+const { marcarLoQueCompra } = require('../clientes/etiquetas');
 
 const router = express.Router();
 
@@ -152,6 +153,9 @@ router.post('/', tomar, (req, res) => {
     return folio;
   });
   const folio = guardar();
+  // El que pide agua es cliente del agua desde hoy, aunque todavía no se
+  // le haya entregado (v5.7.1): es lo que lo pone en su pestaña.
+  marcarLoQueCompra(cliente.id, preparadas.lineas);
 
   bitacora.registrar({
     accion: 'pedido.tomado', entidad: 'pedido', entidadId: id,

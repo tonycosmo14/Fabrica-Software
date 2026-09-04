@@ -17,7 +17,8 @@ import { api } from '../api.js';
 import { esc, avisar, fechaCorta, soloDia } from '../util.js';
 import { confirmar, pedirTexto, pedirEntero, pedirImporte, menu } from '../dialogo.js';
 import { pesos } from '../fracciones.js';
-import { mapa, enlaceMaps, leerEnlace } from '../mapa.js';
+import { mapa, enlaceMaps } from '../mapa.js';
+import { ubicacionDe } from '../ubicacion.js';
 import { imprimirHoja } from '../imprimir.js';
 
 export async function vistaNeveras(pantalla) {
@@ -714,7 +715,9 @@ export async function vistaNeveras(pantalla) {
     };
 
     if (enlace) {
-      const punto = leerEnlace(enlace);
+      // Sirve también el enlace corto del celular (v5.7.1): lo sigue el
+      // servidor y saca las coordenadas del largo.
+      const punto = await ubicacionDe(enlace);
       if (!punto) return avisar('De ese enlace no salieron coordenadas', 'error');
       cuerpo.latitud = punto.lat;
       cuerpo.longitud = punto.lon;

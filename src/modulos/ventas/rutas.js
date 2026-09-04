@@ -25,6 +25,7 @@ const { puede } = require('../../lib/roles');
 const { listaActiva, preciosDe, precioDe, sugerencia } = require('./precios');
 const { sesionAbierta } = require('../caja/calculo');
 const { apuntarAbono } = require('../clientes/abonos');
+const { marcarLoQueCompra } = require('../clientes/etiquetas');
 const { productoPorId, productoPorCodigo, cotizar,
         categoriasActivas, productosActivos } = require('../catalogo/catalogo');
 const { alcanza, avisos } = require('../catalogo/avisos');
@@ -529,6 +530,9 @@ function crearVenta({ lineas, total, pago, lista, almacenId, cajeroId, capturist
   });
 
   const folio = guardar();
+  // Con esto el cliente aparece solo en la pestaña de lo que compra
+  // (v5.7.1): nadie tiene que marcarlo a mano.
+  marcarLoQueCompra(clienteId, lineas);
   const fila = bd.prepare('SELECT serie, folio_anual FROM ventas WHERE id = ?').get(id);
   return {
     id, folio, serie: fila.serie, folioAnual: fila.folio_anual,

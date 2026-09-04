@@ -951,3 +951,54 @@ test('el cajero puede recibir un abono; el operario no', async () => {
 
   await entrarAdmin();
 });
+
+// ============================================================
+// QUÉ LE COMPRA, MARCADO SOLO  (v5.7.1)
+// ============================================================
+
+test('la pestaña de cada cliente se marca sola con lo que compra', async () => {
+  await entrarAdmin();
+  const c = (await llamar('/api/clientes', {
+    method: 'POST', cuerpo: { nombre: 'Doña Etiqueta' }
+  })).json.datos.cliente;
+
+  // Recién dado de alta cae en marquetas (es a lo que se dedica la
+  // fábrica) y en nada más.
+  assert.equal(c.compra_marqueta, 1);
+  assert.equal(c.compra_agua, 0);
+  assert.equal(c.compra_bolsa, 0);
+
+  // Un producto del agua y uno de nevera, marcados en la ficha del producto.
+  const cat = (await llamar('/api/catalogo/categorias', {
+    method: 'POST', cuerpo: { nombre: 'Etiquetas' }
+  })).json.datos.categoria.id;
+  const garrafon = (await llamar('/api/catalogo/productos', {
+    method: 'POST', cuerpo: { nombre: 'Garrafón etiqueta', categoriaId: cat, precio: '25', paraAgua: true }
+  })).json.datos.producto;
+  const bolsa = (await llamar('/api/catalogo/productos', {
+    method: 'POST', cuerpo: { nombre: 'Bolsa etiqueta', categoriaId: cat, precio: '18' }
+  })).json.datos.producto;
+  bd.prepare('UPDATE productos SET para_nevera = 1 WHERE id = ?').run(bolsa.id);
+
+  // Le vende un garrafón: ya es cliente del agua, sin que nadie lo marque.
+  const v = await llamar('/api/ventas', {
+    method: 'POST',
+    cuerpo: { lineas: [{ productoId: garrafon.id, cantidad: 1 }], pago: '25', clienteId: c.id }
+  });
+  assert.equal(v.estado, 201, v.json?.error);
+  let d = (await llamar(`/api/clientes/${c.id}`)).json.datos.cliente;
+  assert.equal(d.compra_agua, 1, 'compró agua: sale en la pestaña del agua');
+  assert.equal(d.compra_bolsa, 0);
+
+  // Y un PEDIDO de bolsas también lo marca, aunque todavía no se entregue:
+  // es lo que lo pone en la preparación de ese reparto.
+  const p = await llamar('/api/pedidos', {
+    method: 'POST', cuerpo: { clienteId: c.id, lineas: [{ productoId: bolsa.id, cantidad: 10 }] }
+  });
+  assert.equal(p.estado, 201, p.json?.error);
+  d = (await llamar(`/api/clientes/${c.id}`)).json.datos.cliente;
+  assert.equal(d.compra_bolsa, 1);
+  // Lo de antes no se apaga: comprar agua una vez es un hecho.
+  assert.equal(d.compra_agua, 1);
+  assert.equal(d.compra_marqueta, 1);
+});

@@ -173,3 +173,31 @@ test('el enlace para ir sale con las coordenadas, y si no, con el nombre', () =>
 
   assert.equal(mapa.enlaceMaps(null, null, ''), null);
 });
+
+// ============================================================
+// LOS ENLACES QUE ANTES SE RECHAZABAN  (v5.7.1)
+// ============================================================
+
+test('lee también la chincheta (!3d!4d), destination= y geo:', () => {
+  const casos = [
+    ['https://www.google.com/maps/place/x/data=!3m5!8m2!3d21.0163!4d-89.8756', 21.0163, -89.8756],
+    ['https://www.google.com/maps/dir/?api=1&destination=21.0163,-89.8756', 21.0163, -89.8756],
+    ['geo:21.0163,-89.8756?z=17', 21.0163, -89.8756],
+    ['21.0163;-89.8756', 21.0163, -89.8756]
+  ];
+  for (const [texto, lat, lon] of casos) {
+    const p = mapa.leerEnlace(texto);
+    assert.ok(p, `no salió nada de: ${texto}`);
+    assert.equal(p.lat, lat);
+    assert.equal(p.lon, lon);
+  }
+});
+
+test('reconoce el enlace corto del celular, que hay que seguir en el servidor', () => {
+  assert.ok(mapa.esEnlaceCorto('https://maps.app.goo.gl/AbCdEf12'));
+  assert.ok(mapa.esEnlaceCorto('https://goo.gl/maps/AbCdEf12'));
+  // Uno largo que YA trae coordenadas no es corto: se lee aquí mismo.
+  assert.ok(!mapa.esEnlaceCorto('https://www.google.com/maps/place/x/@21.0163,-89.8756,17z'));
+  assert.ok(!mapa.esEnlaceCorto('21.0163, -89.8756'));
+  assert.ok(!mapa.esEnlaceCorto('https://ejemplo.com/x'));
+});

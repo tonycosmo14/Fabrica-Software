@@ -49,6 +49,81 @@ function montar(contenido, resolver, valorAlCancelar = null) {
   return { caja, salir };
 }
 
+/**
+ * UN DIÁLOGO PROPIO, para las pantallas que arman el suyo  (v5.7.1).
+ *
+ * Devuelve { caja, salir, hecho }, y con eso se llevan lo que ningún
+ * diálogo hecho a mano trae solo: Esc lo cierra, tocar el fondo lo cierra
+ * y `salir` resuelve una sola vez. Antes había pantallas que pegaban su
+ * propio <div class="dialogo"> a la página y ahí Esc no hacía nada.
+ *
+ *
+ *   const d = armarDialogo(html);
+ *   d.caja.querySelector('#si').onclick = () => d.salir(valor);
+ *   const valor = await d.hecho;      // null si canceló con Esc o el fondo
+ */
+export function armarDialogo(contenido) {
+  let salir;
+  let caja;
+  const hecho = new Promise((resolver) => {
+    ({ caja, salir } = montar(contenido, resolver));
+  });
+  return { caja, salir, hecho };
+}
+
+/**
+ * UNA CONTRASEÑA O UN PIN NUEVOS, ESCRITOS DOS VECES  (v5.7.1)
+ *
+ * Antes se pedían con el `prompt()` pelón del navegador: en texto visible,
+ * una sola vez, y sin decir nada si se colaba un dedazo. Se guardaba lo
+ * que fuera y después «no me detecta la contraseña» — porque la que se
+ * guardó no era la que se creía haber escrito.
+ *
+ * Aquí va tapada, dos veces, y solo se acepta si las dos coinciden.
+ */
+export function pedirClaveNueva({ titulo, texto = '', tipo = 'contrasena', ok = 'Guardar' }) {
+  const esPin = tipo === 'pin';
+  const minimo = esPin ? 4 : 8;
+  return new Promise((resolver) => {
+    const { caja, salir } = montar(`
+      <h3 class="dialogo-titulo">${titulo}</h3>
+      ${texto ? `<p class="dialogo-texto">${texto}</p>` : ''}
+      <label for="clave1">${esPin ? 'PIN nuevo' : 'Contraseña nueva'}
+        <small class="ayuda"> · ${esPin ? 'de 4 a 6 números' : 'mínimo 8 letras o números'}</small>
+      </label>
+      <input id="clave1" type="password" autocomplete="new-password"
+             inputmode="${esPin ? 'numeric' : 'text'}" ${esPin ? 'maxlength="6"' : ''}>
+      <label for="clave2" style="margin-top:10px">Otra vez, para estar seguros</label>
+      <input id="clave2" type="password" autocomplete="new-password"
+             inputmode="${esPin ? 'numeric' : 'text'}" ${esPin ? 'maxlength="6"' : ''}>
+      <p class="ayuda" id="clave-malo" style="margin:8px 0 0;color:var(--rojo)" hidden></p>
+      <div class="dialogo-botones">
+        <button class="secundario" data-no>Cancelar</button>
+        <button data-si>${ok}</button>
+      </div>`, resolver);
+
+    const c1 = caja.querySelector('#clave1');
+    const c2 = caja.querySelector('#clave2');
+    const malo = caja.querySelector('#clave-malo');
+    setTimeout(() => c1.focus(), 220);
+
+    const decir = (t) => { malo.textContent = t; malo.hidden = !t; };
+    const enviar = () => {
+      const a = c1.value;
+      const b = c2.value;
+      if (esPin && !/^[0-9]{4,6}$/.test(a)) { decir('El PIN son de 4 a 6 números, nada más.'); c1.focus(); return; }
+      if (!esPin && a.length < minimo) { decir(`Tiene que tener al menos ${minimo} caracteres.`); c1.focus(); return; }
+      if (a !== b) { decir('No coinciden. Escríbela otra vez en los dos.'); c2.value = ''; c2.focus(); return; }
+      salir(a);
+    };
+
+    c1.onkeydown = (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); c2.focus(); } };
+    c2.onkeydown = (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); enviar(); } };
+    caja.querySelector('[data-no]').onclick = () => salir(null);
+    caja.querySelector('[data-si]').onclick = enviar;
+  });
+}
+
 /** Confirmación de sí o no. Devuelve true o false. */
 export function confirmar({ titulo, texto = '', ok = 'Aceptar', peligro = false }) {
   return new Promise((resolver) => {

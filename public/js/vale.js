@@ -20,7 +20,7 @@ import { imprimirTicket, htmlDeEspejo } from './imprimir.js';
  * Pregunta y hace el vale. Devuelve el vale creado, o `null` si se canceló
  * o algo falló — quien llama decide si repintar.
  */
-export async function hacerVale() {
+export async function hacerVale(claseElegida = null) {
   let datos;
   try {
     datos = await api.obtener('/caja/vales');
@@ -29,7 +29,10 @@ export async function hacerVale() {
   // LO PRIMERO ES CUÁL DE LOS DOS, con la diferencia escrita en el mismo
   // botón: se llaman igual y son opuestos, y nadie tiene por qué acordarse
   // de memoria cuál deja deuda y cuál no.
-  const clase = await menu({
+  //
+  // Desde la v5.7.1 el vale se toca desde la lista de «Sale dinero», y ahí
+  // ya se eligió cuál: no se vuelve a preguntar.
+  const clase = claseElegida || await menu({
     titulo: 'Vale',
     texto: '¿Cuál de los dos?',
     opciones: [

@@ -25,7 +25,7 @@
  */
 import { api } from '../api.js';
 import { esc, avisar, fechaCorta } from '../util.js';
-import { confirmar, pedirTexto, pedirEntero, menu, verTicket } from '../dialogo.js';
+import { confirmar, pedirTexto, pedirEntero, menu, verTicket, armarDialogo } from '../dialogo.js';
 import { pesos, aTexto, crearTeclado } from '../fracciones.js';
 import { imprimirTicket, htmlDeEspejo } from '../imprimir.js';
 
@@ -482,11 +482,8 @@ export async function vistaReparto(pantalla, estado) {
 
   /** Una lista con casillas: se marcan los que suben y se cuelgan de un golpe. */
   function elegirPedidos(lista) {
-    return new Promise((resolver) => {
-      const caja = document.createElement('div');
-      caja.className = 'dialogo abierto';
-      caja.innerHTML = `
-        <div class="dialogo-caja">
+    // Con `armarDialogo` (v5.7.1): Esc y el fondo lo cierran solos.
+    const d = armarDialogo(`
           <h3 class="dialogo-titulo">¿Cuáles suben?</h3>
           <div class="rep-elegir">
             ${lista.map((p) => `
@@ -502,15 +499,11 @@ export async function vistaReparto(pantalla, estado) {
           <div class="dialogo-botones">
             <button class="secundario" data-no>Cancelar</button>
             <button data-si>Colgarlos</button>
-          </div>
-        </div>`;
-      document.body.appendChild(caja);
-
-      const salir = (v) => { caja.remove(); resolver(v); };
-      caja.querySelector('[data-no]').onclick = () => salir(null);
-      caja.querySelector('[data-si]').onclick = () => salir(
-        [...caja.querySelectorAll('input:checked')].map((i) => i.value));
-    });
+          </div>`);
+    d.caja.querySelector('[data-no]').onclick = () => d.salir(null);
+    d.caja.querySelector('[data-si]').onclick = () => d.salir(
+      [...d.caja.querySelectorAll('input:checked')].map((i) => i.value));
+    return d.hecho;
   }
 
   async function subirHielo(s) {
@@ -524,30 +517,22 @@ export async function vistaReparto(pantalla, estado) {
 
   /** El teclado de fracciones de siempre, en un diálogo. */
   function pedirHielo(titulo, max = null) {
-    return new Promise((resolver) => {
-      const caja = document.createElement('div');
-      caja.className = 'dialogo abierto';
-      caja.innerHTML = `
-        <div class="dialogo-caja">
+    const d = armarDialogo(`
           <h3 class="dialogo-titulo">${esc(titulo)}</h3>
           <div id="teclado"></div>
           <div class="dialogo-botones">
             <button class="secundario" data-no>Cancelar</button>
             <button data-si>Subirlo</button>
-          </div>
-        </div>`;
-      document.body.appendChild(caja);
-      // Con tope cuando lo hay: no se puede vender ni devolver más de lo
-      // que subió, y frenarlo aquí es mejor que un error después.
-      const teclado = crearTeclado(caja.querySelector('#teclado'),
-                                   max ? { max } : {});
-      const salir = (v) => { caja.remove(); resolver(v); };
-      caja.querySelector('[data-no]').onclick = () => salir(null);
-      // CERO ES UNA RESPUESTA, no un "no contestó": «no vendí nada» y «no
-      // volvió nada» son las dos cosas que más se contestan al cuadrar.
-      // `null` es solo cancelar.
-      caja.querySelector('[data-si]').onclick = () => salir(teclado.valor());
-    });
+          </div>`);
+    // Con tope cuando lo hay: no se puede vender ni devolver más de lo
+    // que subió, y frenarlo aquí es mejor que un error después.
+    const teclado = crearTeclado(d.caja.querySelector('#teclado'), max ? { max } : {});
+    d.caja.querySelector('[data-no]').onclick = () => d.salir(null);
+    // CERO ES UNA RESPUESTA, no un "no contestó": «no vendí nada» y «no
+    // volvió nada» son las dos cosas que más se contestan al cuadrar.
+    // `null` es solo cancelar.
+    d.caja.querySelector('[data-si]').onclick = () => d.salir(teclado.valor());
+    return d.hecho;
   }
 
   async function subirProducto(s) {

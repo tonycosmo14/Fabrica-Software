@@ -1163,19 +1163,20 @@ debería haber − contado = FALTA</pre>
       <p>Arriba de la lista hay cuatro pestañas: <b>Todos</b>,
       <b>🧊 Marquetas</b>, <b>🧊 Bolsas</b> y <b>💧 Agua</b>. Cada una enseña
       solo los suyos, con su cuenta al lado.</p>
-      <p>Lo que decide en qué pestaña sale es <b>Qué le compra</b>, en su
-      ficha: tres botones que se prenden y se apagan. Puede tener los tres —
-      Abarrotes Juan compra bolsas <i>y</i> agua— y entonces sale en las tres,
-      que es justo lo que hace falta cuando se prepara cada reparto.</p>
+      <p>Lo que decide en qué pestaña sale es <b>lo que le has vendido</b>, y
+      se marca solo: cada venta y cada pedido lo apuntan. El que se lleva un
+      garrafón es cliente del agua desde ese momento. Puede estar en las tres
+      —Abarrotes Juan compra bolsas <i>y</i> agua— y entonces sale en las
+      tres, que es justo lo que hace falta cuando se prepara cada reparto. En
+      su ficha se enseña, nada más, para que se entienda por qué está donde
+      está.</p>
       <p class="ayuda-tip"><b>Es un filtro, no tres listas.</b> El cliente
       sigue siendo <b>uno solo</b>: una deuda, un límite de crédito, un
       historial. Si fueran tres fichas, el día que llegue con $500 en la mano
       nadie sabría a cuál de sus tres cuentas van — y para cuando se
       descubriera, serían meses de historias separadas.</p>
-      <p>Al actualizar, cada cliente quedó marcado <b>por lo que ya te
-      compró</b>, sacado de sus tickets. Si alguno quedó mal —el que solo vino
-      una vez por marquetas y ahora quiere agua— se corrige en su ficha de un
-      toque.</p>
+      <p>Un cliente nuevo, sin un solo ticket, cae en Marquetas —es a lo que
+      se dedica la fábrica— y se mueve solo con su primera compra.</p>
 
       <h4>El horario de entrega y la ubicación</h4>
       <p>En su ficha, junto a la dirección:</p>
@@ -1187,9 +1188,12 @@ debería haber − contado = FALTA</pre>
         <li><b>Referencias</b> — «la de la puerta azul, junto a la
         tortillería». La dirección lleva al rumbo; esto es lo que hace que se
         encuentre la puerta.</li>
-        <li><b>Ubicación</b> — se pega el enlace que da Google Maps al
-        compartir, igual que en las neveras, y el sistema saca las
-        coordenadas solo.</li>
+        <li><b>Ubicación</b> — de dos formas: <b>tocando el mapa</b> donde
+        está la puerta, o <b>pegando el enlace</b> que da Google Maps al
+        compartir desde el celular. Sirve el corto (maps.app.goo.gl) y el
+        largo: el corto no trae las coordenadas adentro, y el sistema lo
+        sigue solo hasta el largo. Con la ubicación puesta, la nota de
+        entrega de sus pedidos sale con su QR.</li>
       </ul>
 
       <h4>Paga una parte y debe la otra</h4>

@@ -116,7 +116,8 @@ function encuadrar(puntos, ancho, alto, margen = 60) {
  *   puntos   [{ lat, lon, etiqueta, tono, id }]
  *   alTocar  qué hacer cuando se toca una chincheta
  */
-export function mapa(caja, { puntos = [], alTocar = null, centro = null, zoom = null } = {}) {
+export function mapa(caja, { puntos = [], alTocar = null, alTocarMapa = null,
+                             centro = null, zoom = null } = {}) {
   const conCoordenadas = puntos
     .map((p) => ({ ...p, lat: Number(p.lat), lon: Number(p.lon) }))
     .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon));
@@ -225,20 +226,36 @@ export function mapa(caja, { puntos = [], alTocar = null, centro = null, zoom = 
   // Con eventos de puntero, que sirven igual para el ratón y para el
   // dedo: la pantalla de la fábrica es táctil.
   let arrastrando = null;
+  // Un toque y un arrastre empiezan igual. Se distinguen al soltar: si el
+  // dedo casi no se movió, fue un toque —y eso es lo que sirve para
+  // ELEGIR un punto en el mapa (v5.7.1)—; si se movió, fue arrastrar.
+  let movido = 0;
   caja.addEventListener('pointerdown', (e) => {
     if (e.target.closest('.mapa-mandos, .mapa-pin, .mapa-credito')) return;
     arrastrando = { x: e.clientX, y: e.clientY };
+    movido = 0;
     caja.setPointerCapture(e.pointerId);
     caja.classList.add('agarrando');
   });
   caja.addEventListener('pointermove', (e) => {
     if (!arrastrando) return;
+    movido += Math.abs(e.clientX - arrastrando.x) + Math.abs(e.clientY - arrastrando.y);
     x0 -= e.clientX - arrastrando.x;
     y0 -= e.clientY - arrastrando.y;
     arrastrando = { x: e.clientX, y: e.clientY };
     pintar();
   });
-  const soltar = () => { arrastrando = null; caja.classList.remove('agarrando'); };
+  const soltar = (e) => {
+    const fueToque = arrastrando && movido < 8;
+    arrastrando = null;
+    caja.classList.remove('agarrando');
+    if (fueToque && alTocarMapa && e && e.type === 'pointerup') {
+      const r = caja.getBoundingClientRect();
+      const px = e.clientX - r.left;
+      const py = e.clientY - r.top;
+      alTocarMapa(aLat(y0 + py, z), aLon(x0 + px, z));
+    }
+  };
   caja.addEventListener('pointerup', soltar);
   caja.addEventListener('pointercancel', soltar);
 
@@ -283,7 +300,18 @@ export function mapa(caja, { puntos = [], alTocar = null, centro = null, zoom = 
       y0 = aY(lat, z) - alto / 2;
       pintar();
     },
-    get cuantas() { return conCoordenadas.length; }
+    get cuantas() { return conCoordenadas.length; },
+    /**
+     * PONER (O MOVER) LA CHINCHETA ELEGIDA  (v5.7.1). Para el mapa donde
+     * se elige la ubicación de un cliente tocando: hay una sola chincheta
+     * y va a donde se tocó.
+     */
+    ponerPunto(lat, lon) {
+      const i = conCoordenadas.findIndex((p) => p.id === '__elegido');
+      const punto = { id: '__elegido', lat: Number(lat), lon: Number(lon), tono: 'elegido', numero: '📍' };
+      if (i >= 0) conCoordenadas[i] = punto; else conCoordenadas.push(punto);
+      pintarChinchetas();
+    }
   };
 }
 
@@ -318,10 +346,22 @@ export function enlaceMaps(lat, lon, nombre = '') {
 
 /** Sacar lat/lon de un enlace de Google Maps pegado a mano. */
 export function leerEnlace(texto) {
-  const t = String(texto || '');
-  // Las tres formas en que Google mete las coordenadas en una dirección.
-  const patrones = [/@(-?\d+\.\d+),(-?\d+\.\d+)/, /[?&]q=(-?\d+\.\d+),\s*(-?\d+\.\d+)/,
-                    /^\s*(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)\s*$/];
+  const t = String(texto || '').trim();
+  // TODAS las formas en que Google —y el teléfono— meten las coordenadas
+  // en un enlace (ampliado en la v5.7.1):
+  //   .../@21.01,-89.87,17z          la dirección de la barra del navegador
+  //   ...?q=21.01,-89.87             el enlace viejo de "compartir"
+  //   ...!3d21.01!4d-89.87           la chincheta dentro de un enlace largo
+  //   ...?ll= / query= / destination= / daddr= / center=
+  //   geo:21.01,-89.87               lo que da Android al compartir
+  //   21.01, -89.87                  escritas a mano
+  const patrones = [
+    /@(-?\d+\.\d+),(-?\d+\.\d+)/,
+    /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/,
+    /[?&](?:q|query|ll|destination|daddr|center)=(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/,
+    /^geo:(-?\d+\.\d+),(-?\d+\.\d+)/,
+    /^(-?\d+\.\d+)\s*[,;]\s*(-?\d+\.\d+)$/
+  ];
   for (const p of patrones) {
     const m = p.exec(t);
     if (m) {
@@ -331,6 +371,20 @@ export function leerEnlace(texto) {
     }
   }
   return null;
+}
+
+/**
+ * ¿ES UN ENLACE CORTO, de los que NO traen las coordenadas adentro?
+ *
+ * Es el que da el botón de compartir del celular —maps.app.goo.gl/xxxx— y
+ * el que más pegan. Las coordenadas están en el enlace largo al que ese
+ * redirige, y para seguirlo hace falta el servidor: el navegador no
+ * puede leer a dónde manda un enlace de otro sitio.
+ */
+export function esEnlaceCorto(texto) {
+  const t = String(texto || '').trim();
+  return /^https?:\/\/(maps\.app\.goo\.gl|goo\.gl\/maps|g\.co\/|maps\.google\.[a-z.]+\/|www\.google\.[a-z.]+\/maps)/i.test(t)
+    && !leerEnlace(t);
 }
 
 export { aX, aY, aLat, aLon, encuadrar };

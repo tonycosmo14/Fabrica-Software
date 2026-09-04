@@ -30,7 +30,8 @@ import { api } from '../api.js';
 import { esc, avisar, fecha as formatoFecha, colorDe } from '../util.js';
 import { pedirTexto, pedirImporte, confirmar, menu, pedirContrasena } from '../dialogo.js';
 import { pesos, paraEditar } from '../fracciones.js';
-import { enlaceMaps, leerEnlace } from '../mapa.js';
+import { enlaceMaps } from '../mapa.js';
+import { ubicacionDe, elegirEnMapa } from '../ubicacion.js';
 
 /**
  * LAS TRES LÍNEAS DEL NEGOCIO  (v5.4)
@@ -325,23 +326,15 @@ export async function vistaClientes(pantalla, estadoApp) {
           <button class="secundario chico" id="abonar-transf">Abono por transferencia</button>
         </div>` : ''}
 
-      <h4 class="cfg-subtitulo">Qué le compra</h4>
-      <div class="cuadre">
-        <div class="cli-lineas">
-          ${[['compra_marqueta', '🧊 Marquetas', 'mayoreo y menudeo del cuarto frío'],
-             ['compra_bolsa', '🧊 Bolsas', 'hielo en cubos, el de las neveras'],
-             ['compra_agua', '💧 Agua', 'garrafones y botellas']].map(([clave, texto, ayuda]) => `
-            <button class="cli-linea ${c[clave] ? 'si' : ''}" data-compra="${clave}"
-                    ${administra ? '' : 'disabled'}>
-              <b>${texto}</b><small>${ayuda}</small>
-            </button>`).join('')}
-        </div>
-        <p class="ayuda" style="margin:10px 0 0">
-          Con esto sale en su pestaña y en la preparación de ese reparto. Puede
-          ser más de una: el cliente sigue siendo <b>uno solo</b>, con una deuda
-          y un límite.
-        </p>
-      </div>
+      <!-- QUÉ LE COMPRA, SIN BOTONES  (v5.7.1). Se marca solo con lo que va
+           comprando —cada venta y cada pedido lo apuntan— y lo único que
+           hace es decidir en qué pestaña de arriba sale. Se enseña para
+           que se entienda por qué está donde está, y ya. -->
+      <p class="ayuda cli-compra">
+        ${[c.compra_marqueta && '🧊 marquetas', c.compra_bolsa && '🧊 bolsas', c.compra_agua && '💧 agua']
+          .filter(Boolean).join(' · ') || 'Todavía no le ha comprado nada'}
+        <small>· se marca solo con lo que compra, y es lo que decide en qué pestaña sale</small>
+      </p>
 
       <h4 class="cfg-subtitulo">Quién es y dónde está</h4>
       <div class="cuadre cfg-cliente-datos cli-rejilla">
@@ -534,23 +527,11 @@ export async function vistaClientes(pantalla, estadoApp) {
     });
 
     // Qué le compra: cada marca se prende y se apaga sola.
-    pantalla.querySelectorAll('[data-compra]').forEach((b) => {
-      b.onclick = () => cambiarLinea(b.dataset.compra);
-    });
     const ubic = q('#ubicacion');
     if (ubic) ubic.onclick = ponerUbicacion;
   }
 
   /** Prender o apagar una línea. No apaga las otras: puede comprar las tres. */
-  async function cambiarLinea(clave) {
-    const c = ficha.cliente;
-    try {
-      await api.actualizar(`/clientes/${c.id}`, { [clave]: c[clave] ? 0 : 1 });
-      await abrir(c.id);
-      await cargar();
-    } catch (e) { avisar(e.message, 'error'); }
-  }
-
   /**
    * LA UBICACIÓN, PEGANDO EL ENLACE DE GOOGLE MAPS.
    *
@@ -560,33 +541,48 @@ export async function vistaClientes(pantalla, estadoApp) {
    */
   async function ponerUbicacion() {
     const c = ficha.cliente;
-    const texto = await pedirTexto({
-      titulo: 'La ubicación de ' + c.nombre,
-      texto: 'Pega aquí el enlace que da Google Maps al compartir, o las ' +
-             'coordenadas tal cual. Déjalo en blanco para quitarla.',
-      valor: c.latitud != null ? `${c.latitud}, ${c.longitud}` : '',
-      marcador: 'https://maps.app.goo.gl/…', unaLinea: true, opcional: true, largo: 300
+    const tiene = c.latitud != null && c.longitud != null;
+
+    // DOS CAMINOS Y LOS DOS LLEGAN  (v5.7.1). Antes solo se podía pegar, y
+    // el enlace corto del celular se rechazaba. Ahora ese enlace lo sigue
+    // el servidor, y además está el mapa para tocar.
+    const como = await menu({
+      titulo: `La ubicación de ${c.nombre}`,
+      texto: tiene ? `Ahora: ${Number(c.latitud).toFixed(5)}, ${Number(c.longitud).toFixed(5)}` : '',
+      opciones: [
+        { valor: 'mapa', texto: '🗺️ Tocar en el mapa', detalle: 'Se busca la puerta y se toca' },
+        { valor: 'enlace', texto: '🔗 Pegar el enlace de Google Maps',
+          detalle: 'El que da «Compartir» en el celular, corto o largo' },
+        ...(tiene ? [{ valor: 'quitar', texto: 'Quitar la ubicación', peligro: true }] : [])
+      ]
     });
-    if (texto === null) return;
+    if (!como) return;
 
-    if (!texto.trim()) {
-      try {
-        await api.actualizar(`/clientes/${c.id}`, { latitud: '', longitud: '' });
-        avisar('Ubicación quitada', 'bien');
-        await abrir(c.id);
-      } catch (e) { avisar(e.message, 'error'); }
-      return;
+    let punto = null;
+    if (como === 'quitar') {
+      punto = { lat: '', lon: '' };
+    } else if (como === 'mapa') {
+      punto = await elegirEnMapa({ titulo: `¿Dónde está ${c.nombre}?`,
+                                   lat: c.latitud, lon: c.longitud });
+      if (!punto) return;
+    } else {
+      const texto = await pedirTexto({
+        titulo: 'El enlace de Google Maps',
+        texto: 'Pega el que da «Compartir» en el celular. Sirve el corto (maps.app.goo.gl) ' +
+               'y el largo. También las coordenadas tal cual: 21.0167, -89.8744',
+        marcador: 'https://maps.app.goo.gl/…', unaLinea: true, largo: 600
+      });
+      if (!texto) return;
+      avisar('Leyendo el enlace…', '');
+      punto = await ubicacionDe(texto);
+      if (!punto) {
+        return avisar('De ahí no salieron coordenadas. Prueba con «Tocar en el mapa».', 'error');
+      }
     }
 
-    const punto = leerEnlace(texto);
-    if (!punto) {
-      return avisar('De ahí no salen coordenadas. Pega el enlace completo de ' +
-                    'Google Maps, o escríbelas como 21.0167, -89.8744', 'error');
-    }
     try {
-      await api.actualizar(`/clientes/${c.id}`,
-                           { latitud: punto.lat, longitud: punto.lon });
-      avisar('Ubicación guardada', 'bien');
+      await api.actualizar(`/clientes/${c.id}`, { latitud: punto.lat, longitud: punto.lon });
+      avisar(como === 'quitar' ? 'Ubicación quitada' : 'Ubicación guardada', 'bien');
       await abrir(c.id);
     } catch (e) { avisar(e.message, 'error'); }
   }
