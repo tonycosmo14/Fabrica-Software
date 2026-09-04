@@ -17,9 +17,38 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '5.1';
+const VERSION_ACTUAL = '5.2';
 
 const VERSIONES = [
+  {
+    numero: '5.2',
+    nombre: 'El agua: la máquina',
+    fecha: '2026-09-04',
+    resumen:
+      'La planta de ósmosis, con el número que de verdad dice cuándo cambiar '
+      + 'las membranas — porque una planta que se está muriendo sigue sacando '
+      + 'agua que se ve igual de transparente. Y el primer cuadre de litros.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'LA PLANTA DE AGUA, pantalla nueva en el inicio (💧 La planta de agua). Ya viene con TU equipo dado de alta: el clorinador, la zeolita y el carbón en tanques de 4 pies, los dos suavizadores de 7 pies en paralelo, las seis membranas de ultra baja presión, los dos medidores, los cinco tinacos de 1000 L, el ozono y la luz ultravioleta. Todo editable, todo se puede dar de baja.' },
+      { tipo: 'importante', texto: 'EL RECHAZO DE SALES, que es el número que manda y sale grande. (TDS de entrada − TDS de salida) ÷ TDS de entrada. Con membranas nuevas anda en 96–98 %; cuando baja de 90 ya no purifican, cuelan. Esto es lo que hace falta de verdad: una planta de ósmosis NO AVISA cuando se está muriendo — sigue sacando agua, sigue llenando garrafones, y el agua se sigue viendo igual. Lo único que cambia es ese número.' },
+      { tipo: 'importante', texto: 'Y ABAJO, CÓMO VIENE LA LÍNEA. Un dato suelto no dice nada, porque el TDS del pozo cambia con la lluvia. Lo que importa es si lleva tres meses bajando, y eso solo se ve dibujado. La escala no empieza en cero a propósito: entre 90 y 98 se juega todo, y con el eje desde cero se vería plana siempre.' },
+      { tipo: 'importante', texto: 'EL CLORO DESPUÉS DEL CARBÓN VA RESALTADO, y tiene su propio aviso. Es la medición más barata de tomar y la más cara de saltarse: el clorinador echa cloro al principio y el carbón está ahí para quitárselo ANTES de las membranas. Si el carbón se saturó y pasa cloro, las SEIS membranas se echan a perder en días. Por eso el tren de tratamiento sale en orden — para que se vea por qué.' },
+      { tipo: 'nuevo', texto: 'LA VUELTA DE REVISIÓN, en una sola tarjeta con un botón: TDS de entrada y salida, cloro, dureza, los dos medidores, presión y notas. Está así porque se hace todos los días con el aparato en la mano: siete ventanitas seguidas cada mañana harían que se dejara de anotar en una semana, y una planta sin lecturas es una planta a ciegas.' },
+      { tipo: 'importante', texto: 'VACÍO Y CERO NO SON LO MISMO, y aquí importa más que en ningún lado. «Cloro 0» quiere decir que se midió y salió limpio, que es la buena noticia del día. «Cloro vacío» quiere decir que nadie lo midió. Confundirlos daría por bueno un carbón saturado, así que lo que no se midió se deja en blanco y sale en blanco.' },
+      { tipo: 'nuevo', texto: 'EL RECHAZO SE VE MIENTRAS SE ESCRIBE. En cuanto se teclean los dos TDS, la pantalla ya dice cómo va a salir. Es la diferencia entre enterarse hoy y enterarse cuando alguien mire la tabla: el que captura tiene el aparato en la mano y puede volver a medir ahí mismo — la mitad de las veces lo que estaba mal era la medición.' },
+      { tipo: 'importante', texto: 'LOS MEDIDORES SE ANOTAN COMO MARCAN, no lo del día. Un medidor de flujo nunca se pone en cero: solo sube. Así que se guarda lo que marca y los litros salen restando la vuelta anterior, igual que los recibos de la luz. Eso tiene una ventaja grande: UN DÍA QUE NADIE ANOTÓ NO SE PIERDE, el medidor lo siguió contando y la siguiente vuelta lo recoge. Y si un día marca menos —porque se cambió el medidor— se marca el renglón y no se cuenta, en vez de inventar un consumo negativo.' },
+      { tipo: 'nuevo', texto: 'A DÓNDE SE FUE EL AGUA: el primer cuadre de litros. Lo que marca el medidor contra marquetas × 150 L, que es lo que en teoría se llevó el hielo. Tú me lo diste: «la marqueta pesa 150 kg si está entera y sellada, por lo que son 150 L». La diferencia es el agua que se derrama por llenar los moldes de más, que hoy no la ve nadie.' },
+      { tipo: 'importante', texto: 'OJO: ESE CUADRE TODAVÍA NO CIERRA, y la pantalla lo dice en vez de presumir. Los garrafones y las botellas salen de esta misma agua y todavía no se registran — van en la v5.3, y entonces se restan ahí. Y si sale en negativo es al revés: el hielo se llevó más agua de la que marcó el medidor, o sea que los moldes se están llenando de menos y las marquetas salen chicas.' },
+      { tipo: 'importante', texto: 'EL EQUIPO Y LA PIEZA SON DOS COSAS, igual que la nevera y su comodato. El equipo es el puesto —«Membrana 3»— y vive lo que viva la planta; la pieza es lo que está puesto hoy. Cambiar la membrana 3 no borra la anterior: se apila. Y eso descubre cosas — si el puesto 3 se come una membrana cada año y los otros cinco duran tres, lo que está mal no es la membrana, es lo que le llega.' },
+      { tipo: 'nuevo', texto: 'LA VIDA DE CADA PIEZA, en días, en litros o las dos, y manda la que vaya más adelantada: una lámpara de UV se acaba por meses aunque no pase agua, y una membrana por litros aunque el calendario no avance. Sale como barra, no como número, para poder compararlas de un vistazo entre veinte renglones. Avisa a los TRES CUARTOS de su vida, no al final: una membrana no llega el mismo día que se pide.' },
+      { tipo: 'nuevo', texto: 'LOS SERVICIOS, con la diferencia que importa: una FALLA deja el equipo marcado como «por reparar» hasta que alguien anote qué se le hizo; un retrolavado, una regeneración o una sanitización se anotan YA HECHOS, porque son trabajo normal y nadie «reporta» un retrolavado esperando a que alguien vaya. Al atender la última falla, el equipo vuelve a trabajando solo.' },
+      { tipo: 'nuevo', texto: 'SEIS AVISOS POR CORREO nuevos, en orden de qué tan caro sale no atenderlos: cloro pasando por el carbón, el agua se pasó del TDS, las membranas se están acabando, pieza que ya cumplió su vida, nadie dio la vuelta, y falla en la planta. Una sola vuelta puede disparar tres, y salen los tres: son tres problemas con tres arreglos distintos, y juntarlos haría que el del cloro se leyera como un renglón más.' },
+      { tipo: 'importante', texto: 'QUIÉN PUEDE QUÉ. Dar la vuelta y reportar una falla lo puede hacer CUALQUIERA —operario, cajero, gerente—: la avería se ve cuando se ve, y el que trae el aparato en la mano es quien está ahí. Cambiar una pieza, capturar lo que costó y mover los límites del TDS es solo tuyo: una membrana cuesta lo que cuesta, y ese límite decide si el agua se embotella o no.' },
+      { tipo: 'nuevo', texto: 'LAS LECTURAS NO SE EDITAN, SE ANULAN, con su motivo. Una lectura es lo que marcaba el aparato ese día y eso no cambia. Si se anotó mal, lo que dice la verdad es que alguien se equivocó — y eso también se guarda.' },
+      { tipo: 'nuevo', texto: 'AJUSTES: el TDS máximo de salida (50 ppm de fábrica), el rechazo mínimo (90 %), la dureza máxima después del suavizador (20 ppm), los días sin lectura antes de avisar, y los litros por marqueta (150). Todo lo tuyo, todo cambiable.' },
+      { tipo: 'nuevo', texto: 'Y TODO EXPLICADO en el manual (❓ Ayuda › La planta de agua: la máquina), incluida la parte de por qué el carbón va antes de las membranas.' }
+    ]
+  },
   {
     numero: '5.1',
     nombre: 'Las neveras',

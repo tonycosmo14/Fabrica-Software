@@ -20,6 +20,7 @@ import { vistaUsuarios } from './vistas/usuarios.js';
 import { vistaRaya } from './vistas/raya.js';
 import { vistaCorreo } from './vistas/correo.js';
 import { vistaNeveras } from './vistas/neveras.js';
+import { vistaAgua } from './vistas/agua.js';
 import { vistaNovedades, hayVersionNueva } from './vistas/novedades.js';
 import { vistaAyuda } from './vistas/ayuda.js';
 import { vistaPersonalizar } from './vistas/personalizar.js';
@@ -56,6 +57,9 @@ const RUTAS = {
   '#/raya':      { titulo: 'La raya',           vista: vistaRaya,      permiso: 'raya.ver' },
   '#/correo':    { titulo: 'Avisos por correo',  vista: vistaCorreo,    permiso: 'correo.configurar' },
   '#/neveras':   { titulo: 'Las neveras',        vista: vistaNeveras,   permiso: 'neveras.ver' },
+  // LA PLANTA DE AGUA (v5.2): el operario la ve y anota la vuelta;
+  // cambiar equipos y mover los límites es del administrador.
+  '#/agua':      { titulo: 'La planta de agua',  vista: vistaAgua,      permiso: 'agua.ver' },
   // El cajero entra con vista limitada: ve cuántas hay e imprime la hoja.
   '#/productos': { titulo: 'Productos y precios', vista: vistaProductos, permiso: 'inventario.ver', fija: true },
   '#/clientes':  { titulo: 'Clientes',           vista: vistaClientes,  permiso: 'clientes.ver', fija: true },

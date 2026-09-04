@@ -4511,3 +4511,146 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
   padding: 9px 12px; border-radius: 10px; font-size: 13px;
   background: var(--superficie); border: 1px solid var(--borde); color: var(--suave);
 }
+
+/* ============================================================
+   LA PLANTA DE AGUA  (v5.2)
+
+   El prefijo es `planta-` y no `agua-` porque `.agua-boton` ya existe
+   desde la v1: es el botón del agua del paño, en Producción. Son dos
+   aguas distintas y mezclar los nombres se paga caro el día que alguien
+   toca una regla creyendo que es de la otra.
+   ============================================================ */
+
+.planta-tablero { display: grid; gap: 10px; margin-bottom: 14px; }
+@media (min-width: 900px) { .planta-tablero { grid-template-columns: 1fr 1fr; } }
+
+.planta-alerta {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 12px 14px; border-radius: 12px;
+  background: var(--superficie); border: 1px solid var(--borde);
+}
+.planta-alerta > b { font-size: 15px; }
+.planta-alerta > span { color: var(--suave); font-size: 13.5px; }
+.planta-alerta.bien { background: var(--cal-normal-f); border-color: var(--verde); }
+.planta-alerta.bien > b { color: var(--verde); }
+.planta-alerta.tarde, .planta-alerta.avisa {
+  background: var(--cal-poco_hueca-f); border-color: var(--ambar); }
+.planta-alerta.tarde > b, .planta-alerta.avisa > b { color: var(--ambar); }
+.planta-alerta.malo { background: var(--et-baja-f); border-color: var(--rojo); }
+.planta-alerta.malo > b { color: var(--rojo); }
+.planta-alerta.perdida { background: var(--cal-otro-f); border-color: var(--cal-otro); }
+.planta-alerta.perdida > b { color: var(--cal-otro); }
+
+/* Dos columnas en pantalla grande, una encima de otra en la chica. */
+.planta-dos { display: grid; gap: 14px; align-items: start; }
+@media (min-width: 1000px) { .planta-dos { grid-template-columns: 1fr 1fr; } }
+
+/* LA VUELTA. Los campos en rejilla: siete números caben en dos columnas
+   sin que haya que rodar la pantalla con el aparato en la mano. */
+.planta-campos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+@media (max-width: 560px) { .planta-campos { grid-template-columns: 1fr; } }
+.planta-campos label { margin: 0; font-size: 13.5px; }
+.planta-campos input { margin: 4px 0 0; }
+.planta-antes { display: block; color: var(--suave); font-size: 11.5px; margin-top: 3px; }
+/* El del cloro se marca: es el único que puede echar a perder seis
+   membranas, y el que más fácil se salta por ser el más aburrido. */
+.planta-ojo { padding: 8px 10px; margin: -8px -10px !important;
+  border-radius: 10px; background: var(--cal-poco_hueca-f); }
+
+.planta-adelanto { margin-top: 10px; font-size: 13.5px; line-height: 1.5; }
+.planta-adelanto.hay { padding: 10px 12px; border-radius: 10px;
+  background: var(--superficie-alt); border: 1px solid var(--borde); }
+.planta-adelanto .bueno, .planta-tira .bueno, .planta-tabla .bueno { color: var(--verde); }
+.planta-adelanto .malo, .planta-tira .malo, .planta-tabla .malo { color: var(--rojo); }
+
+/* EL NÚMERO GRANDE */
+.planta-salud.bien { border-left: 4px solid var(--verde); }
+.planta-salud.malo { border-left: 4px solid var(--rojo); }
+.planta-grande { font-size: 40px; font-weight: 800; line-height: 1.1;
+  font-variant-numeric: tabular-nums; }
+.planta-grande.bien { color: var(--verde); }
+.planta-grande.malo { color: var(--rojo); }
+.planta-grande.chico { font-size: 26px; }
+
+.planta-tira { display: flex; flex-wrap: wrap; gap: 8px; }
+.planta-tira > span {
+  display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 110px;
+  padding: 8px 10px; border-radius: 10px;
+  background: var(--superficie-alt); border: 1px solid var(--borde);
+}
+.planta-tira small { color: var(--suave); font-size: 11.5px; }
+.planta-tira b { font-size: 16px; font-variant-numeric: tabular-nums; }
+.planta-tira.grande b { font-size: 19px; }
+
+/* La línea del rechazo. Sin ejes ni números: lo que se lee de un vistazo
+   es si va bajando, y para eso sobra todo lo demás. */
+.planta-linea { width: 100%; height: 60px; display: block; }
+.planta-trazo { fill: none; stroke: var(--primario); stroke-width: 2;
+  stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.planta-limite { stroke: var(--rojo); stroke-width: 1; stroke-dasharray: 4 4;
+  vector-effect: non-scaling-stroke; opacity: .7; }
+
+/* EL CUADRE */
+.planta-cuadre td small { display: block; color: var(--suave); font-size: 11.5px; }
+.planta-resultado td { border-top: 2px solid var(--borde); font-size: 16px; }
+
+/* EL TREN. Igual que la lista de neveras: el título y su botón en una
+   fila de verdad, nunca con float — un float encoge la caja flex de
+   abajo y deja la lista angosta sin que nada lo explique (pasó en v5.1). */
+.planta-cabeza {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 4px;
+}
+.planta-cabeza > button { flex: none; width: auto; }
+
+.planta-tren { display: flex; flex-direction: column; gap: 8px; }
+.ancho-completo .planta-equipo { max-width: none; }
+.planta-equipo {
+  display: grid; align-items: center; gap: 14px; width: 100%;
+  grid-template-columns: 40px minmax(0, 2fr) 1fr 1.2fr 1.2fr 20px;
+  padding: 11px 14px; text-align: left; min-height: 0;
+  background: var(--superficie); border: 1px solid var(--borde);
+  border-radius: 12px; color: var(--texto); font: inherit;
+}
+.planta-equipo:hover { border-color: var(--primario); }
+.planta-equipo.malo { border-left: 4px solid var(--rojo); }
+.planta-equipo.tarde { border-left: 4px solid var(--ambar); }
+.planta-equipo.baja { opacity: .55; }
+.planta-emoji { font-size: 22px; text-align: center; }
+.planta-quien { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.planta-quien b, .planta-quien small { overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; }
+.planta-quien small { color: var(--suave); font-size: 12.5px; }
+.planta-dato { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.planta-dato small { color: var(--suave); font-size: 11.5px; }
+.planta-dato b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.planta-dato.der { text-align: right; }
+.planta-flecha { color: var(--suave); text-align: right; }
+
+.planta-estado {
+  display: inline-block; padding: 2px 8px; border-radius: 999px;
+  font-size: 12px; font-weight: 700; text-align: center;
+  background: var(--superficie-alt); border: 1px solid var(--borde);
+}
+.planta-estado.bien { background: var(--cal-normal-f); color: var(--verde); }
+.planta-estado.malo { background: var(--et-baja-f); color: var(--rojo); }
+.planta-estado.baja { background: var(--superficie-alt); color: var(--suave); }
+
+/* La barra de vida. Un porcentaje suelto no se compara de un vistazo
+   entre veinte renglones; una barra sí. */
+.planta-barra {
+  display: block; height: 8px; border-radius: 999px; overflow: hidden;
+  background: var(--superficie-alt); border: 1px solid var(--borde);
+}
+.planta-barra > span { display: block; height: 100%; background: var(--verde); }
+.planta-barra.tarde > span { background: var(--ambar); }
+.planta-barra.malo > span { background: var(--rojo); }
+.planta-dato .planta-barra + small { margin-top: 3px; }
+
+.planta-acciones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.planta-acciones > button { flex: none; width: auto; }
+
+.planta-tabla td small { display: block; color: var(--suave); font-size: 11.5px; }
+.planta-tabla tr.pendiente { background: var(--et-baja-f); }
+.planta-tabla tr.planta-puesta { background: var(--cal-normal-f); }
+.planta-tabla .der { text-align: right; }

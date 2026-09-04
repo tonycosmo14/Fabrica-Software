@@ -29,6 +29,8 @@ function revisar() {
   const hizo = [];
   for (const [nombre, f] of [['inventario', inventarioBajo],
                              ['neveras', neverasSinPedir],
+                             ['agua-piezas', piezasVencidas],
+                             ['agua-lectura', sinDarLaVuelta],
                              ['dia', resumenDelDia],
                              ['mes', informeDelMes]]) {
     try { if (f()) hizo.push(nombre); }
@@ -174,7 +176,104 @@ function neverasSinPedir() {
 }
 
 // ============================================================
-// 3 · EL RESUMEN DEL DÍA
+// 3 · LAS PIEZAS DE LA PLANTA QUE YA CUMPLIERON
+// ============================================================
+
+/**
+ * Una vez al día, como el de las neveras y por la misma razón: una
+ * membrana vencida sigue vencida mañana, y avisar cada media hora hasta
+ * que llegue la nueva convierte el correo en ruido.
+ *
+ * Van juntas las vencidas y las que están por cumplir, porque el aviso
+ * útil no es "cámbiala hoy" sino "ve pidiéndola": una membrana tarda en
+ * llegar, y enterarse el día que ya no sirve es enterarse tarde.
+ */
+function piezasVencidas() {
+  if (!encendido('agua_pieza')) return false;
+
+  const dia = hoy();
+  if (cola.valor('aviso_agua_pieza_ultimo', '') === dia) return false;
+
+  const agua = require('../agua/calculo');
+  const p = agua.pendientes();
+  const listas = [...p.vencidas, ...p.porVencer];
+  if (!listas.length) return false;
+
+  cola.guardarValor('aviso_agua_pieza_ultimo', dia);
+
+  const una = listas.length === 1;
+  cola.encolar({
+    aviso: 'agua_pieza',
+    asunto: una
+      ? `${listas[0].nombre}: ${p.vencidas.length ? 'ya toca cambiarla' : 'está por cumplir'}`
+      : `${listas.length} piezas de la planta piden cambio`,
+    html: correo({
+      negocio: cola.negocio(),
+      cuando: momento(),
+      titulo: 'Piezas de la planta de agua',
+      entradilla: 'Éstas ya cumplieron su vida o están por cumplirla. ' +
+                  'Las de arriba son las que ya pasaron.',
+      grande: String(listas.length),
+      color: p.vencidas.length ? 'rojo' : 'ambar',
+      renglones: listas.slice(0, 25).map((e) => [
+        `<b>${escapar(e.nombre)}</b><br><span style="color:#5b6b78">${
+          escapar(e.tipoNombre)}</span>`,
+        e.vida.vencida
+          ? `ya toca · lleva ${e.vida.diasUsados} días`
+          : `${e.vida.gastada} % de su vida`,
+        e.vida.vencida ? 'rojo' : 'ambar'
+      ]),
+      nota: 'Los días de cada equipo se cambian en su ficha, en La planta de agua.'
+    })
+  });
+  return true;
+}
+
+// ============================================================
+// 4 · NADIE DIO LA VUELTA
+// ============================================================
+
+/**
+ * Sin lecturas la planta va a ciegas: las membranas se pueden estar
+ * acabando y nadie se entera hasta que un cliente se queja del sabor.
+ * Este aviso es el que evita que el módulo entero se deje de usar.
+ */
+function sinDarLaVuelta() {
+  if (!encendido('agua_sin_lectura')) return false;
+
+  const dia = hoy();
+  if (cola.valor('aviso_agua_sin_lectura_ultimo', '') === dia) return false;
+
+  const agua = require('../agua/calculo');
+  const p = agua.pendientes();
+  if (!p.sinLectura) return false;
+
+  cola.guardarValor('aviso_agua_sin_lectura_ultimo', dia);
+
+  cola.encolar({
+    aviso: 'agua_sin_lectura',
+    asunto: p.diasSinLectura == null
+      ? 'La planta de agua no tiene ninguna lectura'
+      : `Van ${p.diasSinLectura} días sin dar la vuelta a la planta`,
+    html: correo({
+      negocio: cola.negocio(),
+      cuando: momento(),
+      titulo: 'Nadie ha dado la vuelta a la planta',
+      entradilla: 'Sin lecturas no hay forma de saber cómo está saliendo el agua.',
+      grande: p.diasSinLectura == null ? 'ninguna' : `${p.diasSinLectura} días`,
+      color: 'ambar',
+      renglones: [
+        ['Última lectura', p.ultima ? momento(new Date(p.ultima.fecha)) : 'nunca'],
+        ['Avisa a partir de', `${p.ajustes.diasSinLectura} días`]
+      ],
+      nota: 'La vuelta se anota en La planta de agua, en la tarjeta de arriba.'
+    })
+  });
+  return true;
+}
+
+// ============================================================
+// 5 · EL RESUMEN DEL DÍA
 // ============================================================
 
 /**
@@ -253,7 +352,7 @@ function enLetra(dia) {
 }
 
 // ============================================================
-// 4 · EL INFORME DEL MES
+// 6 · EL INFORME DEL MES
 // ============================================================
 
 /**
@@ -334,4 +433,5 @@ function informeDelMes() {
   return true;
 }
 
-module.exports = { revisar, inventarioBajo, neverasSinPedir, resumenDelDia, informeDelMes };
+module.exports = { revisar, inventarioBajo, neverasSinPedir, piezasVencidas,
+                   sinDarLaVuelta, resumenDelDia, informeDelMes };

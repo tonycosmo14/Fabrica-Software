@@ -7,7 +7,10 @@
 const ROLES = ['operario', 'cajero', 'repartidor', 'gerente', 'admin'];
 
 const PERMISOS_POR_ROL = {
-  operario: ['produccion.ver', 'produccion.registrar'],
+  // EL OPERARIO DA LA VUELTA DE LA PLANTA DE AGUA  (v5.2). Medir el TDS,
+  // el cloro y anotar los medidores es trabajo de turno, y lo hace quien
+  // está ahí. Cambiar una membrana o capturar lo que costó, no.
+  operario: ['produccion.ver', 'produccion.registrar', 'agua.ver', 'agua.anotar'],
   cajero: [
     'produccion.ver',
     'produccion.registrar',
@@ -31,7 +34,11 @@ const PERMISOS_POR_ROL = {
     // LAS NEVERAS  (v5.1). El cajero las VE y puede reportar una falla:
     // el cliente la reporta en el mostrador y hay que poder anotarla en
     // el momento. Prestarlas, moverlas y darlas de baja es otra cosa.
-    'neveras.ver'
+    'neveras.ver',
+    // LA PLANTA DE AGUA  (v5.2). La ve y puede anotar la vuelta: en un
+    // turno flojo el del mostrador es quien tiene tiempo de darla.
+    'agua.ver',
+    'agua.anotar'
   ],
   repartidor: ['reparto.ver', 'reparto.operar'],
 
@@ -53,6 +60,11 @@ const PERMISOS_POR_ROL = {
     // poder anotarla en el momento—; moverlas, prestarlas y darlas de
     // baja es del administrador, que es de quien son.
     'neveras.ver',
+    // LA PLANTA DE AGUA  (v5.2). Igual que las neveras: la ve, anota la
+    // vuelta y reporta una falla. Poner y quitar equipos, capturar lo que
+    // costó una membrana y mover los límites del TDS es del dueño.
+    'agua.ver',
+    'agua.anotar',
     'existencia.ver',
     'existencia.contar',
     'existencia.corregir',
@@ -98,6 +110,11 @@ const PERMISOS_POR_ROL = {
   // contrato y comprometer un fierro de veinte mil pesos; darla de baja
   // es darla por perdida. Verlas y reportar una falla sí es de turno —el
   // cliente la reporta en el mostrador—, pero moverlas no.
+  //
+  // Y CON `agua.administrar`  (v5.2). Una membrana cuesta lo que cuesta y
+  // el límite de TDS es el que decide si el agua se embotella o no: los
+  // dos son decisiones del dueño, no del turno. Medir y reportar sí es de
+  // turno, y por eso `agua.ver` y `agua.anotar` sí los tienen todos.
   //
   // LO MISMO CON `correo.configurar`  (v4.9). Ahí vive la contraseña de la
   // cuenta de correo de la fábrica, y la lista de a quién le llegan los

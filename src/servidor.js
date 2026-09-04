@@ -88,6 +88,7 @@ function crearApp() {
   app.use('/api/versiones', require('./modulos/versiones/rutas'));
   app.use('/api/correo', require('./modulos/correo/rutas'));
   app.use('/api/neveras', require('./modulos/neveras/rutas'));
+  app.use('/api/agua', require('./modulos/agua/rutas'));
   app.use('/api', (req, res) => error(res, 'Esa ruta de la API no existe.', 404));
 
   // Interfaz

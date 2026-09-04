@@ -488,8 +488,9 @@ test('guardar sin contraseña no la borra: sirve para cambiar solo el servidor',
 test('todos los avisos se prenden y se apagan uno por uno', async () => {
   await entrarAdmin();
   const lista = (await llamar('/api/correo')).json.datos.avisos;
-  // Quince en la v4.9, más los dos de las neveras en la v5.1.
-  assert.equal(lista.length, 17);
+  // Quince en la v4.9, más los dos de las neveras en la v5.1, más los
+  // seis de la planta de agua en la v5.2.
+  assert.equal(lista.length, 23);
 
   for (const a of lista) {
     const r = await llamar(`/api/correo/avisos/${a.id}`, {
@@ -497,5 +498,5 @@ test('todos los avisos se prenden y se apagan uno por uno', async () => {
     assert.equal(r.estado, 200, a.id);
     assert.equal(r.json.datos.aviso.encendido, true);
   }
-  assert.equal(avisos.catalogo().filter((a) => a.encendido).length, 17);
+  assert.equal(avisos.catalogo().filter((a) => a.encendido).length, 23);
 });

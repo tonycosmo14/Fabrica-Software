@@ -74,6 +74,29 @@ const AVISOS = [
     ayuda: 'Cuando alguien reporta que una nevera no sirve, con lo que dijo ' +
            'el cliente y dónde está.' },
 
+  { id: 'agua_cloro', nombre: 'Cloro pasando por el carbón', icono: '⚠️', grupo: 'La planta de agua',
+    ayuda: 'El más importante de todos: si el carbón deja pasar cloro, las seis ' +
+           'membranas se echan a perder en días. Avisa en cuanto una vuelta lo mide.' },
+
+  { id: 'agua_tds', nombre: 'El agua se pasó del TDS', icono: '🚱', grupo: 'La planta de agua',
+    ayuda: 'Cuando el agua de salida sale más dura de lo que pusiste como límite. ' +
+           'Esa agua no debería embotellarse.' },
+
+  { id: 'agua_membranas', nombre: 'Las membranas se están acabando', icono: '🌀', grupo: 'La planta de agua',
+    ayuda: 'Cuando el rechazo de sales baja del mínimo. Es el aviso de ir pidiendo ' +
+           'membranas, que no llegan el mismo día.' },
+
+  { id: 'agua_pieza', nombre: 'Pieza que ya cumplió su vida', icono: '🔧', grupo: 'La planta de agua',
+    ayuda: 'Carbón, zeolita, membranas, lámpara de UV: lo que ya pasó de los días ' +
+           'que le pusiste. Sale una vez al día, no cada vez que se mira.' },
+
+  { id: 'agua_sin_lectura', nombre: 'Nadie dio la vuelta', icono: '📋', grupo: 'La planta de agua',
+    ayuda: 'Cuando pasan más días de los que pusiste sin que nadie anote una lectura. ' +
+           'Una planta sin lecturas es una planta a ciegas.' },
+
+  { id: 'agua_falla', nombre: 'Falla en la planta de agua', icono: '🛠️', grupo: 'La planta de agua',
+    ayuda: 'Cuando alguien reporta que un equipo de la planta no está funcionando.' },
+
   { id: 'tanque_nuevo', nombre: 'Tanque nuevo', icono: '🛢️', grupo: 'La gente y la fábrica',
     ayuda: 'Cuando se da de alta un tanque.' },
 
@@ -371,10 +394,113 @@ const SEGUN_ACCION = {
     };
   },
 
+  // ---------- LA PLANTA DE AGUA ----------
+  //
+  // UNA VUELTA PUEDE DISPARAR TRES AVISOS DISTINTOS, y salen los tres:
+  // son tres problemas diferentes con tres arreglos diferentes. Juntarlos
+  // en un correo haría que el del cloro —que es el urgente— se leyera
+  // como un renglón más de un informe.
+  'agua.lectura': (e) => cartasDeLaVuelta(e),
+
+  'agua.falla': (e) => {
+    if (!encendido('agua_falla')) return null;
+    const d = e.detalle;
+    return {
+      aviso: 'agua_falla',
+      asunto: `Falla en la planta de agua · ${escapar(d.equipo || '')}`,
+      titulo: 'Reportaron una falla en la planta',
+      entradilla: `Lo anotó <b>${nombreDe(e.quien)}</b>.`,
+      grande: escapar(d.equipo || 'La planta'),
+      color: 'rojo',
+      renglones: [['Qué tiene', escapar(d.queTiene || '—')]],
+      nota: 'El equipo queda marcado como «por reparar» hasta que se anote qué se le hizo.'
+    };
+  },
+
   // ---------- LLEGADAS Y SALIDAS ----------
   'sesion.inicio': (e) => llegadaOSalida(e, true),
   'sesion.fin': (e) => llegadaOSalida(e, false)
 };
+
+/**
+ * LA VUELTA DE LA PLANTA, CONVERTIDA EN AVISO.
+ *
+ * Se manda UNA carta por problema, y en el orden del daño: el cloro
+ * primero. Como `mirar()` solo encola una carta por evento, se devuelve
+ * la más grave y las otras se encolan aquí mismo.
+ */
+function cartasDeLaVuelta(e) {
+  const agua = require('../agua/calculo');
+  const a = agua.ajustes();
+  const d = e.detalle;
+  const quien = nombreDe(e.quien);
+  const cartas = [];
+
+  if (d.cloro != null && Number(d.cloro) > 0 && encendido('agua_cloro')) {
+    cartas.push({
+      aviso: 'agua_cloro',
+      asunto: '⚠️ Está pasando cloro por el carbón',
+      titulo: 'El carbón está dejando pasar cloro',
+      entradilla: `Lo midió <b>${quien}</b> en la vuelta de hoy.`,
+      grande: `${d.cloro} ppm`,
+      color: 'rojo',
+      renglones: [
+        ['Cloro después del carbón', `${d.cloro} ppm`],
+        ['Debería dar', '0 ppm']
+      ],
+      nota: 'El cloro que llega a las membranas se las come en días. '
+          + 'Hay que cambiar el carbón antes de seguir produciendo.'
+    });
+  }
+
+  if (d.tdsSalida != null && d.tdsSalida > a.tdsMaximo && encendido('agua_tds')) {
+    cartas.push({
+      aviso: 'agua_tds',
+      asunto: `El agua salió en ${d.tdsSalida} ppm`,
+      titulo: 'El agua se pasó del TDS permitido',
+      entradilla: `Lo midió <b>${quien}</b>.`,
+      grande: `${d.tdsSalida} ppm`,
+      color: 'rojo',
+      renglones: [
+        ['Salió en', `${d.tdsSalida} ppm`],
+        ['El límite está en', `${a.tdsMaximo} ppm`]
+      ],
+      nota: 'Esa agua no debería embotellarse.'
+    });
+  }
+
+  if (d.rechazo != null && d.rechazo < a.rechazoMinimo && encendido('agua_membranas')) {
+    cartas.push({
+      aviso: 'agua_membranas',
+      asunto: `Rechazo de sales en ${d.rechazo} %`,
+      titulo: 'Las membranas se están acabando',
+      entradilla: `De la vuelta que dio <b>${quien}</b>.`,
+      grande: `${d.rechazo} %`,
+      color: 'ambar',
+      renglones: [
+        ['Rechazo de sales', `${d.rechazo} %`],
+        ['El mínimo es', `${a.rechazoMinimo} %`],
+        ['Entró con', `${d.tdsEntrada ?? '—'} ppm`],
+        ['Salió con', `${d.tdsSalida ?? '—'} ppm`]
+      ],
+      nota: 'Ve pidiendo membranas: no llegan el mismo día.'
+    });
+  }
+
+  if (!cartas.length) return null;
+
+  // La primera se devuelve para que la encole `mirar()`; las demás se
+  // encolan aquí. Así no hay que cambiar la forma de todo el archivo por
+  // el único evento que puede dar más de una carta.
+  for (const otra of cartas.slice(1)) {
+    cola.encolar({
+      aviso: otra.aviso,
+      asunto: otra.asunto,
+      html: correo({ negocio: cola.negocio(), cuando: momento(), ...otra })
+    });
+  }
+  return cartas[0];
+}
 
 const ROLES = {
   admin: 'Administrador', gerente: 'Gerente de turno', cajero: 'Encargado de caja',
