@@ -149,7 +149,11 @@ test('el ticket de una venta lleva la cantidad en grande', async () => {
 
   const papel = loImpreso();
   assert.match(papel, /3\/4/, 'la cantidad va en el ticket');
-  assert.match(papel, /1\/2 \+ 1\/4/, 'y el desglose de cómo se formó el precio');
+  // EL DESGLOSE "(1/2 + 1/4)" SE QUITÓ  (v5.2.2). Decía de qué pedazos
+  // salió la cuenta, y en el mostrador nadie lo miraba: lo que el cliente
+  // comprueba es cuánto se llevó y cuánto costó, y eso ya está arriba.
+  assert.ok(!papel.includes('1/2 + 1/4'),
+            'el desglose entre paréntesis ya no va');
   // El número que se dice en voz alta: "2026-412", no el folio interno.
   assert.match(papel, new RegExp(venta.numero.replace('-', '\\-')),
                'el ticket lleva su número de la serie del año');

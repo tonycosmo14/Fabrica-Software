@@ -438,7 +438,7 @@ debería quedar − contado = FALTA</pre>
       <p>En un ticket de <b>mayoreo</b> no hace falta acordarse: al apretar
       <em>F10</em> la caja lo pide sola antes de cobrar. Está explicado
       completo en <b>Precios de mayoreo</b>.</p>
-      <p><b>Fiarle</b> es otra cosa y tiene su propio botón en esa misma
+      <p><b>Dárselo a crédito</b> es otra cosa y tiene su propio botón en esa misma
       lista: la mayoría de los mayoristas pagan en el momento.</p>
 
       <h4>Dos clientes a la vez</h4>
@@ -488,7 +488,7 @@ debería quedar − contado = FALTA</pre>
       anotaron igual.</p>
       <p>Si el ticket es de <b>otro turno</b>, el dinero entró otro día pero
       sale del cajón de hoy: queda anotado como salida para que tu corte no
-      te salga corto. Y si era <b>fiado</b>, no sale dinero de ningún lado:
+      te salga corto. Y si iba <b>a crédito</b>, no sale dinero de ningún lado:
       simplemente deja de deberlo.</p>
       <p>Devolver es de <b>gerente</b>: sacar dinero del cajón por algo que
       ya se cobró se revisa.</p>
@@ -514,8 +514,8 @@ debería quedar − contado = FALTA</pre>
       turno. Antes sí pasaba, y el que acababa de entregar se lo volvía a
       quedar sin darse cuenta.</p>
 
-      <h4>Fiar</h4>
-      <p>En la pantalla de cobro, <b>🧾 Fiar a un cliente</b>. Solo a los que
+      <h4>Dejarlo a crédito</h4>
+      <p>En la pantalla de cobro, <b>🧾 Dejarlo a crédito</b>. Solo a los que
       están dados de alta. Está explicado completo en
       <b>Clientes y crédito</b>.</p>
 
@@ -731,8 +731,8 @@ sabado   lo que le falta $1,100   ← gasto (sueldo)
       recordatorio. Ese botón <b>no mueve un peso</b>: el dinero salió el
       día del vale.</p>
 
-      <h4>Lo fiado no está en el cajón</h4>
-      <p>Si en el turno salió mercancía <b>fiada</b>, el corte lo dice aparte:
+      <h4>Lo que salió a crédito no está en el cajón</h4>
+      <p>Si en el turno salió mercancía <b>a crédito</b>, el corte lo dice aparte:
       ese dinero está en la calle, no en los billetes, y no se cuenta en el
       arqueo. Lo mismo lo cobrado por transferencia, que ya se cobró pero
       entró por otro lado.</p>
@@ -1117,12 +1117,12 @@ debería haber − contado = FALTA</pre>
   // ==========================================================
   {
     id: 'clientes',
-    titulo: 'Clientes y crédito: a quién se le fía',
-    busca: 'clientes crédito fiar fiado deuda debe abono abonar cobranza límite plazo vencido saldo cuenta a favor cartera calle logo foto imagen retrato telefono marcar llamar',
+    titulo: 'Clientes y crédito: a quién se le da y cuánto debe',
+    busca: 'clientes crédito a credito fiar fiado deuda debe abono abonar abona parte paga una parte deja algo pago parcial cobranza límite de crédito credito disponible plazo vencido saldo cuenta a favor cartera calle logo foto imagen retrato telefono marcar llamar',
     cuerpo: `
-      <p>La regla de la fábrica es que <b>se le fía solo a los clientes que
+      <p>La regla de la fábrica es que <b>solo se le da crédito a los clientes que
       damos de alta</b>. Al público en general no. Por eso en la caja el
-      botón de fiar abre una lista: no hay forma de escribir un nombre a
+      botón de crédito abre una lista: no hay forma de escribir un nombre a
       mano con gente esperando.</p>
 
       <h4>Dar de alta a alguien</h4>
@@ -1159,15 +1159,39 @@ debería haber − contado = FALTA</pre>
       negocio, teléfono, dirección) y <b>su crédito y su precio</b> (el
       límite, el plazo y qué lista de mayoreo se le cobra).</p>
 
-      <h4>Fiar en la caja</h4>
+      <h4>Paga una parte y debe la otra</h4>
+      <p>Es lo más común de todo: se lleva $480 pero solo trae $300. En la
+      pantalla de crédito hay un campo <b>«¿Deja algo ahorita?»</b>. Se
+      escribe lo que entrega y la cuenta de abajo se rehace sola:</p>
+      <pre class="ayuda-formula">Debía  +  este ticket  −  lo que deja  =  va a deber</pre>
+      <p>Se guarda como <b>dos cosas</b>, que es lo que de verdad pasó: el
+      ticket entero a su cuenta, y su abono. Así en su estado de cuenta se
+      ve que se llevó $480 y entregó $300 — no una venta de $180 que nadie
+      sabría explicar después.</p>
+      <ul>
+        <li><b>El dinero entra al cajón</b> por el mismo camino que la
+        cobranza, así que el corte cuadra sin tocar nada.</li>
+        <li><b>El ticket lo dice</b>: «PAGÓ AHORA $300 · QUEDA A DEBER
+        $180», arriba de la línea para firmar. El cliente se lleva su copia
+        y los dos saben lo mismo.</li>
+        <li><b>El límite se mide contra lo que se le queda</b>, no contra el
+        ticket. Si está pegado a su límite pero paga casi todo, no hay por
+        qué parar la venta y llamar al gerente.</li>
+      </ul>
+      <p class="ayuda-tip">No se puede dejar <b>más</b> de lo que se lleva.
+      Para abonar a lo que debía de antes está su ficha en Clientes, donde
+      además se ve contra qué se está aplicando. Y si lo paga todo, no es
+      crédito: cóbraselo normal.</p>
+
+      <h4>Dar crédito en la caja</h4>
       <ol class="instrucciones">
         <li>Se marca lo que se lleva, como cualquier venta.</li>
-        <li><em>F10</em> para cobrar, y ahí <b>🧾 Fiar a un cliente</b>.</li>
-        <li>Se busca por nombre o negocio y se toca <b>Fiarle</b>.</li>
+        <li><em>F10</em> para cobrar, y ahí <b>🧾 Dejarlo a crédito</b>.</li>
+        <li>Se busca por nombre o negocio y se toca <b>A crédito</b>.</li>
         <li>La pantalla enseña <b>lo que va a deber después de este ticket</b>:
         debía + este ticket = va a deber. <em>Enter</em> lo registra.</li>
       </ol>
-      <p>El ticket sale marcado <b>FIADO</b>, con su nombre y la línea para
+      <p>El ticket sale marcado <b>A CRÉDITO</b>, con su nombre y la línea para
       firmar. Ese papel es el vale: el cliente se lleva su copia y los dos
       saben lo mismo.</p>
 
@@ -1177,9 +1201,9 @@ debería haber − contado = FALTA</pre>
       quién lo autorizó y por qué, en el ticket y en la bitácora.</p>
       <p class="ayuda-tip">Al cliente que lleva veinte años comprando no se le
       para la venta por un número que alguien escribió hace meses. Pero
-      tampoco se le fía de más sin que nadie se entere.</p>
+      tampoco se le da de más sin que nadie se entere.</p>
       <p>El límite <b>vacío quiere decir sin límite</b>. Un límite de cero sí
-      es un límite: a ese no se le fía nada.</p>
+      es un límite: a ese no se le da nada a crédito.</p>
 
       <h4>Cuando el cliente pasa a pagar</h4>
       <p>En su ficha, <b>＋ Recibir abono</b>. Se escribe lo que deja y ya.</p>
@@ -1197,7 +1221,7 @@ debería haber − contado = FALTA</pre>
 
       <h4>Su cuenta</h4>
       <p>Arriba, en grande, lo que debe. Abajo la cuenta de siempre:</p>
-      <pre class="ayuda-formula">se ha llevado fiado − ha pagado = DEBE</pre>
+      <pre class="ayuda-formula">se ha llevado a crédito − ha pagado = DEBE</pre>
       <p>Y después, renglón por renglón, lo que se llevó y lo que pagó. Es lo
       que se le enseña al cliente cuando pregunta.</p>
       <p class="ayuda-tip"><b>El saldo no está guardado en ningún lado: se
@@ -1213,7 +1237,7 @@ debería haber − contado = FALTA</pre>
       <p>El plazo <b>solo avisa</b>: nunca impide venderle.</p>
 
       <h4>En el corte</h4>
-      <p>Lo que salió fiado <b>no se cuenta en el cajón</b>: ese dinero está en
+      <p>Lo que salió a crédito <b>no se cuenta en el cajón</b>: ese dinero está en
       la calle, no en los billetes. El corte lo dice aparte, para que sepas
       cuánto se fió en el turno.</p>
 
@@ -1564,7 +1588,7 @@ debería haber − contado = FALTA</pre>
       <ul>
         <li><b>Venta</b> — una venta de mostrador.</li>
         <li><b>Mayoreo</b> — salió con precio de una lista de mayoreo.</li>
-        <li><b>Fiado</b> — se lo llevó a crédito.</li>
+        <li><b>A crédito</b> — se lo llevó apuntado a su cuenta.</li>
         <li><b>Cambio</b> / <b>Cambiado</b> — el ticket nuevo y el viejo de
         un cambio. Cada uno nombra a su pareja, así que cayendo en
         cualquiera de los dos se ve la historia completa.</li>
@@ -1620,7 +1644,7 @@ debería haber − contado = FALTA</pre>
       En cuanto un producto se vendió, su nombre está en tickets ya cobrados;
       borrarlo dejaría el histórico mintiendo. El sistema te lo dice y te
       manda a darlo de baja. Lo mismo con un cliente que ya se llevó algo
-      fiado, y con una categoría que todavía tiene productos dentro.</p>
+      a crédito, y con una categoría que todavía tiene productos dentro.</p>
 
       <h4>Los conceptos: borrarlos de la lista</h4>
       <p>Los <b>conceptos</b> —los gastos que se repiten de la caja y los
@@ -1760,7 +1784,7 @@ HIELO LOLHA</pre>
         <li><b>CANCELADO</b> — ese ticket ya no vale.</li>
         <li><b>CAMBIO DEL #2026-152124</b>, hasta abajo — este hielo ya se
         había pagado en otro papel; este es el cambio.</li>
-        <li><b>FIADO</b>, con la raya para firmar — el cliente se lo llevó a
+        <li><b>A CRÉDITO</b>, con la raya para firmar — el cliente se lo llevó a
         crédito y este papel es el vale.</li>
       </ul>
 
@@ -2617,7 +2641,7 @@ DEBERIA HABER ..........................  $5,500
 
       <h4>Quién compra más</h4>
       <p>Los clientes que más se llevaron en el mes, con lo que se llevaron
-      en dinero y en marquetas, cuántas veces vinieron, cuántas fiadas y
+      en dinero y en marquetas, cuántas veces vinieron, cuántas a crédito y
       cuándo fue la última.</p>
       <p class="ayuda-tip">Solo entra lo que se cobró <b>con nombre</b>. El
       mostrador de a cuarto es la mitad del negocio y no tiene dueño:
@@ -2626,7 +2650,7 @@ DEBERIA HABER ..........................  $5,500
 
       <h4>Se vendió</h4>
       <p>El precio de todo lo que salió en el mes, <b>esté cobrado o
-      fiado</b>. Lo fiado se dice aparte, porque es dinero que se vendió
+      a crédito</b>. Lo del crédito se dice aparte, porque es dinero que se vendió
       pero todavía no está. Los tickets cancelados y las devoluciones
       <b>no cuentan</b> —pero se dice cuántos hubo—, y un <b>cambio</b>
       tampoco cuenta dos veces: por dentro el ticket viejo queda cancelado

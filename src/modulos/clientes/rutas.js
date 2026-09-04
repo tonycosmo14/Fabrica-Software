@@ -21,6 +21,7 @@ const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
 const { comprobarAdmin, administradores } = require('../../lib/autorizacion');
 const { sesionAbierta } = require('../caja/calculo');
+const { apuntarAbono } = require('./abonos');
 const { listasDeMayoreo, listaPorOmision } = require('../ventas/mayoreo');
 const {
   estadoCliente, cuentaCorriente, clientesConEstado, resumenCartera
@@ -328,33 +329,16 @@ router.post('/:id/abonos', cobrar, (req, res) => {
   // pero se avisa, porque casi siempre es un dedazo.
   const deMas = centavos > saldo ? centavos - saldo : 0;
 
-  const id = nuevoId();
-  const fecha = ahora();
   const turno = sesionAbierta();
   const ejecutorId = req.body?.ejecutorId || req.usuario.id;
-  let movimientoId = null;
 
-  const guardar = bd.transaction(() => {
-    if (formaPago === 'efectivo' && turno) {
-      movimientoId = nuevoId();
-      bd.prepare(`
-        INSERT INTO movimientos_caja
-          (id, caja_id, fecha, tipo, concepto, centavos, ejecutor_id, capturista_id, notas)
-        VALUES (?, ?, ?, 'entrada', ?, ?, ?, ?, ?)
-      `).run(movimientoId, turno.id, fecha,
-             `Abono de ${c.nombre}`.slice(0, 80), centavos,
-             ejecutorId, req.usuario.id, 'Cobranza de crédito');
-    }
-
-    bd.prepare(`
-      INSERT INTO abonos (id, cliente_id, fecha, centavos, forma_pago, notas,
-                          caja_id, movimiento_id, ejecutor_id, capturista_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, c.id, fecha, centavos, formaPago,
-           (req.body?.notas || '').trim().slice(0, 200) || null,
-           turno?.id || null, movimientoId, ejecutorId, req.usuario.id);
-  });
-  guardar();
+  // Cómo se escribe un abono vive en `abonos.js`, porque desde la v5.3 hay
+  // dos sitios que lo hacen: esta cobranza y el mostrador.
+  const { id, movimientoId } = bd.transaction(() => apuntarAbono({
+    cliente: c, centavos, formaPago, turno,
+    ejecutorId, capturistaId: req.usuario.id,
+    notas: (req.body?.notas || '').trim() || null
+  }))();
 
   bitacora.registrar({
     accion: 'credito.abono', entidad: 'cliente', entidadId: c.id,

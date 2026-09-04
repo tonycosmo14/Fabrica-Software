@@ -278,7 +278,10 @@ function queEs(f) {
   if (f.cambio_de)     return { clave: 'cambio',   texto: 'Cambio',   emoji: '⇄' };
   if (f.cambiado_por)  return { clave: 'cambiado', texto: 'Cambiado',  emoji: '⇄' };
   if (f.cancelada_en)  return { clave: 'cancelada', texto: 'Cancelada', emoji: '✕' };
-  if (f.forma_pago === 'credito') return { clave: 'fiado', texto: 'Fiado', emoji: '🤝' };
+  // La CLAVE se queda diciendo `fiado`: es el nombre del color en el CSS y
+  // del filtro guardado, y cambiarla rompería los dos sin que nadie gane
+  // nada. Lo que se lee sí cambió (v5.2.2).
+  if (f.forma_pago === 'credito') return { clave: 'fiado', texto: 'A crédito', emoji: '🤝' };
   if (f.lista_tipo === 'mayoreo') return { clave: 'mayoreo', texto: 'Mayoreo', emoji: '🏷️' };
   return { clave: 'venta', texto: 'Venta', emoji: '🧾' };
 }

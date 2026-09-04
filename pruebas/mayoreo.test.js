@@ -223,14 +223,19 @@ test('el precio queda COPIADO: subirle al mayoreo no toca los tickets viejos', a
   });
 });
 
-test('el ticket guarda y el papel dice con qué lista se cobró', async () => {
+test('el papel dice el precio por marqueta, en el renglón del hielo', async () => {
   const { ticketVenta } = require('../src/modulos/impresion/ticket');
   const v = (await vender('1m', { clienteId: donCarlos.id })).json.datos.venta;
   assert.equal(v.lista_nombre, 'Mayoreo 2');
 
   const detalle = (await llamar(`/api/ventas/${v.id}`)).json.datos.venta;
   const papel = Buffer.from(ticketVenta(detalle, { negocio: 'Hielo LOLHA' })).toString('latin1');
-  assert.match(papel, /Mayoreo 2/, 'el papel explica por qué salió a $220');
+  // ANTES iba debajo del total, como "Precio de Mayoreo 2", y ahí no lo
+  // leía nadie. Ahora va pegado a lo que se llevó — "1  x $220 ... $220" —
+  // que es donde se busca cuando el cliente pregunta por qué salió a eso.
+  assert.match(papel, /x \$220/, 'el precio por marqueta va en el renglón');
+  assert.ok(!papel.includes('Precio de'),
+            'y ya no hay un renglón suelto debajo del total');
   assert.match(papel, /Don Carlos/, 'y de quién fue');
 });
 

@@ -17,9 +17,43 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '5.2.1';
+const VERSION_ACTUAL = '5.3';
 
 const VERSIONES = [
+  {
+    numero: '5.3',
+    nombre: 'Paga una parte y debe la otra',
+    fecha: '2026-09-04',
+    resumen:
+      'Cobrar a medias sin salirse de la caja: el cliente deja lo que trae '
+      + 'y el resto se le queda a deber, en un solo gesto.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'YA SE PUEDE COBRAR A MEDIAS. En la pantalla de crédito hay un campo «¿Deja algo ahorita?». Se lleva $480, deja $300, queda debiendo $180 — y todo en el mismo momento, sin terminar la venta e ir hasta Clientes a ponerle un abono.' },
+      { tipo: 'mejora', texto: 'LA CUENTA SE REHACE SOLA mientras se teclea: «Debía $0 + Este ticket $480 − Deja ahorita $300 = Va a deber $180». Y el botón dice exactamente lo que va a pasar: «Cobrar $300 y dejar $180 a crédito».' },
+      { tipo: 'importante', texto: 'SE GUARDA COMO DOS COSAS, QUE ES LO QUE PASÓ: el ticket entero a su cuenta, y su abono. En el estado de cuenta se ve que se llevó $480 y entregó $300. Si se guardara como «una venta de $180», dentro de tres meses nadie sabría que se llevó dos marquetas completas — y el día que ese ticket se cancele, la cuenta no se corregiría sola.' },
+      { tipo: 'importante', texto: 'EL TICKET LO DICE: «PAGÓ AHORA $300 · QUEDA A DEBER $180», arriba de la línea para firmar. Es la mitad del sentido de ese papel: el cliente se lleva su copia y los dos saben lo mismo. Y lo va a seguir diciendo dentro de tres años, porque el abono queda amarrado a SU ticket.' },
+      { tipo: 'nuevo', texto: 'Y SI SE ANULA ESE ABONO —porque el billete era falso—, el ticket vuelve a decir que debe todo. El importe no se guarda: se saca de los abonos vivos, así que la verdad de hoy es la que sale impresa hoy.' },
+      { tipo: 'mejora', texto: 'EL LÍMITE SE MIDE CONTRA LO QUE SE LE QUEDA A DEBER, no contra el ticket. A un cliente pegado a su límite que paga casi todo ya no se le para la venta ni hay que llamar al gerente por lo poco que queda.' },
+      { tipo: 'importante', texto: 'EL DINERO ENTRA AL CAJÓN por el mismo camino que la cobranza de siempre, así que el corte cuadra sin tocar nada. Y la venta y el abono se guardan JUNTOS: si uno fallara, no se guarda ninguno — nunca puede quedar dinero cobrado sin venta que lo explique, ni un cliente debiendo algo que ya entregó.' },
+      { tipo: 'nuevo', texto: 'No se puede dejar más de lo que se lleva, y si lo paga todo el sistema lo dice: eso no es crédito, es una venta normal. Para abonar a lo que debía de antes sigue estando su ficha en Clientes, donde además se ve contra qué se aplica.' }
+    ]
+  },
+  {
+    numero: '5.2.2',
+    nombre: 'El ticket de mayoreo y la palabra crédito',
+    fecha: '2026-09-04',
+    resumen:
+      'El ticket de mayoreo como lo dibujaste, y «fiado» fuera de todos '
+      + 'lados: ahora dice crédito, que es lo que es.',
+    cambios: [
+      { tipo: 'arreglo', texto: 'FUERA EL RENGLÓN DE «PRECIO DE MAYOREO» DEBAJO DEL TOTAL. Y en su lugar, el precio por marqueta va donde se busca: pegado a lo que se llevó. «2 · 1/2   x $240 ......... $600». Es lo que explica por qué la marqueta salió a $240 y no a $264, y ahí sí lo lee alguien.' },
+      { tipo: 'arreglo', texto: 'FUERA EL PARÉNTESIS «(2x1 + 1/2)». Decía de qué pedazos salió la cuenta, y en el mostrador nadie lo miraba: lo que el cliente comprueba es cuánto se llevó y cuánto costó, y eso ya está arriba en grande.' },
+      { tipo: 'arreglo', texto: 'FUERA «HIELO LOLHA» DEL TICKET DE VENTA. El papel sale de la fábrica; a nadie hay que recordarle dónde acaba de comprar hielo. Los papeles que sí viajan solos —el corte, el vale de sueldo, la cotización, el comodato— lo siguen llevando, porque ésos sí hay que saber de quién son. Y si tienes puesto un renglón de pie («Gracias por su compra»), ése sí se imprime: lo pusiste tú.' },
+      { tipo: 'mejora', texto: 'Y EL RENGLÓN AHORA SEPARA LA MARQUETA DEL PEDAZO: «2 · 1/2» en vez de «2 1/2», que se leían como un número raro.' },
+      { tipo: 'importante', texto: 'LA PALABRA «FIADO» SALIÓ DE TODAS PARTES. Ahora dice A CRÉDITO. En el botón de la caja («🧾 Dejarlo a crédito»), en el sello del ticket («A CRÉDITO»), en el corte del turno, en la ficha del cliente, en el historial, en los números y en todo el manual. Suena a lo que es —una cuenta— y no a un apunte en una libreta.' },
+      { tipo: 'nuevo', texto: 'De paso el vocabulario quedó parejo: LA DEUDA es lo que debe, EL CRÉDITO DISPONIBLE es lo que todavía se le puede dar, y EL LÍMITE DE CRÉDITO es hasta dónde. Tres palabras distintas para tres números distintos, en vez de «fiado» para todo.' }
+    ]
+  },
   {
     numero: '5.2.1',
     nombre: 'La puesta en marcha, arreglada',

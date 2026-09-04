@@ -184,7 +184,7 @@ export async function vistaCaja(pantalla, estadoApp, opciones = {}) {
 
           ${e.vendidoFiado ? `
             <p class="ayuda" style="margin:12px 0 0">
-              Salieron <strong>${pesos(e.vendidoFiado)} fiados</strong> en este turno.
+              Salieron <strong>${pesos(e.vendidoFiado)} a crédito</strong> en este turno.
               Ese dinero está en la calle: no pasó por el cajón y no se cuenta aquí.
             </p>` : ''}
           ${e.vendidoTransferencia ? `

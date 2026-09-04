@@ -42,9 +42,9 @@ const ACCIONES = [
 
   { grupo: 'Clientes',   permiso: 'clientes.ver',         texto: 'Ver los clientes y ponerle nombre al ticket (precio de mayoreo)' },
   { grupo: 'Clientes',   permiso: 'clientes.administrar', texto: 'Dar de alta clientes, su límite y su lista de mayoreo' },
-  { grupo: 'Clientes',   permiso: 'venta.credito',        texto: 'Fiar' },
+  { grupo: 'Clientes',   permiso: 'venta.credito',        texto: 'Dar crédito' },
   { grupo: 'Clientes',   permiso: 'credito.cobrar',       texto: 'Recibir abonos' },
-  { grupo: 'Clientes',   permiso: 'credito.autorizar',    texto: 'Autorizar fiar por encima del límite' },
+  { grupo: 'Clientes',   permiso: 'credito.autorizar',    texto: 'Autorizar crédito por encima del límite' },
 
   { grupo: 'Inventario', permiso: 'inventario.ver',       texto: 'Ver lo que queda de cada producto' },
   { grupo: 'Inventario', permiso: 'inventario.mover',     texto: 'Registrar entradas, salidas y conteos' },

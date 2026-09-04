@@ -224,8 +224,8 @@ export async function vistaEstadisticas(pantalla) {
       </div>
 
       <p class="est-nota">
-        <b>Se vendió</b> es el precio de todo lo que salió, esté cobrado o
-        fiado${d.ventas.fiado ? ` — de eso, <b>${pesos(d.ventas.fiado)}</b> se fio` : ''}.
+        <b>Se vendió</b> es el precio de todo lo que salió, cobrado o a
+        crédito${d.ventas.fiado ? ` — de eso, <b>${pesos(d.ventas.fiado)}</b> se fue a crédito` : ''}.
         Los tickets cancelados y las devoluciones no cuentan${
           d.ventas.canceladas.cuantas
             ? `: hubo ${d.ventas.canceladas.cuantas} por ${pesos(d.ventas.canceladas.centavos)}`
@@ -234,7 +234,7 @@ export async function vistaEstadisticas(pantalla) {
         de <b>${pesos(d.ventas.porTicket)}</b> cada uno en promedio.
         ${d.abonos.cuantos ? `<br>Aparte entraron <b>${pesos(d.abonos.centavos)}</b>
           en ${d.abonos.cuantos} ${d.abonos.cuantos === 1 ? 'abono' : 'abonos'}:
-          eso es dinero de ventas fiadas de <b>otros meses</b>, así que no
+          eso es dinero de ventas a crédito de <b>otros meses</b>, así que no
           suma aquí — pero sí entró al cajón.` : ''}
       </p>`;
   }
@@ -661,7 +661,7 @@ export async function vistaEstadisticas(pantalla) {
                 <td class="der"><strong>${pesos(c.centavos)}</strong></td>
                 <td class="der">${c.marquetas ? esc(c.marquetas.toFixed(2).replace(/\.00$/, '')) : '—'}</td>
                 <td class="der">${c.tickets}${c.fiados
-                  ? ` <small>(${c.fiados} fiado${c.fiados === 1 ? '' : 's'})</small>` : ''}</td>
+                  ? ` <small>(${c.fiados} a crédito)</small>` : ''}</td>
                 <td>${esc(cuando(c.ultima))}</td>
               </tr>`).join('')}
           </table>

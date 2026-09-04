@@ -434,13 +434,16 @@ test('el corte separa lo fiado de lo cobrado por transferencia', async () => {
   assert.equal(e.esperado, e.fondo + e.vendido + e.entradas - e.salidas);
 });
 
-test('el ticket fiado sale marcado y con el nombre del cliente', async () => {
+test('el ticket a crédito sale marcado y con el nombre del cliente', async () => {
   const { ticketVenta } = require('../src/modulos/impresion/ticket');
   const v = await fiar(mary.id, 4);
   const detalle = (await llamar(`/api/ventas/${v.json.datos.venta.id}`)).json.datos.venta;
 
   const papel = Buffer.from(ticketVenta(detalle, { negocio: 'Hielo LOLHA' })).toString('latin1');
-  assert.match(papel, /FIADO/, 'el ticket es el vale: tiene que decirlo');
+  // "A CREDITO" y ya no "FIADO" (v5.2.2): el papel se lo lleva el cliente
+  // y sirve para reclamar; "fiado" suena a apunte en una libreta.
+  assert.match(papel, /A CREDITO/, 'el ticket es el vale: tiene que decirlo');
+  assert.ok(!papel.includes('FIADO'), 'y ya no dice fiado en ningún lado');
   assert.match(papel, /Mar/, 'y llevar el nombre de quien se lo llevó');
   assert.match(papel, /FIRMA DE RECIBIDO/, 'y la línea para firmar');
 });
@@ -515,4 +518,204 @@ test('poner el logo de un cliente que no existe da 404', async () => {
   const r = await llamar('/api/clientes/no-existe/foto', {
     method: 'POST', cuerpo: { archivo: PNG } });
   assert.equal(r.estado, 404);
+});
+
+// ============================================================
+// PAGA UNA PARTE Y DEBE LA OTRA  (v5.3)
+//
+// "Se lleva $480 pero solo paga $300 y queda debiendo $180. No me deja
+//  anotar que solo pagó $300: tengo que terminar la venta que me da todo e
+//  ir hasta Clientes a ponerle un abono. Muy lento."
+//
+// Lo que importa probar es que sea UNA venta a crédito MÁS UN ABONO, y no
+// una tercera cosa: así el saldo lo sigue calculando la misma resta de
+// siempre, y el día que se cancele ese ticket la cuenta se corrige sola.
+// ============================================================
+
+/** Vende a crédito dejando algo en el mostrador. */
+const aCreditoConAbono = (clienteId, dieciseisavos, abono, extra = {}) =>
+  llamar('/api/ventas', {
+    method: 'POST',
+    cuerpo: { lineas: [{ dieciseisavos }], formaPago: 'credito', clienteId, abono, ...extra }
+  });
+
+test('dejar una parte en el mostrador baja la deuda de una vez', async () => {
+  await entrarAdmin();
+  const quien = (await llamar('/api/clientes', {
+    method: 'POST', cuerpo: { nombre: 'Doña Parcial' }
+  })).json.datos.cliente;
+
+  // Una marqueta son $264. Deja $100 y queda debiendo $164.
+  const r = await aCreditoConAbono(quien.id, 16, '100');
+  assert.equal(r.estado, 201, r.json?.error);
+  assert.equal(r.json.datos.abono.centavos, 10000);
+  assert.equal(r.json.datos.abono.quedaADeber, 16400);
+  assert.equal((await ficha(quien.id)).cliente.estado.saldo, 16400);
+});
+
+test('en la cuenta salen las dos cosas: el cargo entero y su abono', async () => {
+  // Es lo que de verdad pasó, y es lo que hace que se pueda explicar. Si
+  // se guardara "una venta de $164" nadie sabría después que se llevó una
+  // marqueta completa.
+  await entrarAdmin();
+  const quien = (await llamar('/api/clientes', {
+    method: 'POST', cuerpo: { nombre: 'Don Detalle' }
+  })).json.datos.cliente;
+
+  await aCreditoConAbono(quien.id, 16, '100');
+  const { cuenta } = await ficha(quien.id);
+
+  const cargo = cuenta.find((m) => m.tipo === 'cargo');
+  const abono = cuenta.find((m) => m.tipo === 'abono');
+  assert.equal(cargo.centavos, 26400, 'el cargo es por lo que se llevó');
+  assert.equal(abono.centavos, 10000, 'y el abono por lo que dejó');
+});
+
+test('el abono del mostrador queda amarrado a SU ticket', async () => {
+  // Sin eso, una reimpresión de ese ticket no podría decir "pagó $100", y
+  // el papel del cliente diría una cosa y el sistema otra.
+  await entrarAdmin();
+  const quien = (await llamar('/api/clientes', {
+    method: 'POST', cuerpo: { nombre: 'Doña Amarre' }
+  })).json.datos.cliente;
+
+  const v = (await aCreditoConAbono(quien.id, 16, '100')).json.datos.venta;
+  const fila = bd.prepare('SELECT venta_id, centavos FROM abonos WHERE venta_id = ?').get(v.id);
+  assert.ok(fila, 'el abono sabe de qué ticket es');
+  assert.equal(fila.centavos, 10000);
+
+  // Y el detalle del ticket lo trae ya sumado, para el papel.
+  const detalle = (await llamar(`/api/ventas/${v.id}`)).json.datos.venta;
+  assert.equal(detalle.abonoCentavos, 10000);
+});
+
+test('el ticket dice lo que dejó y lo que queda a deber', async () => {
+  const { ticketVenta } = require('../src/modulos/impresion/ticket');
+  await entrarAdmin();
+  const quien = (await llamar('/api/clientes', {
+    method: 'POST', cuerpo: { nombre: 'Don Papel' }
+  })).json.datos.cliente;
+
+  const v = (await aCreditoConAbono(quien.id, 16, '100')).json.datos.venta;
+  const detalle = (await llamar(`/api/ventas/${v.id}`)).json.datos.venta;
+  const papel = Buffer.from(ticketVenta(detalle, { negocio: 'X' })).toString('latin1');
+
+  assert.match(papel, /PAGO AHORA/, 'el papel dice lo que entregó');
+  assert.match(papel, /QUEDA A DEBER/, 'y lo que se le queda a deber');
+});
+
+test('anular ese abono deja el ticket diciendo la verdad otra vez', async () => {
+  // El billete era falso: se anula el abono y el papel vuelve a decir que
+  // debe todo, porque el importe se saca de los abonos vivos (regla 3.2).
+  const { ticketVenta } = require('../src/modulos/impresion/ticket');
+  await entrarAdmin();
+  const quien = (await llamar('/api/clientes', {
+    method: 'POST', cuerpo: { nombre: 'Don Billete' }
+  })).json.datos.cliente;
+
+  const v = (await aCreditoConAbono(quien.id, 16, '100')).json.datos.venta;
+  const abonoId = bd.prepare('SELECT id FROM abonos WHERE venta_id = ?').get(v.id).id;
+  await llamar(`/api/clientes/abonos/${abonoId}/anular`, {
+    method: 'POST', cuerpo: { motivo: 'El billete era falso' }
+  });
+
+  const detalle = (await llamar(`/api/ventas/${v.id}`)).json.datos.venta;
+  assert.equal(detalle.abonoCentavos, 0);
+  const papel = Buffer.from(ticketVenta(detalle, { negocio: 'X' })).toString('latin1');
+  assert.ok(!papel.includes('PAGO AHORA'));
+  assert.equal((await ficha(quien.id)).cliente.estado.saldo, 26400, 'debe todo otra vez');
+});
+
+test('el dinero que deja entra al cajón, para que el corte cuadre', async () => {
+  await entrarAdmin();
+  const quien = (await llamar('/api/clientes', {
+    method: 'POST', cuerpo: { nombre: 'Doña Cajón' }
+  })).json.datos.cliente;
+
+  const v = (await aCreditoConAbono(quien.id, 16, '100')).json.datos.venta;
+  const abono = bd.prepare('SELECT * FROM abonos WHERE venta_id = ?').get(v.id);
+
+  if (abono.caja_id) {
+    // Con turno abierto, su renglón de entrada tiene que estar.
+    const mov = bd.prepare('SELECT * FROM movimientos_caja WHERE id = ?').get(abono.movimiento_id);
+    assert.ok(mov, 'el abono deja su renglón en el cajón');
+    assert.equal(mov.tipo, 'entrada');
+    assert.equal(mov.centavos, 10000);
+  } else {
+    // Sin turno abierto se guarda igual —la deuda sí bajó— pero no hay
+    // cajón al que entrar, y eso se dice en vez de inventarlo.
+    assert.equal(abono.movimiento_id, null);
+  }
+});
+
+test('no se puede dejar más de lo que se lleva', async () => {
+  await entrarAdmin();
+  const quien = (await llamar('/api/clientes', {
+    method: 'POST', cuerpo: { nombre: 'Don Exceso' }
+  })).json.datos.cliente;
+
+  const r = await aCreditoConAbono(quien.id, 16, '500');
+  assert.equal(r.estado, 400);
+  assert.match(r.json.error, /más de lo que se lleva/);
+  assert.equal((await ficha(quien.id)).cliente.estado.saldo, 0, 'no se guardó nada');
+});
+
+test('si lo paga todo no es a crédito, y se dice', async () => {
+  await entrarAdmin();
+  const quien = (await llamar('/api/clientes', {
+    method: 'POST', cuerpo: { nombre: 'Don Completo' }
+  })).json.datos.cliente;
+
+  const r = await aCreditoConAbono(quien.id, 16, '264');
+  assert.equal(r.estado, 400);
+  assert.match(r.json.error, /no es a crédito/);
+});
+
+test('el abono de mostrador no va con una venta de contado', async () => {
+  await entrarAdmin();
+  const r = await llamar('/api/ventas', {
+    method: 'POST',
+    cuerpo: { lineas: [{ dieciseisavos: 16 }], pago: '300', abono: '100' }
+  });
+  assert.equal(r.estado, 400);
+});
+
+test('el límite se mide contra lo que se le QUEDA a deber, no contra el ticket', async () => {
+  // A un cliente pegado a su límite que paga casi todo el ticket no tiene
+  // sentido pararle la venta y llamar al gerente por lo poco que queda.
+  await entrarAdmin();
+  const apretado = (await llamar('/api/clientes', {
+    method: 'POST', cuerpo: { nombre: 'Don Justito', limite: 100 }   // $100
+  })).json.datos.cliente;
+
+  // Una marqueta son $264: sin abono se pasa de su límite y pide permiso.
+  const sinAbono = await llamar('/api/ventas', {
+    method: 'POST',
+    cuerpo: { lineas: [{ dieciseisavos: 16 }], formaPago: 'credito', clienteId: apretado.id }
+  });
+  assert.equal(sinAbono.estado, 403);
+  assert.ok(sinAbono.json.requiereAutorizacion);
+
+  // Dejando $200 solo se le quedan $64, que sí caben: pasa sin permiso.
+  const conAbono = await aCreditoConAbono(apretado.id, 16, '200');
+  assert.equal(conAbono.estado, 201, conAbono.json?.error);
+  assert.equal((await ficha(apretado.id)).cliente.estado.saldo, 6400);
+});
+
+test('si la venta falla no queda un abono suelto', async () => {
+  // Los dos se guardan en la misma transacción. Si el abono se escribiera
+  // aparte, un tropiezo dejaría dinero cobrado sin venta que lo explique.
+  await entrarAdmin();
+  const quien = (await llamar('/api/clientes', {
+    method: 'POST', cuerpo: { nombre: 'Doña Atomica' }
+  })).json.datos.cliente;
+
+  const antes = bd.prepare('SELECT COUNT(*) n FROM abonos').get().n;
+  const r = await llamar('/api/ventas', {
+    method: 'POST',
+    cuerpo: { lineas: [], formaPago: 'credito', clienteId: quien.id, abono: '100' }
+  });
+  assert.equal(r.estado, 400, 'una venta vacía no se guarda');
+  assert.equal(bd.prepare('SELECT COUNT(*) n FROM abonos').get().n, antes,
+               'y su abono tampoco');
 });

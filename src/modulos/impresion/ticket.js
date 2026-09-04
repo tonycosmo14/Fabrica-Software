@@ -248,14 +248,44 @@ function ticketVenta(venta, { copia = false, negocio = '' } = {}) {
   // Al doble de ancho caben la mitad de columnas, así que el renglón se
   // arma con la cuenta hecha a mano sobre esa mitad.
   if (hielo) {
-    const cuanto = aTexto(hielo);
+    // "2 · 1/2" y no "2 1/2": el punto separa la marqueta entera del
+    // pedazo, que sin él se leían como un solo número raro.
+    const cuanto = aTexto(hielo).replace(' ', ' \u00b7 ');
     const precio = formato(importeHielo);
     const mitad = Math.floor(t.ancho / 2);
 
-    if (cuanto.length + precio.length + 4 <= mitad) {
+    // EL PRECIO POR MARQUETA, EN EL MISMO RENGLÓN  (v5.2.2)
+    //
+    //     2 · 1/2   x  $240 ............... $600
+    //
+    // Es lo que explica por qué la marqueta salió a $240 y no a $264, y
+    // va donde se busca: pegado a lo que se llevó. Antes iba en un
+    // renglón suelto debajo del total —"Precio de mayoreo"— y ahí no lo
+    // leía nadie.
+    //
+    // Solo sale cuando la división es EXACTA. En mayoreo el precio es por
+    // marqueta y siempre lo es; en el mostrador un medio no cuesta la
+    // mitad —cada fracción tiene su precio propio— y ahí un "por
+    // marqueta" sería un número inventado.
+    const marquetas = hielo / 16;
+    const unitario = importeHielo / marquetas;
+    const conUnitario = venta.lista_tipo === 'mayoreo'
+      && Number.isInteger(unitario) && unitario > 0;
+    const porUno = conUnitario ? `x ${formato(unitario)}` : '';
+
+    const izquierda = porUno ? `${cuanto}   ${porUno}` : cuanto;
+
+    if (izquierda.length + precio.length + 4 <= mitad) {
+      const puntos = Math.max(mitad - izquierda.length - precio.length - 2, 1);
+      t.izquierda().negrita().tamano(2, 1)
+       .linea(`${izquierda} ${'.'.repeat(puntos)} ${precio}`).normal();
+    } else if (cuanto.length + precio.length + 4 <= mitad) {
+      // No cabe con el precio por marqueta, pero sí sin él: manda lo que
+      // se llevó, que es lo que el cliente comprueba.
       const puntos = Math.max(mitad - cuanto.length - precio.length - 2, 1);
       t.izquierda().negrita().tamano(2, 1)
        .linea(`${cuanto} ${'.'.repeat(puntos)} ${precio}`).normal();
+      if (porUno) t.linea(`  ${porUno} cada marqueta`);
     } else {
       // Con "3 marquetas y 7/8" y un importe de cinco cifras no caben
       // juntos en grande: el hielo se queda en grande —que es lo que se
@@ -263,11 +293,6 @@ function ticketVenta(venta, { copia = false, negocio = '' } = {}) {
       t.izquierda().negrita().tamano(2, 1).linea(cuanto).normal();
       t.punteado('Hielo', precio);
     }
-
-    // De qué piezas salió la cuenta, en chico. Solo cuando dice algo que
-    // el renglón de arriba no diga ya.
-    const partes = desglose(hielo);
-    if (partes !== cuanto) t.linea(`  (${partes})`);
   }
 
   if (otras.length) {
@@ -323,26 +348,44 @@ function ticketVenta(venta, { copia = false, negocio = '' } = {}) {
     }
   }
 
-  // FIADO. Va en grande y con el nombre porque este papel es el vale: el
-  // cliente se lleva su copia y con eso los dos saben lo mismo. Y lleva la
-  // línea para firmar, que es lo que hace que sirva de algo al reclamar.
+  // A CRÉDITO. Va en grande y con el nombre porque este papel es el vale:
+  // el cliente se lleva su copia y con eso los dos saben lo mismo. Y lleva
+  // la línea para firmar, que es lo que hace que sirva de algo al reclamar.
   if (venta.forma_pago === 'credito') {
     t.separador();
-    t.centro().negrita().tamano(2, 1).linea('FIADO').normal();
+    t.centro().negrita().tamano(2, 1).linea('A CREDITO').normal();
     if (venta.cliente_negocio) t.centro().linea(venta.cliente_negocio);
-    t.izquierda().firma('FIRMA DE RECIBIDO');
+    t.izquierda();
+
+    // SI DEJÓ UNA PARTE, EL PAPEL LO DICE  (v5.3).
+    //
+    // Es la mitad del sentido de este ticket: el cliente se lo lleva y con
+    // eso los dos saben lo mismo. Si entregó $300 de $480 y el papel solo
+    // dijera "A CRÉDITO $480", el día que reclame no habría nada que
+    // enseñarle — y quien tendría que acordarse sería el cajero.
+    if (venta.abonoCentavos > 0) {
+      const queda = venta.total_centavos - venta.abonoCentavos;
+      t.bloqueDerecha([
+        ['PAGO AHORA:', formato(venta.abonoCentavos)],
+        ['QUEDA A DEBER:', formato(queda)]
+      ]);
+    }
+
+    t.firma('FIRMA DE RECIBIDO');
   } else if (venta.forma_pago === 'transferencia') {
     t.centro().linea('Pagado por transferencia').izquierda();
   }
 
-  // MAYOREO. En un ticket pagado de contado, la lista es lo que explica por
-  // qué la marqueta salió a $240 y no a $264. Un renglón, y solo cuando de
-  // verdad hubo mayoreo.
-  if (venta.forma_pago !== 'credito' && venta.lista_tipo === 'mayoreo') {
-    t.izquierda().linea(`Precio de ${venta.lista_nombre || 'mayoreo'}`);
-  }
-
-  pie(t, negocio);
+  // EL NOMBRE DEL NEGOCIO NO VA EN EL TICKET DE VENTA  (v5.2.2).
+  //
+  // El papel sale de la fábrica; nadie necesita que le recuerden de dónde
+  // salió el hielo que acaba de comprar. Los demás papeles —el corte, el
+  // vale, la cotización, el comodato— sí lo llevan: ésos viajan solos y
+  // hay que saber de quién son.
+  //
+  // Si hay un renglón de pie configurado ("Gracias por su compra"), ése sí
+  // se imprime: es un texto que alguien puso a propósito.
+  pie(t, '');
 
   // DE QUÉ TICKET VIENE ESTE. Un cambio se ve igual que una venta, y sin
   // este renglón nadie sabría que el hielo de este papel ya se había pagado
@@ -1045,7 +1088,7 @@ function ticketCorte(corte, { negocio = '' } = {}) {
       t.columnas2(p.nombre, formato(p.efectivo));
       const extras = [
         `${p.cobradas} ticket${p.cobradas === 1 ? '' : 's'}`,
-        p.fiado ? `fiado ${formato(p.fiado)}` : null,
+        p.fiado ? `a credito ${formato(p.fiado)}` : null,
         p.salidas ? `gastos ${formato(p.salidas)}` : null
       ].filter(Boolean);
       t.linea(`  ${extras.join(' - ')}`);
@@ -1248,7 +1291,7 @@ function ticketCortePersona(corte, persona, { negocio = '' } = {}) {
 
   t.bloqueDerecha([
     ['Cobrado en efectivo', formato(persona.efectivo)],
-    persona.fiado ? ['Fiado', formato(persona.fiado)] : null,
+    persona.fiado ? ['A credito', formato(persona.fiado)] : null,
     persona.transferencia ? ['Transferencia', formato(persona.transferencia)] : null,
     persona.entradas ? ['Metio al cajon', '+' + formato(persona.entradas)] : null,
     persona.salidas ? ['Saco del cajon', '-' + formato(persona.salidas)] : null,

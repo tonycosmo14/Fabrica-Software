@@ -3836,6 +3836,20 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
    único que hay que leer ahí es «no pierdo lo que configuré». */
 .arr-queda { margin: 6px 0 0; font-size: 13px; line-height: 1.7; color: var(--suave); }
 
+/* ¿DEJA ALGO AHORITA?  (v5.3)
+   Va arriba del cuadre, porque lo que se teclea aquí cambia los números de
+   abajo: leer primero el resultado y después la causa se siente al revés. */
+.pos-abona {
+  margin: 0 0 14px; padding: 12px 14px;
+  background: var(--superficie-alt); border: 1px solid var(--borde);
+  border-radius: 12px;
+}
+.pos-abona-fila { display: flex; gap: 8px; align-items: center; margin: 6px 0 4px; }
+.pos-abona-fila input { flex: 1; margin: 0; }
+.pos-abona-fila button { flex: none; width: auto; margin: 0; }
+.pos-abona .ayuda { margin: 0; font-size: 12px; }
+.cuadre-linea.resta strong { color: var(--verde); }
+
 /* El teclado de fracciones y el campo escrito, lado a lado. */
 .arr-hielo {
   display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 260px);

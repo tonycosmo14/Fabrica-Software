@@ -144,14 +144,27 @@ export async function vistaVenta(pantalla, estadoApp) {
    *  · `cliente` es QUIÉN ES. Si tiene lista de mayoreo y lleva suficiente
    *    hielo, el precio de la pantalla cambia solo. Pagando en efectivo
    *    también: el de la nevería paga y se va, pero paga su precio.
-   *  · `fiar` es SI SE LO LLEVA FIADO. Eso ya es otra cosa, se necesita
+   *  · `fiar` es SI SE LO LLEVA A CRÉDITO. Eso ya es otra cosa, se necesita
    *    permiso, y el panel del cobro es distinto.
    *
    * Siempre salen de la lista de clientes dados de alta, nunca de un nombre
    * escrito a mano con la gente esperando.
    */
   let cliente = null;
+  // CÓMO SE LLAMA ESTO EN LA PANTALLA  (v5.2.2)
+  //
+  // Lo que se lee dice «a crédito», nunca «fiado»: suena informal para un
+  // papel que el cliente se lleva y que sirve para reclamar.
+  //
+  // Lo que NO cambió son los nombres de aquí adentro —`fiar`, `pos-fiar`,
+  // la clave `fiado` del historial—. Son el nombre de una clase de CSS, de
+  // un filtro guardado y de una columna: renombrarlos sería tocar media
+  // base de datos para que un letrero se lea distinto. Si algún día
+  // alguien los ve y le chocan, que sepa que es a propósito.
   let fiar = false;
+  // Lo que el cliente deja en el momento cuando se lo lleva a crédito
+  // (v5.3). En centavos, y cero quiere decir "se lo lleva todo a crédito".
+  let abonoMostrador = 0;
   let volverDeClientes = 'cobro';   // a dónde regresa Esc en la lista de clientes
   let cobrarAlElegir = false;       // se abrió camino al cobro: al elegir, se sigue
 
@@ -363,7 +376,7 @@ export async function vistaVenta(pantalla, estadoApp) {
 
     hielo = 0;
     articulos = [];
-    cliente = null; fiar = false;
+    cliente = null; fiar = false; abonoMostrador = 0;
     pintarTodo();
     avisar('Venta apartada. Sigue el siguiente cliente.', 'bien');
     enfocar();
@@ -391,7 +404,7 @@ export async function vistaVenta(pantalla, estadoApp) {
       .filter((a) => a.producto);
     cliente = v.clienteId
       ? (ctx.clientes || []).find((c) => c.id === v.clienteId) || null : null;
-    fiar = false;
+    fiar = false; abonoMostrador = 0;
 
     fase = 'venta';
     refs.cobro.hidden = true;
@@ -1071,7 +1084,7 @@ export async function vistaVenta(pantalla, estadoApp) {
           <div class="pos-desc">
             <span class="cliente-num">#${cliente.numero ?? '—'}</span> ${esc(cliente.nombre)}
             <small>${lista ? `precio de ${esc(lista.nombre)}`
-                    : fiar ? 'se le fía a él' : 'cliente'}</small>
+                    : fiar ? 'va a su crédito' : 'cliente'}</small>
           </div>
           <button class="tachita" data-quita-cliente aria-label="Quitar el cliente">×</button>
         </div>`);
@@ -1160,7 +1173,7 @@ export async function vistaVenta(pantalla, estadoApp) {
     // confundió de persona, y el ticket no se puede quedar con su precio.
     const quitaCliente = refs.lineas.querySelector('[data-quita-cliente]');
     if (quitaCliente) quitaCliente.onclick = () => {
-      cliente = null; fiar = false; pintarTodo(); enfocar();
+      cliente = null; fiar = false; abonoMostrador = 0; pintarTodo(); enfocar();
     };
 
     refs.lineas.querySelectorAll('[data-quita]').forEach((b) => {
@@ -1289,7 +1302,7 @@ export async function vistaVenta(pantalla, estadoApp) {
     const f = fase === 'clientes'
       ? { enter: 'elige al cliente', esc: volverDeClientes === 'venta' ? 'volver al ticket' : 'volver al cobro' }
       : fase === 'cambio' && fiar
-      ? { enter: 'fía y registra', esc: 'mejor cobrarle' }
+      ? { enter: 'lo deja a crédito', esc: 'mejor cobrarle' }
       : FASES[fase];
     refs.pista.innerHTML = `
       <span class="pos-reloj">
@@ -1574,7 +1587,7 @@ export async function vistaVenta(pantalla, estadoApp) {
     // seleccionar". Un cliente pegado al ticket es la forma de cobrarle a
     // uno el precio del anterior.
     cliente = null;
-    fiar = false;
+    fiar = false; abonoMostrador = 0;
     refs.cobro.hidden = true;
     // Se repinta el ticket: al soltar al cliente cambian los precios de
     // mayoreo, y un renglón que dice $220 cuando ya vale $240 es peor que
@@ -1637,7 +1650,7 @@ export async function vistaVenta(pantalla, estadoApp) {
             </button>` : ''}
           ${puedeFiar && !cambiando ? `
             <button class="secundario pos-fiar" id="fiar">
-              🧾 Fiar a un cliente
+              🧾 Dejarlo a crédito
             </button>` : ''}
 
           ${enConfirmacion ? `
@@ -1691,33 +1704,62 @@ export async function vistaVenta(pantalla, estadoApp) {
   }
 
   /**
-   * EL PANEL DE FIAR.
+   * EL PANEL DEL CRÉDITO.
    *
    * Enseña lo que va a deber DESPUÉS de este ticket, no lo que debe ahora:
-   * ese es el número por el que el cajero decide si le fía o llama al
-   * gerente, y hacerlo de cabeza con gente esperando es como se cometen los
-   * errores caros.
+   * ese es el número por el que el cajero decide si le da crédito o llama
+   * al gerente, y hacerlo de cabeza con gente esperando es como se cometen
+   * los errores caros.
+   *
+   * Y DEJA ABONAR UNA PARTE AHÍ MISMO  (v5.3).
+   *
+   * "El cliente se lleva $480 pero solo paga $300 y queda debiendo $180."
+   * Pasa todos los días, y antes había que cerrar la venta por el total,
+   * salirse a Clientes y apuntarle el abono. Dos viajes para un gesto.
+   *
+   * El campo va aquí y no en otra pantalla porque es el mismo momento: el
+   * cliente tiene el billete en la mano.
    */
   function pintarFiado() {
     const t = total();
-    const saldoDespues = cliente.saldo + t;
+    // Lo que de verdad se le va a quedar a deber de este ticket.
+    const queda = Math.max(0, t - abonoMostrador);
+    const saldoDespues = cliente.saldo + queda;
     const disponible = cliente.disponible;
-    const seExcede = disponible !== null && t > disponible;
+    // El límite se mide contra lo que se le queda, no contra el ticket: si
+    // paga casi todo, no hay por qué llamar al gerente.
+    const seExcede = disponible !== null && queda > disponible;
 
     fase = 'cambio';
     refs.cobro.hidden = false;
     refs.cobro.innerHTML = `
       <div class="pos-cobro-caja">
         <div class="pos-cobro-total">
-          <span>Se le fía a</span>
+          <span>Se le da crédito a</span>
           <strong class="pos-fiado-nombre">${esc(cliente.nombre)}</strong>
         </div>
         ${cliente.negocio ? `<p class="ayuda" style="margin:-12px 0 14px;text-align:center">
           ${esc(cliente.negocio)}</p>` : ''}
 
+        <div class="pos-abona">
+          <label class="etiqueta-chica" for="abona">¿Deja algo ahorita?</label>
+          <div class="pos-abona-fila">
+            <input id="abona" class="campo-importe" inputmode="decimal"
+                   placeholder="0.00" autocomplete="off"
+                   value="${abonoMostrador ? (abonoMostrador / 100).toFixed(2) : ''}">
+            <button class="secundario chico" id="abona-nada"
+                    ${abonoMostrador ? '' : 'disabled'}>Nada</button>
+          </div>
+          <small class="ayuda">Déjalo en blanco si se lo lleva todo a crédito.</small>
+        </div>
+
         <div class="cuadre">
           <div class="cuadre-linea"><span>Debía</span><strong>${pesos(cliente.saldo)}</strong></div>
           <div class="cuadre-linea suma"><span>+ Este ticket</span><strong>${pesos(t)}</strong></div>
+          ${abonoMostrador ? `
+            <div class="cuadre-linea resta">
+              <span>− Deja ahorita</span><strong>${pesos(abonoMostrador)}</strong>
+            </div>` : ''}
           <div class="cuadre-linea total">
             <span>= Va a deber</span>
             <strong class="${seExcede ? 'malo' : ''}">${pesos(saldoDespues)}</strong>
@@ -1728,10 +1770,12 @@ export async function vistaVenta(pantalla, estadoApp) {
             </div>` : ''}
         </div>
 
+        <small class="ayuda" id="abona-malo" hidden></small>
+
         ${seExcede ? `
           <div class="aviso-sin-caja" style="margin-top:12px">
             <strong>Se pasa de su límite.</strong>
-            Se puede fiar igual, pero lo tiene que autorizar un gerente con su PIN.
+            Se le puede dar igual, pero lo tiene que autorizar un gerente con su PIN.
           </div>` : ''}
         ${cliente.vencido ? `
           <div class="aviso-sin-caja" style="margin-top:12px">
@@ -1739,20 +1783,73 @@ export async function vistaVenta(pantalla, estadoApp) {
           </div>` : ''}
 
         <button class="pos-confirmar" id="confirmar" style="margin-top:14px">
-          <span>Fiar ${pesos(t)}</span><small>Enter</small>
+          <span>${abonoMostrador
+            ? `Cobrar ${pesos(abonoMostrador)} y dejar ${pesos(queda)} a crédito`
+            : `Dejar ${pesos(t)} a crédito`}</span><small>Enter</small>
         </button>
         <button class="secundario" id="quitar-fiado" style="margin-top:10px;width:100%">
-          Mejor cobrarle
+          Mejor cobrarle todo
         </button>
         <button class="secundario" id="salir-cobro" style="margin-top:10px;width:100%">
           <span class="tecla-dice">Esc · </span>volver al ticket
         </button>
       </div>`;
 
+    const campo = refs.cobro.querySelector('#abona');
+    const malo = refs.cobro.querySelector('#abona-malo');
+
+    /** Lee lo tecleado y vuelve a pintar, para que la cuenta salga sola. */
+    const leerAbono = () => {
+      const escrito = campo.value.trim().replace(/[$,\s]/g, '');
+      if (escrito === '') { abonoMostrador = 0; malo.hidden = true; return true; }
+
+      const n = Number(escrito);
+      if (!Number.isFinite(n) || n < 0) {
+        malo.textContent = 'Eso no es una cantidad.';
+        malo.hidden = false; return false;
+      }
+      const centavos = Math.round(n * 100);
+      if (centavos > t) {
+        malo.textContent = `No puede dejar más de lo que se lleva (${pesos(t)}). `
+          + 'Para abonar a lo de antes, hazlo desde su ficha en Clientes.';
+        malo.hidden = false; return false;
+      }
+      if (centavos === t) {
+        malo.textContent = 'Si lo paga todo no es a crédito: mejor cóbraselo normal.';
+        malo.hidden = false; return false;
+      }
+      abonoMostrador = centavos;
+      malo.hidden = true;
+      return true;
+    };
+
+    // Se repinta al salir del campo y no en cada tecla: mientras se teclea
+    // "300", el 3 y el 30 son cantidades a medias y la cuenta de abajo
+    // estaría bailando.
+    campo.onchange = () => { if (leerAbono()) pintarFiado(); };
+    campo.onblur = () => { if (leerAbono()) pintarFiado(); };
+    campo.onkeydown = (ev) => {
+      if (ev.key !== 'Enter') return;
+      // STOPPROPAGATION, no solo preventDefault: el enter de toda la
+      // pantalla registra la venta, y escribiendo el abono eso cobraba el
+      // ticket con lo tecleado a medias. Aquí enter quiere decir "ya está
+      // el número", y nada más.
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (leerAbono()) pintarFiado();
+    };
+
+    const nada = refs.cobro.querySelector('#abona-nada');
+    if (nada) nada.onclick = () => { abonoMostrador = 0; pintarFiado(); };
+
     setTimeout(() => refs.cobro.querySelector('#confirmar')?.focus(), 0);
-    refs.cobro.querySelector('#confirmar').onclick = registrar;
+    refs.cobro.querySelector('#confirmar').onclick = () => {
+      if (!leerAbono()) { campo.focus(); return; }
+      registrar();
+    };
     refs.cobro.querySelector('#quitar-fiado').onclick = () => {
-      fiar = false; fase = 'cobro'; pago = 0; pintarTodo(); pintarCobro(); pintarPista();
+      fiar = false; abonoMostrador = 0;
+      fase = 'cobro'; pago = 0; pintarTodo(); pintarCobro(); pintarPista();
     };
     refs.cobro.querySelector('#salir-cobro').onclick = cerrarCobro;
     pintarPista();
@@ -1815,7 +1912,7 @@ export async function vistaVenta(pantalla, estadoApp) {
               ${c.vencido ? '<span class="aviso-quedan agotado">vencido</span>' : ''}
               <button class="secundario chico" data-elegir="${esc(c.id)}">Es él</button>
               ${puedeFiar && !cobrarAlElegir
-                ? `<button class="secundario chico" data-fiar="${esc(c.id)}">Fiarle</button>` : ''}
+                ? `<button class="secundario chico" data-fiar="${esc(c.id)}">A crédito</button>` : ''}
             </div>`; }).join('')
             || `<p class="vacio" style="padding:20px 0">${
                  (ctx.clientes || []).length
@@ -1899,7 +1996,7 @@ export async function vistaVenta(pantalla, estadoApp) {
     if (!elegido) return;
 
     cliente = elegido;
-    fiar = false;
+    fiar = false; abonoMostrador = 0;
     pintarTodo();
 
     const lista = llevaMayoreo() ? listaMayoreo() : null;
@@ -2008,6 +2105,11 @@ export async function vistaVenta(pantalla, estadoApp) {
             // Fiado no lleva pago: el cliente no pagó nada.
             ...(fiar && cliente
               ? { formaPago: 'credito', clienteId: cliente.id,
+                  // Lo que dejó en el mostrador. El servidor lo guarda como
+                  // un abono de este ticket, dentro de la misma
+                  // transacción que la venta.
+                  ...(abonoMostrador
+                    ? { abono: (abonoMostrador / 100).toFixed(2) } : {}),
                   ...(autorizacion
                     // El porqué se guarda con el ticket: al mes, "lo
                     // autorizó Lupe" sin el motivo no explica nada.
@@ -2040,7 +2142,7 @@ export async function vistaVenta(pantalla, estadoApp) {
       // /impresion/venta, que es el único sitio que sabe si de verdad
       // imprimió.
       if (cliente && respuesta.cliente) refrescarCliente(respuesta.cliente);
-      cliente = null; fiar = false;
+      cliente = null; fiar = false; abonoMostrador = 0;
       fase = 'cobrada';
       pintarCobrada();
       pintarPista();
@@ -2108,8 +2210,13 @@ export async function vistaVenta(pantalla, estadoApp) {
           </p>` : ''}
 
         ${fiado ? `
+          ${v.abonoCentavos > 0 ? `
+            <div class="pos-cambio grande">
+              <span>Dejó ahorita</span>
+              <strong>${pesos(v.abonoCentavos)}</strong>
+            </div>` : ''}
           <div class="pos-cambio grande pos-fiado">
-            <span>${esc(v.cliente_nombre || 'Fiado')} ahora debe</span>
+            <span>${esc(v.cliente_nombre || 'El cliente')} ahora debe</span>
             <strong>${pesos(fiadoCobrado?.estado?.saldo ?? v.total_centavos)}</strong>
           </div>
           ${v.credito_autorizado_nombre ? `
@@ -2117,7 +2224,9 @@ export async function vistaVenta(pantalla, estadoApp) {
               Autorizó ${esc(v.credito_autorizado_nombre)}
             </p>` : ''}
           <p class="ayuda" style="margin:0 0 10px;text-align:center">
-            El ticket sale marcado <strong>FIADO</strong>, con línea para firmar.
+            El ticket sale marcado <strong>A CRÉDITO</strong>${
+              v.abonoCentavos > 0 ? `, con lo que dejó y lo que queda a deber,` : ''}
+            con línea para firmar.
           </p>` : `
           <div class="pos-cambio grande ${(aDevolver || vuelto) ? '' : 'sin-cambio'}">
             <span>${aDevolver ? 'Devuélvele' : vuelto ? 'Cambio' : 'Pagó justo'}</span>
@@ -2216,7 +2325,7 @@ export async function vistaVenta(pantalla, estadoApp) {
         <div class="tk-total">${pesos(v.total_centavos)}</div>
 
         ${v.forma_pago === 'credito' ? `
-          <div class="tk-copia">FIADO</div>
+          <div class="tk-copia">A CRÉDITO</div>
           ${v.cliente_nombre ? `<div class="tk-pie"><b>${esc(v.cliente_nombre)}</b></div>` : ''}
           <div class="tk-firma">_____________________<br>Firma de recibido</div>` : ''}
 
@@ -2346,7 +2455,7 @@ export async function vistaVenta(pantalla, estadoApp) {
     if (v.cambio_de)    return { clave: 'cambio',    texto: 'Cambio',    emoji: '⇄' };
     if (v.cambiado_por) return { clave: 'cambiado',  texto: 'Cambiado',  emoji: '⇄' };
     if (v.cancelada_en) return { clave: 'cancelada', texto: 'Cancelado', emoji: '✕' };
-    if (v.forma_pago === 'credito') return { clave: 'fiado', texto: 'Fiado', emoji: '🤝' };
+    if (v.forma_pago === 'credito') return { clave: 'fiado', texto: 'A crédito', emoji: '🤝' };
     if (v.lista_tipo === 'mayoreo') return { clave: 'mayoreo', texto: 'Mayoreo', emoji: '🏷️' };
     return { clave: 'venta', texto: 'Venta', emoji: '🧾' };
   }

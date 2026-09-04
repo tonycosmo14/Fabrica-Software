@@ -24,6 +24,7 @@ const { exigirPermiso } = require('../../middleware/sesion');
 const { puede } = require('../../lib/roles');
 const { listaActiva, preciosDe, precioDe, sugerencia } = require('./precios');
 const { sesionAbierta } = require('../caja/calculo');
+const { apuntarAbono } = require('../clientes/abonos');
 const { productoPorId, productoPorCodigo, cotizar,
         categoriasActivas, productosActivos } = require('../catalogo/catalogo');
 const { alcanza, avisos } = require('../catalogo/avisos');
@@ -213,9 +214,59 @@ router.post('/', vender, (req, res) => {
     return error(res, 'Esa forma de pago no existe.');
   }
 
+  // ============================================================
+  // PAGA UNA PARTE Y DEBE LA OTRA  (v5.3)
+  // ============================================================
+  //
+  // "El cliente se lleva dos marquetas de $480 pero solo paga $300 y queda
+  //  debiendo $180."
+  //
+  // Pasa todos los días y antes había que hacerlo en dos viajes: cerrar la
+  // venta a crédito por el total, salirse a Clientes y apuntarle un abono.
+  //
+  // POR QUÉ SE GUARDA COMO VENTA COMPLETA + ABONO, y no como una venta que
+  // dice "pagó $300":
+  //
+  //   · La cuenta del cliente queda contando lo que de verdad pasó: se
+  //     llevó $480 y entregó $300. En su estado de cuenta salen los dos
+  //     renglones, con su fecha, como cualquier otro cargo y abono.
+  //   · El cajón recibe el abono por el mismo camino que la cobranza de
+  //     siempre, así que el corte cuadra sin tocar nada.
+  //   · Y `pago_centavos` sigue queriendo decir una sola cosa: lo que se
+  //     pagó de contado. Un ticket a crédito que dijera "pagó $300"
+  //     mientras la cuenta dice "debe $480" sería dos verdades sobre el
+  //     mismo dinero.
+  let abono = null;
+  if (req.body?.abono !== undefined && req.body.abono !== null && req.body.abono !== '') {
+    if (formaPago !== 'credito') {
+      return error(res, 'El abono de mostrador solo va con las ventas a crédito.');
+    }
+    try { abono = aCentavos(req.body.abono); }
+    catch { return error(res, 'Lo que abona no es un importe válido.'); }
+
+    if (abono <= 0) abono = null;
+    else if (abono > preparadas.total) {
+      // Pagar de más aquí casi siempre es un dedazo, y si de verdad quiere
+      // adelantar de lo viejo, eso es cobranza y tiene su pantalla — donde
+      // además se ve contra qué se está aplicando.
+      return error(res,
+        `No puede abonar más de lo que se lleva (${formato(preparadas.total)}). ` +
+        'Para abonar a lo que debía de antes, hazlo desde su ficha en Clientes.');
+    } else if (abono === preparadas.total) {
+      return error(res,
+        'Si lo paga todo no es a crédito: cóbraselo normal y no le queda deuda.');
+    }
+  }
+
   // --- A crédito ---
+  //
+  // El límite se revisa contra lo que DE VERDAD se le va a quedar a deber.
+  // A un cliente pegado a su límite que paga casi todo el ticket no tiene
+  // sentido pararle la venta y pedir la autorización de un gerente por
+  // ciento ochenta pesos.
+  const aCredito = preparadas.total - (abono || 0);
   const credito = formaPago === 'credito'
-    ? revisarCredito(req, preparadas.total, clienteDelTicket)
+    ? revisarCredito(req, aCredito, clienteDelTicket)
     : { ok: true };
   if (!credito.ok) return error(res, credito.mensaje, credito.codigo, credito.extra || {});
 
@@ -233,6 +284,13 @@ router.post('/', vender, (req, res) => {
     lineas: preparadas.lineas,
     total: preparadas.total,
     pago,
+    // Lo que deja en el momento. Va DENTRO de la misma transacción que la
+    // venta: si una se guarda y la otra no, o el cajón sobra o el cliente
+    // debe algo que ya pagó.
+    abono,
+    abonoFormaPago: req.body?.abonoFormaPago === 'transferencia'
+      ? 'transferencia' : 'efectivo',
+    cliente: clienteDelTicket,
     // Se guarda la lista que EXPLICA el precio: si hubo mayoreo, esa. Los
     // precios ya van copiados renglón por renglón (regla 3.5); esto es para
     // que el ticket y el historial puedan decir "salió a precio de Mayoreo 1".
@@ -256,6 +314,7 @@ router.post('/', vender, (req, res) => {
                lineas: preparadas.lineas.length, cajaFolio: venta.cajaFolio,
                cliente: clienteDelTicket?.nombre,
                mayoreo: listaMayoreo?.nombre || null,
+               ...(abono ? { abono, quedaADeber: aCredito } : {}),
                autorizo: credito.autorizadoPorNombre }
   });
 
@@ -265,7 +324,11 @@ router.post('/', vender, (req, res) => {
       ? { ...clienteDelTicket, estado: estadoCliente(clienteDelTicket) }
       : null,
     // Para que la caja pueda decir "salió a precio de Mayoreo 1".
-    mayoreo: listaMayoreo ? { lista: listaMayoreo.nombre, id: listaMayoreo.id } : null
+    mayoreo: listaMayoreo ? { lista: listaMayoreo.nombre, id: listaMayoreo.id } : null,
+    // Lo que dejó y lo que se le queda a deber de ESTE ticket, ya restado,
+    // para que la pantalla no tenga que volver a hacer la cuenta.
+    abono: abono ? { centavos: abono, quedaADeber: aCredito,
+                     sinTurno: venta.abonoSinTurno } : null
   }, 201);
 });
 
@@ -280,7 +343,7 @@ router.post('/', vender, (req, res) => {
  */
 function revisarCredito(req, total, cliente) {
   if (!puede(req.usuario.rol, 'venta.credito')) {
-    return { ok: false, codigo: 403, mensaje: 'Tu usuario no puede fiar.' };
+    return { ok: false, codigo: 403, mensaje: 'Tu usuario no puede dar crédito.' };
   }
 
   if (!cliente) {
@@ -403,7 +466,8 @@ function prepararLineas(lineas, lista, listaMayoreo = null) {
  */
 function crearVenta({ lineas, total, pago, lista, almacenId, cajeroId, capturistaId,
                       formaPago = 'efectivo', notas = null, cambioDe = null,
-                      clienteId = null, autorizadoPor = null }) {
+                      clienteId = null, autorizadoPor = null,
+                      abono = null, abonoFormaPago = 'efectivo', cliente = null }) {
   const id = nuevoId();
   const fecha = ahora();
   const cambio = pago === null || pago === undefined ? null : pago - total;
@@ -411,6 +475,11 @@ function crearVenta({ lineas, total, pago, lista, almacenId, cajeroId, capturist
   // La venta queda amarrada al turno de caja abierto en este momento. Si no
   // hay turno abierto se cobra igual, pero queda fuera de todo corte.
   const turno = sesionAbierta();
+
+  // Se declara ARRIBA de la transacción aunque se llene dentro: leerla
+  // debajo obliga a comprobar el orden de ejecución para saber si está
+  // definida, y en este archivo ya ha pasado.
+  let abonoHecho = null;
 
   const guardar = bd.transaction(() => {
     const folio = bd.prepare('SELECT COALESCE(MAX(folio), 0) n FROM ventas').get().n + 1;
@@ -442,6 +511,20 @@ function crearVenta({ lineas, total, pago, lista, almacenId, cajeroId, capturist
       insertar.run(nuevoId(), id, l.concepto, l.dieciseisavos, l.centavos,
                    l.desglose, l.productoId, l.cantidad ?? 1);
     }
+
+    // LO QUE DEJÓ EN EL MOSTRADOR, aquí dentro (v5.3). Si el abono se
+    // guardara después, en su propia transacción, un tropiezo entre las
+    // dos dejaría al cliente debiendo dinero que ya entregó — y el papel
+    // en su mano diciendo que lo pagó.
+    if (abono && cliente) {
+      abonoHecho = apuntarAbono({
+        cliente, centavos: abono, formaPago: abonoFormaPago, turno,
+        ejecutorId: cajeroId, capturistaId,
+        concepto: `Abono de ${cliente.nombre} (ticket ${folio})`,
+        notas: `Dejó una parte al llevárselo a crédito`,
+        ventaId: id
+      });
+    }
     return folio;
   });
 
@@ -450,7 +533,11 @@ function crearVenta({ lineas, total, pago, lista, almacenId, cajeroId, capturist
   return {
     id, folio, serie: fila.serie, folioAnual: fila.folio_anual,
     numero: numeroDeTicket({ ...fila, folio }),
-    cajaId: turno?.id || null, cajaFolio: turno?.folio || null
+    cajaId: turno?.id || null, cajaFolio: turno?.folio || null,
+    abonoId: abonoHecho?.id || null,
+    // Sin turno abierto el abono se guardó igual —la deuda sí bajó— pero
+    // ese dinero no está en ningún corte, y eso hay que decirlo.
+    abonoSinTurno: Boolean(abono && abonoFormaPago === 'efectivo' && !turno)
   };
 }
 
@@ -474,6 +561,15 @@ function detalleVenta(id) {
 
   venta.lineas = bd.prepare('SELECT * FROM venta_lineas WHERE venta_id = ?').all(id)
     .map((l) => ({ ...l, texto: aTexto(l.dieciseisavos) }));
+
+  // LO QUE DEJÓ EN EL MOSTRADOR  (v5.3). Se saca de los abonos amarrados a
+  // este ticket, no de una columna guardada: si mañana se anula ese abono
+  // —porque el billete era falso—, la reimpresión deja de decir que pagó,
+  // que es lo que tiene que pasar (regla 3.2).
+  venta.abonoCentavos = bd.prepare(`
+    SELECT COALESCE(SUM(centavos), 0) n FROM abonos
+     WHERE venta_id = ? AND anulado_en IS NULL
+  `).get(id).n;
   // El número ya escrito, para que ninguna pantalla tenga que armarlo y
   // ninguna se olvide de la serie.
   venta.numero = numeroDeTicket(venta);

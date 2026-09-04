@@ -1,0 +1,47 @@
+-- ============================================================
+-- 041_abono_de_mostrador.sql  (v5.3)
+--
+-- PAGA UNA PARTE Y DEBE LA OTRA.
+--
+-- "El cliente 1 se lleva dos marquetas a mayoreo, $480, pero solo va a
+--  pagar $300 en ese momento y va a quedar debiendo $180. No me deja
+--  anotar que solo pagó $300: tengo que terminar la venta que me da todo,
+--  ir hasta Clientes y ponerle un abono. Muy lento."
+--
+-- ============================================================
+-- POR QUÉ UNA COLUMNA Y NO UNA TABLA NUEVA
+-- ============================================================
+--
+-- Lo que pasa en el mostrador ya tiene nombre: es un CARGO (la venta a
+-- crédito, por los $480) y un ABONO (los $300 que entregó). Las dos cosas
+-- existen desde la v1.6 y están probadas: el cargo sube la deuda, el abono
+-- la baja y mete el dinero al cajón por el mismo camino que la cobranza.
+--
+-- Inventar aquí un tercer concepto —"venta pagada a medias"— habría hecho
+-- que el saldo del cliente tuviera que sumar tres cosas en vez de dos, y
+-- ese es justo el tipo de detalle que se olvida el día que alguien cancela
+-- un ticket viejo.
+--
+-- Lo único que faltaba era saber DE QUÉ TICKET era ese abono.
+--
+-- ============================================================
+-- Y ESO NO ES UN LUJO
+-- ============================================================
+--
+-- El papel que se lleva el cliente dice "PAGÓ $300 · QUEDA A DEBER $180".
+-- Sin esta columna, una reimpresión de ese mismo ticket seis meses después
+-- no podría decirlo: saldría "A CRÉDITO $480" y el cliente tendría razón
+-- al reclamar. Con ella, el ticket dice lo mismo hoy que dentro de tres
+-- años.
+--
+-- De paso, en el estado de cuenta se puede ver contra qué ticket entró
+-- cada pago, que es lo primero que se pregunta cuando una cuenta no
+-- cuadra.
+--
+-- Se queda en NULL para todos los abonos de cobranza, que es lo correcto:
+-- ésos no pagan un ticket, bajan la deuda entera.
+-- ============================================================
+
+ALTER TABLE abonos ADD COLUMN venta_id TEXT REFERENCES ventas(id);
+
+CREATE INDEX idx_abonos_venta ON abonos(venta_id);

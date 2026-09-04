@@ -258,7 +258,7 @@ export async function vistaClientes(pantalla, estadoApp) {
         </div>` : ''}
 
       <div class="cuadre">
-        <div class="cuadre-linea"><span>Se ha llevado fiado</span><strong>${pesos(e.cargado)}</strong></div>
+        <div class="cuadre-linea"><span>Se ha llevado a crédito</span><strong>${pesos(e.cargado)}</strong></div>
         <div class="cuadre-linea vendido"><span>− Ha pagado</span><strong>${pesos(e.abonado)}</strong></div>
         <div class="cuadre-linea total">
           <span>= Debe</span>
@@ -308,7 +308,7 @@ export async function vistaClientes(pantalla, estadoApp) {
       ${cuenta.length ? `
         <table class="venta-lineas cuenta-corriente">
           ${cuenta.map(renglonCuenta).join('')}
-        </table>` : '<p class="ayuda">Todavía no se ha llevado nada fiado.</p>'}
+        </table>` : '<p class="ayuda">Todavía no se ha llevado nada a crédito.</p>'}
 
       ${administra && c.activo ? `
         <div class="fila-botones" style="margin-top:18px">
@@ -452,7 +452,7 @@ export async function vistaClientes(pantalla, estadoApp) {
   async function nuevoCliente() {
     const nombre = await pedirTexto({
       titulo: 'Nuevo cliente',
-      texto: 'Solo a los clientes dados de alta se les puede fiar.',
+      texto: 'Solo a los clientes dados de alta se les puede dar crédito.',
       marcador: 'María Canul', ok: 'Dar de alta', largo: 80, unaLinea: true
     });
     if (!nombre) return;
@@ -574,7 +574,7 @@ export async function vistaClientes(pantalla, estadoApp) {
     const c = ficha.cliente;
     if (!await confirmar({
       titulo: `¿Dar de baja a ${c.nombre}?`,
-      texto: 'Deja de salir en la caja y ya no se le puede fiar. Sus tickets viejos ' +
+      texto: 'Deja de salir en la caja y ya no se le puede dar crédito. Sus tickets viejos ' +
              'no cambian, y se puede recuperar cuando sea.',
       ok: 'Dar de baja', peligro: true
     })) return;
@@ -599,7 +599,7 @@ export async function vistaClientes(pantalla, estadoApp) {
     if (!await confirmar({
       titulo: `¿Eliminar a ${c.nombre}?`,
       texto: 'Se borra de verdad, no se puede recuperar. Solo se puede si nunca ' +
-             'se llevó nada fiado ni dejó un abono.',
+             'se llevó nada a crédito ni dejó un abono.',
       ok: 'Sí, eliminar', peligro: true
     })) return;
 

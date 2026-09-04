@@ -154,9 +154,13 @@ test('total, pago y cambio en UN renglón, repartidos a lo ancho', () => {
   assert.equal(l[t].length, 48, 'llega justo a la orilla');
 });
 
-test('el nombre del negocio cierra el ticket, abajo a la izquierda', () => {
+test('el ticket de venta NO lleva el nombre del negocio', () => {
+  // v5.2.2. El papel sale de la fábrica; a nadie hay que recordarle dónde
+  // acaba de comprar hielo. Los papeles que viajan solos —el corte, el
+  // vale, la cotización— sí lo llevan, y ésos se prueban abajo.
   const l = renglones(ticket.ticketVenta(venta, { negocio: 'Hielo LOLHA' }));
-  assert.equal(l.at(-1), 'HIELO LOLHA');
+  assert.ok(!l.some((x) => x.includes('HIELO LOLHA')),
+            'el ticket de venta ya no lo lleva');
 });
 
 test('sin pago tecleado no se inventa un cambio', () => {
