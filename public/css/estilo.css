@@ -4700,3 +4700,59 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 .planta-tabla tr.pendiente { background: var(--et-baja-f); }
 .planta-tabla tr.planta-puesta { background: var(--cal-normal-f); }
 .planta-tabla .der { text-align: right; }
+
+/* ============================================================
+   LOS CLIENTES, POR LO QUE COMPRAN  (v5.4)
+   ============================================================ */
+
+/* DOS Y DOS, no cuatro en fila: la columna de la izquierda mide unos 330
+   px y "Marquetas" no cabe en ochenta. En cuatro se salían dos pestañas
+   fuera de la caja y no había forma de tocarlas. */
+.cli-pestanas {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px;
+  margin-bottom: 10px;
+}
+@media (min-width: 1500px) {
+  .cli-pestanas { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+.cli-pestana {
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  padding: 7px 4px; width: 100%;
+  /* Un hijo de rejilla trae `min-width: auto`, que quiere decir "no me
+     encojas por debajo de mi texto". Con "Marquetas" dentro, la pestaña se
+     salía de la columna aunque la pista sí midiera lo que debía. */
+  min-width: 0;
+  background: var(--superficie-alt); border: 1px solid var(--borde);
+  border-radius: 10px; color: var(--suave);
+  font-size: 12px; font-weight: 600; line-height: 1.2;
+}
+.cli-pestana small { font-size: 11px; opacity: .8; font-variant-numeric: tabular-nums; }
+/* El nombre se recorta antes que empujar la pestaña fuera de la columna. */
+.cli-pestana > span { display: block; max-width: 100%; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.cli-pestana:hover { border-color: var(--primario); color: var(--texto); }
+.cli-pestana.activa {
+  background: var(--primario); border-color: var(--primario);
+  color: var(--primario-texto);
+}
+.cli-pestana.activa small { opacity: .9; }
+
+/* Los tres botones de qué le compra. Prendido y apagado tienen que
+   distinguirse de lejos: es lo que decide en qué reparto sale. */
+.cli-lineas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+@media (max-width: 640px) { .cli-lineas { grid-template-columns: 1fr; } }
+.cli-linea {
+  display: flex; flex-direction: column; gap: 2px; width: 100%;
+  padding: 10px 12px; text-align: left;
+  background: var(--superficie); border: 1px solid var(--borde);
+  border-radius: 10px; color: var(--suave); opacity: .6;
+}
+.cli-linea b { font-size: 14px; }
+.cli-linea small { font-size: 11.5px; }
+.cli-linea:hover:not(:disabled) { border-color: var(--primario); }
+.cli-linea.si {
+  opacity: 1; color: var(--texto);
+  background: var(--cal-normal-f); border-color: var(--verde);
+}
+.cli-linea.si b { color: var(--verde); }
+.cli-linea:disabled { cursor: default; }

@@ -76,9 +76,23 @@ function conEstado(c) {
  * Con ?incluirBajas=1 vienen también los dados de baja, para recuperarlos.
  * Con ?deben=1 solo los que tienen saldo: es la lista de cobranza.
  */
+/**
+ * LAS TRES PESTAÑAS son un filtro, no tres listas.
+ *
+ * `?compra=agua` deja los que compran agua. El que compra las tres cosas
+ * sale en las tres, que es lo que tiene que pasar: cuando se prepare el
+ * agua hay que verlo, y cuando se preparen las bolsas también.
+ */
+const COLUMNA_COMPRA = {
+  marqueta: 'compra_marqueta', bolsa: 'compra_bolsa', agua: 'compra_agua'
+};
+
 router.get('/', verClientes, (req, res) => {
   let clientes = clientesConEstado({ incluirBajas: req.query.incluirBajas === '1' });
   if (req.query.deben === '1') clientes = clientes.filter((c) => c.estado.saldo > 0);
+
+  const columna = COLUMNA_COMPRA[String(req.query.compra || '')];
+  if (columna) clientes = clientes.filter((c) => c[columna] === 1);
 
   const busca = String(req.query.busca || '').trim().toLowerCase();
   if (busca) {
@@ -88,8 +102,19 @@ router.get('/', verClientes, (req, res) => {
 
   // Las listas de mayoreo van con la lista de clientes: la pantalla las
   // necesita para el selector de cada ficha, y son cinco renglones.
+  // Cuántos hay en cada pestaña, SIN el filtro puesto: la pestaña tiene que
+  // poder decir "Agua (14)" aunque ahorita se esté mirando la de bolsas.
+  const todos = clientesConEstado({ incluirBajas: req.query.incluirBajas === '1' });
+  const porLinea = {
+    marqueta: todos.filter((c) => c.compra_marqueta === 1).length,
+    bolsa: todos.filter((c) => c.compra_bolsa === 1).length,
+    agua: todos.filter((c) => c.compra_agua === 1).length,
+    todos: todos.length
+  };
+
   return ok(res, {
     clientes,
+    porLinea,
     cartera: resumenCartera(),
     listas: listasDeMayoreo().map((l) => ({ id: l.id, nombre: l.nombre })),
     mayoreoPorOmision: listaPorOmision()?.nombre || null
@@ -142,6 +167,30 @@ router.delete('/:id/foto', administrar, (req, res) => {
 // ALTA Y EDICIÓN
 // ============================================================
 
+/**
+ * Qué le compra, leído del cuerpo.
+ *
+ * Con `porOmision` —solo en el alta— un cliente al que no se le marcó nada
+ * queda como de marquetas. Sin eso quedaría fuera de las tres pestañas y no
+ * habría forma de encontrarlo más que buscándolo por nombre.
+ */
+function leerCompra(cuerpo, { porOmision = false } = {}) {
+  const c = {
+    marqueta: cuerpo?.compra_marqueta ? 1 : 0,
+    bolsa: cuerpo?.compra_bolsa ? 1 : 0,
+    agua: cuerpo?.compra_agua ? 1 : 0
+  };
+  if (porOmision && !c.marqueta && !c.bolsa && !c.agua) c.marqueta = 1;
+  return c;
+}
+
+/** Una coordenada creíble, o null. La misma regla que en las neveras. */
+function coordenada(v, tope) {
+  if (v === undefined || v === null || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) && Math.abs(n) <= tope ? n : null;
+}
+
 router.post('/', administrar, (req, res) => {
   const nombre = String(req.body?.nombre || '').trim();
   if (!nombre) return error(res, 'Escribe el nombre del cliente.');
@@ -159,6 +208,11 @@ router.post('/', administrar, (req, res) => {
   const plazo = leerEnteroOpcional(req.body?.diasPlazo, 3650);
   if (plazo.error) return error(res, 'El plazo se escribe en días, con números.');
 
+  // QUÉ LE COMPRA. Si no se dice nada se marca marquetas, que es a lo que
+  // se dedica la fábrica: un cliente sin ninguna marca no saldría en
+  // ninguna pestaña y sería invisible.
+  const compra = leerCompra(req.body, { porOmision: true });
+
   const id = nuevoId();
 
   // EL NÚMERO DEL CLIENTE. Es para teclearlo en la caja: "7" y enter, en vez
@@ -169,8 +223,10 @@ router.post('/', administrar, (req, res) => {
     const numero = bd.prepare('SELECT COALESCE(MAX(numero), 0) n FROM clientes').get().n + 1;
     bd.prepare(`
       INSERT INTO clientes (id, numero, nombre, negocio, telefono, direccion, notas,
-                            limite_centavos, dias_plazo, fecha_alta, creado_por)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            limite_centavos, dias_plazo, fecha_alta, creado_por,
+                            compra_marqueta, compra_bolsa, compra_agua,
+                            horario_entrega, referencias, latitud, longitud)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(id, numero, nombre.slice(0, 80),
            (req.body?.negocio || '').trim().slice(0, 80) || null,
            (req.body?.telefono || '').trim().slice(0, 30) || null,
@@ -178,7 +234,11 @@ router.post('/', administrar, (req, res) => {
            (req.body?.notas || '').trim().slice(0, 500) || null,
            limiteCentavos,
            plazo.omitido ? null : plazo.valor,
-           ahora(), req.usuario.id);
+           ahora(), req.usuario.id,
+           compra.marqueta, compra.bolsa, compra.agua,
+           (req.body?.horarioEntrega || '').trim().slice(0, 120) || null,
+           (req.body?.referencias || '').trim().slice(0, 300) || null,
+           coordenada(req.body?.latitud, 90), coordenada(req.body?.longitud, 180));
     return numero;
   });
   alta();
@@ -209,7 +269,8 @@ router.put('/:id', administrar, (req, res) => {
   }
   for (const [clave, columna, largo] of [
     ['negocio', 'negocio', 80], ['telefono', 'telefono', 30],
-    ['direccion', 'direccion', 200], ['notas', 'notas', 500]
+    ['direccion', 'direccion', 200], ['notas', 'notas', 500],
+    ['horarioEntrega', 'horario_entrega', 120], ['referencias', 'referencias', 300]
   ]) {
     if (req.body?.[clave] !== undefined) {
       campos[columna] = String(req.body[clave]).trim().slice(0, largo) || null;
@@ -231,6 +292,20 @@ router.put('/:id', administrar, (req, res) => {
     const plazo = leerEnteroOpcional(req.body.diasPlazo, 3650);
     if (plazo.error) return error(res, 'El plazo se escribe en días, con números.');
     campos.dias_plazo = plazo.valor;
+  }
+
+  // QUÉ LE COMPRA. Cada marca llega sola: prender "agua" no apaga las otras.
+  for (const [clave, columna] of Object.entries(COLUMNA_COMPRA)) {
+    if (req.body?.[`compra_${clave}`] !== undefined) {
+      campos[columna] = req.body[`compra_${clave}`] ? 1 : 0;
+    }
+  }
+
+  // La ubicación, para el mapa y para el QR de la nota de entrega.
+  for (const [clave, columna, tope] of [
+    ['latitud', 'latitud', 90], ['longitud', 'longitud', 180]
+  ]) {
+    if (req.body?.[clave] !== undefined) campos[columna] = coordenada(req.body[clave], tope);
   }
 
   // A qué precio le toca. Vacío = precio de público, que es casi todo el

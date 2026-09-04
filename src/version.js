@@ -17,9 +17,28 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '5.3';
+const VERSION_ACTUAL = '5.4';
 
 const VERSIONES = [
+  {
+    numero: '5.4',
+    nombre: 'Los clientes, por lo que compran',
+    fecha: '2026-09-04',
+    resumen:
+      'Tres pestañas en Clientes —marquetas, bolsas y agua— más el horario '
+      + 'y la ubicación de cada quien. Es lo que hace falta debajo para que '
+      + 'los pedidos y el reparto funcionen.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'CUATRO PESTAÑAS EN CLIENTES: Todos, 🧊 Marquetas, 🧊 Bolsas y 💧 Agua, cada una con su cuenta. Lo que decide en cuál sale es «Qué le compra», tres botones en su ficha que se prenden y se apagan.' },
+      { tipo: 'importante', texto: 'PERO ES UN FILTRO, NO TRES LISTAS, y esta es la decisión que más habría costado al revés. Abarrotes Juan compra bolsas Y agua: si fueran dos fichas tendría DOS DEUDAS, dos límites de crédito y dos historiales — y el día que llegara con $500 en la mano nadie sabría a cuál van. Para cuando se descubriera serían meses de historias separadas que ya no se pueden juntar. El cliente es uno; lo que se guarda es una etiqueta.' },
+      { tipo: 'nuevo', texto: 'Y EL QUE COMPRA LAS TRES SALE EN LAS TRES. No es un descuido: cuando se prepare el agua hay que verlo, y cuando se preparen las bolsas también.' },
+      { tipo: 'mejora', texto: 'AL ACTUALIZAR, CADA CLIENTE QUEDÓ MARCADO SOLO, por lo que ya te compró — sacado de sus tickets y de las neveras que tiene prestadas. Nadie va a etiquetar doscientos clientes a mano, y si hubiera que hacerlo las pestañas saldrían vacías el primer día y no las usaría nadie. Lo que quede mal se corrige en su ficha de un toque.' },
+      { tipo: 'nuevo', texto: 'EL HORARIO DE ENTREGA, como lo dirías: «de 8 a 2 y de 5 a 8». Tú lo dijiste y es de lo más importante que hay para el reparto: una ruta corta que llega a las dos a una tienda que cierra a la una no es corta, es un viaje perdido y hay que volver. El día que la ruta se ordene sola, esto va a mandar antes que la distancia.' },
+      { tipo: 'nuevo', texto: 'LAS REFERENCIAS Y LA UBICACIÓN. «La de la puerta azul, junto a la tortillería» — la dirección lleva al rumbo, esto hace que se encuentre la puerta. Y la ubicación se pone pegando el enlace de Google Maps, igual que en las neveras: es la que va a llevar el QR de la nota de entrega.' },
+      { tipo: 'arreglo', texto: 'EL BOTÓN DE ENCOMENDAR HIELO YA NO ES EL MISMO CUBO QUE EL AVISO DE HIELO BAJO. Estaban a dos dedos uno del otro en la misma barra de la caja, los dos con 🧊. El cubo se queda con el AVISO, que es el que habla del hielo; encomendar es apartar hielo para alguien, y eso ahora es 📦.' },
+      { tipo: 'arreglo', texto: 'De paso, un tropiezo que ya había pasado tres veces en el proyecto: una constante declarada dentro de la pantalla y usada al pintarla dejaba Clientes en blanco con un mensaje en inglés. Ahora vive fuera, donde no puede pasar.' }
+    ]
+  },
   {
     numero: '5.3',
     nombre: 'Paga una parte y debe la otra',

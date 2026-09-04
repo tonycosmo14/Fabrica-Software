@@ -318,7 +318,7 @@ const TEMAS = [
       <b>resta</b> el día que se lo llevan. Sin eso saldría «SOBRA» en cada
       conteo hasta que el cliente pasara por él.</p>
       <p>Aquí se ve la lista de quién tiene qué. Se guarda y se entrega
-      desde <b>Vender</b>, con el botón <b>🧊</b>. Y en
+      desde <b>Vender</b>, con el botón <b>📦</b>. Y en
       <b>Cuartos fríos y horarios</b> se cambia cómo se le llama, que es la
       palabra que sale impresa en el papelito del cliente.</p>
 
@@ -593,7 +593,7 @@ debería quedar − contado = FALTA</pre>
 
       <h4>El hielo que se queda guardado (encomendado)</h4>
       <p>A veces el cliente paga su hielo y pide que se le guarde para
-      pasar por él más tarde o al otro día. Con el botón <b>🧊</b> de arriba
+      pasar por él más tarde o al otro día. Con el botón <b>📦</b> de arriba
       a la derecha: se elige de quién es —o se escribe el nombre, si no está
       dado de alta— y cuánto, y <b>sale su papelito</b> con la fecha, la
       hora y su nombre en grande. Con ese papel vuelve.</p>
@@ -1158,6 +1158,39 @@ debería haber − contado = FALTA</pre>
       tocan en momentos distintos: <b>quién es y dónde está</b> (nombre,
       negocio, teléfono, dirección) y <b>su crédito y su precio</b> (el
       límite, el plazo y qué lista de mayoreo se le cobra).</p>
+
+      <h4>Las tres pestañas: qué le compra cada quien</h4>
+      <p>Arriba de la lista hay cuatro pestañas: <b>Todos</b>,
+      <b>🧊 Marquetas</b>, <b>🧊 Bolsas</b> y <b>💧 Agua</b>. Cada una enseña
+      solo los suyos, con su cuenta al lado.</p>
+      <p>Lo que decide en qué pestaña sale es <b>Qué le compra</b>, en su
+      ficha: tres botones que se prenden y se apagan. Puede tener los tres —
+      Abarrotes Juan compra bolsas <i>y</i> agua— y entonces sale en las tres,
+      que es justo lo que hace falta cuando se prepara cada reparto.</p>
+      <p class="ayuda-tip"><b>Es un filtro, no tres listas.</b> El cliente
+      sigue siendo <b>uno solo</b>: una deuda, un límite de crédito, un
+      historial. Si fueran tres fichas, el día que llegue con $500 en la mano
+      nadie sabría a cuál de sus tres cuentas van — y para cuando se
+      descubriera, serían meses de historias separadas.</p>
+      <p>Al actualizar, cada cliente quedó marcado <b>por lo que ya te
+      compró</b>, sacado de sus tickets. Si alguno quedó mal —el que solo vino
+      una vez por marquetas y ahora quiere agua— se corrige en su ficha de un
+      toque.</p>
+
+      <h4>El horario de entrega y la ubicación</h4>
+      <p>En su ficha, junto a la dirección:</p>
+      <ul>
+        <li><b>Horario de entrega</b> — como lo dirías: «de 8 a 2 y de 5 a 8»,
+        «no antes de las 10». No es un adorno: una ruta corta que llega a las
+        dos a una tienda que cierra a la una <b>no es corta</b>, es un viaje
+        perdido y hay que volver.</li>
+        <li><b>Referencias</b> — «la de la puerta azul, junto a la
+        tortillería». La dirección lleva al rumbo; esto es lo que hace que se
+        encuentre la puerta.</li>
+        <li><b>Ubicación</b> — se pega el enlace que da Google Maps al
+        compartir, igual que en las neveras, y el sistema saca las
+        coordenadas solo.</li>
+      </ul>
 
       <h4>Paga una parte y debe la otra</h4>
       <p>Es lo más común de todo: se lleva $480 pero solo trae $300. En la

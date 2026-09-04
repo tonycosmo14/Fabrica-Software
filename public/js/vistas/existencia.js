@@ -75,7 +75,7 @@ export async function vistaExistencia(pantalla, estadoApp) {
               </tr>`).join('')}
           </table>
           <p class="ayuda" style="margin:12px 0 0">
-            Se guarda y se entrega desde <b>Vender</b>, con el botón 🧊.
+            Se guarda y se entrega desde <b>Vender</b>, con el botón 📦.
           </p>
         </div>` : ''}
 

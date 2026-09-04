@@ -30,6 +30,34 @@ import { api } from '../api.js';
 import { esc, avisar, fecha as formatoFecha, colorDe } from '../util.js';
 import { pedirTexto, pedirImporte, confirmar, menu, pedirContrasena } from '../dialogo.js';
 import { pesos, paraEditar } from '../fracciones.js';
+import { enlaceMaps, leerEnlace } from '../mapa.js';
+
+/**
+ * LAS TRES LÍNEAS DEL NEGOCIO  (v5.4)
+ *
+ * "Hay clientes para el mayoreo de marquetas, hay clientes para el reparto
+ *  de agua y hay clientes para las bolsas."
+ *
+ * Son un FILTRO sobre la misma lista, no tres listas. El cliente sigue
+ * siendo uno solo con su deuda y su límite; lo que se guarda es qué le
+ * compra. El que compra las tres cosas sale en las tres pestañas, que es
+ * justo lo que hace falta cuando se prepara cada reparto.
+ *
+ * VA AQUÍ FUERA, Y NO DENTRO DE LA VISTA, A PROPÓSITO.
+ *
+ * La vista arranca con un `await cargar()` que pinta, y pintar usa esta
+ * lista. Un `const` declarado más abajo dentro de la función todavía no se
+ * ha ejecutado en ese momento, y la pantalla sale en blanco con "Cannot
+ * access LINEAS before initialization" — que no dice nada a nadie. Es la
+ * tercera vez que pasa en este proyecto; una constante que no depende de
+ * nada vive fuera y el problema no existe.
+ */
+const LINEAS = [
+  { clave: '', nombre: 'Todos', emoji: '👥', cuenta: 'todos' },
+  { clave: 'marqueta', nombre: 'Marquetas', emoji: '🧊', cuenta: 'marqueta' },
+  { clave: 'bolsa', nombre: 'Bolsas', emoji: '🧊', cuenta: 'bolsa' },
+  { clave: 'agua', nombre: 'Agua', emoji: '💧', cuenta: 'agua' }
+];
 
 export async function vistaClientes(pantalla, estadoApp) {
   const puede = (p) => estadoApp.permisos.includes('*') || estadoApp.permisos.includes(p);
@@ -47,6 +75,8 @@ export async function vistaClientes(pantalla, estadoApp) {
   let soloDeben = false;
   let verBajas = false;
   let busca = '';
+  // La pestaña: '' son todos, y si no, qué le compra (v5.4).
+  let linea = '';
 
   await cargar();
 
@@ -55,6 +85,7 @@ export async function vistaClientes(pantalla, estadoApp) {
     if (verBajas) query.set('incluirBajas', '1');
     if (soloDeben) query.set('deben', '1');
     if (busca) query.set('busca', busca);
+    if (linea) query.set('compra', linea);
 
     datos = await api.obtener(`/clientes?${query}`);
     listas = datos.listas || [];
@@ -74,6 +105,19 @@ export async function vistaClientes(pantalla, estadoApp) {
     seleccionado = id;
     ficha = await api.obtener(`/clientes/${id}`);
     pintar();
+  }
+
+  function pestanas() {
+    const n = datos.porLinea || {};
+    return `
+      <div class="cli-pestanas">
+        ${LINEAS.map((l) => `
+          <button class="cli-pestana ${linea === l.clave ? 'activa' : ''}"
+                  data-linea="${l.clave}" title="${l.nombre}">
+            <span>${l.emoji} ${l.nombre}</span>
+            <small>${n[l.cuenta] ?? 0}</small>
+          </button>`).join('')}
+      </div>`;
   }
 
   // ==========================================================
@@ -108,12 +152,16 @@ export async function vistaClientes(pantalla, estadoApp) {
 
         <div class="cfg-tablero cfg-tablero-2">
           <aside class="cfg-columna">
+            ${pestanas()}
             <input id="busca" class="buscador" autocomplete="off"
                    placeholder="Nombre, negocio o teléfono" value="${esc(busca)}">
             <div class="cfg-lista">
               ${datos.clientes.map(fila).join('')
                 || `<p class="vacio" style="padding:24px 0">${
-                     busca ? 'Nadie con ese nombre.' : 'Todavía no hay clientes.'}</p>`}
+                     busca ? 'Nadie con ese nombre.'
+                     : linea ? `Nadie de ${LINEAS.find((l) => l.clave === linea).nombre.toLowerCase()} todavía.
+                                Se marca en la ficha de cada cliente, en «Qué le compra».`
+                     : 'Todavía no hay clientes.'}</p>`}
             </div>
             ${administra ? '<button class="secundario chico" id="nuevo">＋ Cliente</button>' : ''}
           </aside>
@@ -277,13 +325,50 @@ export async function vistaClientes(pantalla, estadoApp) {
           <button class="secundario chico" id="abonar-transf">Abono por transferencia</button>
         </div>` : ''}
 
+      <h4 class="cfg-subtitulo">Qué le compra</h4>
+      <div class="cuadre">
+        <div class="cli-lineas">
+          ${[['compra_marqueta', '🧊 Marquetas', 'mayoreo y menudeo del cuarto frío'],
+             ['compra_bolsa', '🧊 Bolsas', 'hielo en cubos, el de las neveras'],
+             ['compra_agua', '💧 Agua', 'garrafones y botellas']].map(([clave, texto, ayuda]) => `
+            <button class="cli-linea ${c[clave] ? 'si' : ''}" data-compra="${clave}"
+                    ${administra ? '' : 'disabled'}>
+              <b>${texto}</b><small>${ayuda}</small>
+            </button>`).join('')}
+        </div>
+        <p class="ayuda" style="margin:10px 0 0">
+          Con esto sale en su pestaña y en la preparación de ese reparto. Puede
+          ser más de una: el cliente sigue siendo <b>uno solo</b>, con una deuda
+          y un límite.
+        </p>
+      </div>
+
       <h4 class="cfg-subtitulo">Quién es y dónde está</h4>
       <div class="cuadre cfg-cliente-datos cli-rejilla">
         ${campo('Nombre', 'nombre', c.nombre)}
         ${campo('Negocio', 'negocio', c.negocio, { marcador: 'Abarrotes Doña Mary' })}
         ${campo('Teléfono', 'telefono', c.telefono, { marcador: '999 123 4567' })}
         ${campo('Dirección', 'direccion', c.direccion)}
+        ${campo('Referencias', 'referencias', c.referencias,
+                { marcador: 'La de la puerta azul, junto a la tortillería',
+                  ayuda: 'lo que hace que se encuentre la puerta' })}
+        ${campo('Horario de entrega', 'horarioEntrega', c.horario_entrega,
+                { marcador: 'de 8 a 2 y de 5 a 8',
+                  ayuda: 'a qué hora se le puede llegar' })}
       </div>
+      ${administra ? `
+        <div class="fila-botones" style="margin-top:10px;flex-wrap:wrap">
+          <button class="secundario chico" id="ubicacion">
+            📍 ${c.latitud != null ? 'Cambiar la ubicación' : 'Poner la ubicación'}
+          </button>
+          ${c.latitud != null ? `
+            <a class="boton-enlace chico" target="_blank" rel="noopener"
+               href="${enlaceMaps(c.latitud, c.longitud, c.nombre)}">Ver en el mapa</a>` : ''}
+        </div>
+        <p class="ayuda" style="margin:6px 0 0">
+          Se pega el enlace que da Google Maps al compartir. Es lo que va a
+          llevar el QR de su nota de entrega.
+        </p>` : ''}
 
       <h4 class="cfg-subtitulo">Su crédito y su precio</h4>
       <div class="cuadre cfg-cliente-datos cli-rejilla">
@@ -396,6 +481,9 @@ export async function vistaClientes(pantalla, estadoApp) {
     buscador.onkeydown = (ev) => { if (ev.key === 'Enter') ev.preventDefault(); };
 
     q('#solo-deben').onclick = () => { soloDeben = !soloDeben; cargar(); };
+    pantalla.querySelectorAll('[data-linea]').forEach((b) => {
+      b.onclick = () => { linea = b.dataset.linea; cargar(); };
+    });
     const bajas = q('#ver-bajas');
     if (bajas) bajas.onclick = () => { verBajas = !verBajas; cargar(); };
     const nuevo = q('#nuevo');
@@ -444,6 +532,63 @@ export async function vistaClientes(pantalla, estadoApp) {
     pantalla.querySelectorAll('[data-anular]').forEach((b) => {
       b.onclick = () => anularAbono(b.dataset.anular);
     });
+
+    // Qué le compra: cada marca se prende y se apaga sola.
+    pantalla.querySelectorAll('[data-compra]').forEach((b) => {
+      b.onclick = () => cambiarLinea(b.dataset.compra);
+    });
+    const ubic = q('#ubicacion');
+    if (ubic) ubic.onclick = ponerUbicacion;
+  }
+
+  /** Prender o apagar una línea. No apaga las otras: puede comprar las tres. */
+  async function cambiarLinea(clave) {
+    const c = ficha.cliente;
+    try {
+      await api.actualizar(`/clientes/${c.id}`, { [clave]: c[clave] ? 0 : 1 });
+      await abrir(c.id);
+      await cargar();
+    } catch (e) { avisar(e.message, 'error'); }
+  }
+
+  /**
+   * LA UBICACIÓN, PEGANDO EL ENLACE DE GOOGLE MAPS.
+   *
+   * Lo mismo que en las neveras y por la misma razón: nadie va a teclear
+   * una latitud a mano, pero el botón de compartir de Google Maps lo tiene
+   * cualquiera en el celular.
+   */
+  async function ponerUbicacion() {
+    const c = ficha.cliente;
+    const texto = await pedirTexto({
+      titulo: 'La ubicación de ' + c.nombre,
+      texto: 'Pega aquí el enlace que da Google Maps al compartir, o las ' +
+             'coordenadas tal cual. Déjalo en blanco para quitarla.',
+      valor: c.latitud != null ? `${c.latitud}, ${c.longitud}` : '',
+      marcador: 'https://maps.app.goo.gl/…', unaLinea: true, opcional: true, largo: 300
+    });
+    if (texto === null) return;
+
+    if (!texto.trim()) {
+      try {
+        await api.actualizar(`/clientes/${c.id}`, { latitud: '', longitud: '' });
+        avisar('Ubicación quitada', 'bien');
+        await abrir(c.id);
+      } catch (e) { avisar(e.message, 'error'); }
+      return;
+    }
+
+    const punto = leerEnlace(texto);
+    if (!punto) {
+      return avisar('De ahí no salen coordenadas. Pega el enlace completo de ' +
+                    'Google Maps, o escríbelas como 21.0167, -89.8744', 'error');
+    }
+    try {
+      await api.actualizar(`/clientes/${c.id}`,
+                           { latitud: punto.lat, longitud: punto.lon });
+      avisar('Ubicación guardada', 'bien');
+      await abrir(c.id);
+    } catch (e) { avisar(e.message, 'error'); }
   }
 
   // ==========================================================

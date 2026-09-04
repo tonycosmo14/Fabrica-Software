@@ -242,9 +242,14 @@ export async function vistaVenta(pantalla, estadoApp) {
             <!-- EL HIELO GUARDADO  (v4.5). Con su contador encima: es el
                  recordatorio de que hay hielo del cuarto que ya es de
                  alguien, y de que alguien va a venir por él. -->
+            <!-- 📦 Y NO 🧊  (v5.4). Tenía el mismo cubo que el aviso de
+                 "queda poco hielo", y los dos viven en esta misma barra a
+                 dos dedos uno del otro. El cubo se queda con el AVISO, que
+                 es el que habla del hielo; lo encomendado es hielo
+                 APARTADO para alguien, y eso es una caja con nombre. -->
             <button class="pos-chico pos-chico-contador" id="encomiendas"
                     title="Hielo pagado que se guarda para el cliente">
-              🧊<span class="pos-contador" id="marca-encomiendas" hidden></span>
+              📦<span class="pos-contador" id="marca-encomiendas" hidden></span>
             </button>
             ${puedeContarHielo ? `
               <button class="pos-chico" id="ir-existencia"

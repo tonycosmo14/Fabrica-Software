@@ -719,3 +719,129 @@ test('si la venta falla no queda un abono suelto', async () => {
   assert.equal(bd.prepare('SELECT COUNT(*) n FROM abonos').get().n, antes,
                'y su abono tampoco');
 });
+
+// ============================================================
+// LAS TRES LÍNEAS DEL NEGOCIO  (v5.4)
+//
+// "Hay clientes para el mayoreo de marquetas, hay clientes para el reparto
+//  de agua y hay clientes para las bolsas. Que clientes tenga tres
+//  pestañas, una para cada uno."
+//
+// Lo que se prueba es la decisión de fondo: que las pestañas sean un
+// FILTRO y no tres listas. Un cliente partido en tres tendría tres deudas
+// y tres límites, y el día que llegue con $500 nadie sabría a cuál van.
+// ============================================================
+
+test('un cliente puede comprar las tres cosas y sigue siendo uno', async () => {
+  await entrarAdmin();
+  const juan = (await llamar('/api/clientes', {
+    method: 'POST',
+    cuerpo: { nombre: 'Abarrotes Juan', compra_bolsa: 1, compra_agua: 1 }
+  })).json.datos.cliente;
+
+  assert.equal(juan.compra_bolsa, 1);
+  assert.equal(juan.compra_agua, 1);
+  assert.equal(juan.compra_marqueta, 0);
+
+  // Y su cuenta es UNA. Se lleva bolsas a crédito y agua a crédito, y lo
+  // que debe es la suma: no dos deudas que nadie sabría cómo cobrar.
+  await fiar(juan.id, 4);
+  await fiar(juan.id, 4);
+  const e = (await ficha(juan.id)).cliente.estado;
+  assert.equal(e.saldo, 14000, 'una sola deuda para las dos líneas');
+});
+
+test('sin decir qué compra, se marca marquetas: si no, sería invisible', async () => {
+  // Un cliente sin ninguna marca no saldría en ninguna pestaña y no habría
+  // forma de encontrarlo más que buscándolo por nombre.
+  await entrarAdmin();
+  const c = (await llamar('/api/clientes', {
+    method: 'POST', cuerpo: { nombre: 'Don Sin Marca' }
+  })).json.datos.cliente;
+  assert.equal(c.compra_marqueta, 1);
+});
+
+test('cada pestaña trae solo los suyos, y el de las tres sale en las tres', async () => {
+  await entrarAdmin();
+  const soloAgua = (await llamar('/api/clientes', {
+    method: 'POST', cuerpo: { nombre: 'Purificadora Ele', compra_agua: 1 }
+  })).json.datos.cliente;
+  const todo = (await llamar('/api/clientes', {
+    method: 'POST',
+    cuerpo: { nombre: 'La Surtidora', compra_marqueta: 1, compra_bolsa: 1, compra_agua: 1 }
+  })).json.datos.cliente;
+
+  const dePestana = async (cual) =>
+    (await llamar(`/api/clientes?compra=${cual}`)).json.datos.clientes.map((c) => c.id);
+
+  const agua = await dePestana('agua');
+  assert.ok(agua.includes(soloAgua.id));
+  assert.ok(agua.includes(todo.id), 'el de las tres también es de agua');
+
+  const marqueta = await dePestana('marqueta');
+  assert.ok(!marqueta.includes(soloAgua.id), 'el de agua no estorba en marquetas');
+  assert.ok(marqueta.includes(todo.id));
+
+  // Y sin pestaña salen todos.
+  const todos = (await llamar('/api/clientes')).json.datos.clientes.map((c) => c.id);
+  assert.ok(todos.includes(soloAgua.id) && todos.includes(todo.id));
+});
+
+test('las cuentas de cada pestaña no dependen de la que se esté viendo', async () => {
+  // La pestaña de agua tiene que poder decir cuántos hay aunque ahorita se
+  // esté mirando la de bolsas.
+  await entrarAdmin();
+  const mirandoAgua = (await llamar('/api/clientes?compra=agua')).json.datos;
+  const mirandoTodo = (await llamar('/api/clientes')).json.datos;
+  assert.deepEqual(mirandoAgua.porLinea, mirandoTodo.porLinea);
+  assert.ok(mirandoAgua.porLinea.agua >= 1);
+});
+
+test('prender una línea no apaga las otras', async () => {
+  await entrarAdmin();
+  const c = (await llamar('/api/clientes', {
+    method: 'POST', cuerpo: { nombre: 'Doña Suma', compra_bolsa: 1 }
+  })).json.datos.cliente;
+
+  await llamar(`/api/clientes/${c.id}`, { method: 'PUT', cuerpo: { compra_agua: 1 } });
+  const d = (await ficha(c.id)).cliente;
+  assert.equal(d.compra_bolsa, 1, 'la que ya tenía se queda');
+  assert.equal(d.compra_agua, 1);
+
+  await llamar(`/api/clientes/${c.id}`, { method: 'PUT', cuerpo: { compra_bolsa: 0 } });
+  assert.equal((await ficha(c.id)).cliente.compra_bolsa, 0, 'y se puede apagar sola');
+  assert.equal((await ficha(c.id)).cliente.compra_agua, 1);
+});
+
+test('el horario y la ubicación se guardan con el cliente', async () => {
+  // El horario no es adorno: una ruta que llega a las 2 a una tienda que
+  // cierra a la 1 es un viaje perdido. Y la ubicación es la del QR.
+  await entrarAdmin();
+  const c = (await llamar('/api/clientes', {
+    method: 'POST',
+    cuerpo: { nombre: 'Tiendita La Esquina', compra_agua: 1,
+              horarioEntrega: 'de 8 a 2 y de 5 a 8',
+              referencias: 'La de la puerta azul',
+              latitud: 21.0167, longitud: -89.8744 }
+  })).json.datos.cliente;
+
+  assert.equal(c.horario_entrega, 'de 8 a 2 y de 5 a 8');
+  assert.equal(c.referencias, 'La de la puerta azul');
+  assert.equal(c.latitud, 21.0167);
+
+  // Y se pueden cambiar y quitar después.
+  await llamar(`/api/clientes/${c.id}`, {
+    method: 'PUT', cuerpo: { horarioEntrega: 'solo por la mañana', latitud: '', longitud: '' }
+  });
+  const d = (await ficha(c.id)).cliente;
+  assert.equal(d.horario_entrega, 'solo por la mañana');
+  assert.equal(d.latitud, null, 'una ubicación vacía se borra, no se queda a medias');
+});
+
+test('una coordenada imposible no se guarda', async () => {
+  await entrarAdmin();
+  const c = (await llamar('/api/clientes', {
+    method: 'POST', cuerpo: { nombre: 'Don Marte', latitud: 999, longitud: -89 }
+  })).json.datos.cliente;
+  assert.equal(c.latitud, null, 'fuera del planeta no se guarda');
+});
