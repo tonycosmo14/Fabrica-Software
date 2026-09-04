@@ -1482,6 +1482,10 @@ function ticketConteo(conteo, { negocio = '' } = {}) {
  * que el QR miente deja de usarlo para siempre.
  */
 function ticketPedido(p, { negocio = '', copia = false } = {}) {
+  // EL QUE VIENEN A BUSCAR ES OTRO PAPEL  (v5.8.1): no va en la mano del
+  // repartidor, va en la del cliente.
+  if (p.tipo === 'recoger') return ticketApartado(p, { negocio, copia });
+
   const cfg = configuracion();
   const t = new Ticket(cfg.anchoMm, cfg.codigoPagina, cfg.tamanoLetra);
 
@@ -1493,6 +1497,11 @@ function ticketPedido(p, { negocio = '', copia = false } = {}) {
     atendio: `Pedido ${p.folio}`,
     fecha: fechaTicket(p.fecha)
   });
+
+  // PARA CUÁNDO, antes que nada: es lo que decide en qué salida sube.
+  if (p.para_cuando) {
+    t.izquierda().negrita().linea(`Para el ${fechaDia(p.para_cuando)}`).negrita(false);
+  }
 
   // ---- ¿A DÓNDE? ----
   //
@@ -1563,6 +1572,74 @@ function ticketPedido(p, { negocio = '', copia = false } = {}) {
   } else {
     t.firma('RECIBIO');
   }
+
+  pie(t, negocio);
+  t.izquierda().cortar(cfg.avanceCorte);
+  return t.bytes();
+}
+
+/**
+ * EL APARTADO: el pedido que vienen a buscar  (v5.8.1)
+ *
+ * "Si hago un pedido que pasan a buscar y creo el cliente, no me imprime
+ *  nada."
+ *
+ * No imprimía porque la nota de entrega es del repartidor, y este pedido
+ * no sube a ninguna camioneta. Pero el cliente que apartó algo se va con
+ * las manos vacías, y sin papel no hay con qué reclamar ni con qué
+ * recoger. Así que sale ESTE: dice qué apartó, para cuándo, y en grande
+ * que SE PAGA AL RECOGER —que es la diferencia con un ticket de venta: el
+ * dinero todavía no entró—. Sin QR ni dirección: nadie va a ir a ninguna
+ * parte.
+ */
+function ticketApartado(p, { negocio = '', copia = false } = {}) {
+  const cfg = configuracion();
+  const t = new Ticket(cfg.anchoMm, cfg.codigoPagina, cfg.tamanoLetra);
+
+  if (copia) marcaCopia(t);
+
+  encabezado(t, {
+    titulo: 'APARTADO',
+    tituloGrande: true,
+    atendio: `Pedido ${p.folio}`,
+    fecha: fechaTicket(p.fecha)
+  });
+
+  t.izquierda().negrita().tamano(2, 1)
+   .parrafo(String(p.cliente_nombre || p.cliente_negocio || '?').slice(0, 40));
+  t.normal();
+  if (p.cliente_negocio) t.parrafo(p.cliente_negocio);
+  if (p.telefono) t.linea(`Tel: ${p.telefono}`);
+
+  if (p.para_cuando) {
+    t.negrita().parrafo(`Pasa por el: ${fechaDia(p.para_cuando)}`).negrita(false);
+  }
+
+  t.separador();
+  for (const l of p.lineas) {
+    const cuanto = l.dieciseisavos > 0
+      ? aTexto(l.dieciseisavos).replace(' ', ' · ')
+      : `${l.cantidad}`;
+    t.punteado(`${cuanto} ${l.concepto}`.trim(), formato(l.precio_centavos));
+  }
+
+  t.separador();
+  t.bloqueDerecha([['TOTAL:', formato(p.total)]]);
+
+  if (p.estado === 'entregado') {
+    t.separador();
+    t.centro().negrita().tamano(2, 1).linea('ENTREGADO').normal();
+    t.linea(fechaTicket(p.entregado_en)).izquierda();
+  } else if (p.estado === 'cancelado') {
+    t.separador();
+    t.centro().negrita().tamano(2, 1).linea('CANCELADO').normal().izquierda();
+    if (p.motivo_cancelacion) t.parrafo(p.motivo_cancelacion);
+  } else {
+    renglonResultado(t, 'SE PAGA AL RECOGER');
+    t.centro().linea('Presenta este papel al recoger').izquierda();
+  }
+
+  if (p.notas) { t.separador(); t.parrafo(p.notas); }
 
   pie(t, negocio);
   t.izquierda().cortar(cfg.avanceCorte);

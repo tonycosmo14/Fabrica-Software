@@ -226,9 +226,8 @@ export async function vistaPedidos(pantalla, estado) {
         <div class="ped-pie">
           <strong>${pesos(p.total)}</strong>
           <div class="ped-botones">
-            ${p.tipo === 'recoger' ? '' : `
-              <button class="secundario chico" data-ver="${p.id}">👁️ Nota</button>
-              <button class="secundario chico" data-nota="${p.id}">🖨️</button>`}
+            <button class="secundario chico" data-ver="${p.id}">👁️ ${p.tipo === 'recoger' ? 'Apartado' : 'Nota'}</button>
+            <button class="secundario chico" data-nota="${p.id}">🖨️</button>
             ${puede('pedidos.entregar')
               ? `<button class="chico" data-entregar="${p.id}">✅ Entregado</button>` : ''}
             ${puede('pedidos.tomar')
@@ -279,8 +278,10 @@ export async function vistaPedidos(pantalla, estado) {
   async function verNota(id) {
     try {
       const previa = await api.obtener(`/impresion/pedido/${id}/previa`);
+      const p = (datos?.pedidos || []).find((x) => String(x.id) === String(id));
       const que = await verTicket({
-        titulo: 'Nota de entrega', renglones: previa.renglones, ancho: previa.ancho,
+        titulo: p?.tipo === 'recoger' ? 'Apartado' : 'Nota de entrega',
+        renglones: previa.renglones, ancho: previa.ancho,
         acciones: [{ valor: 'imprimir', texto: '🖨️ Imprimir' }]
       });
       if (que === 'imprimir') imprimirTicket(htmlDeEspejo(previa.renglones, previa.ancho));
@@ -290,7 +291,7 @@ export async function vistaPedidos(pantalla, estado) {
   async function imprimirNota(id) {
     try {
       const r = await api.enviar(`/impresion/pedido/${id}`, {});
-      if (r.impreso) return avisar('Nota impresa', 'bien');
+      if (r.impreso) return avisar('Impreso', 'bien');
       await verNota(id);
     } catch (e) { avisar(e.message, 'error'); }
   }

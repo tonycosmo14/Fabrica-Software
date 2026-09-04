@@ -1174,10 +1174,12 @@ export async function vistaVenta(pantalla, estadoApp) {
       refs.cobro.innerHTML = `
         <div class="pos-cobro-caja pos-aviso-caja">
           <div class="pos-aviso-grande">🚚</div>
-          <h3 style="margin:0 0 4px">Nadie está esperando</h3>
+          <h3 style="margin:0 0 4px">Ninguna camioneta ha vuelto</h3>
           <p class="ayuda" style="margin:0 0 14px">
-            Aquí salen las salidas que ya volvieron y todavía no entregan su
-            dinero.
+            Este botón es para RECIBIRLE EL DINERO al repartidor cuando
+            regresa de una salida. Las salidas se arman y se mandan desde
+            <strong>Reparto</strong>; cuando una marque «ya regresó»,
+            aquí aparece con lo que debe entregar.
           </p>
           <button class="pos-confirmar" id="salir-cobro">
             <span>Está bien</span><small>Esc</small>
@@ -2794,11 +2796,11 @@ export async function vistaVenta(pantalla, estadoApp) {
         lineas, clienteId: cliente.id, paraCuando, formaPago, tipo
       });
 
-      // La nota de entrega sale sola si va a domicilio: es el papel que va
-      // en la mano del repartidor. El que vienen a buscar no la necesita.
-      if (tipo === 'domicilio') {
-        try { await api.enviar(`/impresion/pedido/${r.pedido.id}`, {}); } catch { /* sin térmica */ }
-      }
+      // Sale un papel en los dos casos, pero no el mismo (v5.8.1): a
+      // domicilio es la nota de entrega, para la mano del repartidor; el que
+      // vienen a buscar es el APARTADO, para la mano del cliente, con
+      // «se paga al recoger» en grande.
+      try { await api.enviar(`/impresion/pedido/${r.pedido.id}`, {}); } catch { /* sin térmica */ }
 
       avisar(`Pedido #${r.pedido.folio} apartado${tipo === 'recoger' ? ' para que pasen por él' : ''} ` +
              `· ${dia === 'hoy' ? 'hoy' : dia === 'manana' ? 'mañana' : paraCuando}`, 'bien');

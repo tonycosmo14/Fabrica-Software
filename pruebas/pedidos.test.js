@@ -695,3 +695,37 @@ test('la fecha de un pedido tiene que ser una fecha', async () => {
                           lineas: [{ productoId: bolsa.id, cantidad: 1 }] });
   assert.equal(r.estado, 400);
 });
+
+// ============================================================
+// EL APARTADO: el pedido que vienen a buscar  (v5.8.1)
+// ============================================================
+
+test('el que pasan a buscar imprime un APARTADO, no una nota de entrega', async () => {
+  const p = (await tomar({
+    clienteId: tienda.id, lineas: [{ productoId: garrafon.id, cantidad: 2 }],
+    tipo: 'recoger', paraCuando: '2026-09-10'
+  })).json.datos.pedido;
+
+  const r = await llamar(`/api/impresion/pedido/${p.id}/previa`);
+  assert.equal(r.estado, 200, 'antes no salía nada: el cliente se iba sin papel');
+  const papel = r.json.datos.renglones.map((x) => x.t).join('\n');
+
+  assert.match(papel, /APARTADO/);
+  assert.ok(!/NOTA DE ENTREGA/.test(papel));
+  assert.match(papel, /SE PAGA AL RECOGER/, 'la diferencia con un ticket: el dinero no ha entrado');
+  assert.match(papel, /10\/Sep/, 'para cuándo pasa por él');
+  assert.match(papel, /Abarrotes Juan/);
+  // Ni dirección ni QR: nadie va a ir a ninguna parte.
+  assert.ok(!/Calle 20 #145/.test(papel));
+  assert.ok(!r.json.datos.renglones.find((x) => x.qr), 'sin QR: no hay a dónde llegar');
+});
+
+test('la nota de entrega dice para qué día es', async () => {
+  const p = (await tomar({
+    clienteId: tienda.id, lineas: [{ productoId: bolsa.id, cantidad: 4 }],
+    paraCuando: '2026-09-12'
+  })).json.datos.pedido;
+  const papel = (await llamar(`/api/impresion/pedido/${p.id}/previa`))
+    .json.datos.renglones.map((x) => x.t).join('\n');
+  assert.match(papel, /Para el 12\/Sep/);
+});

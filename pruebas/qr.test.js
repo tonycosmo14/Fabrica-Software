@@ -130,12 +130,17 @@ function leerQR({ tamano: n, modulos, version }) {
   // QUÉ MÁSCARA SE USÓ. Se lee del propio dibujo, no se supone: es lo
   // mismo que hace un teléfono, y si estuviera mal escrita el texto
   // saldría convertido en basura.
+  // El recorrido de la norma: baja por la columna 8, dobla, y sigue por
+  // la fila 8 hacia la izquierda. (Antes estaba en espejo, igual que el
+  // codificador, y por eso la ida y vuelta pasaba con un QR que ningún
+  // teléfono leía. Ahora hay además una prueba contra un codificador de
+  // fuera, que es la que de verdad manda.)
   let formato = 0;
-  for (let i = 0; i <= 5; i++) formato |= modulos[8][i] << i;
-  formato |= modulos[8][7] << 6;
+  for (let i = 0; i <= 5; i++) formato |= modulos[i][8] << i;
+  formato |= modulos[7][8] << 6;
   formato |= modulos[8][8] << 7;
-  formato |= modulos[7][8] << 8;
-  for (let i = 9; i <= 14; i++) formato |= modulos[14 - i][8] << i;
+  formato |= modulos[8][7] << 8;
+  for (let i = 9; i <= 14; i++) formato |= modulos[8][14 - i] << i;
   const crudo = formato ^ 0b101010000010010;
   assert.strictEqual((crudo >> 13) & 0b11, 0b00, 'el nivel de corrección tiene que ser M');
   const mascara = (crudo >> 10) & 0b111;
@@ -291,4 +296,30 @@ test('sin nada, no hay enlace', () => {
   assert.strictEqual(enlaceDeMapa({}), null);
   assert.strictEqual(enlaceDeMapa({ latitud: null, longitud: null }), null);
   assert.strictEqual(enlaceDeMapa({ latitud: 21.01, longitud: null, direccion: '' }), null);
+});
+
+/* ============================================================
+ * 4. CONTRA UN CODIFICADOR DE FUERA, CUADRITO POR CUADRITO  (v5.8.1)
+ *
+ * Es la prueba que faltaba, y la que habría cazado el error del formato
+ * en espejo: las tres de arriba se hacían con piezas escritas aquí, y un
+ * error repetido en las dos mitades pasa la ida y vuelta.
+ *
+ * Los dibujos de `qr-referencia.json` los produjo la librería `qrcode`
+ * (la de npm, en una carpeta aparte, fuera de este sistema) para estos
+ * textos, con corrección M. Se guardan como texto para que la prueba no
+ * dependa de nada instalado: el sistema sigue sin más dependencia que
+ * express.
+ * ============================================================ */
+test('sale IDÉNTICO a un codificador de fuera, con la misma máscara', () => {
+  const referencias = require('./qr-referencia.json');
+  for (const ref of referencias) {
+    const mio = qr(ref.texto, { mascara: ref.mascara });
+    const filas = mio.modulos.map((f) => f.join(''));
+    assert.equal(filas.length, ref.filas.length, `tamaño distinto para ${ref.texto.slice(0, 20)}`);
+    for (let y = 0; y < filas.length; y++) {
+      assert.equal(filas[y], ref.filas[y],
+        `${ref.texto.slice(0, 20)}: la fila ${y} no coincide`);
+    }
+  }
 });

@@ -2293,8 +2293,10 @@ DEBERIA HABER ..........................  $5,500
       una chincheta se abre su ficha. El color dice cómo va: verde bien,
       ámbar si lleva días sin pedir, rojo si está descompuesta.</p>
 
-      <p>La ubicación se pone en <b>Cambiar los datos</b>, pegando el enlace
-      que Google Maps da al compartir. El sistema saca las coordenadas solo.</p>
+      <p>La ubicación se pone en <b>Cambiar los datos</b>, de dos formas:
+      <b>tocando el mapa</b> donde está la tienda, o pegando el enlace que
+      Google Maps da al compartir (sirve el corto del celular). El sistema
+      saca las coordenadas solo.</p>
 
       <p class="ayuda-tip"><b>El mapa necesita internet; la dirección
       escrita no.</b> Por eso la dirección es la que manda y el mapa es el
@@ -2553,8 +2555,12 @@ DEBERIA HABER ..........................  $5,500
       </ul>
       <p>Después pregunta <b>de quién es</b> —de la lista, o se da de alta ahí
       mismo con su nombre, teléfono y dirección—, <b>para cuándo</b> (hoy,
-      mañana u otro día) y, si es a domicilio, <b>cómo va a pagar</b>. La nota
-      de entrega sale sola.</p>
+      mañana u otro día) y, si es a domicilio, <b>cómo va a pagar</b>.</p>
+      <p>Sale un papel en los dos casos, pero no el mismo: a domicilio es la
+      <b>nota de entrega</b>, para la mano del repartidor, con su QR; el que
+      vienen a buscar es el <b>apartado</b>, para la mano del cliente, con
+      lo que apartó, para cuándo, y <b>SE PAGA AL RECOGER</b> en grande. Ese
+      papel es con el que vuelve.</p>
       <p class="ayuda-tip"><b>Cualquier cosa puede ser un pedido:</b> bolsas,
       garrafones, marquetas, lo que sea que esté en el ticket. Y siempre es
       <b>de alguien</b>: sin nombre no hay a dónde llevarlo ni a quién
@@ -2705,7 +2711,8 @@ DEBERIA HABER ..........................  $5,500
       <p>Cuando el repartidor vuelve, a quien le entrega el dinero es a
       <b>quien esté en la caja</b>. Por eso se recibe en <b>🛒 Vender</b>, con
       el botón <b>🚚</b> de arriba: lleva un numerito con cuántos están
-      esperando.</p>
+      esperando. Si no hay ninguna camioneta de regreso, el botón lo dice
+      y no hace nada más: las salidas <b>se arman en Reparto</b>, no aquí.</p>
       <p>Ahí sale <b>cuánto debía traer</b>, se teclea lo que entregó y se
       apunta. Si hay dos camionetas esperando, se elige de cuál es el dinero.
       Al recibirlo se imprime la <b>liquidación</b>, que es el papel que él

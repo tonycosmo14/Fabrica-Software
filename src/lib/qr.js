@@ -437,7 +437,7 @@ function fealdad(n, m) {
  * quien dibuja: en papel térmico lo hace `Ticket.qr()`, en pantalla el
  * dibujo de la vista previa.
  */
-function qr(texto) {
+function qr(texto, { mascara: forzada = null } = {}) {
   const bytes = [...Buffer.from(String(texto ?? ''), 'utf8')];
   if (!bytes.length) throw new Error('Un QR vacío no lleva a ninguna parte.');
 
@@ -449,6 +449,9 @@ function qr(texto) {
 
   let mejor = null;
   for (let mascara = 0; mascara < 8; mascara++) {
+    // Con una máscara forzada solo se dibuja ésa (es para las pruebas,
+    // que comparan contra un codificador de fuera con la misma máscara).
+    if (forzada !== null && mascara !== forzada) continue;
     const m = base.map((f) => [...f]);
     escribirDatos(n, m, fijo, codewords, SOBRANTES[version]);
 
@@ -473,15 +476,28 @@ function ponerFormato(n, m, mascara) {
   const bits = bitsDeFormato(mascara);
   const b = (i) => (bits >> i) & 1;
 
-  for (let i = 0; i <= 5; i++) m[8][i] = b(i);
-  m[8][7] = b(6);
+  // AQUÍ ESTABA EL ERROR QUE HACÍA QUE NINGÚN TELÉFONO LO LEYERA  (v5.8.1)
+  //
+  // Los quince bits del formato van en dos copias, y cada una tiene un
+  // recorrido fijo: la primera BAJA por la columna 8 (bits 0 a 5), dobla
+  // en la esquina del ojo, y sigue por el renglón 8 hacia la izquierda
+  // (bits 9 a 14). Estaba escrita al revés —por el renglón primero y la
+  // columna después—: la misma figura girada como un espejo. Las pruebas
+  // de ida y vuelta no lo cazaron porque el lector de prueba tenía el
+  // mismo espejo. Lo cazó compararlo contra un codificador de fuera,
+  // cuadrito por cuadrito.
+  //
+  // m[fila][columna]. Primera copia, junto al ojo de arriba a la izquierda:
+  for (let i = 0; i <= 5; i++) m[i][8] = b(i);         // columna 8, filas 0..5
+  m[7][8] = b(6);
   m[8][8] = b(7);
-  m[7][8] = b(8);
-  for (let i = 9; i <= 14; i++) m[14 - i][8] = b(i);
+  m[8][7] = b(8);
+  for (let i = 9; i <= 14; i++) m[8][14 - i] = b(i);   // fila 8, columnas 5..0
 
-  for (let i = 0; i <= 7; i++) m[n - 1 - i][8] = b(i);
-  for (let i = 8; i <= 14; i++) m[8][n - 15 + i] = b(i);
-  m[n - 8][8] = 1;                        // el punto negro de siempre
+  // Segunda copia, repartida entre los otros dos ojos:
+  for (let i = 0; i <= 7; i++) m[8][n - 1 - i] = b(i); // fila 8, columnas n-1..n-8
+  for (let i = 8; i <= 14; i++) m[n - 15 + i][8] = b(i); // columna 8, filas n-7..n-1
+  m[n - 8][8] = 1;                                      // el punto negro de siempre
 }
 
 /**

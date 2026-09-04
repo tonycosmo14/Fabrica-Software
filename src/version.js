@@ -17,9 +17,25 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '5.8';
+const VERSION_ACTUAL = '5.8.1';
 
 const VERSIONES = [
+  {
+    numero: '5.8.1',
+    nombre: 'Los QR ya se leen',
+    fecha: '2026-09-05',
+    resumen:
+      'Los códigos QR de las notas no los reconocía ningún celular: estaba '
+      + 'al revés un pedazo del dibujo. Ya se leen. Y tres cosas más de tu '
+      + 'revisión.',
+    cambios: [
+      { tipo: 'arreglo', texto: 'LOS QR NO SE ESCANEABAN. El código llevaba invertida la franja que le dice al celular con qué máscara se dibujó: el celular la leía, no le cuadraba, y se rendía. Se comparó el dibujo, punto por punto, con un codificador de fuera hasta salir idéntico. Ahora cualquier celular lo lee a la primera.' },
+      { tipo: 'arreglo', texto: 'EL PEDIDO QUE PASAN A BUSCAR YA IMPRIME SU PAPEL: el «apartado», para la mano del cliente, con lo que apartó, para cuándo y «SE PAGA AL RECOGER» en grande. Antes no salía nada porque la nota de entrega es del repartidor, y ese pedido no sube a ninguna camioneta. En Los pedidos también se puede ver e imprimir.' },
+      { tipo: 'mejora', texto: 'La nota de entrega dice ahora PARA QUÉ DÍA es el pedido, arriba del todo.' },
+      { tipo: 'mejora', texto: 'EL BOTÓN 🚚 DE VENDER EXPLICA PARA QUÉ ES cuando no hay nadie: es donde se le recibe el dinero al repartidor que vuelve de una salida. Las salidas se arman en Reparto; cuando una marca que ya regresó, aparece aquí con lo que debe entregar.' },
+      { tipo: 'mejora', texto: 'LA UBICACIÓN DE UNA NEVERA SE PONE TOCANDO EL MAPA, igual que la de un cliente. Se busca la tienda, se toca, y listo. Pegar el enlace de Google Maps sigue sirviendo.' }
+    ]
+  },
   {
     numero: '5.8',
     nombre: 'El pedido, desde cobrar',

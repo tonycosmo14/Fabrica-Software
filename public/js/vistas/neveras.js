@@ -18,7 +18,7 @@ import { esc, avisar, fechaCorta, soloDia } from '../util.js';
 import { confirmar, pedirTexto, pedirEntero, pedirImporte, menu } from '../dialogo.js';
 import { pesos } from '../fracciones.js';
 import { mapa, enlaceMaps } from '../mapa.js';
-import { ubicacionDe } from '../ubicacion.js';
+import { ubicacionDe, elegirEnMapa } from '../ubicacion.js';
 import { imprimirHoja } from '../imprimir.js';
 
 export async function vistaNeveras(pantalla) {
@@ -691,13 +691,47 @@ export async function vistaNeveras(pantalla) {
     });
     if (telefono === null) return;
 
-    const enlace = await pedirTexto({
-      titulo: 'La ubicación',
-      texto: 'Pega aquí el enlace que Google Maps da al compartir, o las ' +
-             'coordenadas separadas por coma. Déjalo en blanco para no cambiarla.',
-      marcador: '21.0167, -89.8744', unaLinea: true, opcional: true, largo: 400
+    // LA UBICACIÓN, DE DOS FORMAS  (v5.8.1): tocando el mapa —que es lo que
+    // se hace parado frente a la tienda— o pegando el enlace del celular.
+    const tiene = co.latitud != null && co.longitud != null;
+    const como = await menu({
+      titulo: '¿Dónde quedó la nevera?',
+      texto: tiene
+        ? `Ahora: ${Number(co.latitud).toFixed(5)}, ${Number(co.longitud).toFixed(5)}`
+        : 'Todavía no tiene ubicación.',
+      opciones: [
+        { valor: 'mapa', texto: '🗺️ Tocar en el mapa', detalle: 'Se busca la tienda y se toca' },
+        { valor: 'enlace', texto: '🔗 Pegar el enlace de Google Maps',
+          detalle: 'El que da «Compartir» en el celular, corto o largo' },
+        { valor: 'igual', texto: tiene ? 'Dejarla como está' : 'Sin ubicación por ahora' },
+        ...(tiene ? [{ valor: 'quitar', texto: 'Quitar la ubicación', peligro: true }] : [])
+      ]
     });
-    if (enlace === null) return;
+    if (!como) return;
+
+    let punto = null;
+    if (como === 'mapa') {
+      punto = await elegirEnMapa({ titulo: `¿Dónde está la nevera ${n.numero}?`,
+                                   lat: co.latitud, lon: co.longitud });
+      if (!punto) return;
+    } else if (como === 'enlace') {
+      const enlace = await pedirTexto({
+        titulo: 'El enlace de Google Maps',
+        texto: 'Pega el que da «Compartir» en el celular. Sirve el corto (maps.app.goo.gl) ' +
+               'y el largo. También las coordenadas tal cual: 21.0167, -89.8744',
+        marcador: 'https://maps.app.goo.gl/…', unaLinea: true, largo: 600
+      });
+      if (enlace === null) return;
+      if (enlace) {
+        avisar('Leyendo el enlace…', '');
+        punto = await ubicacionDe(enlace);
+        if (!punto) {
+          return avisar('De ahí no salieron coordenadas. Prueba con «Tocar en el mapa».', 'error');
+        }
+      }
+    } else if (como === 'quitar') {
+      punto = { lat: null, lon: null };
+    }
 
     const dias = await pedirEntero({
       titulo: '¿A los cuántos días avisar?',
@@ -714,11 +748,7 @@ export async function vistaNeveras(pantalla) {
       latitud: co.latitud, longitud: co.longitud
     };
 
-    if (enlace) {
-      // Sirve también el enlace corto del celular (v5.7.1): lo sigue el
-      // servidor y saca las coordenadas del largo.
-      const punto = await ubicacionDe(enlace);
-      if (!punto) return avisar('De ese enlace no salieron coordenadas', 'error');
+    if (punto) {
       cuerpo.latitud = punto.lat;
       cuerpo.longitud = punto.lon;
     }
