@@ -599,3 +599,99 @@ test('un pedido entregado ya no se corrige', async () => {
   });
   assert.equal(r.estado, 409);
 });
+
+// ============================================================
+// A DOMICILIO O LO RECOGEN  (v5.8)
+// ============================================================
+
+test('un pedido dice si sale en la camioneta o lo vienen a buscar', async () => {
+  const dom = await tomar({ clienteId: tienda.id, lineas: [{ productoId: bolsa.id, cantidad: 2 }] });
+  assert.equal(dom.json.datos.pedido.tipo, 'domicilio', 'sin decir nada, sale en la camioneta');
+
+  const rec = await tomar({ clienteId: tienda.id, tipo: 'recoger',
+                            lineas: [{ productoId: bolsa.id, cantidad: 2 }] });
+  assert.equal(rec.json.datos.pedido.tipo, 'recoger');
+
+  // Los dos se preparan; solo uno sube.
+  const prep = (await llamar('/api/pedidos/preparacion')).json.datos.preparacion;
+  assert.ok(prep.aRecoger >= 1 && prep.aDomicilio >= 1);
+});
+
+test('el que vienen a buscar NO lleva nota de entrega ni sube a la camioneta', async () => {
+  bd.prepare("UPDATE pedidos SET estado = 'cancelado', cancelado_en = datetime('now'), "
+             + "motivo_cancelacion = 'limpieza' WHERE estado = 'pendiente'").run();
+  const rec = (await tomar({ clienteId: tienda.id, tipo: 'recoger',
+                             lineas: [{ productoId: bolsa.id, cantidad: 3 }] })).json.datos.pedido;
+
+  const notas = await llamar('/api/impresion/pedidos/notas', { method: 'POST', cuerpo: {} });
+  assert.equal(notas.estado, 400, 'no hay ninguna nota que imprimir: el único pendiente lo recogen');
+
+  await crearUsuario('Beto2', 'repartidor', '8811');
+  const beto = (await llamar('/api/auth/usuarios-disponibles')).json.datos.usuarios
+    .find((u) => u.nombre === 'Beto2');
+  const s = (await llamar('/api/reparto', {
+    method: 'POST', cuerpo: { repartidorId: beto.id }
+  })).json.datos.salida;
+  const r = await llamar(`/api/reparto/${s.id}/pedidos`, { method: 'POST', cuerpo: { pedidoId: rec.id } });
+  assert.equal(r.estado, 409);
+  assert.match(r.json.error, /pasar a buscar/);
+});
+
+test('cobrarlo en el mostrador: con el pago tecleado sale el cambio', async () => {
+  const p = (await tomar({ clienteId: tienda.id, tipo: 'recoger',
+                           lineas: [{ productoId: bolsa.id, cantidad: 4 }] })).json.datos.pedido; // $60
+  const r = await llamar(`/api/pedidos/${p.id}/entregar`, {
+    method: 'POST', cuerpo: { enMostrador: true, formaPago: 'efectivo', pago: '100' }
+  });
+  assert.equal(r.estado, 200, r.json?.error);
+  const v = r.json.datos.venta;
+  assert.equal(v.total_centavos, 6000);
+  assert.equal(v.pago_centavos, 10000);
+  assert.equal(v.cambio_centavos, 4000, 'el cambio, como en cualquier ticket');
+  assert.equal(r.json.datos.pedido.estado, 'entregado');
+  assert.ok(r.json.datos.cliente?.estado, 'viene el cliente con su cuenta, como en una venta');
+});
+
+test('en el mostrador el crédito se REVISA: pasarse del límite pide autorización', async () => {
+  const apretado = (await llamar('/api/clientes', {
+    method: 'POST', cuerpo: { nombre: 'Don Corto' }
+  })).json.datos.cliente;
+  await llamar(`/api/clientes/${apretado.id}`, { method: 'PUT', cuerpo: { limite: '50' } });
+
+  const p = (await tomar({ clienteId: apretado.id, tipo: 'recoger',
+                           lineas: [{ productoId: garrafon.id, cantidad: 10 }] })).json.datos.pedido; // $250
+
+  const r = await llamar(`/api/pedidos/${p.id}/entregar`, {
+    method: 'POST', cuerpo: { enMostrador: true, formaPago: 'credito' }
+  });
+  assert.equal(r.estado, 403, 'la mercancía sigue de este lado: aquí sí se frena');
+  assert.equal(r.json.requiereAutorizacion, true);
+  assert.equal((await llamar(`/api/pedidos/${p.id}`)).json.datos.pedido.estado, 'pendiente',
+    'no se entregó nada');
+
+  // Desde el reparto, en cambio, ya se entregó y solo se avisa.
+  const r2 = await llamar(`/api/pedidos/${p.id}/entregar`, {
+    method: 'POST', cuerpo: { formaPago: 'credito' }
+  });
+  assert.equal(r2.estado, 200);
+  assert.match(r2.json.datos.avisoCredito, /límite/i);
+});
+
+test('a crédito en el mostrador, lo que deja ahorita se apunta como abono', async () => {
+  const p = (await tomar({ clienteId: tienda.id, tipo: 'recoger',
+                           lineas: [{ productoId: bolsa.id, cantidad: 10 }] })).json.datos.pedido; // $150
+  const saldoAntes = (await llamar(`/api/clientes/${tienda.id}`)).json.datos.cliente.estado.saldo;
+  const r = await llamar(`/api/pedidos/${p.id}/entregar`, {
+    method: 'POST', cuerpo: { enMostrador: true, formaPago: 'credito', abono: '50' }
+  });
+  assert.equal(r.estado, 200, r.json?.error);
+  assert.equal(r.json.datos.venta.abonoCentavos, 5000);
+  const saldo = (await llamar(`/api/clientes/${tienda.id}`)).json.datos.cliente.estado.saldo;
+  assert.equal(saldo - saldoAntes, 10000, 'debe $150 menos los $50 que dejó');
+});
+
+test('la fecha de un pedido tiene que ser una fecha', async () => {
+  const r = await tomar({ clienteId: tienda.id, paraCuando: 'el sábado',
+                          lineas: [{ productoId: bolsa.id, cantidad: 1 }] });
+  assert.equal(r.estado, 400);
+});

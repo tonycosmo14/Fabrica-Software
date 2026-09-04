@@ -25,7 +25,7 @@ const bitacora = require('../../lib/bitacora');
 const calculo = require('./calculo');
 const { crearVenta, detalleVenta } = require('../ventas/rutas');
 const { listaActiva } = require('../ventas/precios');
-const { cabeElCredito } = require('../clientes/calculo');
+const { cabeElCredito, estadoCliente } = require('../clientes/calculo');
 
 const FORMAS = ['efectivo', 'transferencia', 'credito'];
 
@@ -42,7 +42,9 @@ const almacenDeSalida = () => bd.prepare(
  * @param usuario    quién lo está tecleando
  * @param salidaId   de qué viaje viene, si viene de uno
  */
-function entregarPedido({ pedidoId, formaPago, usuario, salidaId = null, ejecutorId = null }) {
+function entregarPedido({ pedidoId, formaPago, usuario, salidaId = null, ejecutorId = null,
+                          pago = null, abono = null, abonoFormaPago = 'efectivo',
+                          autorizadoPor = null, notas = null }) {
   const p = calculo.completo(pedidoId);
   if (!p) return { error: 'Ese pedido no existe.', codigo: 404 };
   if (p.estado === 'entregado') return { error: 'Ese pedido ya se había entregado.' };
@@ -87,17 +89,24 @@ function entregarPedido({ pedidoId, formaPago, usuario, salidaId = null, ejecuto
       cantidad: l.cantidad
     })),
     total: p.total,
-    // A crédito no lleva pago: el cliente no pagó nada. De contado se
-    // guarda pagado justo — el repartidor trajo el dinero exacto de ese
+    // A crédito no lleva pago: el cliente no pagó nada. De contado, lo
+    // que se tecleó si se cobró en la caja —para que salga el cambio— y
+    // si no, pagado justo: el repartidor trajo el dinero exacto de ese
     // ticket, y el cambio lo dio él en la calle.
-    pago: forma === 'credito' ? null : p.total,
+    pago: forma === 'credito' ? null : (pago ?? p.total),
     lista,
     almacenId: almacenDeSalida()?.id || null,
     cajeroId: ejecutorId || usuario.id,
     capturistaId: usuario.id,
     formaPago: forma,
-    notas: `Pedido ${p.folio}`,
-    clienteId: p.cliente_id
+    notas: notas ? `Pedido ${p.folio} · ${notas}` : `Pedido ${p.folio}`,
+    clienteId: p.cliente_id,
+    autorizadoPor,
+    // Lo que dejó en el mostrador al llevárselo a crédito (v5.3), igual
+    // que en cualquier venta: se guarda dentro de la misma transacción.
+    abono: forma === 'credito' && abono ? abono : null,
+    abonoFormaPago,
+    cliente
   });
 
   bd.prepare(`
@@ -135,7 +144,12 @@ function entregarPedido({ pedidoId, formaPago, usuario, salidaId = null, ejecuto
   return {
     pedido: calculo.completo(p.id),
     venta: detalleVenta(venta.id),
-    avisoCredito
+    // El cliente con su cuenta al día, para poder decirle en la cara
+    // cuánto debe ahora. Es lo mismo que devuelve una venta de mostrador.
+    cliente: { ...cliente, estado: estadoCliente(cliente) },
+    avisoCredito,
+    // Sin turno abierto el abono se guardó igual, pero fuera de todo corte.
+    abonoSinTurno: venta.abonoSinTurno || false
   };
 }
 

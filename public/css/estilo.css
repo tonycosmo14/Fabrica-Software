@@ -4978,3 +4978,12 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 .mapa-elegir { height: min(58vh, 480px); border-radius: 12px; overflow: hidden; touch-action: none; }
 .mapa-pin.elegido { background: var(--rojo); border-color: #fff; }
 .cli-compra small { display: block; margin-top: 2px; opacity: .8; }
+
+/* LOS DOS BOTONES DE PEDIDO EN EL COBRO  (v5.8): a domicilio o lo recogen,
+   en un renglón. */
+.pos-pedido-botones { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pos-pedido-botones .pos-fiar { margin: 0; width: 100%; }
+/* La cabeza del pedido cargado en el ticket: se distingue de un renglón
+   normal porque no es algo que se agregó, es algo que ya estaba pedido. */
+.pos-linea-pedido-cabeza { background: var(--superficie-alt); border-radius: 10px; }
+.pos-linea-pedido-cabeza .pos-desc small { display: block; color: var(--suave); }

@@ -84,8 +84,8 @@ export async function vistaPedidos(pantalla, estado) {
         <h2>Los pedidos</h2>
         <p class="ayuda">
           Lo que hay que preparar y lo que hay que entregar.
-          Se toman desde <b>Vender</b>: arma el ticket, elige al cliente y toca
-          «Pedido».
+          Se toman desde <b>Vender</b>: arma el ticket, F10, y ahí «Pedido a
+          domicilio» o «Lo pasan a buscar».
         </p>
       </div>
 
@@ -157,7 +157,8 @@ export async function vistaPedidos(pantalla, estado) {
       </div>
 
       <p class="ayuda ped-total">
-        ${prep.pedidos} pedido${prep.pedidos === 1 ? '' : 's'} ·
+        ${prep.pedidos} pedido${prep.pedidos === 1 ? '' : 's'}
+        ${prep.aRecoger ? ` (🚚 ${prep.aDomicilio} a domicilio · 🏪 ${prep.aRecoger} que vienen a buscar)` : ''} ·
         ${prep.clientes} cliente${prep.clientes === 1 ? '' : 's'} ·
         vale <b>${pesos(prep.total)}</b>
       </p>`;
@@ -173,8 +174,11 @@ export async function vistaPedidos(pantalla, estado) {
 
     return `
       <div class="ped-acciones">
-        <button id="imprimir-todas">🖨️ Imprimir todas las notas</button>
-        <span class="ayuda">Una por cliente, con su QR de ubicación.</span>
+        <button id="imprimir-todas">🖨️ Imprimir las notas de entrega</button>
+        <span class="ayuda">
+          Una por cada pedido a domicilio, con su QR. Los que vienen a buscar
+          (🏪) no llevan nota: se cobran en Vender cuando lleguen.
+        </span>
       </div>
 
       <div class="ped-tarjetas">
@@ -199,6 +203,7 @@ export async function vistaPedidos(pantalla, estado) {
         </div>
 
         <div class="ped-datos">
+          <span class="etiqueta">${p.tipo === 'recoger' ? '🏪 lo recogen' : '🚚 a domicilio'}</span>
           <span class="etiqueta ${atrasado ? 'etiqueta-mal' : ''}">${esc(cuando(p.para_cuando))}</span>
           <span class="etiqueta">${forma.emoji} ${forma.texto}</span>
           ${p.horario ? `<span class="etiqueta">🕗 ${esc(p.horario)}</span>` : ''}
@@ -221,8 +226,9 @@ export async function vistaPedidos(pantalla, estado) {
         <div class="ped-pie">
           <strong>${pesos(p.total)}</strong>
           <div class="ped-botones">
-            <button class="secundario chico" data-ver="${p.id}">👁️ Nota</button>
-            <button class="secundario chico" data-nota="${p.id}">🖨️</button>
+            ${p.tipo === 'recoger' ? '' : `
+              <button class="secundario chico" data-ver="${p.id}">👁️ Nota</button>
+              <button class="secundario chico" data-nota="${p.id}">🖨️</button>`}
             ${puede('pedidos.entregar')
               ? `<button class="chico" data-entregar="${p.id}">✅ Entregado</button>` : ''}
             ${puede('pedidos.tomar')

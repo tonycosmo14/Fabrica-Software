@@ -19,6 +19,7 @@ const { ok, error } = require('../../lib/respuestas');
 const { leerPesos } = require('../../lib/dinero');
 const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
+const { puede } = require('../../lib/roles');
 const { resolverEnlace } = require('../../lib/enlaces-mapa');
 const { comprobarAdmin, administradores } = require('../../lib/autorizacion');
 const { sesionAbierta } = require('../caja/calculo');
@@ -209,7 +210,30 @@ function coordenada(v, tope) {
   return Number.isFinite(n) && Math.abs(n) <= tope ? n : null;
 }
 
-router.post('/', administrar, (req, res) => {
+/**
+ * DAR DE ALTA DESDE LA CAJA, AL TOMAR UN PEDIDO  (v5.8)
+ *
+ * "Me debe pedir para quién es: datos para guardar qué cliente lo va a
+ *  venir a buscar, número de teléfono, ubicación."
+ *
+ * La cajera puede tomar pedidos pero no administra clientes —no decide a
+ * quién se le fía ni cuánto—. Así que puede dar de alta a alguien con lo
+ * básico (nombre, teléfono, dirección, dónde está), y NO puede ponerle
+ * límite de crédito ni lista de mayoreo: eso sigue siendo del gerente.
+ */
+function puedeDarDeAlta(req, res, next) {
+  const rol = req.usuario?.rol;
+  if (!req.usuario) return error(res, 'Necesitas iniciar sesión.', 401);
+  if (puede(rol, 'clientes.administrar')) return next();
+  if (!puede(rol, 'pedidos.tomar')) return error(res, 'Tu rol no tiene acceso a esta operación.', 403);
+  const delGerente = ['limite', 'listaId', 'diasPlazo'].filter((k) => req.body?.[k] !== undefined && req.body[k] !== '');
+  if (delGerente.length) {
+    return error(res, 'El límite de crédito y la lista de mayoreo los pone el gerente.', 403);
+  }
+  return next();
+}
+
+router.post('/', puedeDarDeAlta, (req, res) => {
   const nombre = String(req.body?.nombre || '').trim();
   if (!nombre) return error(res, 'Escribe el nombre del cliente.');
 

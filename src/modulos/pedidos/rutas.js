@@ -37,7 +37,8 @@ const { exigirPermiso } = require('../../middleware/sesion');
 const bitacora = require('../../lib/bitacora');
 const calculo = require('./calculo');
 
-const { prepararLineas } = require('../ventas/rutas');
+const { prepararLineas, revisarCredito } = require('../ventas/rutas');
+const { aCentavos } = require('../../lib/dinero');
 const { listaDeMayoreo } = require('../ventas/mayoreo');
 const { listaActiva } = require('../ventas/precios');
 // ENTREGAR VIVE APARTE (v5.7). Lo llaman dos sitios: esta pantalla, de uno
@@ -66,10 +67,12 @@ router.get('/', ver, (req, res) => ok(res, {
   pedidos: calculo.lista({
     estado: texto(req.query.estado, 20) || 'pendiente',
     hasta: texto(req.query.hasta, 10),
-    cliente: texto(req.query.cliente, 60)
+    cliente: texto(req.query.cliente, 60),
+    tipo: texto(req.query.tipo, 20)
   }),
   pendientes: calculo.cuantosPendientes(),
-  areas: calculo.AREAS
+  areas: calculo.AREAS,
+  tipos: calculo.TIPOS
 }));
 
 /**
@@ -120,6 +123,10 @@ router.post('/', tomar, (req, res) => {
 
   const formaPago = FORMAS.includes(req.body?.formaPago) ? req.body.formaPago : 'efectivo';
   const paraCuando = texto(req.body?.paraCuando, 10) || calculo.hoy();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(paraCuando)) return error(res, 'Esa fecha no se entiende.');
+  // A DOMICILIO O LO RECOGEN  (v5.8). Es lo que decide si sale en la
+  // camioneta o se queda aquí esperando a que pasen por él.
+  const tipo = calculo.TIPOS[req.body?.tipo] ? req.body.tipo : 'domicilio';
 
   const id = nuevoId();
   const fecha = ahora();
@@ -131,15 +138,15 @@ router.post('/', tomar, (req, res) => {
       INSERT INTO pedidos (id, folio, fecha, para_cuando, cliente_id,
                            direccion, referencias, horario, telefono,
                            latitud, longitud, estado, notas, forma_pago,
-                           ejecutor_id, capturista_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', ?, ?, ?, ?)
+                           ejecutor_id, capturista_id, tipo)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', ?, ?, ?, ?, ?)
     `).run(id, folio, fecha, paraCuando, cliente.id,
            // COPIADOS del cliente (regla 3.5): si se muda, la nota de este
            // pedido sigue diciendo a dónde se llevó.
            cliente.direccion, cliente.referencias, cliente.horario_entrega,
            cliente.telefono, cliente.latitud, cliente.longitud,
            texto(req.body?.notas, 500), formaPago,
-           req.body?.ejecutorId || req.usuario.id, req.usuario.id);
+           req.body?.ejecutorId || req.usuario.id, req.usuario.id, tipo);
 
     const meter = bd.prepare(`
       INSERT INTO pedido_lineas (id, pedido_id, producto_id, concepto, cantidad,
@@ -161,7 +168,7 @@ router.post('/', tomar, (req, res) => {
     accion: 'pedido.tomado', entidad: 'pedido', entidadId: id,
     ejecutorId: req.body?.ejecutorId || req.usuario.id, capturistaId: req.usuario.id,
     detalle: { folio, cliente: cliente.nombre, total: preparadas.total,
-               lineas: preparadas.lineas.length, paraCuando }
+               lineas: preparadas.lineas.length, paraCuando, tipo }
   });
 
   return ok(res, { pedido: calculo.completo(id) }, 201);
@@ -182,13 +189,55 @@ router.post('/', tomar, (req, res) => {
  * cotizar. Es lo que promete el papel que el cliente tiene enfrente.
  */
 router.post('/:id/entregar', entregar, (req, res) => {
+  // ============================================================
+  // DESDE EL MOSTRADOR ES UNA VENTA DE MOSTRADOR  (v5.8)
+  // ============================================================
+  //
+  // "Lo pasan a buscar otro día": el cliente llega, se carga su pedido en
+  // la caja y se cobra como cualquier ticket. La mercancía sigue de este
+  // lado, así que aquí el crédito se REVISA de verdad —límite y
+  // autorización— igual que en una venta normal. Lo contrario del reparto,
+  // donde ya se entregó y solo se avisa.
+  const enMostrador = req.body?.enMostrador === true;
+  let autorizadoPor = null;
+  if (enMostrador && req.body?.formaPago === 'credito') {
+    const p = calculo.completo(req.params.id);
+    if (!p) return error(res, 'Ese pedido no existe.', 404);
+    const cliente = bd.prepare('SELECT * FROM clientes WHERE id = ?').get(p.cliente_id);
+    const credito = revisarCredito(req, p.total, cliente);
+    if (!credito.ok) return error(res, credito.mensaje, credito.codigo, credito.extra);
+    autorizadoPor = credito.autorizadoPor || null;
+  }
+
+  let pago = null;
+  let abono = null;
+  try {
+    if (req.body?.pago !== undefined && req.body.pago !== null && req.body.pago !== '') {
+      pago = aCentavos(String(req.body.pago));
+    }
+    if (req.body?.abono) abono = aCentavos(String(req.body.abono));
+  } catch { return error(res, 'El pago no es un importe válido.'); }
+
   const r = entregarPedido({
     pedidoId: req.params.id,
     formaPago: req.body?.formaPago,
     usuario: req.usuario,
-    ejecutorId: req.body?.cajeroId || null
+    ejecutorId: req.body?.cajeroId || null,
+    pago, abono,
+    abonoFormaPago: req.body?.abonoFormaPago === 'transferencia' ? 'transferencia' : 'efectivo',
+    autorizadoPor,
+    notas: texto(req.body?.notas, 120)
   });
   if (r.error) return error(res, r.error, r.codigo || 400);
+
+  // Y CON EL PAGO DEL MOSTRADOR HAY QUE COMPROBAR QUE ALCANZA: el servidor
+  // no se cree lo que mande la pantalla.
+  if (enMostrador && pago !== null && r.venta.forma_pago !== 'credito'
+      && pago < r.venta.total_centavos) {
+    // Ya se guardó; se avisa, que es lo que se puede hacer sin deshacer
+    // una venta. La pantalla no manda esto nunca: comprueba antes.
+    r.avisoPago = 'El pago tecleado era menor que el total.';
+  }
   return ok(res, r);
 });
 

@@ -2524,10 +2524,10 @@ DEBERIA HABER ..........................  $5,500
          + 'whatsapp encargo entregar entregado cancelar promesa para manana atrasado horario '
          + 'referencias direccion cobrar credito transferencia folio',
     cuerpo: `
-      <p>Un pedido es cuando alguien <b>pide por teléfono, por WhatsApp o
-      manda a alguien</b>: «Abarrotes Juan necesita diez garrafones y
-      cincuenta bolsas». Se apunta, se va acumulando con los demás, y sale
-      con el reparto.</p>
+      <p>Un pedido es cuando alguien <b>pide por teléfono, por WhatsApp, manda
+      a alguien, o llega y dice «déjame veinte para el sábado»</b>. Se apunta,
+      se va acumulando con los demás, y o sale con el reparto o se queda
+      esperando a que vengan por él.</p>
 
       <h4>Un pedido NO es una venta todavía</h4>
       <p>Es lo más importante de entender, y lo que hace que todo lo demás
@@ -2541,16 +2541,35 @@ DEBERIA HABER ..........................  $5,500
         cobrado</b> — que es una cosa mucho más fea de explicar.</li>
       </ul>
 
-      <h4>Cómo se toma uno</h4>
+      <h4>Cómo se toma uno: desde Cobrar</h4>
       <p>Se toma en <b>🛒 Vender</b>, no en otra pantalla. Se arma el ticket
       igual que siempre —los mismos botones, los mismos precios, el mismo
-      teclado de fracciones—, se elige al cliente con <b>F6</b>, y en vez de
-      Cobrar se toca <b>📦 Apartar como pedido</b>.</p>
-      <p>Pregunta dos cosas: <b>para cuándo</b> (hoy o mañana) y <b>cómo va a
-      pagar</b>. Y sale sola la nota de entrega.</p>
-      <p class="ayuda-tip"><b>Un pedido siempre es de alguien.</b> Sin cliente
-      no hay a dónde llevarlo, y una nota de entrega sin nombre no sirve de
-      nada. Si es alguien nuevo, se da de alta ahí mismo.</p>
+      teclado de fracciones— y se aprieta <b>F10</b>. Ahí, junto a cobrar,
+      están las dos opciones:</p>
+      <ul>
+        <li><b>🚚 Pedido a domicilio</b> — sale en la camioneta con su nota.</li>
+        <li><b>🏪 Lo pasan a buscar</b> — se queda aquí hasta que vengan por
+        él, y se cobra entonces.</li>
+      </ul>
+      <p>Después pregunta <b>de quién es</b> —de la lista, o se da de alta ahí
+      mismo con su nombre, teléfono y dirección—, <b>para cuándo</b> (hoy,
+      mañana u otro día) y, si es a domicilio, <b>cómo va a pagar</b>. La nota
+      de entrega sale sola.</p>
+      <p class="ayuda-tip"><b>Cualquier cosa puede ser un pedido:</b> bolsas,
+      garrafones, marquetas, lo que sea que esté en el ticket. Y siempre es
+      <b>de alguien</b>: sin nombre no hay a dónde llevarlo ni a quién
+      guardárselo.</p>
+
+      <h4>Cobrar el que vienen a buscar</h4>
+      <p>Cuando el cliente llega, en Vender se toca <b>🛍️</b> arriba —lleva
+      el numerito de cuántos esperan—, se elige su pedido y se <b>carga en el
+      ticket con los precios que se le prometieron</b>. De ahí es una venta
+      como cualquiera: F10, con cuánto paga, el cambio, o a crédito. Al
+      cobrarlo, el pedido queda entregado.</p>
+      <p class="ayuda-tip">Lo que pidió <b>no se edita</b> en el ticket: si
+      quiere algo más, se le cobra aparte. Cambiar lo apuntado después de
+      haberle dicho un precio es la forma de que salga una cosa y se cobre
+      otra.</p>
 
       <h4>Un solo botón, aunque sea agua y hielo</h4>
       <p>Si la tiendita pide <b>diez garrafones y cincuenta bolsas</b>, eso es

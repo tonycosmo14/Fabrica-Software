@@ -234,6 +234,12 @@ router.post('/:id/pedidos', operar, (req, res) => {
   const p = bd.prepare("SELECT * FROM pedidos WHERE id = ? AND estado = 'pendiente'")
     .get(req.body?.pedidoId ?? null);
   if (!p) return error(res, 'Ese pedido no existe o ya no está pendiente.', 409);
+  // EL QUE VIENEN A BUSCAR NO SUBE A LA CAMIONETA  (v5.8). Se queda aquí
+  // esperando a su dueño; subirlo sería llevárselo a una puerta donde
+  // nadie lo espera.
+  if (p.tipo === 'recoger') {
+    return error(res, 'Ese pedido lo van a pasar a buscar: no sube a la camioneta.', 409);
+  }
 
   // UN PEDIDO VA EN UNA SALIDA A LA VEZ. En dos, el hielo se contaría dos
   // veces y las dos camionetas irían a la misma puerta.

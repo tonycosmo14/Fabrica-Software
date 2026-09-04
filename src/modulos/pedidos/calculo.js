@@ -88,6 +88,7 @@ function completo(id) {
   if (!p) return null;
 
   p.lineas = lineasDe(p.id);
+  p.tipoTexto = TIPOS[p.tipo] || TIPOS.domicilio;
   p.total = p.lineas.reduce((n, l) => n + l.precio_centavos, 0);
   p.dieciseisavos = p.lineas.reduce((n, l) => n + l.dieciseisavos, 0);
   // Qué áreas toca este pedido. Lo usa la nota para saber si hay que
@@ -103,11 +104,18 @@ function completo(id) {
  * ayer que no salió sigue debiéndose, y esconderlo porque cambió el día
  * es la forma más fácil de perder un cliente.
  */
-function lista({ estado = 'pendiente', hasta = null, cliente = null, limite = 200 } = {}) {
+const TIPOS = {
+  domicilio: { texto: 'A domicilio', emoji: '🚚', ayuda: 'Sale en la camioneta con su nota' },
+  recoger: { texto: 'Lo recogen', emoji: '🏪', ayuda: 'Se queda aquí hasta que pasen por él' }
+};
+
+function lista({ estado = 'pendiente', hasta = null, cliente = null, tipo = null,
+                 limite = 200 } = {}) {
   const donde = [];
   const args = [];
 
   if (estado && estado !== 'todos') { donde.push('pe.estado = ?'); args.push(estado); }
+  if (tipo && TIPOS[tipo]) { donde.push('pe.tipo = ?'); args.push(tipo); }
   if (hasta) { donde.push('date(pe.para_cuando) <= date(?)'); args.push(hasta); }
   if (cliente) { donde.push('pe.cliente_id = ?'); args.push(cliente); }
 
@@ -158,6 +166,11 @@ function preparacion({ hasta = hoy() } = {}) {
   return {
     hasta,
     pedidos: pedidos.length,
+    // Cuántos salen en la camioneta y cuántos se quedan esperando a que
+    // pasen por ellos: la planta los prepara todos, pero el que carga el
+    // camión necesita saber cuáles NO sube.
+    aDomicilio: pedidos.filter((p) => p.tipo === 'domicilio').length,
+    aRecoger: pedidos.filter((p) => p.tipo === 'recoger').length,
     clientes: new Set(pedidos.map((p) => p.cliente_id)).size,
     total: pedidos.reduce((n, p) => n + p.total, 0),
     areas: Object.values(porArea).map((a) => ({
@@ -178,5 +191,5 @@ function cuantosPendientes() {
 }
 
 module.exports = {
-  AREAS, areaDe, hoy, lineasDe, completo, lista, preparacion, cuantosPendientes
+  AREAS, TIPOS, areaDe, hoy, lineasDe, completo, lista, preparacion, cuantosPendientes
 };

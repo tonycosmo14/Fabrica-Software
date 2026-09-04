@@ -1227,3 +1227,9 @@ module.exports.llevaMayoreoEnLineas = (lineas) =>
 // cotizador: el precio de un pedido se prometió el día que se tomó.
 module.exports.crearVenta = crearVenta;
 module.exports.detalleVenta = detalleVenta;
+// Y LA REVISIÓN DEL CRÉDITO  (v5.8). Un pedido que se cobra en la caja es
+// una venta de mostrador con el precio ya escrito: la mercancía sigue de
+// este lado, y pasarse del límite se frena y se pide autorización igual
+// que en cualquier ticket. Es la misma función para que sea la misma
+// regla.
+module.exports.revisarCredito = revisarCredito;

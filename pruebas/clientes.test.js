@@ -401,7 +401,7 @@ test('la lista de cobranza trae solo a los que deben', async () => {
   assert.ok(clientes.every((c) => c.estado.saldo > 0));
 });
 
-test('el cajero fía y cobra, pero no da de alta clientes ni pone límites', async () => {
+test('el cajero fía, cobra y da de alta lo básico, pero no pone límites', async () => {
   await entrarPorNombre('Mari', '7777');
 
   assert.equal((await llamar('/api/clientes')).estado, 200);
@@ -410,9 +410,19 @@ test('el cajero fía y cobra, pero no da de alta clientes ni pone límites', asy
     method: 'POST', cuerpo: { monto: 10 }
   })).estado, 201);
 
+  // DESDE LA v5.8 SÍ DA DE ALTA, con lo básico: al tomar un pedido por
+  // teléfono hay que poder apuntar a quién es, con su teléfono y su
+  // dirección, sin salir a buscar al gerente.
+  const alta = await llamar('/api/clientes', {
+    method: 'POST', cuerpo: { nombre: 'Nuevo del teléfono', telefono: '9991112233' }
+  });
+  assert.equal(alta.estado, 201, alta.json?.error);
+  assert.equal(alta.json.datos.cliente.limite_centavos, null, 'sin límite: eso no es suyo');
+
+  // Lo que NO puede: decidir a quién se le fía y cuánto, ni a qué precio.
   assert.equal((await llamar('/api/clientes', {
-    method: 'POST', cuerpo: { nombre: 'Nuevo' }
-  })).estado, 403, 'a quién se le fía no lo decide el cajero');
+    method: 'POST', cuerpo: { nombre: 'Con límite', limite: '5000' }
+  })).estado, 403, 'el límite lo pone el gerente');
   assert.equal((await llamar(`/api/clientes/${mary.id}`, {
     method: 'PUT', cuerpo: { limite: 999999 }
   })).estado, 403);

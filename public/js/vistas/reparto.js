@@ -463,7 +463,8 @@ export async function vistaReparto(pantalla, estado) {
     } catch (e) { return avisar(e.message, 'error'); }
 
     const yaVan = new Set(s.pedidos.map((p) => p.id));
-    const libres = pendientes.filter((p) => !yaVan.has(p.id));
+    // Solo los de domicilio: el que vienen a buscar se queda aquí (v5.8).
+    const libres = pendientes.filter((p) => !yaVan.has(p.id) && p.tipo !== 'recoger');
     if (!libres.length) {
       return avisar('No hay pedidos pendientes que colgarle', '');
     }

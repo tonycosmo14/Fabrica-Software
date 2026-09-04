@@ -17,9 +17,28 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '5.7.1';
+const VERSION_ACTUAL = '5.8';
 
 const VERSIONES = [
+  {
+    numero: '5.8',
+    nombre: 'El pedido, desde cobrar',
+    fecha: '2026-09-05',
+    resumen:
+      'Cualquier ticket se vuelve pedido desde F10 —a domicilio o para que '
+      + 'pasen por él—, se da de alta al cliente ahí mismo, y el que vienen '
+      + 'a buscar se cobra en la caja con lo que se le prometió.',
+    cambios: [
+      { tipo: 'importante', texto: 'EL PEDIDO SE TOMA DESDE COBRAR, como lo pediste: se arma el ticket como siempre, F10, y ahí junto a cobrar hay dos botones: «🚚 Pedido a domicilio» y «🏪 Lo pasan a buscar». El botón suelto de «Apartar como pedido» ya no existe, y la columna del ticket vuelve a su tamaño.' },
+      { tipo: 'nuevo', texto: 'DOS CLASES DE PEDIDO. El de domicilio sale en la camioneta con su nota y su QR. El que vienen a buscar se queda aquí, sale en «para preparar» igual —hay que llenar los garrafones de todos modos—, pero no sube a la camioneta ni lleva nota de entrega.' },
+      { tipo: 'nuevo', texto: 'PREGUNTA DE QUIÉN ES, Y SI NO ESTÁ, SE DA DE ALTA AHÍ MISMO: nombre, teléfono y dirección, desde la caja, sin salir a buscar al gerente. Lo que la caja NO puede ponerle es el límite de crédito ni la lista de mayoreo: eso sigue siendo de Clientes.' },
+      { tipo: 'nuevo', texto: 'PARA CUÁNDO: hoy, mañana, u otro día con su fecha. Y cómo va a pagar, solo si es a domicilio —el que viene a buscarlo paga aquí cuando venga—.' },
+      { tipo: 'nuevo', texto: 'COBRAR EL QUE VIENEN A BUSCAR: el botón 🛍️ de arriba en Vender, con su numerito. Se elige el pedido y se carga en el ticket con los precios que se le prometieron; de ahí es una venta como cualquiera: F10, con cuánto paga, el cambio, o a crédito. Al cobrarlo queda entregado.' },
+      { tipo: 'importante', texto: 'Y AHÍ EL CRÉDITO SE REVISA DE VERDAD. Un pedido cobrado en el mostrador es una venta de mostrador: la mercancía sigue de este lado, y pasarse del límite se frena y pide autorización igual que en cualquier ticket. Es distinto del reparto, donde ya se entregó y solo se avisa.' },
+      { tipo: 'mejora', texto: 'Lo que pidió no se edita en el ticket: si quiere algo más, se cobra aparte. Cambiar lo apuntado después de haberle dicho un precio es la forma de que salga una cosa y se cobre otra.' },
+      { tipo: 'mejora', texto: 'En Los pedidos cada tarjeta dice si es 🚚 a domicilio o 🏪 lo recogen, y el botón de imprimir es ahora «las notas de entrega»: solo las de domicilio.' }
+    ]
+  },
   {
     numero: '5.7.1',
     nombre: 'Lo que salió en la revisión',

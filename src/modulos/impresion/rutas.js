@@ -472,9 +472,13 @@ router.post('/pedido/:id', verPedidos, async (req, res) => {
 router.post('/pedidos/notas', verPedidos, async (req, res) => {
   const lista = pedidos.lista({
     estado: 'pendiente',
-    hasta: String(req.body?.hasta || '').slice(0, 10) || pedidos.hoy()
+    hasta: String(req.body?.hasta || '').slice(0, 10) || pedidos.hoy(),
+    // Solo los que salen en la camioneta: el que vienen a buscar no
+    // necesita nota de entrega, y una nota con QR de un pedido que no va
+    // a ningún lado solo confunde a quien carga.
+    tipo: 'domicilio'
   });
-  if (!lista.length) return error(res, 'No hay pedidos pendientes que imprimir.');
+  if (!lista.length) return error(res, 'No hay pedidos a domicilio pendientes que imprimir.');
 
   const cfg = configuracion();
   if (!cfg.directa) return ok(res, { impreso: false, motivo: 'sin-destino', pedidos: lista.length });
