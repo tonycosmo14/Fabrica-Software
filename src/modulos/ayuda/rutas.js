@@ -46,6 +46,10 @@ const ACCIONES = [
   { grupo: 'Clientes',   permiso: 'credito.cobrar',       texto: 'Recibir abonos' },
   { grupo: 'Clientes',   permiso: 'credito.autorizar',    texto: 'Autorizar crédito por encima del límite' },
 
+  { grupo: 'Pedidos',    permiso: 'pedidos.ver',          texto: 'Ver lo que hay que preparar y las notas de entrega' },
+  { grupo: 'Pedidos',    permiso: 'pedidos.tomar',        texto: 'Apartar un pedido y cancelarlo' },
+  { grupo: 'Pedidos',    permiso: 'pedidos.entregar',     texto: 'Marcar un pedido entregado (ahí nace su venta)' },
+
   { grupo: 'Inventario', permiso: 'inventario.ver',       texto: 'Ver lo que queda de cada producto' },
   { grupo: 'Inventario', permiso: 'inventario.mover',     texto: 'Registrar entradas, salidas y conteos' },
   { grupo: 'Inventario', permiso: 'productos.administrar', texto: 'Dar de alta productos y categorías' },

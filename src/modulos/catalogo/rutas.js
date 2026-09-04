@@ -207,7 +207,20 @@ function leerProducto(cuerpo, anterior = null) {
   if (cuerpo?.llevaInventario !== undefined) llevaInventario = cuerpo.llevaInventario ? 1 : 0;
   if (tipo === 'hielo') llevaInventario = 0;
 
-  return { nombre, tipo, dieciseisavos, centavos, codigo, costo, minimo, llevaInventario };
+  // ¿SE PREPARA EN EL ÁREA DEL AGUA?  (v5.6)
+  //
+  // Es lo que parte la hoja de preparación en dos: el del agua lee su
+  // bloque y el del hielo el suyo. Se marca en el producto y no se adivina
+  // por el nombre — adivinar funcionaría hasta el día que alguien dé de
+  // alta "Hielo en botella".
+  //
+  // El hielo de marqueta nunca: sale del cuarto frío por definición.
+  let paraAgua = anterior?.para_agua ?? 0;
+  if (cuerpo?.paraAgua !== undefined) paraAgua = cuerpo.paraAgua ? 1 : 0;
+  if (tipo === 'hielo') paraAgua = 0;
+
+  return { nombre, tipo, dieciseisavos, centavos, codigo, costo, minimo,
+           llevaInventario, paraAgua };
 }
 
 router.post('/productos', administrar, (req, res) => {
@@ -233,12 +246,12 @@ router.post('/productos', administrar, (req, res) => {
   bd.prepare(`
     INSERT INTO productos (id, codigo, nombre, categoria_id, tipo, dieciseisavos,
                            precio_centavos, color, orden, activo, fecha_alta, creado_por,
-                           costo_centavos, minimo, lleva_inventario)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
+                           costo_centavos, minimo, lleva_inventario, para_agua)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)
   `).run(id, datos.codigo, datos.nombre, categoria.id, datos.tipo,
          datos.dieciseisavos, datos.centavos, req.body?.color || null,
          orden, ahora(), req.usuario.id,
-         datos.costo, datos.minimo, datos.llevaInventario);
+         datos.costo, datos.minimo, datos.llevaInventario, datos.paraAgua);
 
   bitacora.registrar({
     accion: 'producto.alta', entidad: 'producto', entidadId: id,
@@ -272,13 +285,13 @@ router.put('/productos/:id', administrar, (req, res) => {
   bd.prepare(`
     UPDATE productos SET codigo = ?, nombre = ?, categoria_id = ?, tipo = ?,
       dieciseisavos = ?, precio_centavos = ?, color = ?, orden = ?,
-      costo_centavos = ?, minimo = ?, lleva_inventario = ?
+      costo_centavos = ?, minimo = ?, lleva_inventario = ?, para_agua = ?
     WHERE id = ?
   `).run(datos.codigo, datos.nombre, categoria.id, datos.tipo,
          datos.dieciseisavos, datos.centavos,
          req.body?.color !== undefined ? req.body.color : p.color,
          req.body?.orden !== undefined ? Number(req.body.orden) || 0 : p.orden,
-         datos.costo, datos.minimo, datos.llevaInventario,
+         datos.costo, datos.minimo, datos.llevaInventario, datos.paraAgua,
          p.id);
 
   bitacora.registrar({

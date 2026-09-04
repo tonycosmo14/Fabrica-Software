@@ -21,7 +21,8 @@ const { configuracion, guardarAjuste, imprimirCrudo,
 const { ticketCotizacion, ticketVenta, ticketMovimiento, ticketVale, ticketEncomienda,
         ticketRaya, ticketPrueba, pulsoCajon, ticketProduccion,
         ticketCorte, ticketCorteMovimientos, ticketHielo, ticketCortePersona, ticketConteo,
-        ticketResumenDia, ticketAbono } = require('./ticket');
+        ticketResumenDia, ticketAbono, ticketPedido,
+        ticketPreparacion } = require('./ticket');
 
 const { aTexto } = require('../../lib/fracciones');
 const { numeroDeTicket } = require('../ventas/folio');
@@ -418,6 +419,101 @@ router.post('/abono/:id', puedeImprimir, async (req, res) => {
   return ok(res, { impreso: true });
 });
 
+/* ============================================================
+ * LOS PAPELES DE UN PEDIDO  (v5.6)
+ *
+ * Dos, y hacen trabajos distintos:
+ *
+ *   LA NOTA DE ENTREGA — una por cliente, con su QR. Va en la mano del
+ *   repartidor y se le queda al cliente firmada.
+ *
+ *   LA HOJA DE PREPARACIÓN — una sola para todo lo pendiente, sumada por
+ *   producto. Se lee en la planta.
+ *
+ * Sin pulso de cajón en ninguno de los dos: aquí no ha entrado dinero
+ * todavía. El dinero entra al ENTREGAR, y ahí sale el ticket de la venta,
+ * que es el que abre el cajón.
+ * ============================================================ */
+
+const pedidos = require('../pedidos/calculo');
+const verPedidos = exigirPermiso('pedidos.ver');
+
+router.get('/pedido/:id/previa', verPedidos, (req, res) => {
+  const p = pedidos.completo(req.params.id);
+  if (!p) return error(res, 'Ese pedido no existe.', 404);
+  const papel = ticketPedido(p, { negocio: nombreNegocio() });
+  return ok(res, { renglones: recortarEspejo(papel.espejo), ancho: papel.anchoTicket });
+});
+
+router.post('/pedido/:id', verPedidos, async (req, res) => {
+  const p = pedidos.completo(req.params.id);
+  if (!p) return error(res, 'Ese pedido no existe.', 404);
+
+  const cfg = configuracion();
+  if (!cfg.directa) return ok(res, { impreso: false, motivo: 'sin-destino' });
+
+  const papel = ticketPedido(p, {
+    negocio: nombreNegocio(), copia: req.body?.copia === true
+  });
+  const r = await imprimirCrudo(papel, { seccion: 'venta' });
+  if (!r.impreso) return error(res, `No se pudo imprimir: ${r.motivo}`, 502);
+  return ok(res, { impreso: true });
+});
+
+/**
+ * TODAS LAS NOTAS DE UN JALÓN.
+ *
+ * "Imprimir las notas de cada uno de los que hicieron su pedido."
+ *
+ * Es como se usa de verdad: se preparan ocho pedidos y se imprimen las
+ * ocho notas seguidas, no de una en una. Si una falla se dice cuál — con
+ * siete notas en la mano y una que no salió, hay que saber de quién es.
+ */
+router.post('/pedidos/notas', verPedidos, async (req, res) => {
+  const lista = pedidos.lista({
+    estado: 'pendiente',
+    hasta: String(req.body?.hasta || '').slice(0, 10) || pedidos.hoy()
+  });
+  if (!lista.length) return error(res, 'No hay pedidos pendientes que imprimir.');
+
+  const cfg = configuracion();
+  if (!cfg.directa) return ok(res, { impreso: false, motivo: 'sin-destino', pedidos: lista.length });
+
+  const fallaron = [];
+  let impresas = 0;
+  for (const p of lista) {
+    const r = await imprimirCrudo(ticketPedido(p, { negocio: nombreNegocio() }),
+                                  { seccion: 'venta' });
+    if (r.impreso) impresas++;
+    else fallaron.push(`${p.folio} (${p.cliente_nombre})`);
+  }
+
+  if (!impresas) return error(res, 'No se pudo imprimir ninguna nota.', 502);
+  return ok(res, { impreso: true, impresas, fallaron });
+});
+
+router.get('/preparacion/previa', verPedidos, (req, res) => {
+  const prep = pedidos.preparacion({
+    hasta: String(req.query.hasta || '').slice(0, 10) || pedidos.hoy()
+  });
+  const papel = ticketPreparacion(prep, { negocio: nombreNegocio(), quien: req.usuario.nombre });
+  return ok(res, { renglones: recortarEspejo(papel.espejo), ancho: papel.anchoTicket });
+});
+
+router.post('/preparacion', verPedidos, async (req, res) => {
+  const prep = pedidos.preparacion({
+    hasta: String(req.body?.hasta || '').slice(0, 10) || pedidos.hoy()
+  });
+
+  const cfg = configuracion();
+  if (!cfg.directa) return ok(res, { impreso: false, motivo: 'sin-destino' });
+
+  const papel = ticketPreparacion(prep, { negocio: nombreNegocio(), quien: req.usuario.nombre });
+  const r = await imprimirCrudo(papel, { seccion: 'venta' });
+  if (!r.impreso) return error(res, `No se pudo imprimir: ${r.motivo}`, 502);
+  return ok(res, { impreso: true });
+});
+
 /**
  * EL PAPEL DE LA RAYA  (v4.8)
  *
@@ -471,7 +567,10 @@ router.post('/raya/:id', exigirPermiso('raya.ver'), async (req, res) => {
 /** Los saltos del final —el avance para el corte— en pantalla solo estorban. */
 function recortarEspejo(renglones = []) {
   const r = [...renglones];
-  while (r.length && !r[r.length - 1].t.trim()) r.pop();
+  // Un renglón de QR viaja con el texto vacío —lo que lleva es el dibujo—
+  // así que se comprueba antes de tirarlo: sin esto, una nota que
+  // terminara en el código se quedaría sin él.
+  while (r.length && !r[r.length - 1].qr && !r[r.length - 1].t.trim()) r.pop();
   return r;
 }
 

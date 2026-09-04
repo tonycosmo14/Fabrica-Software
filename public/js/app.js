@@ -21,6 +21,7 @@ import { vistaRaya } from './vistas/raya.js';
 import { vistaCorreo } from './vistas/correo.js';
 import { vistaNeveras } from './vistas/neveras.js';
 import { vistaAgua } from './vistas/agua.js';
+import { vistaPedidos } from './vistas/pedidos.js';
 import { vistaNovedades, hayVersionNueva } from './vistas/novedades.js';
 import { vistaAyuda } from './vistas/ayuda.js';
 import { vistaPersonalizar } from './vistas/personalizar.js';
@@ -63,6 +64,10 @@ const RUTAS = {
   // LA PLANTA DE AGUA (v5.2): el operario la ve y anota la vuelta;
   // cambiar equipos y mover los límites es del administrador.
   '#/agua':      { titulo: 'La planta de agua',  vista: vistaAgua,      permiso: 'agua.ver' },
+  // LOS PEDIDOS (v5.6): lo que hay que preparar y lo que hay que entregar.
+  // Se TOMAN en Vender —ahí están los precios y el teclado de fracciones—
+  // y aquí se preparan, se imprimen y se marcan entregados.
+  '#/pedidos':   { titulo: 'Los pedidos',        vista: vistaPedidos,   permiso: 'pedidos.ver' },
   // El cajero entra con vista limitada: ve cuántas hay e imprime la hoja.
   '#/productos': { titulo: 'Productos y precios', vista: vistaProductos, permiso: 'inventario.ver', fija: true },
   '#/clientes':  { titulo: 'Clientes',           vista: vistaClientes,  permiso: 'clientes.ver', fija: true },

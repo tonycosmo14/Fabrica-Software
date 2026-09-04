@@ -39,6 +39,10 @@ export function htmlDeEspejo(renglones = [], ancho = 48) {
 
   const cuerpo = renglones.map((r) => {
     const alineado = r.alin === 'centro' ? 'center' : r.alin === 'derecha' ? 'right' : 'left';
+    // EL CÓDIGO QR se dibuja, no se escribe. Va como cuadritos y no como
+    // imagen para que salga nítido en cualquier impresora: una imagen
+    // pequeña estirada se emborrona, y un QR emborronado no se lee.
+    if (r.qr) return `<div style="text-align:${alineado}">${svgDeQr(r.qr)}</div>`;
     const grande = (r.anchoLetra || 1) > 1 || (r.altoLetra || 1) > 1;
     const estilo = [
       `text-align:${alineado}`,
@@ -57,6 +61,48 @@ export function htmlDeEspejo(renglones = [], ancho = 48) {
                 line-height:1.35;white-space:pre-wrap;width:${ancho}ch;max-width:100%">
       ${cuerpo}
     </div>`;
+}
+
+/**
+ * EL CÓDIGO QR, DIBUJADO EN LA PANTALLA  (v5.6)
+ *
+ * El servidor manda el dibujo como una fila de textos de ceros y unos —un
+ * texto por renglón del código— y aquí se convierte en un SVG.
+ *
+ * SVG y no una imagen: el navegador lo dibuja con líneas exactas a
+ * cualquier tamaño, así que sale igual de nítido en la pantalla y en la
+ * hoja. Un PNG chiquito estirado sale borroso, y un QR borroso no lo lee
+ * ningún teléfono.
+ *
+ * El margen blanco de cuatro cuadritos alrededor lo pide la norma: sin él
+ * el lector no encuentra dónde empieza el código.
+ */
+export function svgDeQr(filas = [], { lado = 150 } = {}) {
+  if (!filas.length) return '';
+  const n = filas.length;
+  const margen = 4;
+  const total = n + margen * 2;
+
+  // Los cuadritos negros, juntando los seguidos de cada renglón en un
+  // solo rectángulo: son la mitad de dibujos y se pinta más rápido.
+  const partes = [];
+  for (let y = 0; y < n; y++) {
+    let inicio = -1;
+    for (let x = 0; x <= n; x++) {
+      const negro = x < n && filas[y][x] === '1';
+      if (negro && inicio < 0) inicio = x;
+      if (!negro && inicio >= 0) {
+        partes.push(`M${inicio + margen} ${y + margen}h${x - inicio}v1h-${x - inicio}z`);
+        inicio = -1;
+      }
+    }
+  }
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${total} ${total}"
+               width="${lado}" height="${lado}"
+               style="display:inline-block;background:#fff;image-rendering:pixelated">
+            <path d="${partes.join('')}" fill="#000"/>
+          </svg>`;
 }
 
 /** Deja el área limpia: un ticket viejo no debe salir por accidente. */

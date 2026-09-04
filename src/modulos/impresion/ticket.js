@@ -33,6 +33,7 @@ const { configuracion } = require('./impresora');
 const { aTexto, desglose } = require('../../lib/fracciones');
 const { formato } = require('../../lib/dinero');
 const { numeroDeTicket } = require('../ventas/folio');
+const { qr, enlaceDeMapa } = require('../../lib/qr');
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul',
                'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -1447,6 +1448,187 @@ function ticketConteo(conteo, { negocio = '' } = {}) {
 }
 
 /**
+ * LA NOTA DE ENTREGA  (v5.6)
+ *
+ * ============================================================
+ * ES EL PAPEL QUE VA EN LA MANO DEL REPARTIDOR
+ * ============================================================
+ *
+ * "Imprimir las notas de cada uno de los que hicieron su pedido para
+ *  mandárselas y que el repartidor sepa cuánto le toca a cada quien y
+ *  cuánto le va a cobrar a cada quien."
+ *
+ * Así que no es un ticket de venta: todavía no se ha vendido nada. Es una
+ * instrucción de trabajo con tres respuestas, en el orden en que se
+ * preguntan bajando de la camioneta:
+ *
+ *   ¿A DÓNDE?    el nombre, la dirección, las referencias y el QR.
+ *   ¿QUÉ LLEVO?  las líneas del pedido.
+ *   ¿QUÉ COBRO?  el total, y si se cobra o va a su cuenta.
+ *
+ * El horario va arriba y no abajo: es lo que decide si esta parada se
+ * hace ahora o después, y se lee antes de arrancar.
+ *
+ * ============================================================
+ * EL QR
+ * ============================================================
+ *
+ * Lleva el enlace de Google Maps a la ubicación del cliente. Se escanea
+ * con el teléfono y arranca la navegación — sin teclear una dirección
+ * mientras se maneja, que es la parte peligrosa.
+ *
+ * Solo sale si el cliente TIENE ubicación. Un QR que lleva a la
+ * coordenada cero manda al golfo de Guinea, y un repartidor que aprende
+ * que el QR miente deja de usarlo para siempre.
+ */
+function ticketPedido(p, { negocio = '', copia = false } = {}) {
+  const cfg = configuracion();
+  const t = new Ticket(cfg.anchoMm, cfg.codigoPagina, cfg.tamanoLetra);
+
+  if (copia) marcaCopia(t);
+
+  encabezado(t, {
+    titulo: 'NOTA DE ENTREGA',
+    tituloGrande: true,
+    atendio: `Pedido ${p.folio}`,
+    fecha: fechaTicket(p.fecha)
+  });
+
+  // ---- ¿A DÓNDE? ----
+  //
+  // EL NOMBRE EN GRANDE, y el nombre ES el del cliente — no el del
+  // negocio. Es lo que se busca de un vistazo al sacar el fajo de notas de
+  // la bolsa en cada parada, y es por quien se pregunta en la puerta.
+  // (Mismo orden que la encomienda y el recibo de abono: si cada papel lo
+  // pusiera al revés, nadie sabría cuál de los dos nombres leer.)
+  t.izquierda().negrita().tamano(2, 1)
+   .parrafo(String(p.cliente_nombre || p.cliente_negocio || '?').slice(0, 40));
+  t.normal();
+  if (p.cliente_negocio) t.parrafo(p.cliente_negocio);
+
+  if (p.direccion) t.parrafo(p.direccion);
+  // Las referencias son lo que hace que encuentre la PUERTA, no la calle.
+  if (p.referencias) t.parrafo(`(${p.referencias})`);
+  if (p.telefono) t.linea(`Tel: ${p.telefono}`);
+  if (p.horario) {
+    t.negrita().parrafo(`Horario: ${p.horario}`).negrita(false);
+  }
+
+  // ---- ¿QUÉ LLEVO? ----
+  t.separador();
+  for (const l of p.lineas) {
+    const cuanto = l.dieciseisavos > 0
+      ? aTexto(l.dieciseisavos).replace(' ', ' · ')
+      : `${l.cantidad}`;
+    t.punteado(`${cuanto} ${l.concepto}`.trim(), formato(l.precio_centavos));
+  }
+
+  t.separador();
+  t.bloqueDerecha([['TOTAL:', formato(p.total)]]);
+
+  // ---- ¿QUÉ COBRO? ----
+  //
+  // En grande y sin adornos. Es la línea que evita las dos equivocaciones
+  // que cuestan dinero: cobrarle a quien va a crédito —y que pague dos
+  // veces— y no cobrarle a quien iba a pagar de contado.
+  if (p.forma_pago === 'credito') {
+    renglonResultado(t, 'A CREDITO');
+    t.centro().linea('No se cobra: va a su cuenta').izquierda();
+  } else if (p.forma_pago === 'transferencia') {
+    renglonResultado(t, `POR TRANSFERENCIA ${formato(p.total)}`);
+  } else {
+    renglonResultado(t, `COBRAR ${formato(p.total)}`);
+  }
+
+  if (p.notas) { t.separador(); t.parrafo(p.notas); }
+
+  // ---- EL MAPA ----
+  const enlace = enlaceDeMapa({
+    latitud: p.latitud, longitud: p.longitud, direccion: p.direccion
+  });
+  if (enlace) {
+    t.saltos(1).centro();
+    t.qrDe(qr(enlace).modulos);
+    t.linea('Escanea para llegar').izquierda();
+  }
+
+  if (p.estado === 'entregado') {
+    t.separador();
+    t.centro().negrita().tamano(2, 1).linea('ENTREGADO').normal();
+    t.linea(fechaTicket(p.entregado_en)).izquierda();
+  } else if (p.estado === 'cancelado') {
+    t.separador();
+    t.centro().negrita().tamano(2, 1).linea('CANCELADO').normal().izquierda();
+    if (p.motivo_cancelacion) t.parrafo(p.motivo_cancelacion);
+  } else {
+    t.firma('RECIBIO');
+  }
+
+  pie(t, negocio);
+  t.izquierda().cortar(cfg.avanceCorte);
+  return t.bytes();
+}
+
+/**
+ * LO QUE HAY QUE PREPARAR  (v5.6)
+ *
+ * "Saber cuántos botellones de agua voy a llenar y cuántas bolsas de
+ *  hielo voy a subir."
+ *
+ * Este papel se lee en la planta, con las manos mojadas y de pie. Por eso
+ * NO lleva clientes, ni precios por renglón, ni direcciones: solo cuánto
+ * de cada cosa, en grande, partido por área — el del agua lee su bloque y
+ * el del hielo el suyo, sin buscar entre lo del otro.
+ *
+ * El total en pesos va al final y en chico: no es para la planta, es para
+ * quien firma que salió la camioneta.
+ */
+function ticketPreparacion(prep, { negocio = '', quien = '' } = {}) {
+  const cfg = configuracion();
+  const t = new Ticket(cfg.anchoMm, cfg.codigoPagina, cfg.tamanoLetra);
+
+  encabezado(t, {
+    titulo: 'PARA PREPARAR',
+    tituloGrande: true,
+    atendio: quien,
+    fecha: fechaTicket(new Date().toISOString())
+  });
+
+  t.izquierda().linea(
+    `${prep.pedidos} pedido${prep.pedidos === 1 ? '' : 's'} · `
+    + `${prep.clientes} cliente${prep.clientes === 1 ? '' : 's'}`);
+
+  if (!prep.areas.length) {
+    t.separador();
+    t.centro().negrita().linea('NO HAY NADA PENDIENTE').negrita(false).izquierda();
+    pie(t, negocio);
+    t.izquierda().cortar(cfg.avanceCorte);
+    return t.bytes();
+  }
+
+  for (const area of prep.areas) {
+    t.separadorConTitulo(String(area.nombre).toUpperCase());
+    for (const prod of area.productos) {
+      // La cantidad en grande y el nombre normal, en dos renglones,
+      // porque el número es lo que se lee de lejos mientras se cuenta.
+      const cuanto = prod.dieciseisavos > 0
+        ? aTexto(prod.dieciseisavos).replace(' ', ' · ')
+        : String(prod.cantidad);
+      t.izquierda().negrita().tamano(2, 1).linea(cuanto).normal();
+      t.linea(`   ${String(prod.concepto).slice(0, t.ancho - 3)}`);
+    }
+  }
+
+  t.separador();
+  t.bloqueDerecha([['Vale:', formato(prep.total)]]);
+  t.firma('PREPARO');
+
+  pie(t, negocio);
+  t.izquierda().cortar(cfg.avanceCorte);
+  return t.bytes();
+}
+
+/**
  * SOLO EL PULSO DEL CAJÓN, sin papel de por medio.
  *
  * Va aparte del ticket a propósito. El ticket solo sale si el cajero lo
@@ -1463,6 +1645,6 @@ function pulsoCajon(salida = 2) {
 
 module.exports = {
   ticketVenta, ticketMovimiento, ticketVale, ticketEncomienda, ticketRaya, ticketAbono,
-  ticketCotizacion, ticketPrueba,
+  ticketCotizacion, ticketPrueba, ticketPedido, ticketPreparacion,
   ticketCorte, ticketCorteMovimientos, ticketHielo, ticketCortePersona, ticketConteo, ticketProduccion, ticketResumenDia, pulsoCajon, fechaCorta, fechaTicket
 };

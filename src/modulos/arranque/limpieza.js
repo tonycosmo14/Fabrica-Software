@@ -77,6 +77,15 @@ const MOVIMIENTOS = [
   { tabla: 'cortes_hielo', grupo: 'Los cortes de hielo', cuenta: true },
   { tabla: 'encomiendas', grupo: 'Las encomiendas' },
 
+  // --- Los pedidos (v5.6) ---
+  //
+  // Un pedido es una PROMESA de la fábrica de mentira: al arrancar de
+  // verdad no se le debe nada a nadie. Y si se quedaran, el primer día
+  // real aparecerían en la hoja de preparación pedidos que nunca existieron
+  // y saldría hielo del cuarto frío a llevárselo a nadie.
+  { tabla: 'pedido_lineas', grupo: 'Los pedidos' },
+  { tabla: 'pedidos', grupo: 'Los pedidos', cuenta: true },
+
   // --- El inventario ---
   { tabla: 'movimientos_inventario', grupo: 'El inventario' },
   { tabla: 'avisos_inventario', grupo: 'El inventario' },

@@ -38,9 +38,20 @@ const PERMISOS_POR_ROL = {
     // LA PLANTA DE AGUA  (v5.2). La ve y puede anotar la vuelta: en un
     // turno flojo el del mostrador es quien tiene tiempo de darla.
     'agua.ver',
-    'agua.anotar'
+    'agua.anotar',
+    // LOS PEDIDOS  (v5.6). Quien contesta el teléfono es el del mostrador:
+    // tomar un pedido es su trabajo, no un permiso especial. Y también los
+    // marca entregados, porque el repartidor le entrega a él el dinero al
+    // regresar.
+    'pedidos.ver',
+    'pedidos.tomar',
+    'pedidos.entregar'
   ],
-  repartidor: ['reparto.ver', 'reparto.operar'],
+
+  // EL REPARTIDOR VE LOS PEDIDOS Y LOS ENTREGA  (v5.6), pero no los toma:
+  // un pedido nace de una llamada al mostrador. Si pudiera crearlos en la
+  // calle, saldría hielo del cuarto frío contra un pedido que nadie pidió.
+  repartidor: ['reparto.ver', 'reparto.operar', 'pedidos.ver', 'pedidos.entregar'],
 
   // El gerente de turno: todo lo del cajero, más autorizar lo que se sale
   // de la regla (sacar un paño fuera de orden) y corregir errores.
@@ -86,6 +97,11 @@ const PERMISOS_POR_ROL = {
     'credito.cobrar',
     'credito.autorizar',
     'reparto.ver',
+    // LOS PEDIDOS  (v5.6). Todo lo del cajero. Cancelar uno también, que
+    // va con `pedidos.tomar`: quien puede prometer puede desprometer.
+    'pedidos.ver',
+    'pedidos.tomar',
+    'pedidos.entregar',
     // LOS GASTOS GRANDES DE LA EMPRESA: el amoniaco, la sal, la maquinaria,
     // el recibo de la luz. El gerente los VE —hace falta para saber si un
     // paro de máquina ya se pagó o no— pero solo el administrador los

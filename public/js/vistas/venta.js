@@ -65,6 +65,8 @@ export async function vistaVenta(pantalla, estadoApp) {
   const puedeVerClientes = tiene('clientes.ver');
   // Recibir un abono al crédito, desde la caja (v5.5).
   const puedeCobrarCredito = tiene('credito.cobrar');
+  // Apartar un pedido en vez de cobrarlo (v5.6).
+  const puedeTomarPedidos = tiene('pedidos.tomar');
   const puedeRepartirNumeros = tiene('produccion.numeros');
   // Devolver saca dinero del cajón por algo que ya se cobró: eso lo revisa
   // un gerente, no se hace solo desde el mostrador.
@@ -325,6 +327,16 @@ export async function vistaVenta(pantalla, estadoApp) {
                   title="Imprime el precio SIN vender: no hay folio, no se abre el cajón y no entra al corte.">
             📋 Solo cotización
           </button>
+
+          <!-- APARTAR UN PEDIDO  (v5.6)
+               El mismo ticket, pero en vez de cobrarlo se aparta para que
+               salga con el reparto. No es venta todavía: el hielo no sale
+               del cuarto frío y no entra al corte hasta que se entrega. -->
+          ${puedeTomarPedidos ? `
+            <button class="secundario chico pos-cotizar" id="pedido"
+                    title="Lo aparta para el reparto. Todavía no se cobra: la venta nace al entregarlo.">
+              📦 Apartar como pedido
+            </button>` : ''}
         </section>
 
         <section class="pos-catalogo">
@@ -2282,6 +2294,111 @@ export async function vistaVenta(pantalla, estadoApp) {
     }
   }
 
+  /**
+   * APARTAR EL TICKET COMO PEDIDO  (v5.6)
+   *
+   * ============================================================
+   * ANTES HABÍA QUE COBRARLO PARA PODER ANOTARLO
+   * ============================================================
+   *
+   * "No me gusta cómo se maneja el reparto de hielo en cubos,
+   *  especialmente la parte de tomar un pedido: tengo que literalmente
+   *  hacerlo desde la caja y asignarle un cliente."
+   *
+   * Y eso dejaba dos mentiras escritas: una venta cobrada de hielo que
+   * seguía en el cuarto frío, y un cliente al que no se le había
+   * entregado nada. Si el pedido después no salía, había que CANCELAR UN
+   * TICKET COBRADO, que es de las cosas más feas de explicar en un corte.
+   *
+   * Un pedido es una promesa: alguien pidió, alguien va a llevarlo. La
+   * venta nace al entregarlo, con el precio que este papel prometió.
+   *
+   * ============================================================
+   * SE ARMA IGUAL QUE UN TICKET
+   * ============================================================
+   *
+   * Los mismos botones, el mismo teclado de fracciones, los mismos
+   * precios —incluida la lista de mayoreo del cliente—. Lo único distinto
+   * es el botón con el que se termina. Una pantalla aparte para tomar
+   * pedidos sería un segundo punto de venta que tiene que dar el mismo
+   * precio que éste, y el día que se separen nadie sabrá cuál miente.
+   */
+  async function apartarPedido() {
+    if (cambiando) {
+      avisar('Termina el cambio antes de apartar un pedido', 'error');
+      return;
+    }
+    if (!hayAlgo()) {
+      avisar('Arma primero lo que va a llevarse', 'error');
+      enfocar();
+      return;
+    }
+    // UN PEDIDO ES DE ALGUIEN. Sin nombre no hay a dónde llevarlo, y una
+    // nota de entrega sin destinatario no sirve de nada.
+    if (!cliente) {
+      avisar('¿De quién es el pedido? Elígelo con F6', 'error');
+      if (puedeVerClientes) verClientes('', { volverA: 'venta' });
+      return;
+    }
+
+    const dia = await menu({
+      titulo: '¿Para cuándo es?',
+      texto: `${cliente.nombre} · ${pesos(total())}`,
+      opciones: [
+        { valor: 'hoy', texto: '📅 Para hoy', detalle: 'Sale en el reparto de hoy' },
+        { valor: 'manana', texto: '🌄 Para mañana',
+          detalle: 'No aparece en la preparación de hoy' }
+      ]
+    });
+    if (!dia) { enfocar(); return; }
+
+    const cuando = new Date();
+    if (dia === 'manana') cuando.setDate(cuando.getDate() + 1);
+    const paraCuando = cuando.toISOString().slice(0, 10);
+
+    // CÓMO VA A PAGAR, dicho ahora. No es definitivo —en la puerta el
+    // cliente cambia de opinión— pero es lo que el repartidor necesita
+    // saber antes de salir: si va a cobrar o no.
+    const formaPago = await menu({
+      titulo: '¿Cómo va a pagar?',
+      texto: 'Es lo que va a decir la nota que lleva el repartidor.',
+      opciones: [
+        { valor: 'efectivo', texto: '💵 En efectivo', detalle: 'Se cobra al entregar' },
+        { valor: 'transferencia', texto: '📲 Por transferencia' },
+        ...(puedeFiar
+          ? [{ valor: 'credito', texto: '📗 A su cuenta',
+               detalle: 'Se le carga al crédito al entregarlo' }]
+          : [])
+      ]
+    });
+    if (!formaPago) { enfocar(); return; }
+
+    const lineas = [];
+    if (hielo > 0) lineas.push({ dieciseisavos: hielo });
+    for (const a of articulos) lineas.push({ productoId: a.producto.id, cantidad: a.cantidad });
+
+    try {
+      const r = await api.enviar('/pedidos', {
+        lineas, clienteId: cliente.id, paraCuando, formaPago
+      });
+
+      // La nota sale sola: es el papel que va a la mano del repartidor, y
+      // pedirla en otro toque es garantizar que un día no salga.
+      try { await api.enviar(`/impresion/pedido/${r.pedido.id}`, {}); } catch { /* sin térmica */ }
+
+      avisar(`Pedido #${r.pedido.folio} apartado para ${dia === 'hoy' ? 'hoy' : 'mañana'}`, 'bien');
+
+      hielo = 0;
+      articulos = [];
+      cliente = null; fiar = false; abonoMostrador = 0;
+      pintarTodo();
+      enfocar();
+    } catch (e) {
+      avisar(e.message, 'error');
+      enfocar();
+    }
+  }
+
   async function registrar(autorizacion = null) {
     if (fase !== 'cambio' && fase !== 'guardando') return;
     fase = 'guardando';
@@ -2886,6 +3003,8 @@ export async function vistaVenta(pantalla, estadoApp) {
 
   pantalla.querySelector('#cobrar').onclick = irACobro;
   pantalla.querySelector('#cotizar').onclick = darCotizacion;
+  const btnPedido = pantalla.querySelector('#pedido');
+  if (btnPedido) btnPedido.onclick = apartarPedido;
   pantalla.querySelector('#historial').onclick = () => verHistorial();
   pantalla.querySelector('#nueva-venta').onclick = () => verEnEspera();
   pantalla.querySelector('#cambio').onclick = () => iniciarCambio();

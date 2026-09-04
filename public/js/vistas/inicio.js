@@ -27,6 +27,10 @@ const ACCESOS = [
   { emoji: '💰', titulo: 'Sueldos',      ruta: '#/raya',      permiso: 'raya.ver',             desde: null   },
   { emoji: '🧊', titulo: 'Las neveras', ruta: '#/neveras',   permiso: 'neveras.ver',          desde: null   },
   { emoji: '💧', titulo: 'La planta de agua', ruta: '#/agua', permiso: 'agua.ver',            desde: null   },
+  // 📦 y no otro cubito: en esta pantalla ya hay dos iconos de hielo
+  // (producción y neveras), y un tercero igual no se distingue de lejos.
+  // Un pedido es una caja que espera a que la lleven, y así se lee.
+  { emoji: '📦', titulo: 'Los pedidos',   ruta: '#/pedidos',  permiso: 'pedidos.ver',          desde: null   },
   { emoji: '✉️', titulo: 'Avisos',       ruta: '#/correo',    permiso: 'correo.configurar',    desde: null   },
   { emoji: '🏷️', titulo: 'Productos y precios', ruta: '#/productos', permiso: 'inventario.ver', desde: null },
   { emoji: '🧾', titulo: 'Clientes',      ruta: '#/clientes',  permiso: 'clientes.ver',         desde: null   },

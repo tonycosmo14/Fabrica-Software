@@ -9,6 +9,7 @@
  * Todos devuelven una promesa: se usan con await.
  */
 import { crearTeclado, aTexto, deTexto } from './fracciones.js';
+import { svgDeQr } from './imprimir.js';
 
 function cerrar(caja) {
   caja.classList.remove('abierto');
@@ -333,6 +334,8 @@ export function verTicket({ titulo = 'Ticket', renglones = [], ancho = 48,
                             notas = [], acciones = [] }) {
   return new Promise((resolver) => {
     const linea = (r) => {
+      // El QR se dibuja; lo demás se escribe. (v5.6)
+      if (r.qr) return `<div class="tira-linea alin-centro">${svgDeQr(r.qr, { lado: 130 })}</div>`;
       const escapado = String(r.t)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       return `

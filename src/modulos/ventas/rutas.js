@@ -1215,3 +1215,11 @@ module.exports = router;
 module.exports.prepararLineas = prepararLineas;
 module.exports.llevaMayoreoEnLineas = (lineas) =>
   llevaMayoreo(lineas, { porId: productoPorId, porCodigo: productoPorCodigo });
+
+// LOS PEDIDOS TAMBIÉN CREAN VENTAS  (v5.6). Cuando un pedido se entrega
+// nace su venta, con los precios que ya llevaba escritos el papel que el
+// repartidor tenía en la mano — no con los de hoy. Por eso se llama a esto
+// con las líneas ya cotizadas, en vez de volver a pasarlas por el
+// cotizador: el precio de un pedido se prometió el día que se tomó.
+module.exports.crearVenta = crearVenta;
+module.exports.detalleVenta = detalleVenta;

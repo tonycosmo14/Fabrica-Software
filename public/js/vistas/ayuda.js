@@ -2513,6 +2513,116 @@ DEBERIA HABER ..........................  $5,500
 
   // ==========================================================
   {
+    id: 'pedidos',
+    titulo: 'Los pedidos: apartar, preparar y entregar',
+    busca: 'pedido pedidos apartar reparto repartidor nota de entrega qr codigo qr ubicacion '
+         + 'google maps mapa preparar preparacion garrafones bolsas botellones llamada telefono '
+         + 'whatsapp encargo entregar entregado cancelar promesa para manana atrasado horario '
+         + 'referencias direccion cobrar credito transferencia folio',
+    cuerpo: `
+      <p>Un pedido es cuando alguien <b>pide por teléfono, por WhatsApp o
+      manda a alguien</b>: «Abarrotes Juan necesita diez garrafones y
+      cincuenta bolsas». Se apunta, se va acumulando con los demás, y sale
+      con el reparto.</p>
+
+      <h4>Un pedido NO es una venta todavía</h4>
+      <p>Es lo más importante de entender, y lo que hace que todo lo demás
+      funcione. Un pedido es una <b>promesa</b>: alguien pidió, alguien va a
+      llevarlo. <b>La venta nace cuando se entrega</b>, no antes.</p>
+      <p>Por eso:</p>
+      <ul>
+        <li>Un pedido que no salió <b>no ensucia las ventas del día</b>.</li>
+        <li>El hielo <b>no sale del cuarto frío</b> hasta que sale de verdad.</li>
+        <li>Y cancelar un pedido es cancelar una promesa, <b>no un ticket
+        cobrado</b> — que es una cosa mucho más fea de explicar.</li>
+      </ul>
+
+      <h4>Cómo se toma uno</h4>
+      <p>Se toma en <b>🛒 Vender</b>, no en otra pantalla. Se arma el ticket
+      igual que siempre —los mismos botones, los mismos precios, el mismo
+      teclado de fracciones—, se elige al cliente con <b>F6</b>, y en vez de
+      Cobrar se toca <b>📦 Apartar como pedido</b>.</p>
+      <p>Pregunta dos cosas: <b>para cuándo</b> (hoy o mañana) y <b>cómo va a
+      pagar</b>. Y sale sola la nota de entrega.</p>
+      <p class="ayuda-tip"><b>Un pedido siempre es de alguien.</b> Sin cliente
+      no hay a dónde llevarlo, y una nota de entrega sin nombre no sirve de
+      nada. Si es alguien nuevo, se da de alta ahí mismo.</p>
+
+      <h4>Un solo botón, aunque sea agua y hielo</h4>
+      <p>Si la tiendita pide <b>diez garrafones y cincuenta bolsas</b>, eso es
+      UN pedido, no dos. Partirlo al capturarlo haría que el repartidor
+      llegara con <b>dos notas a la misma puerta</b>.</p>
+      <p>Lo que sí se parte es la <b>preparación</b>, porque ahí sí son dos
+      áreas con dos personas. Y eso lo decide el producto: en la ficha de cada
+      producto se marca si <b>se prepara en el agua</b>.</p>
+
+      <h4>Las dos formas de verlos</h4>
+      <p>En <b>📦 Los pedidos</b> hay dos pestañas, que son el mismo trabajo
+      mirado desde dos sitios:</p>
+      <ul>
+        <li><b>Para preparar</b> — todo sumado por producto y partido en Agua
+        y Hielo: «40 garrafones, 180 bolsas». Es lo que se lee en la planta,
+        de pie y con las manos mojadas, y ahí a nadie le importa de quién es
+        cada cosa. Con su hoja impresa para llevarla.</li>
+        <li><b>Las notas de entrega</b> — una por cliente, con su dirección,
+        su horario y su precio. Es lo que va en la mano del repartidor, y ahí
+        lo que no importa es el total.</li>
+      </ul>
+
+      <h4>La nota de entrega y su QR</h4>
+      <p>La nota contesta las tres preguntas en el orden en que se hacen
+      bajando de la camioneta: <b>a dónde</b>, <b>qué llevo</b> y <b>qué
+      cobro</b>. El horario de la tienda va arriba, porque es lo que decide si
+      esta parada se hace ahora o después.</p>
+      <p>Y lleva un <b>código QR</b>: se escanea con el teléfono y abre la
+      ubicación del cliente en Google Maps. Sin teclear una dirección mientras
+      se maneja.</p>
+      <p class="ayuda-tip">El QR <b>solo sale si el cliente tiene ubicación
+      guardada</b> (se pega en su ficha, en Clientes, el enlace que da Google
+      Maps al compartir). Si no la tiene, la nota sale igual pero sin código:
+      un QR que lleva a la coordenada cero manda al golfo de Guinea, y un
+      repartidor que aprende que el QR miente deja de usarlo para siempre.</p>
+
+      <h4>El precio se congela al tomarlo</h4>
+      <p>Si el pedido se tomó el sábado y el lunes suben los precios, se cobra
+      <b>lo que dice el papel</b> que el repartidor lleva en la mano. Discutir
+      el precio en la puerta del cliente es perder el cliente.</p>
+      <p>Lo mismo con la dirección: se copia al pedido. Si el cliente se muda,
+      la nota de un pedido de hace tres meses sigue diciendo a dónde se llevó.</p>
+
+      <h4>Lo atrasado y lo de mañana</h4>
+      <p>Un pedido de ayer que no salió <b>sigue apareciendo</b>, marcado en
+      ámbar. Esconderlo porque cambió el día es la forma más fácil de perder
+      un cliente.</p>
+      <p>Y lo de <b>mañana no sale en la preparación de hoy</b>: sería hielo
+      derritiéndose en la camioneta. Para verlo, se mueve la fecha de arriba.</p>
+
+      <h4>Entregarlo</h4>
+      <p>Se toca <b>✅ Entregado</b> y pregunta <b>cómo pagó de verdad</b> —en
+      la puerta el cliente cambia de opinión: iba a ser efectivo y pidió que
+      se lo cargaran, o al revés—. Ahí nace la venta con los precios del
+      pedido, sale su ticket, entra al corte del turno abierto y el hielo sale
+      del cuarto frío.</p>
+
+      <h4>Corregir y cancelar</h4>
+      <p>De un pedido pendiente se puede cambiar <b>la fecha, las notas y cómo
+      va a pagar</b>. Lo que <b>no</b> se cambia son las líneas: cambiar lo que
+      pidió después de imprimir su nota es que salga una cosa y llegue otra. Se
+      cancela y se toma otro.</p>
+      <p>Cancelar pide <b>el motivo</b> y no borra nada: queda guardado para
+      poder contestar «¿y el de la tiendita, qué pasó?» tres semanas después.</p>
+
+      <h4>Quién puede qué</h4>
+      <ul>
+        <li><b>Cajera y gerente</b>: toman, entregan y cancelan.</li>
+        <li><b>Repartidor</b>: ve y entrega, pero <b>no toma</b>. Un pedido
+        nace de una llamada al mostrador; si pudiera crearlos en la calle,
+        saldría hielo del cuarto frío contra un pedido que nadie pidió.</li>
+      </ul>`
+  },
+
+  // ==========================================================
+  {
     id: 'correo',
     titulo: 'Avisos por correo: que el sistema te escriba',
     busca: 'correo correos email gmail smtp aviso avisos alerta alertas notificacion notificaciones ' +

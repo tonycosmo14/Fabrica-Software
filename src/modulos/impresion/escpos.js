@@ -493,6 +493,74 @@ class Ticket {
   }
 
   /**
+   * EL CÓDIGO QR, DIBUJADO PUNTO POR PUNTO  (v5.6)
+   *
+   * ESC/POS trae una orden propia para códigos QR (GS ( k). No se usa, y
+   * por una razón: solo la traen algunas impresoras, y en las que no la
+   * traen no sale nada — ni error, ni cuadrito, nada. La nota de entrega
+   * saldría sin QR y el repartidor lo descubriría en la calle.
+   *
+   * Así que se manda como IMAGEN, con GS v 0, que es la orden que
+   * entiende cualquier térmica desde hace veinte años: una tira de bytes
+   * donde cada bit encendido es un punto negro. El dibujo lo arma
+   * `lib/qr.js` y aquí solo se convierte a puntos.
+   *
+   * EL MARGEN BLANCO ALREDEDOR NO ES ADORNO. La norma pide cuatro
+   * cuadritos de blanco por lado, y sin ellos el teléfono no encuentra
+   * dónde empieza el código. En un papel de 80 mm sobra sitio; no ponerlo
+   * es la forma más común de que un QR impreso no se lea.
+   */
+  qrDe(matriz, { escala = null, margen = 4 } = {}) {
+    const n = matriz.length;
+    // Los puntos de ancho del papel: 12 por columna en fuente A.
+    const puntosPapel = this.ancho * (this.fuente === 'b' ? 9 : 12);
+    // Se busca el tamaño que deje el código en unos 32 mm de lado, que es
+    // donde un teléfono lo lee de un tirón sin tener que acercarse.
+    const objetivo = Math.min(Math.round(puntosPapel * 0.45), puntosPapel - 16);
+    // NUNCA MENOS DE 3 PUNTOS POR CUADRITO. A 203 puntos por pulgada, tres
+    // puntos son 0.37 mm de lado, que es el mínimo con el que un teléfono
+    // enfoca. Con dos el código sale «bien» a la vista y no lo lee nadie.
+    const cuadrito = escala || Math.max(3, Math.min(12, Math.floor(objetivo / (n + margen * 2))));
+
+    const lado = (n + margen * 2) * cuadrito;
+    const bytesPorFila = Math.ceil(lado / 8);
+    // Centrado a mano: la orden de imagen no siempre hace caso a ESC a,
+    // y un QR pegado a la orilla se ve como un error de impresión.
+    const sangria = Math.max(0, Math.floor((puntosPapel - lado) / 2 / 8));
+    const anchoTotal = bytesPorFila + sangria;
+
+    const datos = Buffer.alloc(anchoTotal * lado, 0);
+    for (let y = 0; y < lado; y++) {
+      const fila = Math.floor(y / cuadrito) - margen;
+      if (fila < 0 || fila >= n) continue;
+      for (let x = 0; x < lado; x++) {
+        const col = Math.floor(x / cuadrito) - margen;
+        if (col < 0 || col >= n) continue;
+        if (!matriz[fila][col]) continue;
+        const punto = sangria * 8 + x;
+        datos[y * anchoTotal + (punto >> 3)] |= 0x80 >> (punto & 7);
+      }
+    }
+
+    // GS v 0 m xL xH yL yH : m=0 es tamaño normal; xL/xH son los BYTES de
+    // ancho y yL/yH los renglones de alto.
+    this.crudo([GS, 0x76, 0x30, 0x00,
+                anchoTotal & 0xff, (anchoTotal >> 8) & 0xff,
+                lado & 0xff, (lado >> 8) & 0xff]);
+    this.partes.push(datos);
+
+    // EL ESPEJO se lleva el dibujo, no la imagen: la pantalla lo pinta
+    // como cuadritos y sale igual de nítido en cualquier tamaño. Va como
+    // una fila de textos de ceros y unos porque es lo que menos ocupa al
+    // viajar y lo más fácil de leer al llegar.
+    this.espejo.push({
+      t: '', ...this.estiloActual(), alin: 'centro',
+      qr: matriz.map((f) => f.join(''))
+    });
+    return this;
+  }
+
+  /**
    * CORTA EL PAPEL.
    *
    * `avance` son los renglones en blanco que se mandan antes de la cuchilla,

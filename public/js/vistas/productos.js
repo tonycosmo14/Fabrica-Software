@@ -288,6 +288,8 @@ export async function vistaProductos(pantalla, estadoApp) {
             : ''}`}
       </div>
 
+      ${!esDeHielo ? panelArea(p) : ''}
+
       ${administra ? `
         <div class="fila-botones" style="margin-top:14px;flex-wrap:wrap">
           ${p.activo
@@ -333,6 +335,43 @@ export async function vistaProductos(pantalla, estadoApp) {
       <div class="margen ${nivel}" title="${esc(lectura)} ${sobreVenta}% de lo que cobras.">
         <strong>${ganancia < 0 ? '−' : ''}${sobreCosto < 0 ? -sobreCosto : sobreCosto}%</strong>
         <span>${pesos(Math.abs(ganancia))} por pieza</span>
+      </div>`;
+  }
+
+  /**
+   * DÓNDE SE PREPARA ESTE PRODUCTO  (v5.6)
+   *
+   * Es lo único que parte la hoja de preparación de los pedidos en dos: el
+   * del agua lee su bloque y el del hielo el suyo, sin buscar entre lo del
+   * otro.
+   *
+   * Se marca aquí y no se adivina por el nombre. Adivinar funcionaría hasta
+   * el día que alguien dé de alta "Hielo en botella", y el garrafón se iría
+   * a la lista del cuarto frío sin que nadie entendiera por qué.
+   */
+  function panelArea(p) {
+    const agua = Boolean(p.para_agua);
+    if (!administra) {
+      return `
+        <div class="cuadre">
+          <div class="cuadre-linea">
+            <span>Se prepara en</span>
+            <strong>${agua ? '💧 El agua' : '🧊 El hielo'}</strong>
+          </div>
+        </div>`;
+    }
+    return `
+      <h4 class="cfg-subtitulo">¿Dónde se prepara?</h4>
+      <p class="ayuda">
+        Para la hoja de preparación de los pedidos, que sale partida por área.
+      </p>
+      <div class="prod-areas">
+        <button class="prod-area ${agua ? '' : 'activa'}" data-area="hielo">
+          <span class="emoji">🧊</span><strong>El hielo</strong>
+        </button>
+        <button class="prod-area ${agua ? 'activa' : ''}" data-area="agua">
+          <span class="emoji">💧</span><strong>El agua</strong>
+        </button>
       </div>`;
   }
 
@@ -677,6 +716,21 @@ export async function vistaProductos(pantalla, estadoApp) {
     if (alta) alta.onclick = () => darDeAlta(seleccionado);
     const activar = q('#activar-inv');
     if (activar) activar.onclick = () => activarInventario(seleccionado);
+
+    // DÓNDE SE PREPARA  (v5.6). Se guarda al tocarlo, sin botón de guardar:
+    // es un interruptor de dos, y un "guardar" aparte solo sirve para que
+    // alguien lo cambie y se vaya sin darle.
+    pantalla.querySelectorAll('[data-area]').forEach((b) => {
+      b.onclick = async () => {
+        const agua = b.dataset.area === 'agua';
+        if (Boolean(seleccionado?.para_agua) === agua) return;
+        try {
+          await api.actualizar(`/catalogo/productos/${seleccionado.id}`, { paraAgua: agua });
+          avisar(agua ? 'Se prepara con el agua' : 'Se prepara con el hielo', 'bien');
+          cargar();
+        } catch (e) { avisar(e.message, 'error'); }
+      };
+    });
     const entrada = q('#inv-entrada');
     if (entrada) entrada.onclick = () => movimientoInventario(seleccionado, 'entrada');
     const salida = q('#inv-salida');

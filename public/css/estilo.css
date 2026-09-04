@@ -4763,3 +4763,118 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 .pos-cobrar.pos-cobrar-abono {
   background: var(--verde); border-color: var(--verde);
 }
+
+/* ============================================================
+   LOS PEDIDOS  (v5.6)
+   ============================================================ */
+
+/* Las dos formas de mirar la misma lista. Dos pestañas grandes y no un
+   selector: se toca con el dedo en la pantalla del mostrador, y la de
+   preparar se usa cincuenta veces al día. */
+.ped-pestanas {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;
+  margin-bottom: 12px;
+}
+.ped-pestana {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 12px 8px; width: 100%;
+  /* Igual que en clientes: un hijo de rejilla trae `min-width: auto` y se
+     sale de su columna en vez de encogerse. */
+  min-width: 0;
+  background: var(--superficie-alt); border: 1px solid var(--borde);
+  border-radius: 12px; color: var(--suave);
+  font-size: 14px; font-weight: 600; line-height: 1.25;
+}
+.ped-pestana .emoji { font-size: 22px; }
+.ped-pestana small { font-size: 12px; opacity: .85; font-variant-numeric: tabular-nums; }
+.ped-pestana:hover { border-color: var(--primario); color: var(--texto); }
+.ped-pestana.activa {
+  background: var(--primario); border-color: var(--primario); color: var(--primario-texto);
+}
+.ped-pestana.activa small { opacity: .95; }
+
+.ped-dia {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.ped-dia label { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.ped-dia input { width: auto; margin: 0; }
+
+.ped-acciones {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px;
+}
+
+/* LO QUE HAY QUE PREPARAR — se lee de pie y de lejos, así que el número
+   va grande y en columna propia. */
+.ped-areas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 900px) { .ped-areas { grid-template-columns: 1fr; } }
+.ped-area h3 { margin: 0 0 8px; font-size: 17px; }
+.ped-cuanto {
+  font-weight: 700; font-variant-numeric: tabular-nums;
+  white-space: nowrap; color: var(--texto);
+}
+.ped-area .ped-cuanto { font-size: 20px; }
+.ped-total { margin-top: 12px; }
+
+/* LAS NOTAS — una tarjeta por cliente. Dos columnas en PC, que es donde
+   se prepara el reparto; una sola en el mostrador táctil. */
+.ped-tarjetas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 1100px) { .ped-tarjetas { grid-template-columns: 1fr; } }
+
+.ped-tarjeta { display: flex; flex-direction: column; gap: 8px; }
+/* Un pedido de ayer que no salió sigue debiéndose: se ve distinto sin
+   gritar, porque no es un error, es una prioridad. */
+.ped-tarjeta.atrasada { border-left: 4px solid var(--ambar); }
+
+.ped-cabeza { display: flex; align-items: flex-start; gap: 10px; }
+.ped-cabeza .crece { flex: 1; min-width: 0; }
+.ped-cabeza strong { display: block; font-size: 17px; }
+.ped-cabeza small { color: var(--suave); }
+.ped-folio {
+  font-variant-numeric: tabular-nums; font-weight: 700; color: var(--suave);
+  background: var(--superficie-alt); border: 1px solid var(--borde);
+  border-radius: 999px; padding: 2px 10px; font-size: 13px;
+}
+
+.ped-datos { display: flex; flex-wrap: wrap; gap: 6px; }
+.ped-datos .etiqueta {
+  background: var(--superficie-alt); color: var(--suave);
+  border: 1px solid var(--borde); text-transform: none; letter-spacing: 0;
+  font-weight: 600;
+}
+.ped-datos .etiqueta-mal { background: var(--et-baja-f); color: var(--et-baja-t);
+  border-color: var(--et-baja-f); }
+.ped-datos .etiqueta-flojo { opacity: .6; }
+
+.ped-direccion { margin: 0; color: var(--suave); font-size: 14px; line-height: 1.35; }
+
+.ped-lineas { list-style: none; padding: 0; margin: 0; }
+.ped-lineas li {
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 4px 0; border-bottom: 1px dashed var(--borde); font-size: 15px;
+}
+.ped-lineas li:last-child { border-bottom: 0; }
+.ped-precio { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--suave); }
+
+.ped-pie {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  border-top: 1px solid var(--borde); padding-top: 8px;
+}
+.ped-pie > strong { font-size: 20px; font-variant-numeric: tabular-nums; }
+.ped-botones { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* ¿Dónde se prepara este producto? (v5.6) Dos botones y no una casilla:
+   marcado y sin marcar tienen que distinguirse de lejos, porque es lo que
+   decide en qué bloque de la hoja de preparación sale. */
+.prod-areas { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 8px; }
+.prod-area {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 12px 8px; width: 100%; min-width: 0;
+  background: var(--superficie-alt); border: 1px solid var(--borde);
+  border-radius: 12px; color: var(--suave); font-size: 14px; font-weight: 600;
+}
+.prod-area .emoji { font-size: 22px; }
+.prod-area:hover { border-color: var(--primario); color: var(--texto); }
+.prod-area.activa {
+  background: var(--primario); border-color: var(--primario); color: var(--primario-texto);
+}

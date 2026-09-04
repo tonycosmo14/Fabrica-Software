@@ -17,9 +17,33 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '5.5';
+const VERSION_ACTUAL = '5.6';
 
 const VERSIONES = [
+  {
+    numero: '5.6',
+    nombre: 'Los pedidos',
+    fecha: '2026-09-04',
+    resumen:
+      'Se aparta un pedido en vez de cobrarlo, se ve todo junto lo que hay '
+      + 'que preparar, y cada cliente se lleva su nota de entrega con un QR '
+      + 'que abre su ubicación en el mapa.',
+    cambios: [
+      { tipo: 'importante', texto: 'ANTES, PARA ANOTAR UN PEDIDO HABÍA QUE COBRARLO. «Tengo que literalmente hacerlo desde la caja y asignarle un cliente.» Eso dejaba dos mentiras escritas: una venta cobrada de hielo que seguía en el cuarto frío, y un cliente al que no se le había entregado nada. Y si el pedido después no salía, había que cancelar un ticket ya cobrado.' },
+      { tipo: 'nuevo', texto: 'AHORA SE APARTA. Se arma el ticket como siempre —los mismos botones, los mismos precios, el mismo teclado de fracciones—, se elige al cliente y se toca «📦 Apartar como pedido». No se cobra: un pedido es una promesa, y la venta nace cuando se entrega.' },
+      { tipo: 'nuevo', texto: 'UN SOLO BOTÓN PARA AGUA Y PARA HIELO. Un pedido es UNA llamada de UN cliente —«diez garrafones y cincuenta bolsas»— y partirlo en dos al capturarlo haría que el repartidor llegara con dos notas a la misma puerta. Lo que se parte es la PREPARACIÓN, que sí son dos áreas con dos personas.' },
+      { tipo: 'nuevo', texto: 'LA PANTALLA «PARA PREPARAR»: todo sumado por producto y partido en Agua y Hielo. Es lo que se lee en la planta con las manos mojadas —«40 garrafones, 180 bolsas»— y ahí a nadie le importa de quién es cada cosa. Con su hoja impresa para llevarla.' },
+      { tipo: 'nuevo', texto: 'LA NOTA DE ENTREGA, una por cliente, con las tres respuestas en el orden en que se preguntan bajando de la camioneta: a dónde, qué llevo y qué cobro. Con el horario de la tienda arriba, las referencias de la puerta, y en grande si se cobra o va a su cuenta.' },
+      { tipo: 'nuevo', texto: 'Y SU CÓDIGO QR: se escanea con el teléfono y abre la ubicación del cliente en Google Maps. Sin teclear una dirección mientras se maneja, que es la parte peligrosa.' },
+      { tipo: 'importante', texto: 'EL QR SE DIBUJA AQUÍ DENTRO, sin internet y sin librerías de fuera. El día que se caiga la conexión —y se cae— las notas siguen saliendo igual. Y si el cliente no tiene ubicación guardada, la nota sale SIN QR: un código que lleva a la coordenada cero manda al golfo de Guinea, y un repartidor que aprende que el QR miente deja de usarlo para siempre.' },
+      { tipo: 'importante', texto: 'EL PRECIO SE COPIA AL TOMAR EL PEDIDO, no al entregarlo. Si el lunes suben los precios y el pedido se tomó el sábado, lo que se cobra es lo que dice el papel que el repartidor lleva en la mano. Discutir el precio en la puerta del cliente es perder el cliente.' },
+      { tipo: 'importante', texto: 'Y LA DIRECCIÓN TAMBIÉN. Si el cliente se muda, la nota de un pedido de hace tres meses sigue diciendo a dónde se llevó — si no, nadie podría explicar por qué el repartidor fue a donde fue.' },
+      { tipo: 'nuevo', texto: 'LO ATRASADO NO SE ESCONDE. Un pedido de ayer que no salió sigue apareciendo, marcado. Ocultarlo porque cambió el día es la forma más fácil de perder un cliente. Y lo de mañana NO sale en la preparación de hoy: sería hielo derritiéndose en la camioneta.' },
+      { tipo: 'nuevo', texto: 'AL MARCARLO ENTREGADO NACE SU VENTA, con las líneas del pedido tal cual, y sale su ticket. Ahí se pregunta cómo pagó de verdad —en la puerta el cliente cambia de opinión— y ahí es cuando entra al corte y sale el hielo del cuarto frío.' },
+      { tipo: 'nuevo', texto: 'CANCELAR UN PEDIDO ES CANCELAR UNA PROMESA, con su motivo, no un ticket cobrado — que es una cosa mucho más fea de explicar. Y no se borra: queda para poder contestar «¿y el de la tiendita, qué pasó?» tres semanas después.' },
+      { tipo: 'mejora', texto: 'EL REPARTIDOR VE Y ENTREGA, pero no toma pedidos: uno nace de una llamada al mostrador. La cajera y el gerente toman, entregan y cancelan.' }
+    ]
+  },
   {
     numero: '5.5',
     nombre: 'Cobrar la deuda desde la caja',
