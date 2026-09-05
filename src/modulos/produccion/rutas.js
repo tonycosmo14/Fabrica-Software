@@ -33,6 +33,12 @@ const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
 const { tanqueConEstado, canastasFuera, horasDesde } = require('./estado');
 
+/** Un texto de la pantalla, recortado y sin espacios de sobra. Null si viene vacío. */
+function texto(v, largo = 300) {
+  const t = String(v ?? '').trim();
+  return t ? t.slice(0, largo) : null;
+}
+
 /** "hace 7 horas", "hace un rato", "hace 2 días" — para decírselo a alguien. */
 function fraseHoras(horas) {
   if (horas < 1) return 'hace menos de una hora';
@@ -1152,6 +1158,190 @@ function cuentaDeMezcla(filas) {
   const cuenta = Object.fromEntries(calidad.RESULTADOS.map((c) => [c, 0]));
   for (const f of filas) if (cuenta[f.resultado] !== undefined) cuenta[f.resultado]++;
   return cuenta;
+}
+
+// ============================================================
+// LA REVISIÓN DEL TANQUE  (v6.7)
+// ============================================================
+//
+// Corregir sirve para arreglar; esto sirve para DESCUBRIR. El sistema dice
+// qué debería tener cada paño AHORA MISMO —"se sacó hoy a las 6:10, lo
+// reportó Chema, debe tener agua"— y se camina el tanque marcando lo que
+// de verdad hay. Cada diferencia queda escrita con quién reportó aquella
+// sacada, y desde ahí se va a corregirla.
+
+const revisar = exigirPermiso('produccion.revisar');
+
+/** Qué es lo que se espera de cada estado, dicho para una persona. */
+const QUE_DEBE_TENER = {
+  congelando: { texto: 'agua congelando', ayuda: 'se sacó hace poco y se rellenó' },
+  lista:      { texto: 'hielo, listo', ayuda: 'lleva sus horas y no se ha sacado' },
+  fuera:      { texto: 'nada: está fuera del tanque', ayuda: 'se sacó y no se rellenó' },
+  proceso:    { texto: 'a medias', ayuda: 'se empezó a sacar y no se terminó' }
+};
+
+/**
+ * La última sacada reportada de cada paño de un tanque: cuál es, cuándo y
+ * quién la reportó.
+ *
+ * Se pregunta aquí y no se toma de `tanqueConEstado`, que resume las horas
+ * y los nombres para pintar la lista pero no guarda el id de la sacada — y
+ * el id es justo lo que hace falta: es la que se va a ir a corregir.
+ */
+function ultimasReportadas(tanqueId) {
+  const filas = bd.prepare(`
+    SELECT sp.pano_id, sp.id, sp.terminada_en,
+           COALESCE(u.nombre, sp.ejecutor_libre, '—') AS quien
+      FROM sacadas_pano sp
+      JOIN panos p ON p.id = sp.pano_id
+      LEFT JOIN usuarios u ON u.id = sp.ejecutor_id
+     WHERE p.tanque_id = ? AND sp.terminada_en IS NOT NULL AND sp.anulada_en IS NULL
+     ORDER BY sp.pano_id, sp.terminada_en DESC
+  `).all(tanqueId);
+  const mapa = new Map();
+  for (const f of filas) if (!mapa.has(f.pano_id)) mapa.set(f.pano_id, f);
+  return mapa;
+}
+
+/** Lo que el sistema dice que debería haber en cada paño, para ir a verlo. */
+router.get('/revision', revisar, (req, res) => {
+  const tanqueId = req.query.tanque
+    || bd.prepare('SELECT id FROM tanques WHERE activo = 1 ORDER BY orden LIMIT 1').get()?.id;
+  const tanque = tanqueId ? tanqueConEstado(tanqueId) : null;
+  if (!tanque) return error(res, 'Ese tanque no existe.', 404);
+
+  const ultimas = ultimasReportadas(tanque.id);
+  const hoy = new Date().toISOString().slice(0, 10);
+  const panos = tanque.panos.map((p) => {
+    // La sacada que quedaría en entredicho si el paño tiene hielo: la
+    // última que se reportó.
+    const u = ultimas.get(p.id) || null;
+    return {
+      id: p.id,
+      numero: p.numero,
+      esperado: p.estado,
+      debeTener: QUE_DEBE_TENER[p.estado] || QUE_DEBE_TENER.lista,
+      horas: p.horas == null ? null : Math.round(p.horas),
+      ultimaSacada: u
+        ? { id: u.id, fecha: u.terminada_en, quien: u.quien,
+            hoy: String(u.terminada_en).slice(0, 10) === hoy }
+        : null
+    };
+  });
+
+  return ok(res, {
+    tanques: bd.prepare('SELECT id, nombre FROM tanques WHERE activo = 1 ORDER BY orden').all(),
+    tanque: { id: tanque.id, nombre: tanque.nombre },
+    panos,
+    ultima: bd.prepare(`
+      SELECT r.*, u.nombre AS quien FROM revisiones_tanque r
+        LEFT JOIN usuarios u ON u.id = r.ejecutor_id
+       WHERE r.tanque_id = ? ORDER BY r.fecha DESC LIMIT 1
+    `).get(tanque.id) || null
+  });
+});
+
+/**
+ * Guarda la vuelta al tanque.
+ *
+ * Cuerpo: { tanqueId, notas, panos: [{ panoId, encontrado, notas }] }
+ *
+ * Se guarda TODA la vuelta, no solo lo que no cuadró: "se revisaron los 18
+ * y cuadraron 17" es un dato, y "solo se revisó uno" es otro muy distinto.
+ */
+router.post('/revision', revisar, (req, res) => {
+  const tanque = bd.prepare('SELECT * FROM tanques WHERE id = ? AND activo = 1')
+    .get(req.body?.tanqueId ?? null);
+  if (!tanque) return error(res, 'Ese tanque no existe.', 404);
+
+  const marcados = Array.isArray(req.body?.panos) ? req.body.panos : [];
+  if (!marcados.length) return error(res, 'No se revisó ningún paño.');
+
+  const estado = tanqueConEstado(tanque.id);
+  const porId = new Map(estado.panos.map((p) => [p.id, p]));
+  const ultimas = ultimasReportadas(tanque.id);
+  const VALIDOS = ['cuadra', 'con_hielo', 'con_agua', 'vacio'];
+
+  const filas = [];
+  for (const m of marcados) {
+    const pano = porId.get(String(m?.panoId));
+    if (!pano) return error(res, 'Uno de esos paños no es de este tanque.', 409);
+    const encontrado = String(m?.encontrado || '');
+    if (!VALIDOS.includes(encontrado)) return error(res, 'Esa respuesta no existe.');
+    filas.push({ pano, encontrado, notas: texto(m?.notas, 300) });
+  }
+
+  const diferencias = filas.filter((f) => f.encontrado !== 'cuadra');
+  const id = nuevoId();
+  const fecha = ahora();
+
+  bd.transaction(() => {
+    bd.prepare(`
+      INSERT INTO revisiones_tanque (id, tanque_id, fecha, ejecutor_id, notas, panos, diferencias)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(id, tanque.id, fecha, req.usuario.id, texto(req.body?.notas, 500),
+           filas.length, diferencias.length);
+
+    const meter = bd.prepare(`
+      INSERT INTO revisiones_panos
+        (id, revision_id, pano_id, esperado, encontrado, sacada_pano_id, reporto, reportado_en, notas)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    for (const f of filas) {
+      const u = ultimas.get(f.pano.id) || null;
+      meter.run(nuevoId(), id, f.pano.id, f.pano.estado, f.encontrado,
+                u?.id ?? null, u?.quien ?? null, u?.terminada_en ?? null, f.notas);
+    }
+  })();
+
+  bitacora.registrar({
+    accion: diferencias.length ? 'produccion.revision_no_cuadra' : 'produccion.revision',
+    entidad: 'tanque', entidadId: tanque.id, ejecutorId: req.usuario.id,
+    detalle: {
+      tanque: tanque.nombre, panos: filas.length, diferencias: diferencias.length,
+      cuales: diferencias.map((f) => ({
+        pano: f.pano.numero, esperado: f.pano.estado, encontrado: f.encontrado,
+        reporto: ultimas.get(f.pano.id)?.quien || null
+      }))
+    }
+  });
+
+  return ok(res, { revision: detalleRevision(id) }, 201);
+});
+
+/** Las vueltas que se han dado, de la más nueva a la más vieja. */
+router.get('/revisiones', revisar, (req, res) => {
+  const filas = bd.prepare(`
+    SELECT r.*, t.nombre AS tanque, u.nombre AS quien
+      FROM revisiones_tanque r
+      JOIN tanques t ON t.id = r.tanque_id
+      LEFT JOIN usuarios u ON u.id = r.ejecutor_id
+     ORDER BY r.fecha DESC LIMIT 40
+  `).all();
+  return ok(res, { revisiones: filas.map((f) => detalleRevision(f.id, f)) });
+});
+
+function detalleRevision(id, cabeza = null) {
+  const r = cabeza || bd.prepare(`
+    SELECT r.*, t.nombre AS tanque, u.nombre AS quien
+      FROM revisiones_tanque r
+      JOIN tanques t ON t.id = r.tanque_id
+      LEFT JOIN usuarios u ON u.id = r.ejecutor_id
+     WHERE r.id = ?
+  `).get(id);
+  if (!r) return null;
+  return {
+    ...r,
+    // Solo lo que NO cuadró: los que cuadraron ya están contados arriba, y
+    // una lista de dieciocho "todo bien" no la lee nadie.
+    problemas: bd.prepare(`
+      SELECT rp.*, p.numero AS pano
+        FROM revisiones_panos rp
+        JOIN panos p ON p.id = rp.pano_id
+       WHERE rp.revision_id = ? AND rp.encontrado <> 'cuadra'
+       ORDER BY p.numero
+    `).all(r.id)
+  };
 }
 
 // ============================================================

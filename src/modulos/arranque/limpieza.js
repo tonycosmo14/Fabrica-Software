@@ -65,6 +65,9 @@ const MOVIMIENTOS = [
   { tabla: 'sacadas_moldes', grupo: 'La producción' },
   // El rastro de lo que se corrigió de una sacada (v6.6): se va con ella.
   { tabla: 'correcciones_moldes', grupo: 'La producción' },
+  // Las vueltas al tanque para revisar que lo reportado sea verdad (v6.7).
+  { tabla: 'revisiones_panos', grupo: 'La producción' },
+  { tabla: 'revisiones_tanque', grupo: 'La producción' },
   { tabla: 'sacadas', grupo: 'La producción', cuenta: true },
   { tabla: 'rellenados', grupo: 'La producción' },
   { tabla: 'sacadas_pano', grupo: 'La producción' },

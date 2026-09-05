@@ -75,6 +75,11 @@ const AVISOS = [
            'que pusiste como normal. Suele ser el aviso de una lona rota o de una ' +
            'ruta que se está haciendo demasiado larga.' },
 
+  { id: 'revision_tanque', nombre: 'Una revisión de tanque no cuadró', icono: '🔎', grupo: 'Lo que se acaba',
+    ayuda: 'Cuando alguien da la vuelta al tanque y encuentra un paño que no está ' +
+           'como dice el sistema: hielo donde debería haber agua, o al revés. Es el ' +
+           'aviso de que lo reportado no fue lo que pasó.' },
+
   { id: 'nevera_sin_pedir', nombre: 'Nevera que no ha pedido', icono: '📞', grupo: 'Las neveras',
     ayuda: 'Las neveras que llevan más días sin pedir bolsas de los que les ' +
            'pusiste. Sale una vez al día, no cada vez que se mira.' },
@@ -264,6 +269,39 @@ const nombreDe = (u) => escapar(u?.nombre || 'alguien');
 // ============================================================
 
 const SEGUN_ACCION = {
+
+  // ---------- LA REVISIÓN DEL TANQUE  (v6.7) ----------
+  //
+  // Solo cuando NO cuadra. Una vuelta en la que todo estaba en su sitio es
+  // una buena noticia, pero no es una noticia que valga un correo.
+  'produccion.revision_no_cuadra': (e) => {
+    if (!encendido('revision_tanque')) return null;
+    const d = e.detalle;
+    const cuales = Array.isArray(d.cuales) ? d.cuales : [];
+    const COMO = {
+      con_hielo: 'tiene hielo y el sistema dice que ya se sacó',
+      con_agua: 'tiene agua y el sistema dice que está listo',
+      vacio: 'está vacío'
+    };
+    return {
+      aviso: 'revision_tanque',
+      asunto: `${d.tanque}: ${d.diferencias} ${d.diferencias === 1 ? 'paño no cuadra' : 'paños no cuadran'}`,
+      titulo: 'Una revisión de tanque no cuadró',
+      entradilla: `Lo revisó <b>${escapar(e.quien || '—')}</b>: miró `
+        + `${d.panos} ${d.panos === 1 ? 'paño' : 'paños'} de ${escapar(d.tanque)}.`,
+      grande: String(d.diferencias),
+      color: 'rojo',
+      renglones: cuales.slice(0, 10).map((c) => [
+        `Paño ${escapar(c.pano)}`,
+        `${escapar(COMO[c.encontrado] || c.encontrado)}`
+          + (c.reporto ? ` · lo reportó ${escapar(c.reporto)}` : '')
+      ]),
+      nota: 'Un paño con hielo que se reportó sacado es producción que se '
+          + 'apuntó y no existió: el faltante aparece días después y le cae a '
+          + 'quien esté en la caja ese día. Se corrige en la historia de ese '
+          + 'paño, en la fecha en que se reportó.'
+    };
+  },
 
   // ---------- EL CORTE ----------
   'caja.cerrada': (e) => {

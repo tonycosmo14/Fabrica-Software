@@ -66,6 +66,10 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
                           estado.permisos.includes('produccion.numeros');
   const puedeCorregir = estado.permisos.includes('*') ||
                         estado.permisos.includes('produccion.corregir');
+  // Dar la vuelta al tanque para comprobar que lo reportado es lo que hay
+  // (v6.7). No lo tiene el operario: revisarse a uno mismo no es revisar.
+  const puedeRevisar = estado.permisos.includes('*') ||
+                       estado.permisos.includes('produccion.revisar');
   // EL OPERARIO NO ELIGE QUIÉN SACÓ EL PAÑO: fue él.
   //
   // Es la misma regla que en la caja, donde el cajero no escoge quién
@@ -167,6 +171,18 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
             </span>
           </button>` : ''}
 
+        <!-- LA REVISIÓN DEL TANQUE  (v6.7). Corregir sirve para arreglar;
+             esto sirve para descubrir. No se anuncia: se agarra el
+             teléfono, se camina el tanque y se va marcando. -->
+        ${puedeRevisar ? `
+          <button id="revisar" class="accion-principal">
+            <span class="accion-icono">🔎</span>
+            <span class="accion-texto">
+              <strong>Revisar el tanque</strong>
+              <small>Comprobar que lo reportado es lo que hay</small>
+            </span>
+          </button>` : ''}
+
         <!-- EL PAPEL DEL DÍA  (v4.7). Ya no sale pegado al corte: es una
              foto de cómo va el día y se saca cuando se quiera, no al
              cerrar el turno de alguien. -->
@@ -243,6 +259,8 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
       b.onclick = () => { tanqueActivo = b.dataset.tanque; pintar(); };
     });
     pantalla.querySelector('#ver-hoy').onclick = verHoy;
+    const btnRevisar = pantalla.querySelector('#revisar');
+    if (btnRevisar) btnRevisar.onclick = () => revisarTanque();
     const btnSalmuera = pantalla.querySelector('#medir-salmuera');
     if (btnSalmuera) btnSalmuera.onclick = medirSalmuera;
 
@@ -528,6 +546,10 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
     const toca = datos.tanque.siguiente;
     const esElQueToca = !toca || toca.id === panoId;
     let vale = opciones.vale || null;
+
+    // Desde la revisión del tanque se entra directo a corregir la sacada
+    // que quedó en entredicho, sin tener que buscarla en la historia.
+    if (opciones.corregir) return corregirSacada(opciones.corregir);
     let mirando = Boolean(opciones.mirar) || !puedeRegistrar;
 
     // La historia se pide siempre: en la vista de mirar ES la pantalla, y
@@ -1709,6 +1731,158 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
   // ==========================================================
   // LO DE HOY
   // ==========================================================
+  /**
+   * LA REVISIÓN DEL TANQUE  (v6.7)
+   *
+   * "Vamos a revisar los tanques y un paño que se dijo que se sacó está
+   *  ahí y no se sacó."
+   *
+   * El sistema dice qué debería tener cada paño AHORA MISMO —"se sacó hoy
+   * a las 6:10, lo reportó Chema, debe tener agua"— y se va marcando lo
+   * que de verdad hay. Se hace de pie, con el teléfono, en dos minutos, y
+   * cada diferencia queda escrita con quién reportó aquella sacada.
+   */
+  async function revisarTanque(tanque = tanqueActivo) {
+    let d;
+    try { d = await api.obtener(`/produccion/revision?tanque=${encodeURIComponent(tanque)}`); }
+    catch (e) { return avisar(e.message, 'error'); }
+
+    // Se arranca con todo en "cuadra": lo normal es que cuadre, y así la
+    // vuelta son cero toques cuando todo está bien.
+    const respuestas = new Map(d.panos.map((p) => [p.id, 'cuadra']));
+    const notas = new Map();
+
+    const COMO = [
+      { valor: 'cuadra', texto: '✓ Como dice', clase: 'bien' },
+      { valor: 'con_hielo', texto: '🧊 Tiene hielo', clase: 'malo',
+        ayuda: 'y el sistema dice que ya se sacó' },
+      { valor: 'con_agua', texto: '💧 Tiene agua', clase: 'malo',
+        ayuda: 'y el sistema dice que está listo' },
+      { valor: 'vacio', texto: '␀ Vacío', clase: 'malo', ayuda: 'no hay nada dentro' }
+    ];
+
+    function dibujar() {
+      const distintos = [...respuestas.values()].filter((r) => r !== 'cuadra').length;
+
+      pantalla.innerHTML = `
+        <div class="cabecera-pantalla">
+          <button class="secundario chico" id="volver">‹ Producción</button>
+          <h2>Revisar ${esc(d.tanque.nombre)}</h2>
+          <p class="ayuda">
+            Camina el tanque y ve marcando. Todo empieza en «como dice»: solo
+            se toca lo que NO está como el sistema cree.
+            ${d.ultima ? ` La última vuelta la dio ${esc(d.ultima.quien || '—')},
+              ${esc(fechaCorta(d.ultima.fecha))}${
+                d.ultima.diferencias ? ` · ${d.ultima.diferencias} no cuadraban` : ' · todo cuadró'}.` : ''}
+          </p>
+        </div>
+
+        ${d.tanques.length > 1 ? `
+          <div class="pestanas" style="margin-bottom:12px">
+            ${d.tanques.map((t) => `
+              <button class="pestana ${t.id === d.tanque.id ? 'activa' : ''}"
+                      data-otro-tanque="${esc(t.id)}">${esc(t.nombre)}</button>`).join('')}
+          </div>` : ''}
+
+        <div class="revision-lista">
+          ${d.panos.map((p) => {
+            const r = respuestas.get(p.id);
+            const u = p.ultimaSacada;
+            return `
+              <div class="tarjeta revision-fila ${r === 'cuadra' ? '' : 'no-cuadra'}">
+                <div class="revision-quien">
+                  <strong>Paño ${p.numero}</strong>
+                  <span class="revision-debe">debe tener <b>${esc(p.debeTener.texto)}</b></span>
+                  <small class="ayuda">
+                    ${esc(p.debeTener.ayuda)}${p.horas != null ? ` · lleva ${p.horas} h` : ''}
+                    ${u ? ` · la sacó ${esc(u.quien)}, ${esc(fechaCorta(u.fecha))}${
+                      u.hoy ? ' (hoy)' : ''}` : ' · nunca se ha sacado'}
+                  </small>
+                </div>
+                <div class="revision-botones">
+                  ${COMO.map((c) => `
+                    <button class="${r === c.valor ? '' : 'secundario'} chico ${
+                      r === c.valor && c.clase === 'malo' ? 'peligro' : ''}"
+                            data-marcar="${esc(p.id)}" data-valor="${c.valor}"
+                            title="${esc(c.ayuda || '')}">${c.texto}</button>`).join('')}
+                </div>
+                ${r !== 'cuadra' ? `
+                  <input class="revision-nota" data-nota="${esc(p.id)}" maxlength="300"
+                         value="${esc(notas.get(p.id) || '')}"
+                         placeholder="Qué encontraste, si hace falta decirlo">
+                  ${u ? `
+                    <button class="secundario chico" data-ir="${esc(u.id)}" data-pano="${esc(p.id)}">
+                      ✏️ Ir a corregir esa sacada
+                    </button>` : ''}` : ''}
+              </div>`;
+          }).join('')}
+        </div>
+
+        <div class="tarjeta corregir-cierre">
+          <div class="corregir-cuenta">
+            <div><small>Paños revisados</small><strong>${d.panos.length}</strong></div>
+            <div><small>No cuadran</small>
+              <strong class="${distintos ? 'malo' : 'bien'}">${distintos}</strong></div>
+          </div>
+          <label>
+            <span class="etiqueta-chica">Notas de la vuelta<small>opcional</small></span>
+            <input id="notas-rev" maxlength="500" value="${esc(notasVuelta)}"
+                   placeholder="Vuelta de la mañana, antes de abrir">
+          </label>
+          <div class="fila-botones" style="margin-top:12px">
+            <button id="guardar-rev">Guardar la revisión</button>
+            <button class="secundario" id="cancelar-rev">Cancelar</button>
+          </div>
+          ${distintos ? `
+            <p class="ayuda" style="margin:10px 0 0">
+              Al guardar queda escrito qué se encontró y <b>quién reportó</b> cada
+              sacada que no cuadra, y sale un aviso por correo. Corregir la
+              sacada es aparte: con el ✏️ de cada renglón.
+            </p>` : ''}
+        </div>`;
+
+      const q = (sel) => pantalla.querySelector(sel);
+      q('#volver').onclick = pintar;
+      q('#cancelar-rev').onclick = pintar;
+      q('#notas-rev').oninput = (ev) => { notasVuelta = ev.target.value; };
+
+      pantalla.querySelectorAll('[data-otro-tanque]').forEach((b) => {
+        b.onclick = () => revisarTanque(b.dataset.otroTanque);
+      });
+      pantalla.querySelectorAll('[data-marcar]').forEach((b) => {
+        b.onclick = () => { respuestas.set(b.dataset.marcar, b.dataset.valor); dibujar(); };
+      });
+      pantalla.querySelectorAll('[data-nota]').forEach((el) => {
+        el.oninput = () => notas.set(el.dataset.nota, el.value);
+      });
+      pantalla.querySelectorAll('[data-ir]').forEach((b) => {
+        b.onclick = () => detallePano(b.dataset.pano, { mirar: true, corregir: b.dataset.ir });
+      });
+      q('#guardar-rev').onclick = guardar;
+    }
+
+    async function guardar() {
+      try {
+        const r = await api.enviar('/produccion/revision', {
+          tanqueId: d.tanque.id,
+          notas: notasVuelta,
+          panos: d.panos.map((p) => ({
+            panoId: p.id, encontrado: respuestas.get(p.id), notas: notas.get(p.id) || null
+          }))
+        });
+        const rev = r.revision;
+        avisar(rev.diferencias
+          ? `Revisión guardada · ${rev.diferencias} ${rev.diferencias === 1 ? 'paño no cuadra' : 'paños no cuadran'}`
+          : `Revisión guardada · los ${rev.panos} paños cuadran`,
+          rev.diferencias ? 'error' : 'bien');
+        pintar();
+      } catch (e) { avisar(e.message, 'error'); }
+    }
+
+    let notasVuelta = '';
+    dibujar();
+  }
+
   async function verHoy() {
     const r = await api.obtener('/produccion/hoy');
 

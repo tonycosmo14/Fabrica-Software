@@ -490,8 +490,9 @@ test('todos los avisos se prenden y se apagan uno por uno', async () => {
   const lista = (await llamar('/api/correo')).json.datos.avisos;
   // Quince en la v4.9, más los dos de las neveras en la v5.1, más los
   // seis de la planta de agua en la v5.2, más los dos del reparto en la
-  // v5.7 (el dinero que no cuadra y el hielo que se derritió de más).
-  assert.equal(lista.length, 25);
+  // v5.7 (el dinero que no cuadra y el hielo que se derritió de más), más
+  // la revisión de tanque que no cuadra en la v6.7.
+  assert.equal(lista.length, 26);
 
   for (const a of lista) {
     const r = await llamar(`/api/correo/avisos/${a.id}`, {
@@ -499,5 +500,5 @@ test('todos los avisos se prenden y se apagan uno por uno', async () => {
     assert.equal(r.estado, 200, a.id);
     assert.equal(r.json.datos.aviso.encendido, true);
   }
-  assert.equal(avisos.catalogo().filter((a) => a.encendido).length, 25);
+  assert.equal(avisos.catalogo().filter((a) => a.encendido).length, 26);
 });

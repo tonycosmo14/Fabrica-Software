@@ -71,6 +71,10 @@ const PERMISOS_POR_ROL = {
     'produccion.numeros',
     'produccion.autorizar',
     'produccion.corregir',
+    // DAR LA VUELTA AL TANQUE  (v6.7): comprobar que lo que se reportó es
+    // lo que hay. No lo tiene el operario a propósito: revisarse a uno
+    // mismo no es revisar nada.
+    'produccion.revisar',
     'caja.ver',
     'caja.operar',
     'venta.registrar',

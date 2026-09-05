@@ -317,3 +317,119 @@ test('quitar una canasta de una sacada vieja arregla el corte de aquel día', as
   assert.equal(otra.hielo.cuadre.contado, antesDelConteo.esperado, 'LO CONTADO NO SE TOCA');
   assert.ok(pano.id);
 });
+
+// ============================================================
+// LA REVISIÓN DEL TANQUE  (v6.7)
+// Lo que descubre al mañoso al día siguiente, no a los tres días.
+// ============================================================
+
+test('la revisión dice qué debería tener cada paño ahora mismo', async () => {
+  await entrarAdmin();
+  const r = await llamar(`/api/produccion/revision?tanque=${tanqueId}`);
+  assert.equal(r.estado, 200);
+  const d = r.json.datos;
+  assert.equal(d.panos.length, 8);
+
+  for (const p of d.panos) {
+    assert.ok(p.debeTener.texto, 'de cada paño se dice qué debería haber');
+    assert.ok(['congelando', 'lista', 'fuera', 'proceso'].includes(p.esperado));
+  }
+  // Los que se sacaron hoy tienen que decir quién los reportó: es el dato
+  // que hace útil la vuelta.
+  const sacadoHoy = d.panos.find((p) => p.ultimaSacada?.hoy);
+  assert.ok(sacadoHoy, 'en estas pruebas ya se sacaron varios hoy');
+  assert.ok(sacadoHoy.ultimaSacada.quien);
+});
+
+test('una vuelta en la que todo cuadra se guarda, y no arma escándalo', async () => {
+  await entrarAdmin();
+  const d = (await llamar(`/api/produccion/revision?tanque=${tanqueId}`)).json.datos;
+
+  const r = await llamar('/api/produccion/revision', {
+    method: 'POST',
+    cuerpo: {
+      tanqueId,
+      panos: d.panos.map((p) => ({ panoId: p.id, encontrado: 'cuadra' }))
+    }
+  });
+  assert.equal(r.estado, 201, JSON.stringify(r.json));
+  assert.equal(r.json.datos.revision.panos, 8);
+  assert.equal(r.json.datos.revision.diferencias, 0);
+  assert.equal(r.json.datos.revision.problemas.length, 0);
+
+  const enBitacora = bd.prepare(
+    "SELECT COUNT(*) n FROM bitacora WHERE accion = 'produccion.revision'").get().n;
+  assert.ok(enBitacora >= 1, 'la vuelta buena también queda apuntada');
+});
+
+test('el paño que dice sacado y tiene hielo queda señalado, con quién lo reportó', async () => {
+  await entrarAdmin();
+  const d = (await llamar(`/api/produccion/revision?tanque=${tanqueId}`)).json.datos;
+  const sospechoso = d.panos.find((p) => p.ultimaSacada && p.esperado === 'congelando');
+  assert.ok(sospechoso, 'hace falta uno que el sistema crea recién sacado');
+
+  const r = await llamar('/api/produccion/revision', {
+    method: 'POST',
+    cuerpo: {
+      tanqueId,
+      notas: 'Vuelta de la mañana',
+      panos: d.panos.map((p) => ({
+        panoId: p.id,
+        encontrado: p.id === sospechoso.id ? 'con_hielo' : 'cuadra',
+        notas: p.id === sospechoso.id ? 'Está entero, no lo sacaron' : null
+      }))
+    }
+  });
+  assert.equal(r.estado, 201);
+  const rev = r.json.datos.revision;
+  assert.equal(rev.diferencias, 1);
+  assert.equal(rev.problemas.length, 1, 'solo sale lo que no cuadró');
+
+  const p = rev.problemas[0];
+  assert.equal(p.pano, sospechoso.numero);
+  assert.equal(p.encontrado, 'con_hielo');
+  assert.equal(p.esperado, 'congelando');
+  assert.equal(p.sacada_pano_id, sospechoso.ultimaSacada.id,
+    'queda amarrado a la sacada que hay que ir a corregir');
+  assert.equal(p.reporto, sospechoso.ultimaSacada.quien, 'y a quién la reportó');
+  assert.match(p.notas, /no lo sacaron/);
+
+  // Y sale en la lista de vueltas, para poder volver a ella.
+  const lista = (await llamar('/api/produccion/revisiones')).json.datos.revisiones;
+  assert.equal(lista[0].id, rev.id);
+  assert.equal(lista[0].diferencias, 1);
+});
+
+test('el operario no revisa el tanque; el gerente sí', async () => {
+  const d = (await llamar(`/api/produccion/revision?tanque=${tanqueId}`)).json.datos;
+  const cuerpo = { tanqueId, panos: [{ panoId: d.panos[0].id, encontrado: 'cuadra' }] };
+
+  await entrarPorNombre('Chema', '5555');
+  let r = await llamar('/api/produccion/revision', { method: 'POST', cuerpo });
+  assert.equal(r.estado, 403, 'revisarse a uno mismo no es revisar nada');
+  assert.equal((await llamar(`/api/produccion/revision?tanque=${tanqueId}`)).estado, 403);
+
+  await entrarPorNombre('Lupe', '9999');
+  r = await llamar('/api/produccion/revision', { method: 'POST', cuerpo });
+  assert.equal(r.estado, 201);
+  await entrarAdmin();
+});
+
+test('una respuesta inventada o un paño de otro tanque no se guardan', async () => {
+  await entrarAdmin();
+  const d = (await llamar(`/api/produccion/revision?tanque=${tanqueId}`)).json.datos;
+
+  let r = await llamar('/api/produccion/revision', {
+    method: 'POST',
+    cuerpo: { tanqueId, panos: [{ panoId: d.panos[0].id, encontrado: 'mas o menos' }] }
+  });
+  assert.equal(r.estado, 400);
+
+  r = await llamar('/api/produccion/revision', {
+    method: 'POST', cuerpo: { tanqueId, panos: [{ panoId: 'no-existe', encontrado: 'cuadra' }] }
+  });
+  assert.equal(r.estado, 409);
+
+  r = await llamar('/api/produccion/revision', { method: 'POST', cuerpo: { tanqueId, panos: [] } });
+  assert.equal(r.estado, 400);
+});

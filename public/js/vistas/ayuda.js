@@ -45,7 +45,7 @@ const TEMAS = [
   {
     id: 'produccion',
     titulo: 'Producción de hielo: sacar el hielo de los tanques',
-    busca: 'producción tanque paño canasta molde sacar rellenar rotación intercalado merma agua purificada potable congelación horas cuánto tarda en congelar 48 quién lo sacó otro eventual nombre calidad sellada 80 90 60 40 por ciento porcentaje hueca cáscara aguada ahogada salada contaminada salmuera se botó cómo salió el hielo mezcla ojo ficha historia última vez F2 atajo panel canastas pendientes a medias turno canasta por canasta terminar',
+    busca: 'producción tanque paño canasta molde sacar rellenar rotación intercalado merma agua purificada potable congelación horas cuánto tarda en congelar 48 revisar el tanque revisión robo faltante quién lo sacó otro eventual nombre calidad sellada 80 90 60 40 por ciento porcentaje hueca cáscara aguada ahogada salada contaminada salmuera se botó cómo salió el hielo mezcla ojo ficha historia última vez F2 atajo panel canastas pendientes a medias turno canasta por canasta terminar',
     cuerpo: `
       <h4>Cómo está armado un tanque</h4>
       <p>Un <b>tanque</b> tiene varios <b>paños</b>. Cada paño tiene
@@ -339,6 +339,41 @@ const TEMAS = [
       <p class="ayuda-tip">Es del gerente y del administrador, el mismo
       permiso que anular. <b>El operario no corrige su propio reporte</b>:
       ese es justo el agujero que esto viene a tapar.</p>
+
+      <h4>🔎 Revisar el tanque</h4>
+      <p>Corregir sirve para <b>arreglar</b>; esto sirve para
+      <b>descubrir</b>, y al día siguiente en vez de a los tres días.</p>
+      <p>El botón está arriba, en Producción de hielo. Sale la lista de los
+      paños del tanque con <b>lo que el sistema dice que debería tener cada
+      uno ahora mismo</b>:</p>
+      <p class="ayuda-tip">«Paño 5 · debe tener <b>agua congelando</b> · se
+      sacó hace poco y se rellenó · lleva 1 h · la sacó Don Chema, hoy a las
+      6:10.»</p>
+      <p>Se camina el tanque con el teléfono en la mano y se va marcando lo
+      que hay de verdad. Todo empieza en <b>«✓ Como dice»</b>, así que una
+      vuelta en la que todo está bien no cuesta ni un toque. Cuando algo no
+      cuadra hay tres respuestas:</p>
+      <ul>
+        <li><b>🧊 Tiene hielo</b> — y el sistema dice que ya se sacó. <b>Este
+        es el importante.</b> Quiere decir que se reportó una sacada que no
+        pasó: hay producción apuntada que no existe, y el faltante va a
+        aparecer días después, en el conteo, cuando le toque a otra
+        persona.</li>
+        <li><b>💧 Tiene agua</b> — y el sistema dice que está listo. Salió
+        hielo que nadie reportó.</li>
+        <li><b>␀ Vacío</b> — no hay nada dentro y debería haberlo.</li>
+      </ul>
+      <p>De cada paño que no cuadra queda escrito qué se esperaba, qué se
+      encontró, lo que quieras anotar, y <b>quién reportó aquella sacada</b>,
+      con su fecha. Y ahí mismo, con el <b>✏️ Ir a corregir esa sacada</b>, se
+      va directo a arreglarla molde por molde.</p>
+      <p>Al guardar sale un <b>aviso por correo</b> si algo no cuadró —viene
+      encendido de fábrica—, para que te enteres aunque no estés. La vuelta
+      buena también queda guardada: «se revisaron los 18 y cuadraron los 18»
+      es un dato, y «solo se revisó uno» es otro muy distinto.</p>
+      <p class="ayuda-tip">Es del gerente y del administrador. <b>No lo tiene
+      el operario</b>: revisarse a uno mismo no es revisar nada. Y no se
+      anuncia: se agarra el teléfono y se camina el tanque.</p>
 
       <h4>El papel del día</h4>
       <p>El botón <b>🧾 El día</b> saca cuánto hielo queda en cada cuarto

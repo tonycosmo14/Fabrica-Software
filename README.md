@@ -897,6 +897,7 @@ verdad de qué hay en cada versión. Escrita a mano se quedaba atrás.
 | **v6.5** | Los estados del hielo, como son | ✅ listo |
 | **v6.5.1** | Que no se pierda de vista | ✅ listo |
 | **v6.6** | Corregir el paño, molde por molde | ✅ listo |
+| **v6.7** | Revisar el tanque | ✅ listo |
 
 **Lo que falta:** el instalador para Windows, y la
 importación de lo que hay en Aronium la noche antes de arrancar.

@@ -28,6 +28,7 @@ const ACCIONES = [
   { grupo: 'Producción', permiso: 'produccion.registrar', texto: 'Registrar lo que se sacó y rellenar' },
   { grupo: 'Producción', permiso: 'produccion.autorizar', texto: 'Autorizar sacar un paño fuera de orden' },
   { grupo: 'Producción', permiso: 'produccion.corregir',  texto: 'Anular un registro mal capturado, o corregir cómo salió' },
+  { grupo: 'Producción', permiso: 'produccion.revisar',   texto: 'Revisar el tanque: comprobar que lo reportado es lo que hay' },
 
   { grupo: 'Existencia', permiso: 'existencia.ver',       texto: 'Ver lo que hay en el cuarto frío' },
   { grupo: 'Existencia', permiso: 'existencia.contar',    texto: 'Hacer el conteo' },

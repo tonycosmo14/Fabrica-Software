@@ -17,9 +17,25 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '6.6';
+const VERSION_ACTUAL = '6.7';
 
 const VERSIONES = [
+  {
+    numero: '6.7',
+    nombre: 'Revisar el tanque',
+    fecha: '2026-09-05',
+    resumen:
+      'Una vuelta al tanque con el sistema diciendo qué debería tener cada '
+      + 'paño. Es lo que descubre al día siguiente lo que hoy aparece a los '
+      + 'tres días, con el faltante en el turno de otra persona.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'EL BOTÓN 🔎 REVISAR EL TANQUE, arriba en Producción de hielo. Sale la lista de sus paños con lo que el sistema dice que debería tener cada uno AHORA MISMO: «paño 5, debe tener agua congelando, se sacó hoy a las 6:10, la sacó Don Chema». Se camina el tanque y se va marcando lo que hay de verdad.' },
+      { tipo: 'importante', texto: 'LA RESPUESTA QUE IMPORTA ES «🧊 TIENE HIELO» y el sistema dice que ya se sacó: quiere decir que se reportó una sacada que no pasó. Hay producción apuntada que no existe, y ese faltante iba a aparecer días después en el conteo, cuando ya le tocaba a otro.' },
+      { tipo: 'nuevo', texto: 'DE CADA PAÑO QUE NO CUADRA queda escrito qué se esperaba, qué se encontró, lo que anotes, y QUIÉN REPORTÓ aquella sacada, con su fecha. Y ahí mismo, con el ✏️, se va directo a corregirla molde por molde.' },
+      { tipo: 'nuevo', texto: 'AVISO POR CORREO cuando una revisión no cuadra, encendido de fábrica: para enterarte aunque no estés ahí. La vuelta en que todo cuadra también se guarda —«se revisaron los 18 y cuadraron»— pero no manda correo.' },
+      { tipo: 'mejora', texto: 'Todo empieza marcado en «como dice»: una vuelta en la que todo está bien no cuesta ni un toque. Es del gerente y del administrador; el operario no se revisa a sí mismo.' }
+    ]
+  },
   {
     numero: '6.6',
     nombre: 'Corregir el paño, molde por molde',
