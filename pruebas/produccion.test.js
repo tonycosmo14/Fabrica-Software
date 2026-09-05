@@ -31,6 +31,22 @@ async function estadoTanque() {
   return json.datos;
 }
 
+/**
+ * Manda las sacadas de un paño a AYER.
+ *
+ * Desde la v6.6 un paño no se puede sacar dos veces el mismo día —el agua
+ * no se hace hielo en unas horas— y varias de estas pruebas necesitan
+ * sacarlo otra vez, que en la fábrica sería al día siguiente.
+ */
+function otroDia(panoId) {
+  bd.prepare(`
+    UPDATE sacadas_pano
+       SET iniciada_en = datetime(iniciada_en, '-1 day'),
+           terminada_en = datetime(terminada_en, '-1 day')
+     WHERE pano_id = ?
+  `).run(panoId);
+}
+
 preparar(async () => {
   const r = await llamar('/api/tanques', {
     method: 'POST',
@@ -182,6 +198,7 @@ test('otro obrero termina el paño que quedó a medias', async () => {
 test('dejar un paño fuera NO lo rellena y sale en la alerta', async () => {
   const d0 = await estadoTanque();
   const siguiente = d0.tanque.panos.find((p) => p.numero === d0.tanque.siguiente.numero);
+  otroDia(siguiente.id);
 
   await llamar(`/api/produccion/panos/${siguiente.id}/sacar`, {
     method: 'POST', cuerpo: { rellenar: false }
@@ -195,6 +212,7 @@ test('dejar un paño fuera NO lo rellena y sale en la alerta', async () => {
 test('la merma se guarda y el molde recuerda que falló', async () => {
   const d0 = await estadoTanque();
   const pano = d0.tanque.panos.find((p) => p.estado === 'congelando');
+  otroDia(pano.id);
   const molde = pano.canastas[0].moldes[0];
 
   const admin = bd.prepare("SELECT id FROM usuarios WHERE usuario = 'tony'").get();
@@ -256,6 +274,7 @@ test('el vale de autorización se pide antes y se usa una sola vez', async () =>
   const d0 = await estadoTanque();
   const toca = d0.tanque.siguiente.numero;
   const otro = d0.tanque.panos.find((p) => p.numero !== toca && p.estado !== 'fuera');
+  otroDia(otro.id);
 
   // Sin vale ni PIN: se rechaza y se avisa que hace falta autorización.
   const sinNada = await llamar(`/api/produccion/panos/${otro.id}/sacar`, {
@@ -286,7 +305,9 @@ test('el vale de autorización se pide antes y se usa una sola vez', async () =>
   assert.equal(sp.autorizada_por, admin);
   assert.equal(sp.motivo_orden, 'Se acabó el agua del otro');
 
-  // El mismo vale ya no sirve para nada.
+  // El mismo vale ya no sirve para nada. (Se manda a ayer para que lo que
+  // lo frene sea el vale gastado y no la regla del mismo día.)
+  otroDia(otro.id);
   const repetido = await llamar(`/api/produccion/panos/${otro.id}/sacar`, {
     method: 'POST', cuerpo: { tipoAgua: 'purificada', vale }
   });
@@ -296,8 +317,13 @@ test('el vale de autorización se pide antes y se usa una sola vez', async () =>
 test('un vale no sirve para un paño distinto del que se pidió', async () => {
   await entrarAdmin();
   const d0 = await estadoTanque();
-  const a = d0.tanque.panos[0];
-  const b = d0.tanque.panos[1];
+  // Los dos tienen que pedir autorización, así que ninguno puede ser el
+  // que toca; y a ayer, que hoy ya salieron en otras pruebas.
+  const toca = d0.tanque.siguiente.numero;
+  const libres = d0.tanque.panos.filter((p) => p.numero !== toca && p.estado !== 'fuera');
+  const a = libres[0];
+  const b = libres[1];
+  otroDia(a.id); otroDia(b.id);
 
   const auth = await llamar('/api/produccion/autorizar', {
     method: 'POST',
@@ -358,6 +384,7 @@ test('el molde cuenta las veces SEGUIDAS que falla', async () => {
 
   // Falla dos veces seguidas: la racha tiene que llegar a 2.
   for (let i = 0; i < 2; i++) {
+    otroDia(pano.id);
     await llamar(`/api/produccion/panos/${pano.id}/sacar`, {
       method: 'POST',
       cuerpo: {
@@ -374,6 +401,7 @@ test('el molde cuenta las veces SEGUIDAS que falla', async () => {
   assert.equal(m.rachaFallos, 2);
 
   // Sale bien una vez y la cuenta se corta.
+  otroDia(pano.id);
   await llamar(`/api/produccion/panos/${pano.id}/sacar`, {
     method: 'POST',
     cuerpo: {

@@ -35,7 +35,7 @@ const hoy = async () => (await llamar('/api/produccion/hoy')).json.datos;
 preparar(async () => {
   const r = await llamar('/api/tanques', {
     method: 'POST',
-    cuerpo: { nombre: '2N', panos: 6, plantilla: [3, 3], horasCongelacion: 24 }
+    cuerpo: { nombre: '2N', panos: 24, plantilla: [3, 3], horasCongelacion: 24 }
   });
   tanqueId = r.json.datos.tanque.id;
 

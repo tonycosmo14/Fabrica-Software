@@ -32,6 +32,14 @@ const { numerosASacar } = require('./siguientes');
 const bitacora = require('../../lib/bitacora');
 const { exigirPermiso } = require('../../middleware/sesion');
 const { tanqueConEstado, canastasFuera, horasDesde } = require('./estado');
+
+/** "hace 7 horas", "hace un rato", "hace 2 días" — para decírselo a alguien. */
+function fraseHoras(horas) {
+  if (horas < 1) return 'hace menos de una hora';
+  if (horas < 2) return 'hace una hora';
+  if (horas < 36) return `hace ${Math.round(horas)} horas`;
+  return `hace ${Math.round(horas / 24)} días`;
+}
 const vales = require('./vales');
 const calidad = require('./calidad');
 // El cuarto frío se lee desde aquí para poder enseñarlo en Producción sin
@@ -211,9 +219,13 @@ router.get('/panos/:id/ficha', verProduccion, (req, res) => {
   `).get(req.params.id);
   if (!pano) return error(res, 'Ese paño no existe.', 404);
 
-  // Las últimas veces que se sacó, de la más nueva a la más vieja. Seis
-  // bastan: es más de una vuelta completa de la rotación en cualquier
-  // tanque, y con eso se ve si algo viene repitiéndose.
+  // Las últimas veces que se sacó, de la más nueva a la más vieja.
+  //
+  // Eran seis, y se quedaron cortas (v6.6): "nos ha pasado que el error
+  // aparece hasta que le damos la vuelta completa a ese paño, por lo que
+  // tenemos que retroceder en las fechas hasta la última vez que se sacó y
+  // modificarlo ahí". Con treinta caben varias vueltas del tanque más
+  // grande.
   const sacadas = bd.prepare(`
     SELECT sp.id, sp.iniciada_en, sp.terminada_en, sp.notas, sp.motivo_orden,
            sp.anulada_en, sp.motivo_anulacion,
@@ -229,7 +241,7 @@ router.get('/panos/:id/ficha', verProduccion, (req, res) => {
       LEFT JOIN usuarios co ON co.id = sp.corregida_por
      WHERE sp.pano_id = ?
      ORDER BY sp.iniciada_en DESC
-     LIMIT 6
+     LIMIT 30
   `).all(pano.id);
 
   const cuentaDe = bd.prepare(`
@@ -324,6 +336,47 @@ router.post('/panos/:id/sacar', registrar, (req, res) => {
   const tipoAgua = String(req.body?.tipoAgua || 'purificada');
   if (rellenar && !TIPOS_AGUA.includes(tipoAgua)) {
     return error(res, 'Indica si se rellena con agua purificada o potable.');
+  }
+
+  // ============================================================
+  // UN PAÑO NO SE SACA DOS VECES EL MISMO DÍA  (v6.6)
+  // ============================================================
+  //
+  // "Un paño no se puede sacar dos veces el mismo día. Es imposible,
+  //  simplemente no ha congelado, por lo que desbloquearlo no me lo debe
+  //  de contar."
+  //
+  // Antes, desbloquear un paño ya sacado y volver a capturarlo creaba una
+  // sacada NUEVA y sumaba otra vez sus marquetas: el cuarto frío crecía
+  // con hielo que no existe, y el error aparecía días después en el
+  // conteo. Lo que se quería hacer casi siempre era CORREGIR la sacada de
+  // hoy, así que eso es lo que se ofrece en vez del error.
+  //
+  // Se mide por DÍA y no por horas de congelación a propósito: un paño que
+  // se sacó ayer y todavía no cumple sus horas sí se puede sacar —pasa en
+  // mayo, cuando el tanque va lento— y para eso está la regla de la
+  // rotación, que pide la firma de un responsable. Lo del mismo día no es
+  // discutible: el agua no se hizo hielo en seis horas.
+  const hoySalio = bd.prepare(`
+    SELECT sp.id, sp.terminada_en,
+           COALESCE(u.nombre, sp.ejecutor_libre, '—') AS quien
+      FROM sacadas_pano sp
+      LEFT JOIN usuarios u ON u.id = sp.ejecutor_id
+     WHERE sp.pano_id = ? AND sp.anulada_en IS NULL
+       AND sp.terminada_en IS NOT NULL
+       AND date(sp.terminada_en, 'localtime') = date('now', 'localtime')
+     ORDER BY sp.terminada_en DESC LIMIT 1
+  `).get(pano.id);
+
+  if (hoySalio) {
+    return error(res,
+      `El paño ${pano.numero} ya se sacó hoy, y lo reportó ${hoySalio.quien}. ` +
+      'No puede volver a salir: el hielo no congela en unas horas. Si lo de ' +
+      'esa sacada quedó mal anotado, se corrige ahí mismo, en su historia.',
+      409, {
+        yaSeSacoHoy: true, sacadaId: hoySalio.id,
+        cuando: hoySalio.terminada_en, quien: hoySalio.quien
+      });
   }
 
   // --- La rotación es regla: si no toca, hace falta autorización ---
@@ -858,6 +911,248 @@ router.post('/sacadas-pano/:id/corregir', exigirPermiso('produccion.corregir'), 
     }))
   });
 });
+
+/**
+ * LOS MOLDES DE UNA SACADA CUALQUIERA  (v6.6)
+ *
+ * La ficha del paño trae el mapa de moldes de la ÚLTIMA vez. Para corregir
+ * una de hace tres días hace falta el de aquella, y por eso se pide
+ * aparte: es la pantalla de corregir la que sabe cuál eligió el gerente.
+ */
+router.get('/sacadas-pano/:id/moldes', verProduccion, (req, res) => {
+  const sp = bd.prepare(`
+    SELECT sp.*, p.numero AS pano_numero, t.nombre AS tanque_nombre,
+           COALESCE(u.nombre, sp.ejecutor_libre, '—') AS quien
+      FROM sacadas_pano sp
+      JOIN panos p   ON p.id = sp.pano_id
+      JOIN tanques t ON t.id = p.tanque_id
+      LEFT JOIN usuarios u ON u.id = sp.ejecutor_id
+     WHERE sp.id = ?
+  `).get(req.params.id);
+  if (!sp) return error(res, 'Ese registro no existe.', 404);
+
+  const moldes = bd.prepare(`
+    SELECT sm.molde_id AS moldeId, c.numero AS canasta, m.numero AS molde,
+           sm.resultado, sm.nota, s.fecha
+      FROM sacadas_moldes sm
+      JOIN sacadas s  ON s.id = sm.sacada_id
+      JOIN moldes m   ON m.id = sm.molde_id
+      JOIN canastas c ON c.id = m.canasta_id
+     WHERE s.sacada_pano_id = ?
+     ORDER BY c.numero, m.numero
+  `).all(sp.id);
+
+  // Lo que ya se le corrigió antes, para poder enseñarlo.
+  const correcciones = bd.prepare(`
+    SELECT cm.*, u.nombre AS quien
+      FROM correcciones_moldes cm
+      LEFT JOIN usuarios u ON u.id = cm.ejecutor_id
+     WHERE cm.sacada_pano_id = ?
+     ORDER BY cm.fecha DESC
+  `).all(sp.id);
+
+  return ok(res, {
+    sacada: {
+      id: sp.id, pano: sp.pano_numero, tanque: sp.tanque_nombre,
+      fecha: sp.terminada_en || sp.iniciada_en, quien: sp.quien,
+      anulada: Boolean(sp.anulada_en), correcciones: sp.correcciones
+    },
+    moldes,
+    mezcla: calidad.resumir(cuentaDeMezcla(moldes)),
+    correcciones,
+    calidades: calidad.CALIDADES,
+    calidadPorOmision: calidad.CALIDAD_POR_OMISION
+  });
+});
+
+/**
+ * CORREGIR MOLDE POR MOLDE, EN SU FECHA  (v6.6)
+ *
+ * "Si aprieto corregir cómo salió y uso uno, me cambia completamente
+ *  todas. Y a veces las correcciones son de una canasta o de un molde nada
+ *  más. Cuando quiera corregir algo, debería corregirlo en base al
+ *  historial de ese paño: yo selecciono el movimiento, la fecha que quiero
+ *  corregir, para que se refleje en los cortes de esa fecha."
+ *
+ * Se entra por la HISTORIA del paño y se elige la sacada por su fecha, así
+ * que esto corrige lo de aquel día, no lo de hoy. Dos cosas se pueden
+ * hacer, y son muy distintas:
+ *
+ *   CAMBIAR CÓMO SALIÓ un molde o una canasta — la hueca que era ahogada.
+ *   El hielo sí salió; lo que estaba mal era la anotación.
+ *
+ *   QUITARLO DE LA SACADA — "esa canasta no se sacó". Es el caso del que
+ *   reporta el paño completo y deja una canasta adentro para venderla otro
+ *   día. Esos moldes NO salieron nunca: su renglón se borra, el rellenado
+ *   que se había apuntado se deshace y la canasta vuelve al tanque como
+ *   estaba, con su hielo. La producción de aquel día baja, y con ella el
+ *   corte de aquel día.
+ *
+ * Todo queda escrito en `correcciones_moldes`, que solo se agrega: qué
+ * decía, qué dice, quién y por qué. Y los conteos de hielo que ya contaban
+ * esa sacada se vuelven a sacar solos (existencia/correccion.js): lo
+ * contado en el cuarto frío no se toca, lo que "debía haber" sí.
+ */
+router.post('/sacadas-pano/:id/corregir-moldes', exigirPermiso('produccion.corregir'), (req, res) => {
+  const sp = bd.prepare(`
+    SELECT sp.*, p.numero AS pano_numero, p.tanque_id, t.nombre AS tanque_nombre
+      FROM sacadas_pano sp
+      JOIN panos p   ON p.id = sp.pano_id
+      JOIN tanques t ON t.id = p.tanque_id
+     WHERE sp.id = ?
+  `).get(req.params.id);
+  if (!sp) return error(res, 'Ese registro no existe.', 404);
+  if (sp.anulada_en) return error(res, 'Esa sacada está anulada: no hay nada que corregir.', 409);
+
+  const motivo = String(req.body?.motivo || '').trim();
+  if (!motivo) return error(res, 'Escribe por qué se corrige. Un registro no se cambia sin razón.');
+
+  // Lo que hay ahora mismo en esa sacada, molde por molde.
+  const filas = bd.prepare(`
+    SELECT sm.id, sm.molde_id, sm.resultado, sm.nota, sm.sacada_id,
+           s.canasta_id, s.fecha, c.numero AS canasta, m.numero AS molde
+      FROM sacadas_moldes sm
+      JOIN sacadas s  ON s.id = sm.sacada_id
+      JOIN moldes m   ON m.id = sm.molde_id
+      JOIN canastas c ON c.id = m.canasta_id
+     WHERE s.sacada_pano_id = ?
+  `).all(sp.id);
+  if (!filas.length) return error(res, 'Esa sacada no tiene moldes registrados.', 409);
+
+  const porMolde = new Map(filas.map((f) => [f.molde_id, f]));
+  const cambios = Array.isArray(req.body?.cambios) ? req.body.cambios : [];
+  const quitar = (Array.isArray(req.body?.quitar) ? req.body.quitar : []).map(String);
+
+  if (!cambios.length && !quitar.length) {
+    return error(res, 'No dijiste qué corregir: toca los moldes que salieron distinto.');
+  }
+
+  // Se comprueba TODO antes de tocar nada: media corrección aplicada es
+  // peor que ninguna.
+  const listos = [];
+  for (const c of cambios) {
+    const fila = porMolde.get(String(c?.moldeId));
+    if (!fila) return error(res, 'Uno de esos moldes no es de esta sacada.', 409);
+    if (quitar.includes(String(c.moldeId))) {
+      return error(res, 'Un molde no se puede cambiar y quitar a la vez.');
+    }
+    let como;
+    try { como = calidad.interpretar({ resultado: c.resultado, nota: c.nota }); }
+    catch (e) { return error(res, e.message); }
+    listos.push({ fila, como });
+  }
+  for (const id of quitar) {
+    if (!porMolde.has(id)) return error(res, 'Uno de esos moldes no es de esta sacada.', 409);
+  }
+
+  const antes = calidad.resumir(cuentaDeMezcla(filas));
+  const fecha = ahora();
+
+  bd.transaction(() => {
+    const apunte = bd.prepare(`
+      INSERT INTO correcciones_moldes
+        (id, sacada_pano_id, molde_id, que, antes, antes_nota, despues, despues_nota,
+         motivo, fecha, ejecutor_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    for (const { fila, como } of listos) {
+      if (fila.resultado === como.resultado && (fila.nota || null) === (como.nota || null)) continue;
+      bd.prepare('UPDATE sacadas_moldes SET resultado = ?, nota = ? WHERE id = ?')
+        .run(como.resultado, como.nota, fila.id);
+      apunte.run(nuevoId(), sp.id, fila.molde_id, 'cambio', fila.resultado, fila.nota,
+                 como.resultado, como.nota, motivo.slice(0, 200), fecha, req.usuario.id);
+    }
+
+    for (const id of quitar) {
+      const fila = porMolde.get(id);
+      bd.prepare('DELETE FROM sacadas_moldes WHERE id = ?').run(fila.id);
+      apunte.run(nuevoId(), sp.id, fila.molde_id, 'quitado', fila.resultado, fila.nota,
+                 null, null, motivo.slice(0, 200), fecha, req.usuario.id);
+    }
+
+    // LA CANASTA QUE SE QUEDÓ ADENTRO vuelve al tanque como estaba: sin
+    // sacada y sin el rellenado que se había apuntado. Si no se deshiciera
+    // el rellenado, el sistema creería que ahí hay agua empezando a
+    // congelar cuando lo que hay es el hielo de siempre.
+    const vacias = bd.prepare(`
+      SELECT s.id, s.canasta_id FROM sacadas s
+       WHERE s.sacada_pano_id = ?
+         AND NOT EXISTS (SELECT 1 FROM sacadas_moldes sm WHERE sm.sacada_id = s.id)
+    `).all(sp.id);
+    for (const v of vacias) {
+      bd.prepare('DELETE FROM rellenados WHERE sacada_pano_id = ? AND canasta_id = ?')
+        .run(sp.id, v.canasta_id);
+      bd.prepare('DELETE FROM sacadas WHERE id = ?').run(v.id);
+    }
+
+    // Si no quedó ni un molde, esa sacada no ocurrió.
+    const quedan = bd.prepare(`
+      SELECT COUNT(*) n FROM sacadas_moldes sm
+        JOIN sacadas s ON s.id = sm.sacada_id
+       WHERE s.sacada_pano_id = ?
+    `).get(sp.id).n;
+    if (!quedan) {
+      bd.prepare(`
+        UPDATE sacadas_pano
+           SET anulada_en = ?, anulada_por = ?, motivo_anulacion = ?
+         WHERE id = ?
+      `).run(fecha, req.usuario.id, `No se sacó: ${motivo}`.slice(0, 200), sp.id);
+    }
+
+    bd.prepare(`
+      UPDATE sacadas_pano
+         SET corregida_en = ?, corregida_por = ?, motivo_correccion = ?,
+             correcciones = correcciones + 1
+       WHERE id = ?
+    `).run(fecha, req.usuario.id, motivo.slice(0, 200), sp.id);
+  })();
+
+  const quedaron = bd.prepare(`
+    SELECT sm.resultado FROM sacadas_moldes sm
+      JOIN sacadas s ON s.id = sm.sacada_id
+     WHERE s.sacada_pano_id = ?
+  `).all(sp.id);
+  const despues = calidad.resumir(cuentaDeMezcla(quedaron));
+
+  // Los conteos que ya contaban esa sacada se vuelven a sacar solos.
+  const { corregirConteosQueAbarcan } = require('../existencia/correccion');
+  const conteos = corregirConteosQueAbarcan(filas[0].fecha, {
+    usuarioId: req.usuario.id,
+    motivo: `Se corrigió el paño ${sp.pano_numero}: ${motivo}`
+  });
+
+  bitacora.registrar({
+    accion: 'produccion.correccion', entidad: 'pano', entidadId: sp.pano_id,
+    ejecutorId: req.usuario.id,
+    detalle: {
+      tanque: sp.tanque_nombre, pano: sp.pano_numero, motivo,
+      cambiados: listos.length, quitados: quitar.length,
+      antes: { alAlmacen: antes.alAlmacen, producidas: antes.producidas },
+      ahora: { alAlmacen: despues.alAlmacen, producidas: despues.producidas },
+      conteosCorregidos: conteos.length
+    }
+  });
+
+  return ok(res, {
+    corregida: true,
+    antes, despues,
+    cambiados: listos.length,
+    quitados: quitar.length,
+    anulada: !quedaron.length,
+    conteos: conteos.map((c) => ({
+      id: c.id, cajaId: c.cajaId, fecha: c.fecha,
+      faltanteAntes: c.antes.faltante, faltanteAhora: c.ahora.faltante
+    }))
+  });
+});
+
+/** Cuenta cuántos moldes de cada estado hay en una lista de renglones. */
+function cuentaDeMezcla(filas) {
+  const cuenta = Object.fromEntries(calidad.RESULTADOS.map((c) => [c, 0]));
+  for (const f of filas) if (cuenta[f.resultado] !== undefined) cuenta[f.resultado]++;
+  return cuenta;
+}
 
 // ============================================================
 // LO DE HOY

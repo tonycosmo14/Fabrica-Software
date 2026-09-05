@@ -932,6 +932,18 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
           (r.faltan ? ` · quedan ${r.faltan} canastas pendientes` : ''), 'bien');
         await pintar();
       } catch (e) {
+        // YA SE SACÓ HOY  (v6.6): no es un error que se resuelva con un
+        // PIN, es que ese hielo no existe. Lo que casi siempre se quería
+        // hacer es corregir la sacada de hoy, y ahí se lleva.
+        if (e.yaSeSacoHoy && e.sacadaId) {
+          const ir = await confirmar({
+            titulo: `El paño ${pano.numero} ya se sacó hoy`,
+            texto: `${e.message} ¿Vamos a corregir esa sacada?`,
+            ok: 'Sí, corregirla'
+          });
+          if (ir) return corregirSacada(e.sacadaId);
+          return;
+        }
         if (e.requiereAutorizacion || /autoriza|PIN/i.test(e.message)) {
           const auth = await pedirAutorizacion({
             titulo: `No toca el paño ${pano.numero}`,
@@ -945,37 +957,224 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
       }
     }
 
+    /**
+     * CORREGIR UNA SACADA, MOLDE POR MOLDE  (v6.6)
+     *
+     * "A veces las correcciones son de una canasta o de un molde nada más,
+     *  por lo que necesito corregir una por una."
+     *
+     * Se abre desde la historia, con la sacada que se eligió por su fecha,
+     * y se toca solo lo que estuvo mal. Lo que no se toca no se manda.
+     */
     async function corregirSacada(sacadaId) {
-      const h = (ficha?.historial || []).find((x) => x.id === sacadaId);
-      const como = await preguntarComoSalio({
-        titulo: `¿Cómo salió de verdad el paño ${pano.numero}?`,
-        texto: h ? `La sacada del ${fechaCorta(h.fecha)}. Se cambia el estado de TODOS sus moldes; ` +
-                   'lo contado en el cuarto frío no se toca, pero el cuadre de ese corte se vuelve a sacar.'
-                 : '',
-        conIgual: false
-      });
-      if (!como) return;
+      let d;
+      try { d = await api.obtener(`/produccion/sacadas-pano/${sacadaId}/moldes`); }
+      catch (e) { return avisar(e.message, 'error'); }
 
-      const motivo = await pedirTexto({
-        titulo: 'Por qué se corrige',
-        texto: 'Queda escrito en la sacada y en la bitácora.',
-        marcador: 'Se marcó hueca y era ahogada', ok: 'Corregir', largo: 200, unaLinea: true
-      });
-      if (!motivo) return;
+      const cambios = new Map();     // moldeId -> { resultado, nota }
+      const quitados = new Set();    // moldeId
+      const original = new Map(d.moldes.map((m) => [m.moldeId, m]));
 
-      try {
-        const r = await api.enviar(`/produccion/sacadas-pano/${sacadaId}/corregir`, {
-          calidad: como.resultado, nota: como.nota, motivo
+      const porCanasta = new Map();
+      for (const m of d.moldes) {
+        if (!porCanasta.has(m.canasta)) porCanasta.set(m.canasta, []);
+        porCanasta.get(m.canasta).push(m);
+      }
+
+      const estadoDe = (id) => (quitados.has(id) ? null : (cambios.get(id) || original.get(id)));
+      const tocado = (id) => quitados.has(id) || cambios.has(id);
+
+      function cuentas() {
+        let antes = 0;
+        let ahora = 0;
+        for (const [id, m] of original) {
+          if (esVendible(m.resultado)) antes++;
+          const e = estadoDe(id);
+          if (e && esVendible(e.resultado)) ahora++;
+        }
+        return { antes, ahora };
+      }
+
+      function dibujarCorreccion() {
+        const { antes, ahora } = cuentas();
+        const hay = cambios.size || quitados.size;
+
+        pantalla.innerHTML = `
+          <div class="pantalla-corregir">
+          <div class="cabecera-pantalla">
+            <button class="secundario chico" id="volver">‹ La historia del paño</button>
+            <h2>Corregir · ${esc(d.sacada.tanque)} · Paño ${esc(d.sacada.pano)}</h2>
+            <p class="ayuda">
+              La sacada del <b>${esc(fechaCorta(d.sacada.fecha))}</b>, la reportó
+              <b>${esc(d.sacada.quien)}</b>.
+              ${d.sacada.correcciones ? ` Ya se corrigió ${d.sacada.correcciones} ${
+                d.sacada.correcciones === 1 ? 'vez' : 'veces'}.` : ''}
+            </p>
+          </div>
+
+          <div class="aviso-sin-caja" style="margin-bottom:14px">
+            <strong>Se cambia solo lo que toques.</strong>
+            Toca un molde para decir cómo salió de verdad, o para decir que
+            <b>no se sacó</b> —esa canasta se quedó en el tanque—. Lo que no
+            toques se queda exactamente como está. Lo contado en el cuarto
+            frío no se mueve; lo que «debía haber» aquel día, sí.
+          </div>
+
+          <div class="canastas-merma">
+            ${[...porCanasta.entries()].map(([num, moldes]) => {
+              const todosFuera = moldes.every((m) => quitados.has(m.moldeId));
+              return `
+                <div class="tarjeta">
+                  <div class="canasta-cabeza">
+                    <strong>Canasta ${num}</strong>
+                    <button class="secundario chico" data-canasta="${num}">
+                      ${todosFuera ? '↩ Sí se sacó' : '🚫 Esta canasta no se sacó'}
+                    </button>
+                  </div>
+                  <div class="moldes-detalle">
+                    ${moldes.map((m) => {
+                      const e = estadoDe(m.moldeId);
+                      const fuera = quitados.has(m.moldeId);
+                      return `
+                        <button class="molde-boton ${fuera ? 'quitado' : esc(e.resultado)}
+                                       ${tocado(m.moldeId) ? 'tocado' : ''}"
+                                data-molde="${esc(m.moldeId)}"
+                                title="${fuera ? 'No se sacó' : esc(nombreLargo(e))}">
+                          <span class="molde-num">${m.molde}</span>
+                          <span class="molde-estado">${
+                            fuera ? 'no salió' : esc(etiqueta(e))}</span>
+                        </button>`;
+                    }).join('')}
+                  </div>
+                </div>`;
+            }).join('')}
+          </div>
+
+          <div class="tarjeta corregir-cierre">
+            <div class="corregir-cuenta">
+              <div><small>Iban al cuarto frío</small><strong>${antes}</strong></div>
+              <div class="flecha">→</div>
+              <div><small>Quedan</small>
+                <strong class="${ahora < antes ? 'malo' : ahora > antes ? 'bien' : ''}">${ahora}</strong></div>
+              ${quitados.size ? `<div><small>No se sacaron</small>
+                <strong class="malo">${quitados.size}</strong></div>` : ''}
+            </div>
+            <label>
+              <span class="etiqueta-chica">Por qué se corrige<small>queda escrito con tu nombre</small></span>
+              <input id="motivo-corr" maxlength="200" value="${esc(motivoEscrito)}"
+                     placeholder="La canasta 2 se quedó en el tanque, nunca salió">
+            </label>
+            <div class="fila-botones" style="margin-top:12px">
+              <button id="guardar-corr" ${hay ? '' : 'disabled'}>Guardar la corrección</button>
+              <button class="secundario" id="cancelar-corr">Cancelar</button>
+            </div>
+          </div>
+
+          ${d.correcciones.length ? `
+            <h3 style="margin-top:20px">Lo que ya se le corrigió</h3>
+            <div class="hist-envoltura">
+              <table class="tabla hist-tabla">
+                <tr><th>Cuándo</th><th>Quién</th><th>Qué</th><th>Por qué</th></tr>
+                ${d.correcciones.map((c) => `
+                  <tr>
+                    <td>${esc(fechaCorta(c.fecha))}</td>
+                    <td>${esc(c.quien || '—')}</td>
+                    <td>${c.que === 'quitado'
+                      ? `no se sacó <small>(decía ${esc(c.antes)})</small>`
+                      : `${esc(c.antes)} → ${esc(c.despues)}`}</td>
+                    <td><small>${esc(c.motivo)}</small></td>
+                  </tr>`).join('')}
+              </table>
+            </div>` : ''}
+          </div>`;
+
+        const q = (sel) => pantalla.querySelector(sel);
+        q('#volver').onclick = () => detallePano(panoId, { mirar: true });
+        q('#cancelar-corr').onclick = () => detallePano(panoId, { mirar: true });
+        q('#motivo-corr').oninput = (ev) => { motivoEscrito = ev.target.value; };
+
+        pantalla.querySelectorAll('[data-canasta]').forEach((b) => {
+          b.onclick = () => {
+            const moldes = porCanasta.get(Number(b.dataset.canasta));
+            const todosFuera = moldes.every((m) => quitados.has(m.moldeId));
+            for (const m of moldes) {
+              if (todosFuera) quitados.delete(m.moldeId);
+              else { quitados.add(m.moldeId); cambios.delete(m.moldeId); }
+            }
+            dibujarCorreccion();
+          };
         });
-        const c = r.conteos?.[0];
-        avisar(`Corregido: ${r.antes.alAlmacen} → ${r.despues.alAlmacen} al cuarto frío` +
-               (c ? ` · el cuadre de hielo de ese corte pasó de ${aTexto(c.faltanteAntes)} a ${aTexto(c.faltanteAhora)} de faltante` : ''),
-               'bien');
-        // Se recarga todo: los colores de los moldes y la historia salen
-        // del servidor, y las dos cosas acaban de cambiar.
-        datos = await api.obtener(`/produccion/estado?tanque=${encodeURIComponent(tanqueActivo)}`);
-        detallePano(panoId, { mirar: true });
-      } catch (e) { avisar(e.message, 'error'); }
+
+        pantalla.querySelectorAll('[data-molde]').forEach((b) => {
+          b.onclick = () => tocarMolde(b.dataset.molde);
+        });
+
+        q('#guardar-corr').onclick = guardarCorreccion;
+      }
+
+      async function tocarMolde(moldeId) {
+        const m = original.get(moldeId);
+        const opciones = [];
+        if (tocado(moldeId)) {
+          opciones.push({ valor: '__igual', texto: '↩ Dejarlo como estaba',
+                          detalle: `Volver a «${nombreLargo(m)}»` });
+        }
+        for (const c of CALIDADES) {
+          opciones.push({ valor: c.clave, texto: `${c.icono} ${c.nombre}`, detalle: c.nota });
+        }
+        opciones.push({ valor: '__quitar', texto: '🚫 Este molde no se sacó',
+                        detalle: 'Se queda en el tanque con su hielo. Deja de contar como producido de aquel día.',
+                        peligro: true });
+
+        const elegido = await menu({
+          titulo: `Canasta ${m.canasta} · molde ${m.molde}`,
+          texto: `Ahora dice «${nombreLargo(m)}».`,
+          opciones
+        });
+        if (!elegido) return;
+
+        if (elegido === '__igual') { cambios.delete(moldeId); quitados.delete(moldeId); }
+        else if (elegido === '__quitar') { quitados.add(moldeId); cambios.delete(moldeId); }
+        else {
+          let nota = null;
+          if (pideNota(elegido)) {
+            nota = await pedirNota('');
+            if (!nota) return;
+          }
+          quitados.delete(moldeId);
+          if (elegido === m.resultado && (nota || null) === (m.nota || null)) cambios.delete(moldeId);
+          else cambios.set(moldeId, { resultado: elegido, nota });
+        }
+        dibujarCorreccion();
+      }
+
+      async function guardarCorreccion() {
+        const motivo = (pantalla.querySelector('#motivo-corr')?.value || '').trim();
+        if (!motivo) {
+          avisar('Escribe por qué se corrige', 'error');
+          pantalla.querySelector('#motivo-corr')?.focus();
+          return;
+        }
+        try {
+          const r = await api.enviar(`/produccion/sacadas-pano/${sacadaId}/corregir-moldes`, {
+            motivo,
+            cambios: [...cambios.entries()].map(([moldeId, c]) => ({ moldeId, ...c })),
+            quitar: [...quitados]
+          });
+          const c = r.conteos?.[0];
+          avisar(
+            `Corregido: ${r.antes.alAlmacen} → ${r.despues.alAlmacen} al cuarto frío` +
+            (r.quitados ? ` · ${r.quitados} no se sacaron` : '') +
+            (r.anulada ? ' · esa sacada quedó anulada' : '') +
+            (c ? ` · el cuadre de aquel corte pasó de ${aTexto(c.faltanteAntes)} a ${aTexto(c.faltanteAhora)}` : ''),
+            'bien');
+          datos = await api.obtener(`/produccion/estado?tanque=${encodeURIComponent(tanqueActivo)}`);
+          detallePano(panoId, { mirar: true });
+        } catch (e) { avisar(e.message, 'error'); }
+      }
+
+      let motivoEscrito = '';
+      dibujarCorreccion();
     }
 
     async function anular() {
@@ -1093,7 +1292,7 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
             u.motivoCorreccion ? `: «${esc(u.motivoCorreccion)}»` : ''}.</p>` : ''}
           ${puedeCorregir ? `
             <div class="acciones-centradas" style="margin-top:10px">
-              <button class="secundario chico" data-corregir="${esc(u.id)}">✏️ Corregir cómo salió</button>
+              <button class="secundario chico" data-corregir="${esc(u.id)}">✏️ Corregir esta sacada</button>
             </div>` : ''}
         </div>
 

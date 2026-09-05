@@ -17,9 +17,27 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '6.5.1';
+const VERSION_ACTUAL = '6.6';
 
 const VERSIONES = [
+  {
+    numero: '6.6',
+    nombre: 'Corregir el paño, molde por molde',
+    fecha: '2026-09-05',
+    resumen:
+      'Un paño ya no se puede sacar dos veces el mismo día —eso era lo que '
+      + 'inflaba el cuarto frío— y las correcciones se hacen molde por molde, '
+      + 'en la sacada y la fecha que se elija del historial.',
+    cambios: [
+      { tipo: 'importante', texto: 'UN PAÑO NO SE SACA DOS VECES EL MISMO DÍA. El agua no se hace hielo en unas horas. Antes, desbloquear un paño ya sacado y capturarlo otra vez SUMABA otra vez sus marquetas, y el error aparecía dos o tres días después en el conteo, cuando ya le tocaba a otro. Ahora no se deja ni con el PIN del administrador, y en vez del error pregunta si vamos a corregir esa sacada.' },
+      { tipo: 'importante', texto: 'CORREGIR MOLDE POR MOLDE, no el paño entero. Se entra por la 👁 Historia, se elige la sacada por su fecha y su hora, y sale el mapa de moldes de AQUEL día. Se toca solo lo que estuvo mal; lo que no se toca se queda igual.' },
+      { tipo: 'nuevo', texto: '«🚫 ESTA CANASTA NO SE SACÓ». El caso del que reporta el paño completo y deja una canasta adentro para venderla otro día: esos moldes nunca salieron, dejan de contar como producidos de aquel día, y la canasta vuelve al tanque con su hielo y sin el rellenado que se le había apuntado. Si se quitan todos, la sacada queda anulada.' },
+      { tipo: 'mejora', texto: 'ABAJO SE VE EN VIVO cuántas iban al cuarto frío y cuántas quedan, y cuántas no se sacaron. Se escribe el porqué y se guarda de un botón.' },
+      { tipo: 'mejora', texto: 'TODO DEJA RASTRO, molde por molde: lo que decía, lo que dice, quién lo cambió y por qué. Sale en la misma pantalla de corregir, debajo.' },
+      { tipo: 'mejora', texto: 'LA HISTORIA DEL PAÑO GUARDA LAS ÚLTIMAS TREINTA SACADAS, no seis: el error a veces aparece hasta que el paño da la vuelta completa, y hay que poder retroceder hasta esa fecha.' },
+      { tipo: 'mejora', texto: 'Los cuadres de hielo de aquella fecha se vuelven a sacar solos, como en la v6.1: lo contado no se toca, lo que «debía haber» sí, y el corte enseña lo que decía al firmarse.' }
+    ]
+  },
   {
     numero: '6.5.1',
     nombre: 'Que no se pierda de vista',

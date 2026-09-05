@@ -292,22 +292,53 @@ const TEMAS = [
       anular: si alguien había escrito "la grúa se atoró", eso sigue siendo
       verdad después.</p>
 
-      <h4>Corregir cómo salió una sacada, aunque el corte ya esté firmado</h4>
-      <p>"Marqué un paño como hueco y era ahogado: cinco marquetas y media
-      de diferencia en el corte." Anular y volver a sacar no sirve: la
-      rotación ya pasó de ese paño y la sacada nueva saldría con la fecha
-      de hoy. Lo que se corrige es <b>cómo salió</b>.</p>
-      <p>En la <b>👁 Historia</b> del paño, cada sacada lleva un <b>✏️</b>.
-      Se elige cómo salió de verdad —con su destino si lo pide— y el
-      porqué. Se cambia el estado de <b>todos sus moldes</b>, la sacada
-      queda marcada como corregida (quién, cuándo, por qué), y los
-      <b>cuadres de hielo</b> que ya la contaban se vuelven a sacar solos:
-      lo contado en el cuarto frío no se toca, lo que "debía haber" sí. En
-      el corte sale un aviso con lo que decía cuando se firmó.</p>
-      <p class="ayuda-tip">Es del gerente y del administrador (el mismo
-      permiso que anular). Lo del papel firmado <b>se guarda una sola
-      vez</b>: si se corrige dos veces, lo original sigue siendo lo del
-      papel, no lo de la primera corrección.</p>
+      <h4>Un paño no se saca dos veces el mismo día</h4>
+      <p>Es imposible: el agua no se hace hielo en unas horas. Si se intenta
+      —aunque sea desbloqueando el paño y con el PIN del administrador— el
+      sistema no lo deja, y en vez del error pregunta: <b>«¿vamos a corregir
+      esa sacada?»</b>. Porque eso es lo que casi siempre se quería hacer.</p>
+      <p>Antes sí se dejaba, y era el problema más caro que tenía el
+      sistema: desbloquear un paño ya sacado y volver a capturarlo
+      <b>sumaba otra vez sus marquetas</b>. El cuarto frío crecía con hielo
+      que no existía y el error aparecía dos o tres días después, en el
+      conteo, cuando ya le tocaba a otra persona.</p>
+      <p class="ayuda-tip">Un paño que se sacó <b>ayer</b> sí se puede
+      sacar, aunque no haya cumplido sus horas: pasa en mayo, cuando el
+      tanque va lento. Para eso está la regla de la rotación, que pide la
+      firma de un gerente.</p>
+
+      <h4>Corregir una sacada, molde por molde y en su fecha</h4>
+      <p>"A veces las correcciones son de una canasta o de un molde nada
+      más." Se entra por la <b>👁 Historia</b> del paño y se elige
+      <b>cuál sacada</b> —por su fecha, su hora y quién la reportó—, con el
+      <b>✏️</b> de su renglón. La historia guarda las últimas treinta, más
+      de una vuelta completa del tanque, porque el error a veces aparece
+      hasta que el paño vuelve a tocar.</p>
+      <p>Ahí sale el <b>mapa de moldes de aquella sacada</b>, con el color
+      de como quedó cada uno. Se toca solo lo que estuvo mal, y hay dos
+      cosas que se pueden hacer:</p>
+      <ul>
+        <li><b>Cambiar cómo salió</b> — la que se marcó hueca y era ahogada.
+        El hielo sí salió; lo que estaba mal era la anotación.</li>
+        <li><b>🚫 No se sacó</b> — un molde, o <b>la canasta entera</b> con
+        su botón. Es el caso del que reporta el paño completo y deja una
+        canasta adentro. Esos moldes <b>nunca salieron</b>: dejan de contar
+        como producidos de aquel día, y la canasta vuelve al tanque como
+        estaba, con su hielo, sin el rellenado que se le había apuntado.</li>
+      </ul>
+      <p>Abajo se ve en vivo <b>cuántas iban al cuarto frío y cuántas
+      quedan</b>, se escribe el porqué y se guarda. Lo que no se toca no se
+      manda. Si se quitan todos los moldes, esa sacada queda <b>anulada</b>:
+      no ocurrió.</p>
+      <p>Y en cuanto se guarda, los <b>cuadres de hielo</b> de aquella fecha
+      se vuelven a sacar solos: lo contado en el cuarto frío no se toca, lo
+      que "debía haber" sí, y el corte enseña un aviso con lo que decía
+      cuando se firmó. Cada molde corregido queda con lo que decía antes, lo
+      que dice ahora, quién lo cambió y por qué, y eso sale en la misma
+      pantalla.</p>
+      <p class="ayuda-tip">Es del gerente y del administrador, el mismo
+      permiso que anular. <b>El operario no corrige su propio reporte</b>:
+      ese es justo el agujero que esto viene a tapar.</p>
 
       <h4>El papel del día</h4>
       <p>El botón <b>🧾 El día</b> saca cuánto hielo queda en cada cuarto
