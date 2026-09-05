@@ -1206,6 +1206,22 @@ debería haber − contado = FALTA</pre>
       negocio, teléfono, dirección) y <b>su crédito y su precio</b> (el
       límite, el plazo y qué lista de mayoreo se le cobra).</p>
 
+      <h4>Su ficha, en dos</h4>
+      <p>Al tocar un cliente, arriba salen siempre su nombre, su teléfono,
+      su dirección y <b>lo que debe</b>. Debajo, dos pestañas:</p>
+      <ul>
+        <li><b>💳 Su cuenta</b> — lo que se ha llevado, lo que ha pagado, lo
+        que debe, los botones de recibir abono y todos sus movimientos. Es
+        lo que se mira noventa veces de cada cien.</li>
+        <li><b>✏️ Sus datos</b> — el formulario, en dos columnas: quién es y
+        dónde está, su crédito y su precio, y sus notas.</li>
+      </ul>
+      <p>En <b>Sus datos</b> nada se guarda solo: se rellena todo de corrido,
+      como un papel, y abajo —<b>siempre a la vista</b>, por larga que sea la
+      ficha— está <b>Guardar los cambios</b>, que se enciende en cuanto algo
+      cambia. Si te arrepientes, <b>Deshacer</b> lo deja como estaba. Antes se
+      guardaba al salir de cada campo y la pantalla parpadeaba a cada dato.</p>
+
       <h4>Los de siempre y los de una vez</h4>
       <p>"Separar los clientes de verdad frecuentes —los de todos los días—
       de los de una entrega de una vez." Arriba de la lista, las dos

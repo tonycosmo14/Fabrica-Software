@@ -5070,3 +5070,63 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 .cfg-horas-campo { display: flex; align-items: center; gap: 8px; }
 .cfg-horas-campo input { width: 90px; text-align: right; }
 .cfg-horas-campo span { color: var(--suave); }
+
+/* EL TANQUE, SIEMPRE A LA VISTA  (v6.5.1)
+   Las pestañas de los tanques y el renglón del paño que toca se quedan
+   pegados debajo de la barra de arriba: con dieciocho paños, al bajar se
+   perdía en cuál tanque se estaba. `--alto-barra` la mide app.js, porque
+   cambia con el logo y con el ancho de la pantalla. */
+.prod-fijo {
+  position: sticky; top: var(--alto-barra, 64px); z-index: 6;
+  background: var(--fondo);
+  padding: 8px 0 2px;
+  margin: -8px 0 0;
+}
+.prod-fijo .barra-produccion { margin-bottom: 8px; }
+
+/* LA FICHA DEL CLIENTE, ORDENADA  (v6.5.1)
+   "Lo sigo viendo un poquito achocado. Es mejor rellenar los datos y que
+   esté el botón de guardar en la parte inferior siempre visible." */
+.cli-pestanas-ficha { margin: 16px 0 14px; }
+
+.cli-form { display: block; }
+.cli-campos {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px;
+  margin-top: 10px;
+}
+.cli-campo { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.cli-campo.ancho { grid-column: 1 / -1; }
+.cli-campo > .etiqueta-chica { display: flex; flex-direction: column; gap: 1px; }
+.cli-campo > .etiqueta-chica small { color: var(--suave); font-size: 11.5px; font-weight: 400; }
+.cli-campo input, .cli-campo select, .cli-campo textarea { width: 100%; margin: 0; }
+.cli-campo textarea { resize: vertical; min-height: 62px; }
+.cli-campo > strong { padding: 6px 0; }
+
+.cli-ubicacion {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap; margin-top: 12px;
+  padding: 10px 12px; border-radius: 10px; background: var(--superficie-alt);
+}
+.cli-ubicacion .fila-botones { margin: 0; }
+
+/* El botón de guardar se queda pegado abajo de la columna, por larga que
+   sea la ficha: rellenar seis campos y tener que buscarlo es como se
+   pierden los datos. */
+.cli-guardar {
+  position: sticky; bottom: 0; z-index: 3;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin: 18px -4px -4px; padding: 10px 12px;
+  border-top: 1px solid var(--borde);
+  background: var(--superficie);
+  border-radius: 0 0 12px 12px;
+}
+.cli-guardar .ayuda { flex: 1; min-width: 120px; margin: 0; }
+.cli-guardar button { width: auto; min-width: 0; margin: 0; }
+.cli-guardar.con-cambios { box-shadow: 0 -6px 14px rgba(0, 0, 0, .10); }
+.cli-guardar.con-cambios .ayuda { color: var(--ambar); font-weight: 700; }
+
+.cli-solo { margin-top: 14px; }
+
+@media (max-width: 720px) {
+  .cli-campos { grid-template-columns: 1fr; }
+}

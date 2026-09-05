@@ -179,18 +179,24 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
         </button>
       </div>
 
-      <div class="pestanas-fila">
-        <div class="pestanas">
-          ${tanques.map((t) => `
-            <button class="pestana ${t.id === tanque.id ? 'activa' : ''}"
-                    data-tanque="${esc(t.id)}">${esc(t.nombre)}</button>`).join('')}
+      <!-- EL TANQUE SE QUEDA A LA VISTA  (v6.5.1). "Los tanques muy largos
+           que tienen muchos paños, hasta dieciocho, al desplazar de repente
+           me perdía y no sabía en qué tanque estaba." Las pestañas y el
+           renglón del paño que toca se pegan debajo de la barra de arriba;
+           todo lo demás se desliza. -->
+      <div class="prod-fijo">
+        <div class="pestanas-fila">
+          <div class="pestanas">
+            ${tanques.map((t) => `
+              <button class="pestana ${t.id === tanque.id ? 'activa' : ''}"
+                      data-tanque="${esc(t.id)}">${esc(t.nombre)}</button>`).join('')}
+          </div>
+          ${puedeConfigurar ? `
+            <a class="tuerca" href="#/config-tanques"
+               title="Configurar los tanques, paños y canastas">⚙</a>` : ''}
         </div>
-        ${puedeConfigurar ? `
-          <a class="tuerca" href="#/config-tanques"
-             title="Configurar los tanques, paños y canastas">⚙</a>` : ''}
-      </div>
 
-      <div class="barra-produccion">
+        <div class="barra-produccion">
         ${toca ? `
           <div class="toca">
             <span class="toca-etiqueta">toca</span>
@@ -204,6 +210,7 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
             <span class="agua-icono">💧</span>
             <span>${agua === 'purificada' ? 'Purificada' : 'Potable'}</span>
           </button>` : ''}
+        </div>
       </div>
 
       ${fuera ? `

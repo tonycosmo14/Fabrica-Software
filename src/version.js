@@ -17,9 +17,24 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '6.5';
+const VERSION_ACTUAL = '6.5.1';
 
 const VERSIONES = [
+  {
+    numero: '6.5.1',
+    nombre: 'Que no se pierda de vista',
+    fecha: '2026-09-05',
+    resumen:
+      'Dos arreglos de los que pediste: el tanque se queda a la vista al '
+      + 'desplazar, y la ficha del cliente deja de estar achocada y de '
+      + 'parpadear.',
+    cambios: [
+      { tipo: 'arreglo', texto: 'EL TANQUE SE QUEDA A LA VISTA. Las pestañas de los tanques y el renglón del paño que toca se pegan debajo de la barra de arriba al desplazar. Con dieciocho paños, al bajar ya no se pierde en cuál tanque estabas; todo lo demás se desliza igual.' },
+      { tipo: 'mejora', texto: 'LA FICHA DEL CLIENTE, EN DOS PESTAÑAS: «💳 Su cuenta» —lo que debe, los abonos y sus movimientos— y «✏️ Sus datos» —el formulario—. Arriba se quedan siempre su nombre, su teléfono y lo que debe.' },
+      { tipo: 'arreglo', texto: 'SE ACABÓ EL PARPADEO. Los datos del cliente ya no se guardan al salir de cada campo: se rellenan de corrido y abajo, SIEMPRE A LA VISTA, está «Guardar los cambios», que se enciende en cuanto algo cambia. Y «Deshacer» lo deja como estaba.' },
+      { tipo: 'mejora', texto: 'LOS DATOS EN DOS COLUMNAS, con la etiqueta arriba y el campo debajo: nombre y negocio, teléfono y horario, y la dirección y las referencias a lo ancho. La ubicación y su mapa en su propio renglón.' }
+    ]
+  },
   {
     numero: '6.5',
     nombre: 'Los estados del hielo, como son',

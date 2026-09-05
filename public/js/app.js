@@ -164,6 +164,7 @@ async function dibujar() {
   // así que en la barra solo se usa para la pestaña del navegador.
   document.title = `${ruta.titulo} · Hielo LOLHA`;
   pintarBarra();
+  medirBarra();
   document.getElementById('btn-atras').hidden =
     location.hash === pantallaDeArranque() || location.hash === '#/inicio' || !location.hash;
   // Avisar a la vista que se va, para que suelte lo que haya enganchado
@@ -194,6 +195,23 @@ async function dibujar() {
  * El logo puede cambiar (Personalizar) y el tema también, así que se
  * vuelve a pintar en cada pantalla.
  */
+/**
+ * CUÁNTO MIDE LA BARRA DE ARRIBA  (v6.5.1)
+ *
+ * La barra es pegajosa —se queda arriba al desplazar— y hay pantallas que
+ * necesitan pegar algo justo DEBAJO de ella: en Producción, el nombre del
+ * tanque y sus pestañas, para que con dieciocho paños no se pierda uno al
+ * bajar. Su alto cambia con el logo y con el ancho de la pantalla, así que
+ * se mide y se deja escrito; adivinarlo en el CSS es lo que hace que un
+ * día la pestaña quede tapada.
+ */
+function medirBarra() {
+  const barra = document.getElementById('barra');
+  const alto = barra && !barra.hidden ? barra.offsetHeight : 0;
+  document.documentElement.style.setProperty('--alto-barra', `${alto}px`);
+}
+window.addEventListener('resize', medirBarra);
+
 function pintarBarra() {
   document.getElementById('barra-marca').innerHTML = marcaBarraHTML();
   // En el celular no cabe el nombre completo: se deja el de pila.

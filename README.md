@@ -895,6 +895,7 @@ verdad de qué hay en cada versión. Escrita a mano se quedaba atrás.
 | **v6.3** | Los pedidos, a su camioneta | ✅ listo |
 | **v6.4** | Los de siempre y los de una vez | ✅ listo |
 | **v6.5** | Los estados del hielo, como son | ✅ listo |
+| **v6.5.1** | Que no se pierda de vista | ✅ listo |
 
 **Lo que falta:** el instalador para Windows, y la
 importación de lo que hay en Aronium la noche antes de arrancar.

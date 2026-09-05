@@ -82,6 +82,8 @@ export async function vistaClientes(pantalla, estadoApp) {
   let busca = '';
   // La pestaña: '' son todos, y si no, qué le compra (v5.4).
   let linea = '';
+  // Dentro de la ficha, su cuenta o sus datos (v6.5.1).
+  let pestanaFicha = 'cuenta';
 
   await cargar();
 
@@ -253,21 +255,40 @@ export async function vistaClientes(pantalla, estadoApp) {
   // guardado. Un formulario de cinco pasos para corregir un teléfono es un
   // estorbo, y corregir teléfonos es lo que se hace todos los días.
   // ==========================================================
-  function campo(etiqueta, clave, valor, { ayuda = '', marcador = '' } = {}) {
+  /**
+   * UN DATO DE LA FICHA  (rehecho en la v6.5.1)
+   *
+   * "Lo sigo viendo un poquito achocado o mal ordenado. Es mejor rellenar
+   *  los datos y que esté el botón de guardar en la parte inferior siempre
+   *  visible."
+   *
+   * Antes cada dato era un renglón etiqueta|campo apretado a lo ancho, y se
+   * guardaba solo al salir del campo —lo que repintaba la pantalla entera y
+   * hacía el parpadeo—. Ahora la etiqueta va ARRIBA y el campo debajo, en
+   * una rejilla de dos columnas, y nada se guarda hasta que se toca
+   * Guardar. `data-inicial` es lo que decía al abrirlo: con eso se sabe qué
+   * cambió y qué mandar.
+   */
+  function campo(etiqueta, clave, valor, { ayuda = '', marcador = '', ancho = false,
+                                           largo = false } = {}) {
+    const v = valor === null || valor === undefined ? '' : String(valor);
     if (!administra) {
       return `
-        <div class="cuadre-linea">
-          <span>${esc(etiqueta)}</span>
-          <strong>${esc(valor === '' || valor === null || valor === undefined
-            ? '—' : String(valor))}</strong>
+        <div class="cli-campo ${ancho ? 'ancho' : ''}">
+          <span class="etiqueta-chica">${esc(etiqueta)}</span>
+          <strong>${esc(v === '' ? '—' : v)}</strong>
         </div>`;
     }
     return `
-      <div class="cuadre-linea campo-vivo">
-        <span>${esc(etiqueta)}${ayuda ? `<small>${esc(ayuda)}</small>` : ''}</span>
-        <input data-campo="${esc(clave)}" value="${esc(valor ?? '')}"
-               placeholder="${esc(marcador)}" autocomplete="off">
-      </div>`;
+      <label class="cli-campo ${ancho ? 'ancho' : ''}">
+        <span class="etiqueta-chica">${esc(etiqueta)}${
+          ayuda ? `<small>${esc(ayuda)}</small>` : ''}</span>
+        ${largo
+          ? `<textarea data-campo="${esc(clave)}" data-inicial="${esc(v)}" rows="2"
+                       placeholder="${esc(marcador)}">${esc(v)}</textarea>`
+          : `<input data-campo="${esc(clave)}" data-inicial="${esc(v)}" value="${esc(v)}"
+                    placeholder="${esc(marcador)}" autocomplete="off">`}
+      </label>`;
   }
 
   // ==========================================================
@@ -302,6 +323,7 @@ export async function vistaClientes(pantalla, estadoApp) {
           </p>
           <div class="cli-etiquetas">
             ${c.activo ? '' : '<span class="etiqueta baja">Dado de baja</span>'}
+            ${e.ritmo?.frecuente ? '<span class="etiqueta mayoreo">⭐ De siempre</span>' : ''}
             ${c.lista
               ? `<span class="etiqueta mayoreo">🏷️ ${esc(c.lista.nombre)}</span>` : ''}
             ${e.vencido ? '<span class="etiqueta-mal">Se le pasó el plazo</span>' : ''}
@@ -320,6 +342,27 @@ export async function vistaClientes(pantalla, estadoApp) {
         </div>
       </div>
 
+      <!-- LA FICHA, EN DOS  (v6.5.1). Su cuenta —lo que debe y lo que se ha
+           llevado— es lo que se mira noventa veces de cada cien; sus datos
+           se tocan el día que se dan de alta y casi nunca más. Juntos en
+           una sola columna era una pared de renglones. -->
+      <div class="cli-pestanas cli-pestanas-ficha">
+        <button class="cli-pestana ${pestanaFicha === 'cuenta' ? 'activa' : ''}" data-ficha-p="cuenta">
+          <span>💳 Su cuenta</span>
+        </button>
+        <button class="cli-pestana ${pestanaFicha === 'datos' ? 'activa' : ''}" data-ficha-p="datos">
+          <span>✏️ Sus datos</span>
+        </button>
+      </div>
+
+      ${pestanaFicha === 'cuenta' ? panelSuCuenta(c, cuenta) : panelSusDatos(c)}`;
+  }
+
+  /** Lo que debe, lo que ha pagado y qué se ha llevado. */
+  function panelSuCuenta(c, cuenta) {
+    const e = c.estado;
+    const r = e.ritmo;
+    return `
       ${e.vencido ? `
         <div class="aviso-sin-caja" style="margin-bottom:12px">
           <strong>Se le pasó el plazo.</strong>
@@ -346,82 +389,108 @@ export async function vistaClientes(pantalla, estadoApp) {
           <button class="secundario chico" id="abonar-transf">Abono por transferencia</button>
         </div>` : ''}
 
-      <!-- QUÉ LE COMPRA, SIN BOTONES  (v5.7.1). Se marca solo con lo que va
-           comprando —cada venta y cada pedido lo apuntan— y lo único que
-           hace es decidir en qué pestaña de arriba sale. Se enseña para
-           que se entienda por qué está donde está, y ya. -->
-      <p class="ayuda cli-compra">
-        ${[c.compra_marqueta && '🧊 marquetas', c.compra_bolsa && '🧊 bolsas', c.compra_agua && '💧 agua']
-          .filter(Boolean).join(' · ') || 'Todavía no le ha comprado nada'}
-        <small>· se marca solo con lo que compra, y es lo que decide en qué pestaña sale</small>
-      </p>
-      ${cuenta?.ritmo || c.estado?.ritmo ? `
+      <!-- QUÉ LE COMPRA Y CADA CUÁNTO, sin botones: las dos cosas se marcan
+           solas con lo que va comprando, y lo único que hacen es decidir en
+           qué pestaña de arriba sale. -->
+      <div class="cli-solo">
         <p class="ayuda cli-compra">
-          ${(cuenta?.ritmo || c.estado.ritmo).frecuente ? '⭐ <b>De siempre</b>' : '🕓 <b>De una vez</b>'}
-          · ${textoRitmo(cuenta?.ritmo || c.estado.ritmo)}
-          <small>· es «de siempre» con ${(cuenta?.ritmo || c.estado.ritmo).tope} tickets o más en 30 días; sale solo de las ventas</small>
-        </p>` : ''}
-
-      <h4 class="cfg-subtitulo">Quién es y dónde está</h4>
-      <div class="cuadre cfg-cliente-datos cli-rejilla">
-        ${campo('Nombre', 'nombre', c.nombre)}
-        ${campo('Negocio', 'negocio', c.negocio, { marcador: 'Abarrotes Doña Mary' })}
-        ${campo('Teléfono', 'telefono', c.telefono, { marcador: '999 123 4567' })}
-        ${campo('Dirección', 'direccion', c.direccion)}
-        ${campo('Referencias', 'referencias', c.referencias,
-                { marcador: 'La de la puerta azul, junto a la tortillería',
-                  ayuda: 'lo que hace que se encuentre la puerta' })}
-        ${campo('Horario de entrega', 'horarioEntrega', c.horario_entrega,
-                { marcador: 'de 8 a 2 y de 5 a 8',
-                  ayuda: 'a qué hora se le puede llegar' })}
+          ${[c.compra_marqueta && '🧊 marquetas', c.compra_bolsa && '🧊 bolsas', c.compra_agua && '💧 agua']
+            .filter(Boolean).join(' · ') || 'Todavía no le ha comprado nada'}
+          <small>· se marca solo con lo que compra</small>
+        </p>
+        ${r ? `
+          <p class="ayuda cli-compra">
+            ${r.frecuente ? '⭐ <b>De siempre</b>' : '🕓 <b>De una vez</b>'} · ${textoRitmo(r)}
+            <small>· es «de siempre» con ${r.tope} tickets o más en 30 días</small>
+          </p>` : ''}
       </div>
-      ${administra ? `
-        <div class="fila-botones" style="margin-top:10px;flex-wrap:wrap">
-          <button class="secundario chico" id="ubicacion">
-            📍 ${c.latitud != null ? 'Cambiar la ubicación' : 'Poner la ubicación'}
-          </button>
-          ${c.latitud != null ? `
-            <a class="boton-enlace chico" target="_blank" rel="noopener"
-               href="${enlaceMaps(c.latitud, c.longitud, c.nombre)}">Ver en el mapa</a>` : ''}
-        </div>
-        <p class="ayuda" style="margin:6px 0 0">
-          Se pega el enlace que da Google Maps al compartir. Es lo que va a
-          llevar el QR de su nota de entrega.
-        </p>` : ''}
 
-      <h4 class="cfg-subtitulo">Su crédito y su precio</h4>
-      <div class="cuadre cfg-cliente-datos cli-rejilla">
-        ${campo('Límite de crédito', 'limite',
-                paraEditar(c.limite_centavos),
-                { ayuda: 'vacío = sin límite', marcador: 'sin límite' })}
-        ${campo('Días de plazo', 'diasPlazo', c.dias_plazo ?? '',
-                { ayuda: 'solo para avisar de lo vencido', marcador: 'sin plazo' })}
-        ${selectorDeLista(c)}
-      </div>
-      ${administra ? `
-        <p class="ayuda" style="margin-top:8px">
-          Pasarse del límite <strong>no impide la venta</strong>: pide el PIN de un
-          gerente y queda escrito quién lo autorizó.
-        </p>` : ''}
-
-      ${c.notas || administra ? `
-        <h4 class="cfg-subtitulo">Notas</h4>
-        <div class="cuadre">${campo('Notas', 'notas', c.notas)}</div>` : ''}
-
-      <h4 class="cfg-subtitulo">Su cuenta</h4>
+      <h4 class="cfg-subtitulo">Lo que se ha llevado y lo que ha pagado</h4>
       ${cuenta.length ? `
         <table class="venta-lineas cuenta-corriente">
           ${cuenta.map(renglonCuenta).join('')}
-        </table>` : '<p class="ayuda">Todavía no se ha llevado nada a crédito.</p>'}
+        </table>` : '<p class="ayuda">Todavía no se ha llevado nada a crédito.</p>'}`;
+  }
 
-      ${administra && c.activo ? `
-        <div class="fila-botones" style="margin-top:18px">
-          <button class="secundario chico peligro" id="baja">Dar de baja</button>
-          ${esAdmin ? '<button class="secundario chico peligro" id="borrar">Eliminar</button>' : ''}
-        </div>` : ''}
-      ${administra && !c.activo ? `
-        <div class="fila-botones" style="margin-top:18px">
-          <button class="secundario chico" id="alta">Volver a dar de alta</button>
+  /**
+   * SUS DATOS, en dos columnas y con un solo Guardar abajo.
+   *
+   * Nada se manda hasta que se toca el botón: así se rellena la ficha
+   * entera de corrido —como se rellena un papel— y la pantalla no se
+   * repinta a cada campo, que era el parpadeo.
+   */
+  function panelSusDatos(c) {
+    return `
+      <form id="cli-form" class="cli-form" autocomplete="off">
+        <h4 class="cfg-subtitulo">Quién es y dónde está</h4>
+        <div class="cli-campos">
+          ${campo('Nombre', 'nombre', c.nombre)}
+          ${campo('Negocio', 'negocio', c.negocio, { marcador: 'Abarrotes Doña Mary' })}
+          ${campo('Teléfono', 'telefono', c.telefono, { marcador: '999 123 4567' })}
+          ${campo('Horario de entrega', 'horarioEntrega', c.horario_entrega,
+                  { marcador: 'de 8 a 2 y de 5 a 8', ayuda: 'a qué hora se le puede llegar' })}
+          ${campo('Dirección', 'direccion', c.direccion, { ancho: true })}
+          ${campo('Referencias', 'referencias', c.referencias,
+                  { ancho: true, marcador: 'La de la puerta azul, junto a la tortillería',
+                    ayuda: 'lo que hace que se encuentre la puerta' })}
+        </div>
+
+        <div class="cli-ubicacion">
+          <span class="ayuda">
+            📍 ${c.latitud != null
+              ? `Con ubicación puesta: ${Number(c.latitud).toFixed(5)}, ${Number(c.longitud).toFixed(5)}`
+              : 'Sin ubicación. Es la que lleva el QR de su nota de entrega.'}
+          </span>
+          ${administra ? `
+            <span class="fila-botones">
+              <button type="button" class="secundario chico" id="ubicacion">
+                ${c.latitud != null ? 'Cambiar' : 'Ponerla'}
+              </button>
+              ${c.latitud != null ? `
+                <a class="boton-enlace chico" target="_blank" rel="noopener"
+                   href="${enlaceMaps(c.latitud, c.longitud, c.nombre)}">Ver en el mapa</a>` : ''}
+            </span>` : ''}
+        </div>
+
+        <h4 class="cfg-subtitulo">Su crédito y su precio</h4>
+        <div class="cli-campos">
+          ${campo('Límite de crédito', 'limite', paraEditar(c.limite_centavos),
+                  { ayuda: 'vacío = sin límite', marcador: 'sin límite' })}
+          ${campo('Días de plazo', 'diasPlazo', c.dias_plazo ?? '',
+                  { ayuda: 'solo para avisar de lo vencido', marcador: 'sin plazo' })}
+          ${selectorDeLista(c)}
+        </div>
+        ${administra ? `
+          <p class="ayuda" style="margin:8px 0 0">
+            Pasarse del límite <strong>no impide la venta</strong>: pide el PIN de un
+            gerente y queda escrito quién lo autorizó.
+          </p>` : ''}
+
+        <h4 class="cfg-subtitulo">Notas</h4>
+        <div class="cli-campos">
+          ${campo('Notas', 'notas', c.notas, { ancho: true, largo: true,
+                  marcador: 'Lo que haga falta recordar de este cliente' })}
+        </div>
+
+        ${administra && c.activo ? `
+          <div class="fila-botones" style="margin-top:18px">
+            <button type="button" class="secundario chico peligro" id="baja">Dar de baja</button>
+            ${esAdmin ? '<button type="button" class="secundario chico peligro" id="borrar">Eliminar</button>' : ''}
+          </div>` : ''}
+        ${administra && !c.activo ? `
+          <div class="fila-botones" style="margin-top:18px">
+            <button type="button" class="secundario chico" id="alta">Volver a dar de alta</button>
+          </div>` : ''}
+      </form>
+
+      ${administra ? `
+        <!-- EL BOTÓN DE GUARDAR, SIEMPRE A LA VISTA. Se queda pegado abajo
+             de la columna por más que la ficha sea larga: rellenar seis
+             campos y tener que buscar el botón es como se pierden datos. -->
+        <div class="cli-guardar" id="cli-guardar">
+          <span class="ayuda" id="cli-aviso">Nada que guardar</span>
+          <button type="button" class="secundario chico" id="deshacer" disabled>Deshacer</button>
+          <button type="button" id="guardar-cliente" disabled>Guardar los cambios</button>
         </div>` : ''}`;
   }
 
@@ -439,15 +508,15 @@ export async function vistaClientes(pantalla, estadoApp) {
     const suya = c.lista_id;
     if (!administra) {
       return `
-        <div class="cuadre-linea">
-          <span>Precio de mayoreo</span>
+        <div class="cli-campo ancho">
+          <span class="etiqueta-chica">Precio de mayoreo</span>
           <strong>${c.lista ? esc(c.lista.nombre) : (laNormal || 'el de siempre')}</strong>
         </div>`;
     }
     return `
-      <div class="cuadre-linea campo-vivo">
-        <span>Precio de mayoreo<small>cuál lista se le cobra al teclear 1m</small></span>
-        <select data-lista>
+      <label class="cli-campo ancho">
+        <span class="etiqueta-chica">Precio de mayoreo<small>cuál lista se le cobra al teclear 1m</small></span>
+        <select data-lista data-inicial="${esc(suya || '')}">
           <option value="">${laNormal ? `El normal (${esc(laNormal)})` : 'El de siempre'}</option>
           ${listas.map((l) => `
             <option value="${esc(l.id)}" ${suya === l.id ? 'selected' : ''}>
@@ -456,7 +525,7 @@ export async function vistaClientes(pantalla, estadoApp) {
         </select>
         ${c.lista && !c.lista.activo
           ? '<small class="malo">esa lista se dio de baja: se le cobra público</small>' : ''}
-      </div>`;
+      </label>`;
   }
 
   function renglonCuenta(m) {
@@ -512,23 +581,45 @@ export async function vistaClientes(pantalla, estadoApp) {
       b.onclick = () => abrir(b.dataset.cliente);
     });
 
-    // Los campos se guardan al salir de ellos, igual que en Productos.
-    pantalla.querySelectorAll('[data-campo]').forEach((el) => {
-      el.onblur = () => guardarCampo(el);
-      el.onkeydown = (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); el.blur(); } };
+    // LAS DOS PESTAÑAS DE LA FICHA  (v6.5.1).
+    pantalla.querySelectorAll('[data-ficha-p]').forEach((b) => {
+      b.onclick = () => { pestanaFicha = b.dataset.fichaP; pintar(); };
     });
 
-    const selLista = pantalla.querySelector('[data-lista]');
-    if (selLista) selLista.onchange = async () => {
-      try {
-        const r = await api.actualizar(`/clientes/${ficha.cliente.id}`,
-                                       { listaId: selLista.value });
-        ficha.cliente = r.cliente;
-        avisar(r.cliente.lista
-          ? `${r.cliente.nombre} paga precio de ${r.cliente.lista.nombre}`
-          : `${r.cliente.nombre} paga el precio de mayoreo normal`, 'bien');
-        await cargar();
-      } catch (e) { avisar(e.message, 'error'); await abrir(ficha.cliente.id); }
+    // NADA SE GUARDA SOLO  (v6.5.1). Los campos se rellenan de corrido y el
+    // botón de abajo se enciende en cuanto algo cambia. Antes se guardaba
+    // al salir de cada campo y la pantalla se repintaba entera: ese era el
+    // parpadeo.
+    const cambiables = [...pantalla.querySelectorAll('[data-campo], [data-lista]')];
+    const revisar = () => {
+      const hay = cambiables.some((el) => el.value !== (el.dataset.inicial ?? ''));
+      const guardar = q('#guardar-cliente');
+      const deshacer = q('#deshacer');
+      const aviso = q('#cli-aviso');
+      if (guardar) guardar.disabled = !hay;
+      if (deshacer) deshacer.disabled = !hay;
+      if (aviso) aviso.textContent = hay ? 'Hay cambios sin guardar' : 'Nada que guardar';
+      q('#cli-guardar')?.classList.toggle('con-cambios', hay);
+    };
+    cambiables.forEach((el) => {
+      el.oninput = revisar;
+      el.onchange = revisar;
+      // Enter guarda, como en cualquier formulario; en las notas no, que
+      // ahí el Enter es un renglón nuevo.
+      if (el.tagName === 'INPUT') {
+        el.onkeydown = (ev) => {
+          if (ev.key === 'Enter') { ev.preventDefault(); guardarFicha(); }
+        };
+      }
+    });
+    revisar();
+
+    const guardar = q('#guardar-cliente');
+    if (guardar) guardar.onclick = guardarFicha;
+    const deshacer = q('#deshacer');
+    if (deshacer) deshacer.onclick = () => {
+      cambiables.forEach((el) => { el.value = el.dataset.inicial ?? ''; });
+      revisar();
     };
 
     const subirFoto = q('#foto-cliente');
@@ -678,16 +769,32 @@ export async function vistaClientes(pantalla, estadoApp) {
     } catch (e) { avisar(e.message, 'error'); }
   }
 
-  async function guardarCampo(el) {
+  /**
+   * GUARDA TODO LO QUE CAMBIÓ, de un viaje.
+   *
+   * Se manda solo lo que de verdad se tocó: mandar la ficha entera haría
+   * que abrir un cliente y cerrarlo le pusiera fecha de modificación a
+   * todo, y que dos personas editando a la vez se pisaran campos que
+   * ninguna tocó.
+   */
+  async function guardarFicha() {
     if (!ficha) return;
-    const clave = el.dataset.campo;
+    const cambiables = [...pantalla.querySelectorAll('[data-campo], [data-lista]')];
+    const cuerpo = {};
+    for (const el of cambiables) {
+      const antes = el.dataset.inicial ?? '';
+      if (el.value === antes) continue;
+      const clave = el.dataset.campo || 'listaId';
+      cuerpo[clave] = typeof el.value === 'string' ? el.value.trim() : el.value;
+    }
+    if (!Object.keys(cuerpo).length) return;
+
     try {
-      const r = await api.actualizar(`/clientes/${ficha.cliente.id}`, { [clave]: el.value.trim() });
+      const r = await api.actualizar(`/clientes/${ficha.cliente.id}`, cuerpo);
       ficha.cliente = r.cliente;
-      el.classList.add('guardado');
-      setTimeout(() => el.classList.remove('guardado'), 900);
-      // La lista de la izquierda enseña el nombre y el saldo: si cambió el
-      // nombre, ahí también tiene que cambiar.
+      avisar('Guardado', 'bien');
+      // Una sola repintada, y a propósito: el nombre y el saldo salen
+      // también en la lista de la izquierda.
       await cargar();
     } catch (e) {
       avisar(e.message, 'error');
