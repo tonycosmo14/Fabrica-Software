@@ -34,11 +34,85 @@ const FRACCIONES_VALIDAS = [16, 8, 4, 2, 1];
  * recuperarlos: nada se borra, pero si no hay forma de verlos, para el
  * usuario es como si se hubieran borrado.
  */
+/**
+ * LOS CUATRO NÚMEROS DE ABAJO  (v7.1)
+ *
+ * Cuántos productos se venden, cuánto vale lo que hay en el mostrador,
+ * qué se gana en promedio y cuántos hay que pedir. Se sacan de lo que ya
+ * está guardado; nada de esto es un contador.
+ */
+function resumenCatalogo() {
+  const activos = bd.prepare(
+    'SELECT * FROM productos WHERE activo = 1').all();
+  const deBaja = bd.prepare(
+    'SELECT COUNT(*) n FROM productos WHERE activo = 0').get().n;
+
+  // EL MARGEN PROMEDIO: solo de los que tienen costo puesto. Meter en el
+  // promedio a los que no lo tienen sería contarlos como si se regalaran.
+  const conCosto = activos.filter((p) => p.costo_centavos > 0 && p.precio_centavos > 0);
+  const margen = conCosto.length
+    ? Math.round((conCosto.reduce((n, p) =>
+        n + ((p.precio_centavos - p.costo_centavos) / p.precio_centavos), 0)
+        / conCosto.length) * 1000) / 10
+    : null;
+
+  // LO QUE HAY EN EL MOSTRADOR, a precio de venta. Solo lo que lleva
+  // cuenta de piezas: el hielo se mide en marquetas y su valor vive en la
+  // Existencia del cuarto frío.
+  let valor = 0;
+  let porPedir = 0;
+  for (const p of activos.filter((x) => x.lleva_inventario)) {
+    const e = estadoProducto(p);
+    valor += Math.max(0, e.esperado) * (p.precio_centavos || 0);
+    if (e.bajo) porPedir++;
+  }
+
+  return {
+    productos: activos.length,
+    deBaja,
+    conMayoreo: activos.filter((p) => p.mayoreo_desde).length,
+    sinCosto: activos.length - conCosto.length,
+    margen,
+    valorMostrador: valor,
+    porPedir
+  };
+}
+
+/**
+ * A CUÁNTOS CLIENTES SE LES DEJÓ UN PRECIO PROPIO EN CADA PRODUCTO  (v7.1)
+ *
+ * "Precios especiales por clientes: cada cliente puede llegar a tener un
+ *  precio diferente."
+ *
+ * En la ficha del producto se ve el número, no la lista: quien está
+ * poniendo precios necesita saber que ese renglón lo tienen amarrado
+ * catorce clientes ANTES de moverlo. Los catorce nombres se ven en
+ * Clientes, que es donde se cambian.
+ */
+function conveniosPorProducto() {
+  const filas = bd.prepare(`
+    SELECT cp.producto_id AS id, COUNT(*) AS n
+      FROM cliente_precios cp
+      JOIN clientes c ON c.id = cp.cliente_id AND c.activo = 1
+     GROUP BY cp.producto_id
+  `).all();
+  return new Map(filas.map((f) => [f.id, f.n]));
+}
+
+function conConvenios(productos) {
+  const cuenta = conveniosPorProducto();
+  for (const p of productos) p.convenios = cuenta.get(p.id) || 0;
+  return productos;
+}
+
 router.get('/', verCatalogo, (req, res) => {
   const conBajas = req.query.incluirBajas === '1';
 
   if (!conBajas) {
-    return ok(res, { categorias: categoriasActivas(), productos: productosActivos() });
+    return ok(res, {
+      categorias: categoriasActivas(), productos: conConvenios(productosActivos()),
+      resumen: resumenCatalogo()
+    });
   }
 
   const categorias = bd.prepare(
@@ -51,7 +125,96 @@ router.get('/', verCatalogo, (req, res) => {
      ORDER BY p.activo DESC, p.orden, p.nombre
   `).all();
 
-  return ok(res, { categorias, productos });
+  return ok(res, { categorias, productos: conConvenios(productos), resumen: resumenCatalogo() });
+});
+
+/**
+ * QUÉ HA COSTADO ESTE PRODUCTO A LO LARGO DEL TIEMPO  (v7.1)
+ *
+ * No hay una tabla de historial de precios, y no hace falta: cada cambio
+ * ya quedó escrito en la BITÁCORA con lo que decía antes y lo que dice
+ * después. Leerlo de ahí es leer la misma verdad que audita todo lo
+ * demás; una tabla aparte sería una segunda copia que el día que se
+ * desincronice nadie sabría cuál creer.
+ */
+router.get('/productos/:id/historial', administrar, (req, res) => {
+  const p = bd.prepare('SELECT * FROM productos WHERE id = ?').get(req.params.id);
+  if (!p) return error(res, 'Ese producto no existe.', 404);
+
+  const filas = bd.prepare(`
+    SELECT b.fecha, b.detalle, u.nombre AS quien
+      FROM bitacora b
+      LEFT JOIN usuarios u ON u.id = b.ejecutor_id
+     WHERE b.entidad = 'producto' AND b.entidad_id = ?
+       AND b.accion IN ('producto.alta', 'producto.edicion')
+     ORDER BY b.fecha DESC
+     LIMIT 60
+  `).all(p.id);
+
+  const cambios = [];
+  for (const f of filas) {
+    let d = null;
+    try { d = JSON.parse(f.detalle || '{}'); } catch { d = null; }
+    if (!d) continue;
+    // Solo los renglones donde el precio de verdad se movió: en la
+    // bitácora también quedan los cambios de nombre y de mínimo, y
+    // enseñarlos aquí sería llenar el historial de ruido.
+    const antes = d.antes?.precio_centavos ?? null;
+    const despues = d.despues?.precio_centavos ?? d.precio_centavos ?? null;
+    const mayoreoAntes = d.antes?.mayoreo_centavos ?? null;
+    const mayoreoDespues = d.despues?.mayoreo_centavos ?? null;
+    const movioMostrador = despues !== null && antes !== despues;
+    const movioMayoreo = mayoreoAntes !== mayoreoDespues;
+    if (!movioMostrador && !movioMayoreo) continue;
+    cambios.push({
+      fecha: f.fecha, quien: f.quien,
+      antes, despues,
+      mayoreoAntes, mayoreoDespues,
+      desde: d.despues?.mayoreo_desde ?? null
+    });
+  }
+
+  return ok(res, { producto: { id: p.id, nombre: p.nombre }, cambios });
+});
+
+/**
+ * DUPLICAR UN PRODUCTO.
+ *
+ * Dar de alta la bolsa de 10 kg cuando ya existe la de 5 es copiar ocho
+ * campos y cambiar dos. El código NO se copia —es único y se teclea— y
+ * el nombre lleva "(copia)" para que nadie se confunda con el original
+ * mientras lo termina de ajustar.
+ */
+router.post('/productos/:id/duplicar', administrar, (req, res) => {
+  const p = bd.prepare('SELECT * FROM productos WHERE id = ?').get(req.params.id);
+  if (!p) return error(res, 'Ese producto no existe.', 404);
+
+  const id = nuevoId();
+  const orden = bd.prepare(
+    'SELECT COALESCE(MAX(orden), 0) n FROM productos WHERE categoria_id = ?'
+  ).get(p.categoria_id).n + 1;
+
+  bd.prepare(`
+    INSERT INTO productos (id, codigo, nombre, categoria_id, tipo, dieciseisavos,
+                           precio_centavos, color, orden, activo, fecha_alta, creado_por,
+                           costo_centavos, minimo, lleva_inventario, para_agua,
+                           para_nevera, mayoreo, mayoreo_desde, mayoreo_centavos)
+    VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, `${p.nombre} (copia)`.slice(0, 60), p.categoria_id, p.tipo,
+         p.dieciseisavos, p.precio_centavos, p.color, orden, ahora(), req.usuario.id,
+         p.costo_centavos, p.minimo, p.lleva_inventario, p.para_agua,
+         p.para_nevera, p.mayoreo, p.mayoreo_desde, p.mayoreo_centavos);
+
+  bitacora.registrar({
+    accion: 'producto.alta', entidad: 'producto', entidadId: id,
+    ejecutorId: req.usuario.id,
+    detalle: { nombre: `${p.nombre} (copia)`, copiadoDe: p.nombre,
+               precio_centavos: p.precio_centavos }
+  });
+
+  return ok(res, {
+    producto: bd.prepare('SELECT * FROM productos WHERE id = ?').get(id)
+  }, 201);
 });
 
 // ============================================================
@@ -191,6 +354,46 @@ function leerProducto(cuerpo, anterior = null) {
     }
   }
 
+  // EL PRECIO POR VOLUMEN  (v7.1)
+  //
+  // "De cincuenta bolsas para arriba, a $16.50." Le toca a quien sea que
+  // se lleve cincuenta. Los dos datos van juntos: vaciar cualquiera de
+  // los dos apaga la regla, y por eso no hay un interruptor aparte que
+  // pueda quedar en desacuerdo con los números.
+  //
+  // El hielo por fracción no lo usa: ahí el volumen ya está en el propio
+  // botón —una marqueta entera es el mayoreo— y su precio sale de la
+  // lista, no de esta columna.
+  let mayoreoDesde = anterior?.mayoreo_desde ?? null;
+  let mayoreoCentavos = anterior?.mayoreo_centavos ?? null;
+
+  if (cuerpo?.mayoreoDesde !== undefined) {
+    const t = String(cuerpo.mayoreoDesde ?? '').replace(/[^0-9]/g, '');
+    mayoreoDesde = t === '' ? null : Number(t);
+    if (mayoreoDesde !== null && (mayoreoDesde < 2 || mayoreoDesde > 100000)) {
+      return { error: 'El mayoreo empieza desde 2 piezas o más.' };
+    }
+  }
+  if (cuerpo?.mayoreoPrecio !== undefined) {
+    const t = String(cuerpo.mayoreoPrecio ?? '').replace(/[^0-9.]/g, '');
+    if (t === '') mayoreoCentavos = null;
+    else {
+      try { mayoreoCentavos = aCentavos(t); }
+      catch { return { error: 'Ese precio de mayoreo no es válido.' }; }
+      if (mayoreoCentavos > 100000000) return { error: 'Ese precio es demasiado alto.' };
+    }
+  }
+  // Uno sin el otro no dice nada: se apagan los dos juntos.
+  if (mayoreoDesde === null || mayoreoCentavos === null) {
+    mayoreoDesde = null; mayoreoCentavos = null;
+  }
+  if (tipo === 'hielo') { mayoreoDesde = null; mayoreoCentavos = null; }
+  // Un "mayoreo" más caro que el mostrador es un dedazo, y se descubre
+  // el día que alguien se lleve cincuenta y pague de más.
+  if (mayoreoCentavos !== null && centavos !== null && mayoreoCentavos > centavos) {
+    return { error: 'El precio de mayoreo tiene que ser menor que el de mostrador.' };
+  }
+
   // Aviso de "ya hay que pedir".
   let minimo = anterior?.minimo ?? null;
   if (cuerpo?.minimo !== undefined) {
@@ -231,7 +434,7 @@ function leerProducto(cuerpo, anterior = null) {
   if (tipo === 'hielo') paraAgua = 0;
 
   return { nombre, tipo, dieciseisavos, centavos, codigo, costo, minimo,
-           llevaInventario, paraAgua };
+           llevaInventario, paraAgua, mayoreoDesde, mayoreoCentavos };
 }
 
 router.post('/productos', administrar, (req, res) => {
@@ -257,17 +460,22 @@ router.post('/productos', administrar, (req, res) => {
   bd.prepare(`
     INSERT INTO productos (id, codigo, nombre, categoria_id, tipo, dieciseisavos,
                            precio_centavos, color, orden, activo, fecha_alta, creado_por,
-                           costo_centavos, minimo, lleva_inventario, para_agua)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)
+                           costo_centavos, minimo, lleva_inventario, para_agua,
+                           mayoreo_desde, mayoreo_centavos)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(id, datos.codigo, datos.nombre, categoria.id, datos.tipo,
          datos.dieciseisavos, datos.centavos, req.body?.color || null,
          orden, ahora(), req.usuario.id,
-         datos.costo, datos.minimo, datos.llevaInventario, datos.paraAgua);
+         datos.costo, datos.minimo, datos.llevaInventario, datos.paraAgua,
+         datos.mayoreoDesde, datos.mayoreoCentavos);
 
   bitacora.registrar({
     accion: 'producto.alta', entidad: 'producto', entidadId: id,
     ejecutorId: req.usuario.id,
-    detalle: { nombre: datos.nombre, tipo: datos.tipo, codigo: datos.codigo }
+    // El precio va en la bitácora desde el alta: es el primer renglón de
+    // su historial, y sin él el historial empieza a media película.
+    detalle: { nombre: datos.nombre, tipo: datos.tipo, codigo: datos.codigo,
+               precio_centavos: datos.centavos }
   });
 
   return ok(res, { producto: bd.prepare('SELECT * FROM productos WHERE id = ?').get(id) }, 201);
@@ -296,18 +504,29 @@ router.put('/productos/:id', administrar, (req, res) => {
   bd.prepare(`
     UPDATE productos SET codigo = ?, nombre = ?, categoria_id = ?, tipo = ?,
       dieciseisavos = ?, precio_centavos = ?, color = ?, orden = ?,
-      costo_centavos = ?, minimo = ?, lleva_inventario = ?, para_agua = ?
+      costo_centavos = ?, minimo = ?, lleva_inventario = ?, para_agua = ?,
+      mayoreo_desde = ?, mayoreo_centavos = ?
     WHERE id = ?
   `).run(datos.codigo, datos.nombre, categoria.id, datos.tipo,
          datos.dieciseisavos, datos.centavos,
          req.body?.color !== undefined ? req.body.color : p.color,
          req.body?.orden !== undefined ? Number(req.body.orden) || 0 : p.orden,
          datos.costo, datos.minimo, datos.llevaInventario, datos.paraAgua,
+         datos.mayoreoDesde, datos.mayoreoCentavos,
          p.id);
 
   bitacora.registrar({
     accion: 'producto.edicion', entidad: 'producto', entidadId: p.id,
-    ejecutorId: req.usuario.id, detalle: { nombre: datos.nombre }
+    ejecutorId: req.usuario.id,
+    // ANTES Y DESPUÉS del precio, para que el historial salga de aquí y
+    // no de una tabla aparte que se pueda desincronizar.
+    detalle: {
+      nombre: datos.nombre,
+      antes: { precio_centavos: p.precio_centavos, costo_centavos: p.costo_centavos,
+               mayoreo_desde: p.mayoreo_desde, mayoreo_centavos: p.mayoreo_centavos },
+      despues: { precio_centavos: datos.centavos, costo_centavos: datos.costo,
+                 mayoreo_desde: datos.mayoreoDesde, mayoreo_centavos: datos.mayoreoCentavos }
+    }
   });
 
   return ok(res, { producto: bd.prepare('SELECT * FROM productos WHERE id = ?').get(p.id) });

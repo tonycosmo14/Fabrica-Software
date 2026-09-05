@@ -1,0 +1,56 @@
+-- ============================================================
+-- 056_precio_por_volumen.sql  (v7.1)
+--
+-- EL MAYOREO POR CANTIDAD.
+--
+-- "Hay mayoreo en algunos productos por cantidad —yo lo activo y decido
+--  cuál es esa cantidad— y precios especiales por clientes: cada cliente
+--  puede llegar a tener un precio diferente."
+--
+-- Son DOS COSAS DISTINTAS, y hasta hoy solo existía media de cada una.
+-- Conviene decirlo claro porque todo lo demás depende de entenderlo:
+--
+--   EL PRECIO POR VOLUMEN es del PRODUCTO. "De cincuenta bolsas para
+--   arriba, a $16.50." Le toca a QUIEN SEA que se lleve cincuenta —el
+--   cliente de siempre, el que entra por primera vez, el que ni nombre
+--   dio—. No es un trato con nadie: es cuánto vale comprar mucho.
+--
+--   EL CONVENIO es del CLIENTE. "A Mariscos El Faro la bolsa se la dejo
+--   en $15, lleve una o lleve cien." Ese ya existe desde la v6.9
+--   (`cliente_precios`) y no se toca aquí.
+--
+-- Con las dos cosas la cascada al cobrar queda así, de lo más particular
+-- a lo más general:
+--
+--   1. SU CONVENIO en ese producto              (cliente_precios, v6.9)
+--   2. EL PRECIO POR VOLUMEN, si se lleva bastante   ← esto
+--   3. SU LISTA DE MAYOREO, para el hielo por fracción  (016)
+--   4. EL PRECIO DE MOSTRADOR                    (010)
+--
+-- Y el precio siempre se COPIA a la venta (regla 3.5): cambiarlo mañana
+-- no toca un ticket de ayer.
+--
+-- ============================================================
+-- POR QUÉ NO ES UNA TABLA DE ESCALONES
+-- ============================================================
+--
+-- Se podría hacer una tabla con "de 1 a 49 tanto, de 50 a 99 tanto, de
+-- 100 en adelante tanto". No se hace, por ahora, por una razón: nadie en
+-- esta fábrica vende con tres escalones. Se vende con uno —"de cincuenta
+-- para arriba"— y una tabla vacía de escalones es una pantalla más que
+-- llenar para guardar un solo número.
+--
+-- El día que haga falta el segundo escalón, esta columna se convierte en
+-- la primera fila de esa tabla sin perder nada. Lo que no se puede
+-- deshacer es capturar mal cien productos en una pantalla complicada.
+-- ------------------------------------------------------------
+
+-- A partir de cuántas PIEZAS. Vacío = este producto no tiene mayoreo por
+-- cantidad, que es lo normal. Es lo que enciende y apaga la regla: no
+-- hace falta un interruptor aparte que pueda quedar en desacuerdo con el
+-- número.
+ALTER TABLE productos ADD COLUMN mayoreo_desde INTEGER;
+
+-- Cuánto vale la pieza a partir de ahí. Los dos van juntos: uno sin el
+-- otro no dice nada, y el código no aplica la regla si falta cualquiera.
+ALTER TABLE productos ADD COLUMN mayoreo_centavos INTEGER;

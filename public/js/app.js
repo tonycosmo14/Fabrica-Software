@@ -74,7 +74,9 @@ const RUTAS = {
   // cuenta.
   '#/reparto':   { titulo: 'El reparto',         vista: vistaReparto,   permiso: 'reparto.ver' },
   // El cajero entra con vista limitada: ve cuántas hay e imprime la hoja.
-  '#/productos': { titulo: 'Productos y precios', vista: vistaProductos, permiso: 'inventario.ver', fija: true },
+  // Sin `fija`: la pantalla lleva los cuatro números del catálogo debajo
+  // del tablero (v7.1) y con alto fijo se quedaban fuera de la vista.
+  '#/productos': { titulo: 'Productos y precios', vista: vistaProductos, permiso: 'inventario.ver' },
   // Clientes YA NO es de alto fijo (v6.9): la cartera es una página que se
   // desplaza —cuatro números, las pestañas, la tabla y la ficha— y con el
   // alto clavado la mitad quedaba fuera sin forma de llegar a ella.

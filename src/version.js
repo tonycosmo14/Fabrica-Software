@@ -17,9 +17,57 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '7.0';
+const VERSION_ACTUAL = '7.1';
 
 const VERSIONES = [
+  {
+    numero: '7.1',
+    nombre: 'Productos y precios, como los quiero ver',
+    fecha: '2026-09-05',
+    resumen:
+      'El catálogo entero en una pantalla, con la ficha partida en tres '
+      + 'bloques, y el mayoreo por cantidad que faltaba: «de cincuenta '
+      + 'bolsas para arriba, a $16.50», y le toca a quien sea.',
+    cambios: [
+      { tipo: 'nuevo', texto:
+        'PRECIO POR VOLUMEN. En la ficha de cada producto se pone a partir '
+        + 'de cuántas piezas baja el precio y a cuánto queda la pieza. Le '
+        + 'toca a QUIEN SEA que se lleve esa cantidad, tenga trato o no: no '
+        + 'es un acuerdo con nadie, es cuánto vale comprar mucho. Los dos '
+        + 'datos van juntos y se apaga borrando los dos.' },
+      { tipo: 'nuevo', texto:
+        'LOS TRES PRECIOS, EN UN SOLO BLOQUE. Mostrador, precio por volumen '
+        + 'y a cuántos clientes se les dejó precio propio. Al cobrar gana el '
+        + 'más particular: su convenio, luego el volumen, luego su lista de '
+        + 'mayoreo y al final el mostrador.' },
+      { tipo: 'nuevo', texto:
+        'AVISA SI REGALAS EL PRODUCTO. Debajo del precio por volumen se ve '
+        + 'el descuento que estás dando y cuánto sigues ganando a ese '
+        + 'precio. Si queda por debajo de lo que te cuesta, lo dice.' },
+      { tipo: 'nuevo', texto:
+        'HISTORIAL DE PRECIOS. Cada cambio con la fecha, quién lo hizo y de '
+        + 'cuánto a cuánto. Sale de la bitácora, no de una lista aparte. Los '
+        + 'tickets ya cobrados no cambian.' },
+      { tipo: 'nuevo', texto:
+        'DUPLICAR UN PRODUCTO. La copia trae el mismo precio, costo y '
+        + 'ajustes; nace sin código y con «(copia)» en el nombre.' },
+      { tipo: 'nuevo', texto:
+        'BUSCADOR Y FILTROS. Se busca por nombre o código en TODO el '
+        + 'catálogo, no solo en la categoría abierta, y hay tres botones: '
+        + 'Todos, Con existencia y Por pedir.' },
+      { tipo: 'mejora', texto:
+        'LA FICHA, EN TRES BLOQUES NUMERADOS: identificación, precios y '
+        + 'existencias. Son tres decisiones distintas y ahora se encuentran '
+        + 'sin leer la columna entera.' },
+      { tipo: 'mejora', texto:
+        'CUATRO NÚMEROS ABAJO: catálogo activo, cuántos tienen precio '
+        + 'especial, el valor de lo que hay en mostrador con su margen '
+        + 'promedio, y cuántos hay que pedir.' },
+      { tipo: 'mejora', texto:
+        'MARCAS EN LA LISTA. En cada renglón, ▣ si tiene precio por volumen '
+        + 'y ◆ si hay clientes con precio propio.' }
+    ]
+  },
   {
     numero: '7.0',
     nombre: 'Pedidos, como los quiero ver',

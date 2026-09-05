@@ -903,6 +903,7 @@ verdad de qué hay en cada versión. Escrita a mano se quedaba atrás.
 | **v6.9** | Clientes, como los quiero ver | ✅ listo |
 | **v6.9.1** | La nevera del cliente, y el ancho de la ficha | ✅ listo |
 | **v7.0** | Pedidos, como los quiero ver | ✅ listo |
+| **v7.1** | Productos y precios, como los quiero ver | ✅ listo |
 
 **Lo que falta:** el instalador para Windows, y la
 importación de lo que hay en Aronium la noche antes de arrancar.

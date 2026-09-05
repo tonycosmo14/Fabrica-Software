@@ -5782,3 +5782,167 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 .revision-botones { display: flex; flex-wrap: wrap; gap: 6px; }
 .revision-botones button { width: auto; min-width: 0; margin: 0; }
 .revision-nota { margin: 0; }
+
+/* ============================================================
+   PRODUCTOS Y PRECIOS  (v7.1 — el diseño del dueño)
+
+   "Es muy similar, solo mejor estibado y ordenado."
+
+   Las tres columnas de siempre —categorías, productos, ficha— pero la
+   pantalla ya no es de alto fijo: debajo del tablero van los cuatro
+   números del catálogo, y con alto fijo se quedaban fuera de la vista.
+   La ficha se parte en tres bloques numerados porque son tres decisiones
+   distintas —quién es, cuánto vale, cuánto hay— y mezcladas en una sola
+   columna había que leerlas enteras para encontrar la de en medio.
+   ============================================================ */
+.prod-pantalla { width: 100%; }
+
+.prod-cabecera {
+  display: flex; gap: 16px; align-items: flex-end; justify-content: space-between;
+  flex-wrap: wrap; margin-bottom: 16px;
+}
+.prod-cabecera h2 { margin: 0; }
+.prod-kicker {
+  margin: 0 0 2px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--suave); font-weight: 700;
+}
+.prod-cabecera-acciones { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.prod-cabecera-acciones button { margin: 0; white-space: nowrap; }
+
+/* --- EL TABLERO DE TRES COLUMNAS --- */
+.prod-tablero { display: grid; grid-template-columns: 1fr; gap: 14px; align-items: start; }
+@media (min-width: 1000px) {
+  /* La ficha se lleva la parte grande: ahí van los tres bloques con los
+     precios, que es a lo que se entra. Las dos listas son para llegar. */
+  .prod-tablero { grid-template-columns: 220px minmax(260px, 1fr) minmax(360px, 1.35fr); }
+}
+.prod-columna {
+  display: flex; flex-direction: column; gap: 8px; min-width: 0;
+  background: var(--superficie); border: 1px solid var(--borde);
+  border-radius: 14px; padding: 14px;
+}
+.prod-columna > .cfg-lista { flex: 1; }
+/* Las listas se desplazan solas y la página no: con cuarenta productos, la
+   ficha de la derecha se iría a la mitad del scroll si no. */
+@media (min-width: 1000px) {
+  .prod-categorias .cfg-lista, .prod-listado .cfg-lista {
+    max-height: calc(100vh - var(--alto-barra, 64px) - 220px);
+  }
+  /* La ficha se queda a la vista mientras se recorre la lista: se compara
+     un producto con los de al lado, y perderlo al bajar obliga a volver. */
+  .prod-ficha {
+    position: sticky; top: var(--alto-barra, 64px);
+    max-height: calc(100vh - var(--alto-barra, 64px) - 24px); overflow-y: auto;
+  }
+}
+.prod-listado-cabeza { display: flex; align-items: center; justify-content: space-between; }
+.prod-listado-cabeza .cfg-titulo small {
+  font-size: 12px; font-weight: 700; color: var(--suave);
+  background: var(--superficie-alt); border-radius: 999px; padding: 1px 8px;
+}
+.prod-listado .buscador { margin: 0; }
+
+/* Los tres filtros. Chips y no un desplegable: son tres, se ven de un
+   golpe y se tocan con el dedo en la pantalla del mostrador. */
+.prod-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.prod-chip {
+  margin: 0; min-width: 0; min-height: 0; padding: 5px 11px;
+  font-size: 12.5px; font-weight: 600; border-radius: 999px;
+  background: var(--superficie-alt); color: var(--suave);
+  border: 1px solid var(--borde); box-shadow: none;
+  text-transform: none; letter-spacing: 0;
+}
+.prod-chip:hover { border-color: var(--primario); color: var(--texto); }
+.prod-chip.activa {
+  background: var(--primario); border-color: var(--primario); color: var(--primario-texto);
+}
+
+/* Las dos marcas del renglón: ▣ tiene precio por volumen, ◆ hay clientes
+   con precio propio. Un símbolo y no una palabra: en una lista de cuarenta
+   renglones, dos palabras más por renglón la vuelven ilegible. */
+.prod-fila-marcas { display: flex; align-items: center; gap: 5px; flex: none; }
+.prod-punto { font-size: 11px; line-height: 1; }
+.prod-punto.volumen { color: var(--primario); }
+.prod-punto.convenio { color: var(--ambar); }
+
+/* --- LOS BLOQUES NUMERADOS DE LA FICHA --- */
+.prod-bloque { margin-top: 18px; }
+.prod-bloque:first-of-type { margin-top: 10px; }
+.prod-bloque-cabeza {
+  display: flex; align-items: center; gap: 9px; margin-bottom: 10px;
+  padding-bottom: 7px; border-bottom: 1px solid var(--borde);
+}
+.prod-bloque-cabeza h4 { margin: 0; font-size: 14px; flex: 1; min-width: 0; }
+.prod-bloque-num {
+  display: grid; place-items: center; flex: 0 0 24px; width: 24px; height: 24px;
+  border-radius: 7px; background: var(--et-operario-f); color: var(--et-operario-t);
+  font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+
+/* --- EL PRECIO POR VOLUMEN --- */
+/* En su propia caja y no como dos renglones más del cuadre: los dos
+   números van juntos —uno sin el otro no dice nada— y encima llevan la
+   etiqueta del descuento y el aviso de estar vendiendo bajo costo. */
+.prod-volumen {
+  margin-top: 12px; padding: 12px 14px; border-radius: 12px;
+  background: var(--superficie-alt); border: 1px solid var(--borde);
+  border-left: 3px solid var(--borde-fuerte);
+}
+.prod-volumen.encendido { border-left-color: var(--primario); }
+.prod-volumen-cabeza {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap;
+}
+.prod-volumen .ayuda { margin: 8px 0 0; }
+.prod-volumen .aviso-sin-caja { margin-top: 10px; }
+.prod-etiqueta {
+  font-size: 11.5px; font-weight: 700; white-space: nowrap;
+  padding: 2px 9px; border-radius: 999px;
+  background: var(--et-operario-f); color: var(--et-operario-t);
+}
+.prod-etiqueta.apagada { background: transparent; color: var(--suave); border: 1px solid var(--borde); }
+
+.prod-volumen-campos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+.prod-volumen-campos label { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.prod-volumen-campos span { font-size: 11.5px; font-weight: 600; color: var(--suave); }
+.prod-volumen-campos input {
+  margin: 0; text-align: right; font-variant-numeric: tabular-nums; font-weight: 700;
+}
+.prod-volumen-campos small { font-size: 11px; color: var(--suave); text-align: right; }
+
+/* --- LOS CONVENIOS CON CLIENTES --- */
+.prod-convenios {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  flex-wrap: wrap; margin-top: 12px; padding: 11px 14px; border-radius: 12px;
+  background: var(--superficie-alt); border: 1px solid var(--borde);
+}
+.prod-convenios strong { display: block; font-size: 13.5px; }
+.prod-convenios small { display: block; font-size: 11.5px; color: var(--suave); max-width: 44ch; }
+.prod-convenios .boton { margin: 0; white-space: nowrap; }
+
+/* --- EL PIE DE LA FICHA --- */
+.prod-pie {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--borde);
+}
+.prod-pie button { margin: 0; }
+
+/* --- LOS CUATRO NÚMEROS DE ABAJO --- */
+.prod-kpis {
+  display: grid; gap: 12px; margin-top: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+/* --- EL HISTORIAL DE PRECIOS --- */
+.prod-historial { max-height: 46vh; overflow: auto; margin: 6px 0; }
+.prod-historial td { padding: 8px 6px; vertical-align: top; }
+/* La fecha en un solo renglón: partida en tres —«05 sep / 2026, / 05:21
+   p.m.»— cada cambio ocupaba el triple de alto y el historial dejaba de
+   poderse recorrer con la vista. */
+.prod-historial td:first-child { font-size: 12px; white-space: nowrap; }
+.prod-historial td small { display: block; font-size: 11.5px; color: var(--suave); max-width: none; }
+.prod-historial td.der strong { font-variant-numeric: tabular-nums; }
+
+@media (max-width: 620px) {
+  .prod-volumen-campos { grid-template-columns: 1fr; }
+}

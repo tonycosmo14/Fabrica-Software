@@ -1,13 +1,46 @@
 /**
- * PRODUCTOS, PRECIOS E INVENTARIO  (v1.4)
+ * PRODUCTOS Y PRECIOS  (v1.4 · rediseñada en la v7.1 con el diseño del dueño)
  *
- * Tres columnas a lo ancho, sin desplazar la página: categorías, productos
- * y el detalle de lo que se está viendo.
+ * "Es muy similar, solo mejor estibado y ordenado."
+ *
+ * La pantalla entera, no una columna: el catálogo a la izquierda, el
+ * padrón de productos en medio con su buscador, la ficha del que se toque
+ * a la derecha en tres bloques numerados, y abajo los cuatro números que
+ * resumen el catálogo.
  *
  * SE EDITA EN EL SITIO. Nada de "Editar" que abra un formulario de cinco
  * pasos: se toca el nombre, el precio o el costo y se escribe encima. Sale
  * del campo y ya está guardado. Un formulario por paso está bien para dar
  * de alta algo nuevo; para corregir un precio es un estorbo.
+ *
+ * ============================================================
+ * LOS TRES PRECIOS DE UN PRODUCTO  (v7.1)
+ * ============================================================
+ *
+ * "Hay mayoreo en algunos productos por cantidad —yo lo activo y decido
+ *  cuál es esa cantidad— y precios especiales por clientes: cada cliente
+ *  puede llegar a tener un precio diferente."
+ *
+ * Son dos cosas distintas y por eso se ven en dos renglones distintos del
+ * bloque de tarifas:
+ *
+ *   EL PRECIO DE MOSTRADOR es lo que vale de una en una. Lo paga quien no
+ *   tiene nada especial, que es casi todo el mundo.
+ *
+ *   EL PRECIO POR VOLUMEN es del PRODUCTO. "De cincuenta bolsas para
+ *   arriba, a $16.50." Le toca a QUIEN SEA que se lleve cincuenta: no es
+ *   un trato con nadie, es cuánto vale comprar mucho. Se enciende y se
+ *   apaga aquí mismo, poniendo o borrando los dos números.
+ *
+ *   EL CONVENIO es del CLIENTE. "A Mariscos El Faro la bolsa se la dejo en
+ *   $15, lleve una o lleve cien." Se pone en la ficha del cliente, no
+ *   aquí; aquí solo se ve A CUÁNTOS se les dejó un precio propio, porque
+ *   eso hay que saberlo ANTES de mover el de mostrador.
+ *
+ * Al cobrar gana el más particular: su convenio, si no el precio por
+ * volumen, si no su lista de mayoreo (el hielo por fracción), si no el
+ * mostrador. Y el precio siempre se COPIA al ticket (regla 3.5): subirlo
+ * mañana no toca una venta de ayer.
  *
  * EL CAJERO ENTRA CON VISTA LIMITADA: ve cuántas piezas hay y puede
  * imprimir la hoja para contar. Ni los costos ni los botones de editar
@@ -15,7 +48,7 @@
  */
 import { api } from '../api.js';
 import { esc, avisar, fecha as formatoFecha } from '../util.js';
-import { pedirTexto, pedirImporte, confirmar, menu,
+import { pedirTexto, pedirImporte, confirmar, menu, armarDialogo,
          pedirAutorizacion, pedirContrasena } from '../dialogo.js';
 import { aTexto, pesos, paraEditar } from '../fracciones.js';
 
@@ -28,6 +61,20 @@ const FRACCIONES = [
 ];
 
 const ID_HIELO = 'cat-hielo';
+
+/**
+ * LOS TRES FILTROS DE LA LISTA.
+ *
+ * No dicen "en stock / bajo stock" porque en esta fábrica no todo lleva
+ * cuenta de piezas: el hielo se mide en marquetas y hay productos a los
+ * que nunca se les encendió el inventario. Decirle "sin stock" a algo que
+ * simplemente no se cuenta sería mentir en la pantalla.
+ */
+const FILTROS = [
+  { clave: '',        nombre: 'Todos' },
+  { clave: 'existe',  nombre: 'Con existencia' },
+  { clave: 'pedir',   nombre: 'Por pedir' }
+];
 
 export async function vistaProductos(pantalla, estadoApp) {
   const puede = (p) => estadoApp.permisos.includes('*') || estadoApp.permisos.includes(p);
@@ -44,6 +91,8 @@ export async function vistaProductos(pantalla, estadoApp) {
   let categoriaAbierta = ID_HIELO;
   let seleccionado = null;
   let verBajas = false;
+  let busca = '';
+  let filtro = '';
 
   await cargar();
 
@@ -108,31 +157,60 @@ export async function vistaProductos(pantalla, estadoApp) {
     return inventario.inventario.find((i) => i.producto.id === id) || null;
   }
 
+  /**
+   * QUÉ PRODUCTOS SE VEN EN LA COLUMNA DE EN MEDIO.
+   *
+   * Con el buscador vacío, los de la categoría abierta. Con algo escrito,
+   * TODO EL CATÁLOGO: quien busca "garrafón" no sabe —ni tiene por qué
+   * saber— en qué carpeta quedó guardado, y hacerle abrir carpeta por
+   * carpeta es justo lo que un buscador viene a evitar.
+   */
+  function productosALaVista() {
+    const texto = busca.trim().toLowerCase();
+    let lista = texto
+      ? catalogo.productos.filter((p) =>
+          (p.nombre || '').toLowerCase().includes(texto)
+          || (p.codigo || '').toLowerCase().includes(texto))
+      : catalogo.productos.filter((p) => p.categoria_id === categoriaAbierta);
+
+    if (filtro === 'existe') {
+      lista = lista.filter((p) => (estadoDe(p.id)?.esperado ?? 0) > 0);
+    } else if (filtro === 'pedir') {
+      lista = lista.filter((p) => estadoDe(p.id)?.bajo);
+    }
+    return lista;
+  }
+
   // ==========================================================
   // LA PANTALLA
   // ==========================================================
   function pintar() {
     const cat = catalogo.categorias.find((c) => c.id === categoriaAbierta);
-    const suyos = catalogo.productos.filter((p) => p.categoria_id === categoriaAbierta);
+    const suyos = productosALaVista();
+    const bajas = catalogo.productos.filter((p) => !p.activo).length;
 
     pantalla.innerHTML = `
-      <div class="cfg">
-        <div class="cfg-cabeza">
-          <h2>${administra ? 'Productos y precios' : 'Inventario'}</h2>
-          <div class="cfg-cabeza-acciones">
+      <div class="prod-pantalla ancho-completo">
+        <div class="prod-cabecera">
+          <div>
+            <p class="prod-kicker">Catálogo maestro, tarifas y control de existencias</p>
+            <h2>${administra ? 'Productos y precios' : 'Inventario'}</h2>
+          </div>
+          <div class="prod-cabecera-acciones">
             ${inventario.bajos
               ? `<span class="etiqueta-mal">${inventario.bajos} por pedir</span>` : ''}
             <button class="secundario chico" id="hoja-inventario">🖨️ Hoja para contar</button>
             ${administra ? `
               <button class="secundario chico ${verBajas ? 'activo' : ''}" id="ver-bajas">
-                ${verBajas ? 'Ocultar dados de baja' : 'Ver dados de baja'}
+                ${verBajas ? 'Ocultar dados de baja'
+                  : `Ver dados de baja${bajas ? ` (${bajas})` : ''}`}
               </button>
               ` : ''}
           </div>
         </div>
 
-        <div class="cfg-tablero">
-          <aside class="cfg-columna">
+        <div class="prod-tablero">
+          <aside class="prod-columna prod-categorias">
             <p class="cfg-titulo">Categorías</p>
             <div class="cfg-lista">
               ${catalogo.categorias.map((c) => filaCategoria(c)).join('')}
@@ -140,29 +218,104 @@ export async function vistaProductos(pantalla, estadoApp) {
             ${administra ? '<button class="secundario chico" id="nueva-cat">＋ Categoría</button>' : ''}
           </aside>
 
-          <section class="cfg-columna">
-            <p class="cfg-titulo">${esc(cat?.nombre || 'Productos')}</p>
-            <div class="cfg-lista cfg-productos">
-              ${suyos.map((p) => filaProducto(p)).join('')
-                || '<p class="vacio" style="padding:24px 0">Sin productos aquí.</p>'}
+          <section class="prod-columna prod-listado">
+            <div class="prod-listado-cabeza">
+              <p class="cfg-titulo">
+                ${busca ? 'Buscando en todo el catálogo' : esc(cat?.nombre || 'Productos')}
+                <small>${suyos.length}</small>
+              </p>
             </div>
-            ${administra && cat && cat.activo
+            <input id="busca" class="buscador" autocomplete="off"
+                   placeholder="Buscar por nombre o código…" value="${esc(busca)}">
+            <div class="prod-chips">
+              ${FILTROS.map((f) => `
+                <button class="prod-chip ${filtro === f.clave ? 'activa' : ''}"
+                        data-filtro="${f.clave}">${esc(f.nombre)}</button>`).join('')}
+            </div>
+            <div class="cfg-lista cfg-productos" id="listado">
+              ${suyos.map((p) => filaProducto(p)).join('') || vacioListado()}
+            </div>
+            ${administra && cat && cat.activo && !busca
               ? '<button class="secundario chico" id="nuevo-prod">＋ Producto</button>' : ''}
           </section>
 
-          <section class="cfg-columna cfg-detalle" id="detalle">
+          <section class="prod-columna prod-ficha" id="detalle">
             ${panelDerecho()}
           </section>
         </div>
+
+        ${administra ? tarjetasCatalogo() : ''}
       </div>`;
 
     enganchar();
   }
 
+  function vacioListado() {
+    if (busca) return `<p class="vacio" style="padding:24px 0">Nada con «${esc(busca)}».</p>`;
+    if (filtro === 'pedir') return '<p class="vacio" style="padding:24px 0">Nada por pedir aquí.</p>';
+    if (filtro === 'existe') return '<p class="vacio" style="padding:24px 0">Nada con existencia aquí.</p>';
+    return '<p class="vacio" style="padding:24px 0">Sin productos aquí.</p>';
+  }
+
+  /**
+   * LOS CUATRO NÚMEROS DE ABAJO.
+   *
+   * Cada uno con su renglón chico: un número solo no dice nada. "38% de
+   * margen" no significa lo mismo si sale de tres productos con costo
+   * capturado que si sale de cuarenta, y quien va a decidir si sube un
+   * precio necesita el de abajo tanto como el de arriba.
+   *
+   * VAN ABAJO Y NO ARRIBA, al revés que en Clientes: aquí lo que se viene
+   * a hacer es tocar un producto, no leer el resumen. Arriba estorbarían
+   * el trabajo de todos los días.
+   */
+  function tarjetasCatalogo() {
+    const r = catalogo.resumen;
+    if (!r) return '';
+    const convenios = catalogo.productos.reduce((n, p) => n + (p.convenios || 0), 0);
+
+    const tarjetas = [
+      { icono: '📦', titulo: 'Catálogo activo', valor: String(r.productos),
+        pie: r.deBaja ? `${r.deBaja} dado${r.deBaja === 1 ? '' : 's'} de baja` : 'Ninguno de baja',
+        nota: 'Lo que se puede vender hoy' },
+      { icono: '🏷️', titulo: 'Con precio especial',
+        valor: `${r.conMayoreo}<small> por volumen</small>`,
+        pie: convenios
+          ? `${convenios} convenio${convenios === 1 ? '' : 's'} con clientes`
+          : 'Sin convenios con clientes',
+        nota: 'Mayoreo por cantidad y tratos particulares' },
+      { icono: '💰', titulo: 'Valor en mostrador',
+        valor: `${pesos(r.valorMostrador)}<small> MXN</small>`,
+        pie: r.margen === null ? 'Sin costos capturados'
+          : `${r.margen}% de margen promedio`,
+        nota: r.sinCosto
+          ? `${r.sinCosto} sin costo capturado`
+          : 'Solo lo que lleva cuenta de piezas' },
+      { icono: '🚚', titulo: 'Por pedir', valor: String(r.porPedir),
+        pie: r.porPedir ? 'Ya bajaron de su mínimo' : 'Nada bajo mínimo',
+        nota: 'Aviso de reposición',
+        mal: r.porPedir > 0 }
+    ];
+
+    return `
+      <div class="prod-kpis">
+        ${tarjetas.map((t) => `
+          <div class="cli-kpi ${t.mal ? 'kpi-mal' : ''}">
+            <div class="cli-kpi-cabeza">
+              <span class="cli-kpi-titulo">${esc(t.titulo)}</span>
+              <span class="cli-kpi-icono">${t.icono}</span>
+            </div>
+            <strong class="cli-kpi-valor">${t.valor}</strong>
+            <span class="cli-kpi-pie">${esc(t.pie)}</span>
+            <span class="cli-kpi-nota">${esc(t.nota)}</span>
+          </div>`).join('')}
+      </div>`;
+  }
+
   function filaCategoria(c) {
     const especial = c.id === ID_HIELO;
     return `
-      <div class="cfg-fila-cat ${c.id === categoriaAbierta ? 'activo' : ''}
+      <div class="cfg-fila-cat ${c.id === categoriaAbierta && !busca ? 'activo' : ''}
                   ${c.activo ? '' : 'de-baja'} ${especial ? 'especial' : ''}">
         <button class="cfg-item" data-categoria="${esc(c.id)}">
           ${c.foto
@@ -183,6 +336,7 @@ export async function vistaProductos(pantalla, estadoApp) {
 
   function filaProducto(p) {
     const inv = estadoDe(p.id);
+    const conVolumen = p.mayoreo_desde && p.mayoreo_centavos != null;
     return `
       <button class="cfg-item cfg-producto ${seleccionado?.id === p.id ? 'activo' : ''}
                      ${p.activo ? '' : 'de-baja'}"
@@ -198,15 +352,21 @@ export async function vistaProductos(pantalla, estadoApp) {
               ? pesos(precioDeHielo(p.dieciseisavos, p.mayoreo)) +
                 (p.mayoreo ? ' · mayoreo' : '')
               : pesos(p.precio_centavos)}
+            ${conVolumen ? ` · ${pesos(p.mayoreo_centavos)} de ${p.mayoreo_desde}+` : ''}
             ${p.activo ? '' : ' · dado de baja'}
           </small>
         </span>
-        ${inv ? `<small class="cfg-stock ${inv.bajo ? 'bajo' : ''}">${inv.esperado}</small>` : ''}
+        <span class="prod-fila-marcas">
+          ${conVolumen ? '<span class="prod-punto volumen" title="Tiene precio por volumen">▣</span>' : ''}
+          ${p.convenios ? `<span class="prod-punto convenio" title="${p.convenios} cliente${p.convenios === 1 ? ' tiene' : 's tienen'} precio propio">◆</span>` : ''}
+          ${inv ? `<small class="cfg-stock ${inv.bajo ? 'bajo' : ''}">${inv.esperado}</small>` : ''}
+        </span>
       </button>`;
   }
 
   function panelDerecho() {
     if (seleccionado) return panelProducto(seleccionado);
+    if (busca) return '<p class="vacio" style="padding:40px 0">Toca un producto de la lista para verlo aquí.</p>';
     if (esHielo()) return panelHielo();
     const cat = catalogo.categorias.find((c) => c.id === categoriaAbierta);
     if (cat) return panelCategoria(cat);
@@ -238,13 +398,26 @@ export async function vistaProductos(pantalla, estadoApp) {
       </div>`;
   }
 
+  /** El encabezado de cada bloque de la ficha: "01 · Identificación". */
+  function bloque(numero, titulo, cuerpo, extra = '') {
+    return `
+      <section class="prod-bloque">
+        <div class="prod-bloque-cabeza">
+          <span class="prod-bloque-num">${numero}</span>
+          <h4>${esc(titulo)}</h4>
+          ${extra}
+        </div>
+        ${cuerpo}
+      </section>`;
+  }
+
   // ==========================================================
   // PANEL: UN PRODUCTO
   // ==========================================================
   function panelProducto(p) {
     const inv = estadoDe(p.id);
     const esDeHielo = p.tipo === 'hielo';
-    const precio = esDeHielo ? precioDeHielo(p.dieciseisavos) : p.precio_centavos;
+    const cat = catalogo.categorias.find((c) => c.id === p.categoria_id);
 
     return `
       <div class="cfg-detalle-cabeza">
@@ -255,6 +428,7 @@ export async function vistaProductos(pantalla, estadoApp) {
             : '<span class="cfg-foto-vacia grande">📦</span>'}
         </div>
         <div class="crece">
+          <p class="prod-kicker">${esc(cat?.nombre || 'Sin categoría')}</p>
           <h3 style="margin:0">${esc(p.nombre)}</h3>
           ${p.activo ? '' : '<p class="etiqueta-mal" style="display:inline-block;margin:6px 0 0">Dado de baja</p>'}
           ${administra ? `
@@ -266,39 +440,139 @@ export async function vistaProductos(pantalla, estadoApp) {
         ${!esDeHielo && veCostos ? margen(p) : ''}
       </div>
 
-      <div class="cuadre">
-        ${campo('Nombre', 'nombre', p.nombre)}
-        ${campo('Código para teclear', 'codigo', p.codigo || '',
-                { ayuda: 'lo que se teclea en la caja' })}
-        ${esDeHielo ? `
-          <div class="cuadre-linea">
-            <span>Entrega</span>
-            <strong>${esc(p.dieciseisavos === 16 ? 'una marqueta'
-                     : aTexto(p.dieciseisavos) + ' de marqueta')}</strong>
-          </div>
-          <div class="cuadre-linea total">
-            <span>Cuesta hoy</span><strong>${pesos(precio)}</strong>
-          </div>`
-        : `
-          ${campo('Precio de venta', 'precio', paraEditar(p.precio_centavos), { tipo: 'dinero' })}
-          ${veCostos
-            ? campo('Te cuesta', 'costo',
-                    paraEditar(p.costo_centavos),
-                    { tipo: 'dinero' })
-            : ''}`}
-      </div>
+      ${bloque('01', 'Identificación', `
+        <div class="cuadre">
+          ${campo('Nombre', 'nombre', p.nombre)}
+          ${campo('Código para teclear', 'codigo', p.codigo || '',
+                  { ayuda: 'lo que se teclea en la caja' })}
+          ${esDeHielo ? `
+            <div class="cuadre-linea">
+              <span>Entrega</span>
+              <strong>${esc(p.dieciseisavos === 16 ? 'una marqueta'
+                       : aTexto(p.dieciseisavos) + ' de marqueta')}</strong>
+            </div>` : ''}
+        </div>`)}
 
+      ${bloque('02', 'Estructura tarifaria y márgenes', tarifas(p))}
+
+      ${bloque('03', esDeHielo ? 'Existencia del cuarto frío' : 'Inventario y existencias',
+               esDeHielo ? panelExistenciaHielo() : panelInventario(p, inv))}
 
       ${administra ? `
-        <div class="fila-botones" style="margin-top:14px;flex-wrap:wrap">
+        <div class="prod-pie">
+          <button class="secundario chico" id="duplicar-prod">⧉ Duplicar producto</button>
+          <button class="secundario chico" id="historial-prod">🕘 Historial de precios</button>
           ${p.activo
             ? '<button class="secundario chico peligro" id="baja-prod">Dar de baja</button>'
             : '<button class="chico" id="alta-prod">Volver a dar de alta</button>'}
           ${esAdmin
             ? '<button class="secundario chico peligro" id="borrar-prod">Eliminar</button>' : ''}
+        </div>` : ''}`;
+  }
+
+  /**
+   * LOS PRECIOS DE ESTE PRODUCTO, EN UN SOLO BLOQUE  (v7.1)
+   *
+   * De lo general a lo particular y en este orden, porque así se decide:
+   * primero cuánto vale de una en una, luego a partir de cuántas se abarata
+   * —y cuánto se sigue ganando ahí, que es lo que evita regalar el
+   * producto—, y al final a cuántos clientes se les dejó un precio propio,
+   * que es lo que hay que mirar ANTES de mover el de mostrador.
+   */
+  function tarifas(p) {
+    if (p.tipo === 'hielo') {
+      return `
+        <div class="cuadre">
+          <div class="cuadre-linea total">
+            <span>Cuesta hoy<small>de la lista de público, por fracción</small></span>
+            <strong>${pesos(precioDeHielo(p.dieciseisavos))}</strong>
+          </div>
+          ${listaMayoreoNormal() ? `
+            <div class="cuadre-linea">
+              <span>Mayoreo normal<small>${esc(listaMayoreoNormal().nombre)}</small></span>
+              <strong>${pesos(precioDeHielo(p.dieciseisavos, true))}</strong>
+            </div>` : ''}
+        </div>
+        <p class="ayuda">
+          El precio del hielo NO vive en el producto: sale de la lista por
+          fracción, y se cambia tocando <b>${esc(catalogo.categorias.find((c) => c.id === ID_HIELO)?.nombre || 'El hielo')}</b>
+          en la columna de la izquierda. Si viviera en los dos lados, un día
+          los dos números dirían cosas distintas.
+        </p>`;
+    }
+
+    const tieneVolumen = !!(p.mayoreo_desde && p.mayoreo_centavos != null);
+    const descuento = tieneVolumen && p.precio_centavos
+      ? Math.round(((p.precio_centavos - p.mayoreo_centavos) / p.precio_centavos) * 100)
+      : null;
+    const margenVolumen = tieneVolumen && p.costo_centavos != null && p.mayoreo_centavos
+      ? Math.round(((p.mayoreo_centavos - p.costo_centavos) / p.mayoreo_centavos) * 100)
+      : null;
+    const bajoCosto = tieneVolumen && p.costo_centavos != null
+      && p.mayoreo_centavos < p.costo_centavos;
+
+    return `
+      <div class="cuadre">
+        ${campo('Precio de mostrador', 'precio', paraEditar(p.precio_centavos),
+                { tipo: 'dinero', ayuda: 'lo que paga quien lleva una' })}
+        ${veCostos
+          ? campo('Te cuesta', 'costo', paraEditar(p.costo_centavos), { tipo: 'dinero' })
+          : ''}
+      </div>
+
+      ${administra ? `
+        <div class="prod-volumen ${tieneVolumen ? 'encendido' : ''}">
+          <div class="prod-volumen-cabeza">
+            <strong>Precio por volumen</strong>
+            ${tieneVolumen
+              ? `<span class="prod-etiqueta">−${descuento}% desde ${p.mayoreo_desde} pzas</span>`
+              : '<span class="prod-etiqueta apagada">apagado</span>'}
+          </div>
+          <div class="prod-volumen-campos">
+            <label>
+              <span>A partir de</span>
+              <input data-campo="mayoreoDesde" data-tipo="entero" inputmode="numeric"
+                     placeholder="—" value="${esc(p.mayoreo_desde ?? '')}" autocomplete="off">
+              <small>piezas</small>
+            </label>
+            <label>
+              <span>La pieza a</span>
+              <input data-campo="mayoreoPrecio" data-tipo="dinero" inputmode="decimal"
+                     placeholder="—" value="${p.mayoreo_centavos != null ? paraEditar(p.mayoreo_centavos) : ''}"
+                     autocomplete="off">
+              <small>pesos</small>
+            </label>
+          </div>
+          <p class="ayuda">
+            Le toca a <b>quien sea</b> que se lleve esa cantidad, tenga trato
+            o no. Hacen falta los dos datos: se apaga borrando los dos.
+            ${margenVolumen !== null && !bajoCosto
+              ? `<br>A ese precio todavía ganas <b>${margenVolumen}%</b>
+                 (${pesos(p.mayoreo_centavos - p.costo_centavos)} por pieza).` : ''}
+          </p>
+          ${bajoCosto ? `
+            <div class="aviso-sin-caja">
+              <strong>Ese precio está por debajo de lo que te cuesta.</strong>
+              Cada pieza que se lleve de ${p.mayoreo_desde} para arriba pierde
+              ${pesos(p.costo_centavos - p.mayoreo_centavos)}.
+            </div>` : ''}
+        </div>` : tieneVolumen ? `
+        <div class="cuadre">
+          <div class="cuadre-linea">
+            <span>De ${p.mayoreo_desde} piezas en adelante</span>
+            <strong>${pesos(p.mayoreo_centavos)}</strong>
+          </div>
         </div>` : ''}
 
-      ${esDeHielo ? panelExistenciaHielo() : panelInventario(p, inv)}`;
+      <div class="prod-convenios">
+        <div>
+          <strong>${p.convenios || 0} convenio${p.convenios === 1 ? '' : 's'} con clientes</strong>
+          <small>${p.convenios
+            ? 'Le gana al de mostrador y al de volumen: es su precio, lleve una o lleve cien.'
+            : 'A nadie se le ha dejado un precio propio de este producto.'}</small>
+        </div>
+        <a class="boton secundario chico" href="#/clientes">Ver en clientes</a>
+      </div>`;
   }
 
   /**
@@ -351,7 +625,6 @@ export async function vistaProductos(pantalla, estadoApp) {
    * el renglón que ocupa en la ficha.
    */
 
-  /** Para el hielo, el inventario ES la existencia del cuarto frío. */
   /**
    * LA EXISTENCIA, EN CORTO.
    *
@@ -380,7 +653,6 @@ export async function vistaProductos(pantalla, estadoApp) {
     if (!p.lleva_inventario) {
       if (!administra) return '';
       return `
-        <h4 class="cfg-subtitulo">Inventario</h4>
         <p class="ayuda">
           Este producto no lleva cuenta de piezas. Actívalo si quieres que el
           sistema te avise cuando haya que pedir más.
@@ -389,7 +661,6 @@ export async function vistaProductos(pantalla, estadoApp) {
     }
 
     return `
-      <h4 class="cfg-subtitulo">Inventario</h4>
       <div class="cuadre">
         <div class="cuadre-linea">
           <span>Había en el último conteo</span><strong>${inv?.anterior ?? 0}</strong>
@@ -628,6 +899,7 @@ export async function vistaProductos(pantalla, estadoApp) {
         </div>` : ''}`;
   }
 
+
   // ==========================================================
   // ENGANCHAR
   // ==========================================================
@@ -644,8 +916,33 @@ export async function vistaProductos(pantalla, estadoApp) {
     const nuevoProd = q('#nuevo-prod');
     if (nuevoProd) nuevoProd.onclick = nuevoProducto;
 
+    // EL BUSCADOR NO REPINTA LA PANTALLA ENTERA, solo la lista de en
+    // medio: repintarla le arrancaría el foco al que está escribiendo y
+    // la segunda letra se iría a ninguna parte.
+    const buscador = q('#busca');
+    if (buscador) {
+      let espera;
+      buscador.oninput = () => {
+        clearTimeout(espera);
+        espera = setTimeout(() => { busca = buscador.value.trim(); refrescarProductos(); }, 200);
+      };
+      buscador.onkeydown = (ev) => { if (ev.key === 'Enter') ev.preventDefault(); };
+    }
+
+    todos('[data-filtro]').forEach((b) => {
+      b.onclick = () => { filtro = b.dataset.filtro; pintar(); };
+    });
+
     todos('[data-categoria]').forEach((b) => {
-      b.onclick = () => { categoriaAbierta = b.dataset.categoria; seleccionado = null; pintar(); };
+      b.onclick = () => {
+        categoriaAbierta = b.dataset.categoria;
+        // Al abrir una carpeta se sale de la búsqueda: quedarse dentro de
+        // ella enseñaría la categoría en el título y los resultados de
+        // otra cosa en la lista.
+        busca = '';
+        seleccionado = null;
+        pintar();
+      };
     });
     todos('[data-cat-menu]').forEach((b) => {
       b.onclick = (ev) => {
@@ -653,18 +950,49 @@ export async function vistaProductos(pantalla, estadoApp) {
         menuCategoria(catalogo.categorias.find((c) => c.id === b.dataset.catMenu));
       };
     });
-    todos('[data-prod]').forEach((b) => {
-      b.onclick = () => {
-        seleccionado = catalogo.productos.find((p) => p.id === b.dataset.prod);
-        pintar();
-      };
-    });
+    engancharFilas();
 
     engancharDetalle();
   }
 
+  /** Los renglones de la lista de en medio, que se repintan solos. */
+  function engancharFilas() {
+    pantalla.querySelectorAll('[data-prod]').forEach((b) => {
+      b.onclick = () => {
+        seleccionado = catalogo.productos.find((p) => p.id === b.dataset.prod);
+        pintarDetalle();
+        pantalla.querySelectorAll('[data-prod]').forEach((otro) => {
+          otro.classList.toggle('activo', otro.dataset.prod === seleccionado?.id);
+        });
+      };
+    });
+  }
+
+  /** Repinta solo la columna de en medio, sin tocar el foco del buscador. */
+  function refrescarProductos() {
+    const cuerpo = pantalla.querySelector('#listado');
+    if (!cuerpo) { pintar(); return; }
+    const suyos = productosALaVista();
+    cuerpo.innerHTML = suyos.map((p) => filaProducto(p)).join('') || vacioListado();
+    const titulo = pantalla.querySelector('.prod-listado-cabeza .cfg-titulo');
+    if (titulo) {
+      const cat = catalogo.categorias.find((c) => c.id === categoriaAbierta);
+      titulo.innerHTML = `${busca ? 'Buscando en todo el catálogo' : esc(cat?.nombre || 'Productos')}
+                          <small>${suyos.length}</small>`;
+    }
+    engancharFilas();
+  }
+
+  /** Repinta solo la ficha de la derecha. */
+  function pintarDetalle() {
+    const caja = pantalla.querySelector('#detalle');
+    if (!caja) { pintar(); return; }
+    caja.innerHTML = panelDerecho();
+    engancharDetalle();
+  }
+
   function engancharDetalle() {
-    const q = (sel) => pantalla.querySelector(sel);
+    const q = (sel) => pantalla.querySelector('#detalle ' + sel) || pantalla.querySelector(sel);
 
     // --- los campos que se editan en el sitio ---
     pantalla.querySelectorAll('[data-campo]').forEach((campoEl) => {
@@ -695,6 +1023,10 @@ export async function vistaProductos(pantalla, estadoApp) {
     if (borrar) borrar.onclick = () => eliminarProducto(seleccionado);
     const alta = q('#alta-prod');
     if (alta) alta.onclick = () => darDeAlta(seleccionado);
+    const duplicar = q('#duplicar-prod');
+    if (duplicar) duplicar.onclick = () => duplicarProducto(seleccionado);
+    const historial = q('#historial-prod');
+    if (historial) historial.onclick = () => verHistorial(seleccionado);
     const activar = q('#activar-inv');
     if (activar) activar.onclick = () => activarInventario(seleccionado);
     const apagar = q('#apagar-inv');
@@ -733,6 +1065,84 @@ export async function vistaProductos(pantalla, estadoApp) {
     }
   }
 
+  /**
+   * DUPLICAR.
+   *
+   * Dar de alta la bolsa de 10 kg cuando ya existe la de 5 es copiar ocho
+   * campos y cambiar dos. La copia nace sin código —es único y se teclea—
+   * y con "(copia)" en el nombre, para no confundirla con la original
+   * mientras se termina de ajustar.
+   */
+  async function duplicarProducto(p) {
+    if (!p) return;
+    if (!await confirmar({
+      titulo: `¿Duplicar ${p.nombre}?`,
+      texto: 'Se crea otro producto con el mismo precio, costo y ajustes. ' +
+             'Nace sin código y con «(copia)» en el nombre, para que lo ' +
+             'cambies y no se confunda con éste.',
+      ok: 'Duplicar'
+    })) return;
+
+    try {
+      const r = await api.enviar(`/catalogo/productos/${p.id}/duplicar`, {});
+      seleccionado = r.producto;
+      categoriaAbierta = r.producto.categoria_id;
+      busca = '';
+      avisar('Copia creada. Cámbiale el nombre y el precio aquí mismo.', 'bien');
+      await cargar();
+    } catch (e) { avisar(e.message, 'error'); }
+  }
+
+  /**
+   * EL HISTORIAL DE PRECIOS.
+   *
+   * No sale de una tabla de historial: sale de la BITÁCORA, que es donde
+   * ya quedó escrito cada cambio con lo que decía antes y lo que dice
+   * después. Una tabla aparte sería una segunda copia de la misma verdad,
+   * y el día que se desincronizara nadie sabría cuál creer.
+   */
+  async function verHistorial(p) {
+    if (!p) return;
+    let datos;
+    try {
+      datos = await api.obtener(`/catalogo/productos/${p.id}/historial`);
+    } catch (e) { avisar(e.message, 'error'); return; }
+
+    const renglon = (c) => {
+      const mostrador = c.despues !== null && c.antes !== c.despues
+        ? `<strong>${c.antes === null ? '—' : pesos(c.antes)} → ${pesos(c.despues)}</strong>`
+        : '';
+      const volumen = c.mayoreoAntes !== c.mayoreoDespues
+        ? `<small>por volumen: ${c.mayoreoAntes === null ? 'apagado' : pesos(c.mayoreoAntes)}
+           → ${c.mayoreoDespues === null ? 'apagado'
+               : `${pesos(c.mayoreoDespues)} desde ${c.desde ?? '?'} pzas`}</small>`
+        : '';
+      return `
+        <tr>
+          <td>${esc(formatoFecha(c.fecha))}<small>${esc(c.quien || 'sin nombre')}</small></td>
+          <td class="der">${mostrador}${volumen}</td>
+        </tr>`;
+    };
+
+    const d = armarDialogo(`
+      <h3 class="dialogo-titulo">Historial de precios</h3>
+      <p class="dialogo-texto">${esc(p.nombre)}</p>
+      ${datos.cambios.length ? `
+        <div class="prod-historial">
+          <table class="cli-tabla" style="min-width:0">
+            <tbody>${datos.cambios.map(renglon).join('')}</tbody>
+          </table>
+        </div>
+        <p class="dialogo-texto">
+          Los tickets ya cobrados NO cambian: el precio quedó copiado en
+          cada uno el día que se vendió.
+        </p>`
+      : '<p class="dialogo-texto">Todavía no se le ha movido el precio a este producto.</p>'}
+      <div class="dialogo-botones"><button data-cerrar>Cerrar</button></div>`);
+    d.caja.querySelector('[data-cerrar]').onclick = () => d.salir(null);
+    await d.hecho;
+  }
+
   async function guardarMinimoHielo(campoEl) {
     const marquetas = campoEl.value.replace(/[^0-9]/g, '');
     if (marquetas === '' || Number(marquetas) === alertas?.hielo?.minimoMarquetas) {
@@ -750,14 +1160,47 @@ export async function vistaProductos(pantalla, estadoApp) {
     }
   }
 
+  /** Lo que hay escrito ahora mismo en un campo de la ficha. */
+  function leerCampo(clave) {
+    return pantalla.querySelector(`[data-campo="${clave}"]`)?.value.trim() ?? '';
+  }
+
   /** Guarda un campo del producto en cuanto se sale de él. */
   async function guardarCampo(campoEl) {
     const clave = campoEl.dataset.campo;
     const valor = campoEl.value.trim();
+    const esVolumen = clave === 'mayoreoDesde' || clave === 'mayoreoPrecio';
+
+    // ============================================================
+    // LOS DOS CAMPOS DEL VOLUMEN VIAJAN JUNTOS, Y A MEDIAS NO SE GUARDAN
+    // ============================================================
+    //
+    // Un "a partir de 50" sin precio no dice nada, y el servidor apaga la
+    // regla entera si le falta cualquiera de los dos. Si cada campo se
+    // guardara solo al salir de él, encender el precio por volumen sería
+    // imposible: se escribe el 50, se sale, y como todavía no hay precio
+    // se borra el 50; se escribe el precio, se sale, y como ya no hay 50
+    // se borra el precio. Una pantalla en la que el dato desaparece al
+    // capturarlo se siente rota aunque el servidor esté haciendo justo lo
+    // que se le pidió.
+    //
+    // Así que se manda lo que hay escrito en los DOS, y mientras solo haya
+    // uno no se manda nada: se avisa y ya. Vaciar los dos sí se guarda —es
+    // como se apaga.
+    let cuerpo = { [clave]: valor };
+    if (esVolumen) {
+      const desde = leerCampo('mayoreoDesde');
+      const precio = leerCampo('mayoreoPrecio');
+      if (!desde !== !precio) {          // uno lleno y el otro vacío
+        avisar('El precio por volumen necesita las dos cosas: a partir de '
+             + 'cuántas piezas y a cuánto queda la pieza.', '');
+        return;
+      }
+      cuerpo = { mayoreoDesde: desde, mayoreoPrecio: precio };
+    }
 
     try {
-      const r = await api.actualizar(`/catalogo/productos/${seleccionado.id}`,
-                                     { [clave]: valor });
+      const r = await api.actualizar(`/catalogo/productos/${seleccionado.id}`, cuerpo);
       seleccionado = r.producto;
 
       // Se devuelve el valor ya normalizado: quien escribió "30" ve "30.00",
@@ -776,8 +1219,15 @@ export async function vistaProductos(pantalla, estadoApp) {
       // foco a quien va saltando de campo en campo.
       catalogo = await api.obtener(`/catalogo${verBajas ? '?incluirBajas=1' : ''}`);
       inventario = await api.obtener('/inventario').catch(() => inventario);
+      seleccionado = catalogo.productos.find((p) => p.id === seleccionado.id) || seleccionado;
       refrescarListas();
       refrescarMargen();
+      // LOS DOS CAMPOS DEL VOLUMEN VAN JUNTOS: al poner uno se apaga o se
+      // enciende la regla entera, y con ella la etiqueta del descuento, el
+      // margen a ese precio y el aviso de estar vendiendo bajo costo. Eso
+      // no se puede arreglar cambiando un número suelto en la pantalla:
+      // hay que repintar el bloque.
+      if (clave === 'mayoreoDesde' || clave === 'mayoreoPrecio') refrescarTarifas();
     } catch (e) {
       avisar(e.message, 'error');
       campoEl.value = campoEl.defaultValue;
@@ -796,38 +1246,52 @@ export async function vistaProductos(pantalla, estadoApp) {
     } catch (e) { avisar(e.message, 'error'); }
   }
 
-  /** Repinta solo las dos listas de la izquierda. */
+  /** Repinta las dos listas de la izquierda sin tocar la ficha. */
   function refrescarListas() {
-    const izq = pantalla.querySelectorAll('.cfg-lista');
-    if (izq[0]) {
-      izq[0].innerHTML = catalogo.categorias.map((c) => filaCategoria(c)).join('');
+    const cats = pantalla.querySelector('.prod-categorias .cfg-lista');
+    if (cats) {
+      cats.innerHTML = catalogo.categorias.map((c) => filaCategoria(c)).join('');
+      pantalla.querySelectorAll('[data-categoria]').forEach((b) => {
+        b.onclick = () => {
+          categoriaAbierta = b.dataset.categoria; busca = ''; seleccionado = null; pintar();
+        };
+      });
+      pantalla.querySelectorAll('[data-cat-menu]').forEach((b) => {
+        b.onclick = (ev) => {
+          ev.stopPropagation();
+          menuCategoria(catalogo.categorias.find((c) => c.id === b.dataset.catMenu));
+        };
+      });
     }
-    if (izq[1]) {
-      izq[1].innerHTML = catalogo.productos
-        .filter((p) => p.categoria_id === categoriaAbierta)
-        .map((p) => filaProducto(p)).join('');
-    }
-    pantalla.querySelectorAll('[data-categoria]').forEach((b) => {
-      b.onclick = () => { categoriaAbierta = b.dataset.categoria; seleccionado = null; pintar(); };
-    });
-    pantalla.querySelectorAll('[data-cat-menu]').forEach((b) => {
-      b.onclick = (ev) => {
-        ev.stopPropagation();
-        menuCategoria(catalogo.categorias.find((c) => c.id === b.dataset.catMenu));
-      };
-    });
-    pantalla.querySelectorAll('[data-prod]').forEach((b) => {
-      b.onclick = () => {
-        seleccionado = catalogo.productos.find((p) => p.id === b.dataset.prod);
-        pintar();
-      };
-    });
+    refrescarProductos();
+    refrescarTarjetas();
+  }
+
+  /** Los cuatro números de abajo, que cambian al mover un precio o un costo. */
+  function refrescarTarjetas() {
+    const caja = pantalla.querySelector('.prod-kpis');
+    if (!caja) return;
+    const nuevo = document.createElement('div');
+    nuevo.innerHTML = tarjetasCatalogo();
+    const reemplazo = nuevo.querySelector('.prod-kpis');
+    if (reemplazo) caja.replaceWith(reemplazo);
   }
 
   /** El margen cambia al tocar el precio o el costo: se repinta solo él. */
   function refrescarMargen() {
     const caja = pantalla.querySelector('.margen');
     if (caja && seleccionado) caja.outerHTML = margen(seleccionado) || '';
+  }
+
+  /** El bloque 02 entero, cuando se enciende o se apaga el precio por volumen. */
+  function refrescarTarifas() {
+    const caja = pantalla.querySelector('.prod-volumen');
+    if (!caja || !seleccionado) return;
+    const nuevo = document.createElement('div');
+    nuevo.innerHTML = tarifas(seleccionado);
+    const reemplazo = nuevo.querySelector('.prod-volumen');
+    if (reemplazo) caja.replaceWith(reemplazo);
+    engancharDetalle();
   }
 
   // ==========================================================

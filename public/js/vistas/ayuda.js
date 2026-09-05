@@ -1123,7 +1123,7 @@ debería quedar − lo que se contó = FALTA o SOBRA</pre>
   {
     id: 'productos',
     titulo: 'Productos y precios: qué aparece en la caja',
-    busca: 'productos categorías catálogo precios códigos alta baja refrescos garrafones botones color inventario activar desactivar apagar quitar inventario costo ganancia margen foto pedir mínimo contar existencias piezas bolsa hielo gourmet cortado bolsas donde se prepara area planta de agua fabrica de hielo negocio',
+    busca: 'productos categorías catálogo precios códigos alta baja refrescos garrafones botones color inventario activar desactivar apagar quitar inventario costo ganancia margen foto pedir mínimo contar existencias piezas bolsa hielo gourmet cortado bolsas donde se prepara area planta de agua fabrica de hielo negocio precio por volumen mayoreo por cantidad a partir de cuantas piezas convenio precio especial por cliente descuento duplicar sku copia historial de precios buscador filtro con existencia por pedir estructura tarifaria margen bruto valor en mostrador',
     cuerpo: `
       <p>Los botones de la caja se dan de alta en <b>Productos y precios</b>,
       sin tocar el programa. Solo el administrador.</p>
@@ -1187,21 +1187,16 @@ debería haber − contado = FALTA</pre>
       donde iba, con el mismo aviso que tenía. Lo único que se apaga es el
       «ya hay que pedir más» y el tope para vender.</p>
 
-      <h4>¿De cuál de los dos negocios es?</h4>
-      <p>Aquí son dos negocios en un mismo catálogo —la fábrica de hielo y la
-      planta de agua— y cada producto dice de cuál es. Hace dos cosas:</p>
-      <ul>
-        <li><b>Parte en dos la hoja de preparación</b> de los pedidos, para
-        que quien prepara el agua lea su bloque y quien baja hielo el suyo,
-        sin buscar entre lo del otro.</li>
-        <li><b>Marca al cliente como «💧 agua»</b> en cuanto le compra algo de
-        ese lado, y con eso puedes buscar después quién compra agua.</li>
-      </ul>
-      <p class="ayuda-tip">No limita nada: <b>cualquier producto de los dos
-      lados se vende y se puede pedir</b>. Se marca a mano y no se adivina por
-      el nombre, porque el día que alguien dé de alta «Hielo en botella» el
-      garrafón se iría a la lista del cuarto frío sin que nadie entendiera
-      por qué.</p>
+      <h4>Ya no se pregunta «¿dónde se prepara?»</h4>
+      <p>La ficha del producto preguntaba de cuál de los dos lados era —la
+      fábrica de hielo o la planta de agua—. <b>Se quitó en la v6.9</b>,
+      porque la fábrica es una sola: un cliente pide en la caja agua, hielo,
+      refrescos o lo que quiera, y con lo que se lleva ya se sabe qué es.</p>
+      <p>Lo que esa marca hacía se sigue haciendo, pero solo: la hoja de
+      preparación de los pedidos sigue partida en dos bloques y el cliente
+      que compra agua sigue saliendo en <b>💧 agua</b>. El sistema lo deduce
+      del nombre del producto al darlo de alta o al renombrarlo, y ya nadie
+      tiene que acordarse de marcarlo.</p>
 
       <h4>Con cuánto hielo avisar</h4>
       <p>En la categoría <b>Hielo</b>, abajo del todo: <b>avisar con esto o
@@ -1213,10 +1208,87 @@ debería haber − contado = FALTA</pre>
       mañana el cuarto frío puede estar lleno y el sistema marcar cero. Si el
       🧊 sale y tú sabes que sí hay, lo que falta es capturar producción.</p>
 
+      <h4>Los tres precios de un producto <small>(v7.1)</small></h4>
+      <p>En la ficha, el bloque <b>02 · Estructura tarifaria y márgenes</b>.
+      Son tres cosas distintas y conviene no confundirlas:</p>
+      <ul class="instrucciones">
+        <li><b>Precio de mostrador</b> — lo que vale de una en una. Lo paga
+        quien no tiene nada especial, que es casi todo el mundo.</li>
+        <li><b>Precio por volumen</b> — <em>«de cincuenta bolsas para arriba,
+        a $16.50»</em>. Es <b>del producto</b>: le toca a <b>quien sea</b> que
+        se lleve esa cantidad, tenga trato contigo o no, sea cliente de
+        siempre o alguien que entró por primera vez. No es un trato con
+        nadie: es cuánto vale comprar mucho.</li>
+        <li><b>Convenio del cliente</b> — <em>«a Mariscos El Faro la bolsa se
+        la dejo en $15, lleve una o lleve cien»</em>. Es <b>del cliente</b> y
+        se pone en <b>Clientes</b>, en su ficha. Aquí solo se ve a cuántos se
+        les dejó precio propio de este producto, porque eso hay que saberlo
+        antes de mover el de mostrador.</li>
+      </ul>
+
+      <p>Al cobrar gana <b>el más particular</b>, en este orden:</p>
+      <pre class="ayuda-formula">1. su convenio, si lo tiene en ese producto
+2. el precio por volumen, si se lleva bastante
+3. su lista de mayoreo, para el hielo por fracción
+4. el precio de mostrador</pre>
+
+      <h4>Encender el precio por volumen</h4>
+      <p>Se pone <b>a partir de cuántas piezas</b> y <b>a cuánto queda la
+      pieza</b>. Los dos van juntos: uno sin el otro no dice nada, y por eso
+      no hay un interruptor aparte que pueda quedar en desacuerdo con los
+      números. <b>Se apaga borrando los dos.</b></p>
+      <p>Debajo aparece el descuento que estás dando (<b>−22% desde 50 pzas</b>)
+      y, si le pusiste costo, <b>cuánto sigues ganando a ese precio</b>. Si el
+      precio de volumen queda por debajo de lo que te cuesta, el sistema lo
+      dice con letras rojas: cada pieza de ahí para arriba te haría perder.</p>
+      <p class="ayuda-tip">No se acepta un precio de volumen <b>más caro</b>
+      que el de mostrador —eso siempre es un dedazo— ni «desde 1 pieza», que
+      no sería mayoreo sino cambiar el precio normal. Y el hielo por fracción
+      no lo lleva: ahí el volumen ya está en el propio botón (la marqueta
+      entera <em>es</em> el mayoreo) y su precio sale de la lista.</p>
+
       <h4>Costo y ganancia</h4>
       <p>Si le pones el costo a un producto, el sistema te dice cuánto ganas
       por pieza. El costo de cada compra se guarda con esa compra; el del
       producto es el de la última.</p>
+
+      <h4>Duplicar e historial <small>(v7.1)</small></h4>
+      <ul class="instrucciones">
+        <li><b>⧉ Duplicar producto</b> — dar de alta la bolsa de 10 kg cuando
+        ya existe la de 5 es copiar ocho campos y cambiar dos. La copia trae
+        el mismo precio, costo y ajustes; nace <b>sin código</b> —es único y
+        se teclea— y con «(copia)» en el nombre para que no se confunda con
+        la original mientras la terminas de ajustar. No hereda los convenios
+        del original: un trato es con un cliente sobre un producto concreto,
+        no sobre «algo parecido».</li>
+        <li><b>🕘 Historial de precios</b> — cada cambio con la fecha, quién
+        lo hizo y de cuánto a cuánto, incluidos los del precio por volumen.
+        No sale de una lista aparte: sale de la <b>bitácora</b>, que es donde
+        ya quedó escrito. <b>Los tickets ya cobrados no cambian</b>: el precio
+        quedó copiado en cada uno el día que se vendió.</li>
+      </ul>
+
+      <h4>Buscar y filtrar <small>(v7.1)</small></h4>
+      <p>Arriba de la lista de en medio hay un buscador: escribe el nombre o
+      el código y busca en <b>todo el catálogo</b>, no solo en la categoría
+      abierta —quien busca «garrafón» no tiene por qué acordarse de en qué
+      carpeta quedó—. Debajo, tres botones: <b>Todos</b>, <b>Con
+      existencia</b> y <b>Por pedir</b>.</p>
+      <p>En cada renglón de la lista pueden salir dos marcas: <b>▣</b> tiene
+      precio por volumen y <b>◆</b> hay clientes con precio propio.</p>
+
+      <h4>Los cuatro números de abajo <small>(v7.1)</small></h4>
+      <ul class="instrucciones">
+        <li><b>Catálogo activo</b> — cuántos se pueden vender hoy, y cuántos
+        están dados de baja.</li>
+        <li><b>Con precio especial</b> — cuántos productos tienen precio por
+        volumen, y cuántos convenios hay repartidos entre los clientes.</li>
+        <li><b>Valor en mostrador</b> — lo que valdría a precio de venta lo
+        que hay contado, con el margen promedio debajo. Solo cuenta lo que
+        lleva cuenta de piezas: el hielo se mide en marquetas y su valor vive
+        en la Existencia del cuarto frío.</li>
+        <li><b>Por pedir</b> — cuántos ya bajaron de su mínimo.</li>
+      </ul>
 
       <h4>Editar: se toca y se escribe</h4>
       <p>No hay botón de guardar. Tocas el nombre, el precio o el costo,
@@ -1605,7 +1677,7 @@ debería haber − contado = FALTA</pre>
   {
     id: 'mayoreo',
     titulo: 'Precios de mayoreo',
-    busca: 'mayoreo precio especial lista mayorista nevería descuento 1m 12m media marqueta número de cliente F6 cliente precio distinto',
+    busca: 'mayoreo precio especial lista mayorista nevería descuento 1m 12m media marqueta número de cliente F6 cliente precio distinto precio por volumen por cantidad convenio bolsas garrafones piezas cascada de precios',
     cuerpo: `
       <p>Hay clientes que compran en cantidad y tienen <b>su propio precio</b>.
       Se cobra tecleando, sin buscar a nadie primero.</p>
@@ -1649,6 +1721,23 @@ debería haber − contado = FALTA</pre>
       <p>Cada cliente tiene un número que le toca al darlo de alta y que
       <b>no cambia nunca</b>, ni aunque se dé de baja. Sale en su ficha, en
       la lista de <b>Clientes</b> y en la de la caja. Es lo que se teclea.</p>
+
+      <h4>Esto es para el HIELO por fracción</h4>
+      <p>Las listas de mayoreo son del hielo: marqueta, media, cuarto. Para
+      lo que se vende por piezas —bolsas, garrafones, refrescos— hay otras
+      dos formas, y están en <b>Productos y precios</b>, en la ficha de cada
+      producto:</p>
+      <ul class="instrucciones">
+        <li><b>Precio por volumen</b> — <em>«de 50 bolsas para arriba, a
+        $16.50»</em>. Es del producto: le toca a quien sea que se lleve esa
+        cantidad, tenga trato o no.</li>
+        <li><b>Convenio del cliente</b> — <em>«a El Faro se la dejo en $15,
+        lleve una o lleve cien»</em>. Es del cliente y se pone en su ficha,
+        en <b>Clientes</b>.</li>
+      </ul>
+      <p class="ayuda-tip">Cuando se juntan, gana el más particular: primero
+      su convenio, luego el precio por volumen, luego su lista de mayoreo y
+      al final el de mostrador.</p>
 
       <h4>Es una LISTA, no un descuento</h4>
       <p><b>Mayoreo 1</b> es una lista de precios completa, donde la marqueta

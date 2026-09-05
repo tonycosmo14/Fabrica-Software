@@ -84,15 +84,43 @@ function cotizar({ producto, dieciseisavos, listaId, cantidad = 1 }) {
     };
   }
 
+  // EL PRECIO POR VOLUMEN  (v7.1). "De cincuenta bolsas para arriba, a
+  // $16.50." Le toca a QUIEN SEA que se lleve cincuenta: no es un trato
+  // con nadie, es cuánto vale comprar mucho. El convenio de un cliente
+  // concreto se aplica después y le gana (ventas/rutas.js).
+  const unitario = precioPorVolumen(producto, veces);
+
   return {
-    centavos: producto.precio_centavos * veces,
+    centavos: unitario * veces,
     dieciseisavos: 0,                       // no sale del cuarto frío
     concepto: producto.nombre,
     desglose: veces > 1 ? `${veces} × ${producto.nombre}` : null,
+    // Para que el ticket y la pantalla puedan decir POR QUÉ salió más
+    // barato. Sin esto, un total que no cuadra con el precio de la lista
+    // parece un error del sistema.
+    porVolumen: unitario !== producto.precio_centavos
+      ? { desde: producto.mayoreo_desde, unitario } : null,
     faltan: []
   };
 }
 
+/**
+ * CUÁNTO VALE LA PIEZA LLEVÁNDOSE ESTAS.
+ *
+ * Los dos datos van juntos: un "a partir de 50" sin precio, o un precio
+ * sin "a partir de", no dicen nada y la regla no se aplica. Así no hace
+ * falta un interruptor aparte que pueda quedar en desacuerdo con los
+ * números.
+ */
+function precioPorVolumen(producto, cuantas) {
+  const desde = producto?.mayoreo_desde;
+  const precio = producto?.mayoreo_centavos;
+  if (!Number.isInteger(desde) || desde < 1) return producto.precio_centavos;
+  if (precio === null || precio === undefined) return producto.precio_centavos;
+  return cuantas >= desde ? precio : producto.precio_centavos;
+}
+
 module.exports = {
-  categoriasActivas, productosActivos, productoPorId, productoPorCodigo, cotizar
+  categoriasActivas, productosActivos, productoPorId, productoPorCodigo, cotizar,
+  precioPorVolumen
 };
