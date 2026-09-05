@@ -99,12 +99,28 @@ const TEMAS = [
       día siguiente.</p>
 
       <h4>Cómo salió el hielo</h4>
-      <p>Al sacar un paño se dice <b>cómo salió</b>, con un toque. Son ocho
-      estados, y la regla es una sola: <b>o se vende, o se botó</b>. No hay
-      ninguna pregunta más.</p>
+      <p>Al sacar un paño se dice <b>cómo salió</b>. La pregunta va en
+      <b>dos pasos</b>, porque son dos cosas muy distintas:</p>
+      <ul>
+        <li><b>Primero, la que decide:</b> ✅ salió buena · hueca o cáscara ·
+        salada · aguada · otro. Aquí se contesta lo único que cambia las
+        cuentas: <b>o se vende, o se botó</b>.</li>
+        <li><b>Después, solo si salió buena:</b> qué tan congelada, de
+        cuatro. Eso es <b>nada más para el registro</b> — las cuatro se
+        cobran al mismo precio — y viene <b>ya contestado</b> con lo de
+        siempre, así que el paño normal se sigue sacando con un solo
+        toque.</li>
+      </ul>
 
-      <p><b>Las cuatro que se venden</b> hablan del frío de esa noche, de
-      mejor a peor:</p>
+      <p class="ayuda-tip">Antes salían los ocho en fila y afinar un
+      porcentaje que no cambia el dinero parecía tan importante como decir
+      si el hielo se vendía. No lo es. Lo que sí importa del porcentaje es
+      <b>el promedio del año</b>: si la mezcla se corre hacia abajo varios
+      días seguidos, algo está pasando con el frío, y eso se ve antes de que
+      una máquina se pare.</p>
+
+      <p><b>Las cuatro que se venden</b> —el segundo paso— hablan del frío
+      de esa noche, de mejor a peor:</p>
       <ul>
         <li><b>100% sellada.</b> Bien congelada, el centro cerrado a tope.
         Sale cuando llueve mucho, cuando no hay venta, o cuando las máquinas
@@ -142,8 +158,8 @@ const TEMAS = [
 
       <p>Eso vale para <b>todo el paño</b>, que es lo que pasa de verdad: la
       fábrica congela bien o mal esa noche y el paño sale parejo. Si UN molde
-      salió distinto del resto, se toca ese molde y se elige lo suyo. Los que
-      no se tocan van como el paño.</p>
+      salió distinto del resto, se toca ese molde y se elige lo suyo —con los
+      mismos dos pasos— y los que no se tocan van como el paño.</p>
 
       <p class="ayuda-tip"><b>Lo que cuenta como existencia</b>, en corto: la
       <b>sellada</b> y las <b>tres de porcentaje</b>. Todo lo demás es merma
@@ -1107,7 +1123,7 @@ debería quedar − lo que se contó = FALTA o SOBRA</pre>
   {
     id: 'productos',
     titulo: 'Productos y precios: qué aparece en la caja',
-    busca: 'productos categorías catálogo precios códigos alta baja refrescos garrafones botones color inventario costo ganancia margen foto pedir mínimo contar existencias piezas bolsa hielo gourmet cortado bolsas',
+    busca: 'productos categorías catálogo precios códigos alta baja refrescos garrafones botones color inventario activar desactivar apagar quitar inventario costo ganancia margen foto pedir mínimo contar existencias piezas bolsa hielo gourmet cortado bolsas donde se prepara area planta de agua fabrica de hielo negocio',
     cuerpo: `
       <p>Los botones de la caja se dan de alta en <b>Productos y precios</b>,
       sin tocar el programa. Solo el administrador.</p>
@@ -1162,6 +1178,30 @@ debería haber − contado = FALTA</pre>
       <p class="ayuda-tip">Un producto en cero <b>ya no se puede vender</b>.
       Si prefieres que se venda sin tope, quítale el inventario: entonces el
       sistema deja de llevarle la cuenta.</p>
+
+      <h4>Encenderlo y apagarlo</h4>
+      <p>Se enciende con <b>Llevar inventario</b> y se apaga con <b>Dejar de
+      llevar inventario de esto</b>, abajo del mismo panel. Apagarlo
+      <b>no borra nada</b>: las entradas, las salidas y los conteos se quedan
+      donde están, y el día que lo vuelvas a encender la cuenta sigue desde
+      donde iba, con el mismo aviso que tenía. Lo único que se apaga es el
+      «ya hay que pedir más» y el tope para vender.</p>
+
+      <h4>¿De cuál de los dos negocios es?</h4>
+      <p>Aquí son dos negocios en un mismo catálogo —la fábrica de hielo y la
+      planta de agua— y cada producto dice de cuál es. Hace dos cosas:</p>
+      <ul>
+        <li><b>Parte en dos la hoja de preparación</b> de los pedidos, para
+        que quien prepara el agua lea su bloque y quien baja hielo el suyo,
+        sin buscar entre lo del otro.</li>
+        <li><b>Marca al cliente como «💧 agua»</b> en cuanto le compra algo de
+        ese lado, y con eso puedes buscar después quién compra agua.</li>
+      </ul>
+      <p class="ayuda-tip">No limita nada: <b>cualquier producto de los dos
+      lados se vende y se puede pedir</b>. Se marca a mano y no se adivina por
+      el nombre, porque el día que alguien dé de alta «Hielo en botella» el
+      garrafón se iría a la lista del cuarto frío sin que nadie entendiera
+      por qué.</p>
 
       <h4>Con cuánto hielo avisar</h4>
       <p>En la categoría <b>Hielo</b>, abajo del todo: <b>avisar con esto o

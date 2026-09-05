@@ -119,6 +119,8 @@ router.get('/estado', verProduccion, (req, res) => {
     // lugar donde dicen cómo se llaman y qué significan (calidad.js).
     calidades: calidad.CALIDADES,
     calidadPorOmision: calidad.CALIDAD_POR_OMISION,
+    calidadSalio: calidad.SALIO,
+    preguntaGrado: calidad.PREGUNTA_GRADO,
     // CUÁNTO HIELO QUEDA EN EL CUARTO FRÍO  (v4.1)
     //
     // Va aquí y no detrás del permiso de existencia a propósito: el operario
@@ -315,7 +317,9 @@ router.get('/panos/:id/ficha', verProduccion, (req, res) => {
     },
     ultima, moldes, historial,
     calidades: calidad.CALIDADES,
-    calidadPorOmision: calidad.CALIDAD_POR_OMISION
+    calidadPorOmision: calidad.CALIDAD_POR_OMISION,
+    calidadSalio: calidad.SALIO,
+    preguntaGrado: calidad.PREGUNTA_GRADO
   });
 });
 
@@ -967,7 +971,9 @@ router.get('/sacadas-pano/:id/moldes', verProduccion, (req, res) => {
     mezcla: calidad.resumir(cuentaDeMezcla(moldes)),
     correcciones,
     calidades: calidad.CALIDADES,
-    calidadPorOmision: calidad.CALIDAD_POR_OMISION
+    calidadPorOmision: calidad.CALIDAD_POR_OMISION,
+    calidadSalio: calidad.SALIO,
+    preguntaGrado: calidad.PREGUNTA_GRADO
   });
 });
 

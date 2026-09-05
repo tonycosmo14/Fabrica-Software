@@ -339,15 +339,24 @@ export async function vistaProductos(pantalla, estadoApp) {
   }
 
   /**
-   * DÓNDE SE PREPARA ESTE PRODUCTO  (v5.6)
+   * DE QUÉ NEGOCIO ES ESTE PRODUCTO  (v5.6, mejor explicado en la v6.8.1)
    *
-   * Es lo único que parte la hoja de preparación de los pedidos en dos: el
-   * del agua lee su bloque y el del hielo el suyo, sin buscar entre lo del
-   * otro.
+   * Aquí son dos negocios en un mismo catálogo —la fábrica de hielo y la
+   * planta de agua— y esto es lo único que dice cuál es cuál. Hace dos
+   * cosas de verdad:
    *
-   * Se marca aquí y no se adivina por el nombre. Adivinar funcionaría hasta
-   * el día que alguien dé de alta "Hielo en botella", y el garrafón se iría
-   * a la lista del cuarto frío sin que nadie entendiera por qué.
+   *   · PARTE EN DOS LA HOJA DE PREPARACIÓN de los pedidos: el del agua
+   *     lee su bloque y el del hielo el suyo, sin buscar entre lo del otro.
+   *   · MARCA AL CLIENTE COMO «💧 agua» en cuanto le compra algo de aquí,
+   *     y con eso se puede buscar después quién compra agua.
+   *
+   * Y NO DECIDE NADA DE LOS PEDIDOS: cualquier producto de los dos lados
+   * se puede pedir. Se decía "¿dónde se prepara?" y sonaba a que era una
+   * cosa de la pantalla de pedidos y a que dejaba fuera al otro lado.
+   *
+   * Se marca a mano y no se adivina por el nombre. Adivinar funcionaría
+   * hasta el día que alguien dé de alta "Hielo en botella", y el garrafón
+   * se iría a la lista del cuarto frío sin que nadie entendiera por qué.
    */
   function panelArea(p) {
     const agua = Boolean(p.para_agua);
@@ -355,22 +364,25 @@ export async function vistaProductos(pantalla, estadoApp) {
       return `
         <div class="cuadre">
           <div class="cuadre-linea">
-            <span>Se prepara en</span>
-            <strong>${agua ? '💧 El agua' : '🧊 El hielo'}</strong>
+            <span>Es de</span>
+            <strong>${agua ? '💧 La planta de agua' : '🧊 La fábrica de hielo'}</strong>
           </div>
         </div>`;
     }
     return `
-      <h4 class="cfg-subtitulo">¿Dónde se prepara?</h4>
+      <h4 class="cfg-subtitulo">¿De cuál de los dos negocios es?</h4>
       <p class="ayuda">
-        Para la hoja de preparación de los pedidos, que sale partida por área.
+        Parte en dos la hoja de preparación de los pedidos —cada quien lee
+        su bloque— y marca como «💧 agua» al cliente que compra de esto.
+        <b>No limita nada:</b> cualquier producto de los dos lados se puede
+        vender y se puede pedir.
       </p>
       <div class="prod-areas">
         <button class="prod-area ${agua ? '' : 'activa'}" data-area="hielo">
-          <span class="emoji">🧊</span><strong>El hielo</strong>
+          <span class="emoji">🧊</span><strong>La fábrica de hielo</strong>
         </button>
         <button class="prod-area ${agua ? 'activa' : ''}" data-area="agua">
-          <span class="emoji">💧</span><strong>El agua</strong>
+          <span class="emoji">💧</span><strong>La planta de agua</strong>
         </button>
       </div>`;
   }
@@ -446,6 +458,11 @@ export async function vistaProductos(pantalla, estadoApp) {
         <p class="ayuda" style="margin-top:12px">
           Último conteo: ${esc(formatoFecha(inv.ultimoConteo.fecha))}
           · ${esc(inv.ultimoConteo.concepto || '')}
+        </p>` : ''}
+
+      ${administra ? `
+        <p class="ayuda" style="margin-top:14px">
+          <button class="enlace" id="apagar-inv">Dejar de llevar inventario de esto</button>
         </p>` : ''}`;
   }
 
@@ -716,17 +733,19 @@ export async function vistaProductos(pantalla, estadoApp) {
     if (alta) alta.onclick = () => darDeAlta(seleccionado);
     const activar = q('#activar-inv');
     if (activar) activar.onclick = () => activarInventario(seleccionado);
+    const apagar = q('#apagar-inv');
+    if (apagar) apagar.onclick = () => apagarInventario(seleccionado);
 
-    // DÓNDE SE PREPARA  (v5.6). Se guarda al tocarlo, sin botón de guardar:
-    // es un interruptor de dos, y un "guardar" aparte solo sirve para que
-    // alguien lo cambie y se vaya sin darle.
+    // DE QUÉ NEGOCIO ES  (v5.6). Se guarda al tocarlo, sin botón de
+    // guardar: es un interruptor de dos, y un "guardar" aparte solo sirve
+    // para que alguien lo cambie y se vaya sin darle.
     pantalla.querySelectorAll('[data-area]').forEach((b) => {
       b.onclick = async () => {
         const agua = b.dataset.area === 'agua';
         if (Boolean(seleccionado?.para_agua) === agua) return;
         try {
           await api.actualizar(`/catalogo/productos/${seleccionado.id}`, { paraAgua: agua });
-          avisar(agua ? 'Se prepara con el agua' : 'Se prepara con el hielo', 'bien');
+          avisar(agua ? 'Es de la planta de agua' : 'Es de la fábrica de hielo', 'bien');
           cargar();
         } catch (e) { avisar(e.message, 'error'); }
       };
@@ -1149,6 +1168,32 @@ export async function vistaProductos(pantalla, estadoApp) {
     try {
       await api.actualizar(`/catalogo/productos/${p.id}`, { llevaInventario: true, minimo });
       avisar('Inventario activado. Ahora registra lo que hay.', 'bien');
+      cargar();
+    } catch (e) { avisar(e.message, 'error'); }
+  }
+
+  /**
+   * APAGARLO.
+   *
+   * Se podía encender y no se podía apagar, y eso dejaba un producto
+   * pidiendo conteos para siempre por haberle dado una vez. No se borra
+   * nada: las entradas, las salidas y los conteos se quedan donde están,
+   * y el día que se vuelva a encender la cuenta sigue desde ahí. Lo único
+   * que se apaga es el aviso de "ya hay que pedir más".
+   */
+  async function apagarInventario(p) {
+    const sigue = await confirmar({
+      titulo: `¿Dejar de llevar inventario de ${p.nombre}?`,
+      texto: 'Deja de contarse y de avisar cuando baje. Lo ya registrado ' +
+             '—entradas, salidas y conteos— NO se borra: si mañana lo ' +
+             'vuelves a encender, la cuenta sigue desde donde iba.',
+      ok: 'Dejar de llevarlo'
+    });
+    if (!sigue) return;
+
+    try {
+      await api.actualizar(`/catalogo/productos/${p.id}`, { llevaInventario: false });
+      avisar(`${p.nombre} ya no lleva inventario`, 'bien');
       cargar();
     } catch (e) { avisar(e.message, 'error'); }
   }

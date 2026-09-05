@@ -17,9 +17,24 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '6.8';
+const VERSION_ACTUAL = '6.8.1';
 
 const VERSIONES = [
+  {
+    numero: '6.8.1',
+    nombre: 'Tres cosas que estorbaban',
+    fecha: '2026-09-05',
+    resumen:
+      'La pregunta del hielo en dos pasos: primero si se vende, y solo '
+      + 'después qué tan congelada. El inventario ya se puede apagar. Y «dónde '
+      + 'se prepara» ahora dice para qué sirve de verdad.',
+    cambios: [
+      { tipo: 'mejora', texto: 'CÓMO SALIÓ EL HIELO, EN DOS PASOS. Primero lo que decide: ✅ Salió buena, hueca o cáscara, salada, aguada, otro. Y solo si salió buena, enseguida los cuatro grados: 100% sellada, 80-90, 60-80, 40-60. Antes eran ocho botones en fila y afinar un porcentaje que no cambia el dinero parecía tan importante como decir si el hielo se vendía.' },
+      { tipo: 'mejora', texto: 'EL PAÑO NORMAL SIGUE SIENDO UN SOLO TOQUE: al elegir «salió buena» el grado ya viene puesto en el de siempre (del 80 al 90%). Cambiarlo es el segundo toque, y solo lo da quien quiere afinar el registro. Igual en un molde suelto y al corregir una sacada.' },
+      { tipo: 'arreglo', texto: 'EL INVENTARIO YA SE PUEDE APAGAR. Se podía encender y no apagar, así que un producto al que se le dio una vez quedaba pidiendo conteos para siempre. Ahora hay un «Dejar de llevar inventario de esto», y no borra nada: entradas, salidas y conteos se quedan, y si lo vuelves a encender la cuenta sigue desde donde iba.' },
+      { tipo: 'mejora', texto: '«¿DÓNDE SE PREPARA?» AHORA DICE QUÉ ES: «¿de cuál de los dos negocios es?», la fábrica de hielo o la planta de agua. Es lo que parte en dos la hoja de preparación de los pedidos y lo que marca al cliente como «💧 agua» para poder buscarlo después. Y lo dice claro: NO limita nada, cualquier producto de los dos lados se vende y se puede pedir.' }
+    ]
+  },
   {
     numero: '6.8',
     nombre: 'La raya, como se paga de verdad',

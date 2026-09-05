@@ -101,6 +101,11 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
   // Cuál es la de por omisión también la manda el servidor: si mañana
   // cambia la escala, aquí no hay un nombre viejo que corregir.
   let POR_OMISION = 'c80';
+  // El botón del primer paso que abre los cuatro grados. Viene del
+  // servidor: no es un estado, es la pregunta.
+  let SALIO = { clave: '__salio', nombre: 'Salió buena', plural: 'Salieron buenas',
+                boton: 'buena', icono: '✅', nota: '' };
+  let PREGUNTA_GRADO = '¿Qué tan congelada salió?';
 
   // F2 SACA LOS NÚMEROS. Es lo que más veces al día se hace desde esta
   // pantalla, y con el operario enfrente esperando, un atajo ahorra el viaje
@@ -140,6 +145,8 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
 
     CALIDADES = datos.calidades || [];
     POR_OMISION = datos.calidadPorOmision || POR_OMISION;
+    SALIO = datos.calidadSalio || SALIO;
+    PREGUNTA_GRADO = datos.preguntaGrado || PREGUNTA_GRADO;
 
     const { tanques, tanque, fuera } = datos;
     tanqueActivo = tanque.id;
@@ -619,6 +626,10 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
     const dibujar = () => {
       const { cuenta, alAlmacen } = contar();
       const elegida = CALIDADES.find((c) => c.clave === calidadPano);
+      // Si lo elegido se vende, el primer paso está en «salió buena» y
+      // abajo se ve de qué grado. Se DERIVA de la respuesta y no se lleva
+      // en una variable aparte, que es como se desincronizan las dos.
+      const salioBuena = esVendible(calidadPano);
       const marcadas = porSacar.filter((c) => elegidas.has(c.id));
       const totalMoldes = marcadas.reduce((n, c) => n + c.moldes.length, 0);
       const quedarian = porSacar.length - marcadas.length;
@@ -655,13 +666,27 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
               <div class="tarjeta">
                 <label>¿Cómo salió el hielo de este paño?</label>
                 <div class="calidades">
-                  ${CALIDADES.map((c) => `
-                    <button class="calidad-boton ${esc(c.clave)} ${c.clave === calidadPano ? 'elegida' : ''}"
+                  ${primerPaso().map((c) => `
+                    <button class="calidad-boton ${esc(c.clave)} ${
+                              c.clave === (salioBuena ? SALIO.clave : calidadPano) ? 'elegida' : ''}"
                             data-calidad="${esc(c.clave)}">
                       <span class="calidad-icono">${c.icono}</span>
                       <span class="calidad-nombre">${esc(c.plural)}</span>
                     </button>`).join('')}
                 </div>
+
+                ${salioBuena ? `
+                  <label class="calidad-grado-label">${esc(PREGUNTA_GRADO)}
+                    <small>solo para el registro: todas se venden igual</small></label>
+                  <div class="calidades grados">
+                    ${grados().map((c) => `
+                      <button class="calidad-boton ${esc(c.clave)} ${c.clave === calidadPano ? 'elegida' : ''}"
+                              data-calidad="${esc(c.clave)}">
+                        <span class="calidad-icono">${c.icono}</span>
+                        <span class="calidad-nombre">${esc(c.plural)}</span>
+                      </button>`).join('')}
+                  </div>` : ''}
+
                 <p class="ayuda calidad-nota">${esc(elegida ? elegida.nota : '')}</p>
 
                 ${calidadPano === 'otro' && notaPano ? `
@@ -857,6 +882,15 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
       pantalla.querySelectorAll('[data-calidad]').forEach((b) => {
         b.onclick = async () => {
           const clave = b.dataset.calidad;
+          // «Salió buena» no es un estado: abre los cuatro grados con el
+          // de siempre ya puesto, y de un solo toque el paño normal queda
+          // contestado. Cambiar de grado es el segundo toque, y solo lo da
+          // quien quiere afinar el registro.
+          if (clave === SALIO.clave) {
+            notaPano = '';
+            calidadPano = POR_OMISION;
+            return dibujar();
+          }
           // "Otro" no sirve de nada sin la explicación: si no se escribe,
           // no se cambia el estado.
           if (pideNota(clave)) {
@@ -1141,19 +1175,26 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
           opciones.push({ valor: '__igual', texto: '↩ Dejarlo como estaba',
                           detalle: `Volver a «${nombreLargo(m)}»` });
         }
-        for (const c of CALIDADES) {
+        for (const c of primerPaso()) {
           opciones.push({ valor: c.clave, texto: `${c.icono} ${c.nombre}`, detalle: c.nota });
         }
         opciones.push({ valor: '__quitar', texto: '🚫 Este molde no se sacó',
                         detalle: 'Se queda en el tanque con su hielo. Deja de contar como producido de aquel día.',
                         peligro: true });
 
-        const elegido = await menu({
-          titulo: `Canasta ${m.canasta} · molde ${m.molde}`,
+        const titulo = `Canasta ${m.canasta} · molde ${m.molde}`;
+        let elegido = await menu({
+          titulo,
           texto: `Ahora dice «${nombreLargo(m)}».`,
           opciones
         });
         if (!elegido) return;
+
+        // El segundo paso, igual que al capturar.
+        if (elegido === SALIO.clave) {
+          elegido = await preguntarGrado(titulo);
+          if (!elegido) return;
+        }
 
         if (elegido === '__igual') { cambios.delete(moldeId); quitados.delete(moldeId); }
         else if (elegido === '__quitar') { quitados.add(moldeId); cambios.delete(moldeId); }
@@ -1395,6 +1436,24 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
   const esVendible = (clave) => Boolean(deCatalogo(clave)?.vendible);
 
   /**
+   * LOS DOS PASOS DE LA PREGUNTA  (v6.8.1)
+   *
+   * "Que 100% sellada, 80, 60 y 40 sea solo una opción. Eso lo quiero
+   *  simplemente para llevar un registro; una vez que se saca y está
+   *  aceptable se va a meter al mismo precio sí o sí."
+   *
+   * Primer paso: la decisión que sí cambia algo —¿entra al cuarto frío o
+   * se botó?—. Segundo paso, solo si entró: qué tan congelada, que es el
+   * registro y ya viene contestado con lo de siempre.
+   *
+   * Los cuatro grados son EXACTAMENTE las vendibles, así que se derivan de
+   * la bandera que ya trae cada estado. No hay una segunda lista aquí que
+   * se pueda quedar vieja.
+   */
+  const grados = () => CALIDADES.filter((c) => c.vendible);
+  const primerPaso = () => [SALIO, ...CALIDADES.filter((c) => !c.vendible)];
+
+  /**
    * El texto corto que va DENTRO del botón de un molde. Tiene que caber en
    * 62 píxeles, así que son una o dos palabras; el nombre entero sale en el
    * título al pasar el ratón.
@@ -1431,12 +1490,18 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
       opciones.push({ valor: 'igual', texto: '↩ Como el resto del paño',
                       detalle: 'Quita la marca de este molde.' });
     }
-    for (const c of CALIDADES) {
+    for (const c of primerPaso()) {
       opciones.push({ valor: c.clave, texto: `${c.icono} ${c.nombre}`, detalle: c.nota });
     }
-    const elegido = await menu({ titulo, texto, opciones });
+    let elegido = await menu({ titulo, texto, opciones });
     if (!elegido) return undefined;
     if (elegido === 'igual') return null;
+
+    // EL SEGUNDO PASO, solo si salió buena.
+    if (elegido === SALIO.clave) {
+      elegido = await preguntarGrado(titulo);
+      if (!elegido) return undefined;
+    }
 
     let nota = null;
     if (pideNota(elegido)) {
@@ -1445,6 +1510,20 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
     }
 
     return { resultado: elegido, nota };
+  }
+
+  /** El segundo paso: cuál de los cuatro grados. */
+  function preguntarGrado(titulo) {
+    return menu({
+      titulo,
+      texto: `${PREGUNTA_GRADO} Es solo para el registro: las cuatro se ` +
+             'venden al mismo precio.',
+      // Cuál es "lo de siempre" no se marca aquí: la nota del propio
+      // estado ya lo dice, y añadírselo lo repetía dos veces seguidas.
+      opciones: grados().map((c) => ({
+        valor: c.clave, texto: `${c.icono} ${c.nombre}`, detalle: c.nota
+      }))
+    });
   }
 
   /**

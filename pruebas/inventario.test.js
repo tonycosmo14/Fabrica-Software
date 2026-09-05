@@ -265,6 +265,44 @@ test('el gerente sí ve los costos y sí mueve el inventario', async () => {
     method: 'POST', cuerpo: { contado: 4 } })).estado, 201);
 });
 
+// ============================================================
+// ENCENDERLO Y APAGARLO  (v6.8.1)
+// ============================================================
+//
+// "Una vez que activo el inventario en un producto no lo puedo volver a
+//  desactivar después." Se podía encender y no apagar, así que un producto
+//  al que se le dio una vez quedaba pidiendo conteos para siempre.
+
+test('el inventario se puede apagar, y lo registrado no se borra', async () => {
+  await entrarAdmin();
+  const antes = await estado();
+  assert.ok(antes.esperado !== undefined, 'venía llevando cuenta');
+
+  const r = await llamar(`/api/catalogo/productos/${coca.id}`, {
+    method: 'PUT', cuerpo: { llevaInventario: false }
+  });
+  assert.equal(r.estado, 200);
+  assert.equal(r.json.datos.producto.lleva_inventario, 0);
+
+  // Ni un movimiento se fue: apagarlo es dejar de contar, no borrar.
+  const movimientos = bd.prepare(
+    'SELECT COUNT(*) n FROM movimientos_inventario WHERE producto_id = ?').get(coca.id).n;
+  assert.ok(movimientos > 0, 'sus entradas, salidas y conteos siguen ahí');
+});
+
+test('apagado no acepta movimientos, y al encenderlo la cuenta sigue donde iba', async () => {
+  const r = await llamar(`/api/inventario/${coca.id}/movimientos`, {
+    method: 'POST', cuerpo: { tipo: 'entrada', cantidad: 5 }
+  });
+  assert.equal(r.estado, 409, 'un producto que no lleva inventario no se mueve');
+
+  const volvio = (await llamar(`/api/catalogo/productos/${coca.id}`, {
+    method: 'PUT', cuerpo: { llevaInventario: true }
+  })).json.datos.producto;
+  assert.equal(volvio.lleva_inventario, 1);
+  assert.equal(volvio.minimo, 6, 'y con el mismo aviso que tenía');
+});
+
 test('un operario no ve el inventario', async () => {
   await entrarAdmin();
   await llamar('/api/usuarios', {

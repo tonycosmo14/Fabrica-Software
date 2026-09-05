@@ -48,6 +48,32 @@
  *
  * EL ORDEN DEL ARREGLO ES EL ORDEN REAL, de más a menos aprovechable.
  * Varias pantallas dependen de eso para dibujar la mezcla: no se reordena.
+ *
+ * ============================================================
+ * LA PREGUNTA VA EN DOS PASOS  (v6.8.1)
+ * ============================================================
+ *
+ * "Que 100% sellada, 80, 60 y 40 sea solo una opción. Eso lo quiero
+ *  simplemente para llevar un registro de cómo más o menos está saliendo
+ *  el hielo; una vez que se saca y está aceptable se va a meter al mismo
+ *  precio sí o sí."
+ *
+ * Y tiene razón: las cuatro primeras NO SON CUATRO RESPUESTAS, son cuatro
+ * grados de la misma respuesta. Poner las ocho en fila hacía que la
+ * decisión de verdad —¿esto se vende o se botó?— pareciera igual de difícil
+ * que afinar un porcentaje que al final no cambia nada del dinero.
+ *
+ * Así que se pregunta en dos pasos:
+ *
+ *   PRIMER PASO   Salió buena · hueca o cáscara · salada · aguada · otro.
+ *                 Es la pregunta que decide: si entra al cuarto frío o no.
+ *   SEGUNDO PASO  Solo si salió buena: qué tan congelada, de las cuatro.
+ *                 Es el registro, y viene ya contestado con lo de siempre.
+ *
+ * El segundo paso son EXACTAMENTE las vendibles, y eso no es coincidencia:
+ * "salió buena" quiere decir "se vende", y todo lo que se vende se cobra
+ * igual. Por eso no hace falta una lista aparte — se derivan de `vendible`
+ * y no hay dos listas que se puedan quedar viejas una respecto de la otra.
  */
 
 /**
@@ -109,6 +135,24 @@ const CALIDADES = [
 ];
 
 const CLAVES_CALIDAD = CALIDADES.map((c) => c.clave);
+
+/**
+ * EL BOTÓN DEL PRIMER PASO que abre los cuatro grados.
+ *
+ * No es un estado y NUNCA se guarda: su clave lleva dos guiones bajos a
+ * propósito, para que si alguna vez se le escapara a la base de datos, el
+ * CHECK de la columna la rebote en vez de dejarla pasar.
+ */
+const SALIO = {
+  clave: '__salio', nombre: 'Salió buena', plural: 'Salieron buenas',
+  corto: 'buenas', boton: 'buena', icono: '✅',
+  nota: 'Sirve: se va al cuarto frío y se vende. Enseguida se pregunta qué ' +
+        'tan congelada salió, que es nada más para el registro — todas se ' +
+        'cobran al mismo precio.'
+};
+
+/** Lo que se pregunta en el segundo paso. */
+const PREGUNTA_GRADO = '¿Qué tan congelada salió?';
 
 /**
  * Se llamaba RESULTADOS porque además de las calidades había un "se rompió"
@@ -320,6 +364,7 @@ function resumir(mezcla = {}) {
 }
 
 module.exports = {
+  SALIO, PREGUNTA_GRADO,
   CALIDADES, CLAVES_CALIDAD, RESULTADOS, CALIDAD_POR_OMISION,
   PIDEN_NOTA, SIN_HIELO, VENDIBLES, MERMAS,
   nombreDe, pideNota,

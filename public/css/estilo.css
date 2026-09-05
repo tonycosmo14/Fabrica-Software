@@ -1053,12 +1053,31 @@ select { color-scheme: light dark; }
   display: grid; gap: 8px; margin-top: 8px;
   grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
 }
-/* CUATRO Y CUATRO, no ocho seguidos. Ocho botones en fila salen tan
-   angostos que "Saladas o contaminadas" se parte en tres renglones, y en
-   una pantalla táctil el dedo agradece el ancho. */
+/* CINCO Y CUATRO desde la v6.8.1: arriba la pregunta que decide —salió
+   buena, hueca, salada, aguada, otro— y abajo, solo si salió buena, los
+   cuatro grados. Antes eran ocho botones seguidos y "Saladas o
+   contaminadas" se partía en tres renglones. */
 @media (min-width: 700px) {
-  .calidades { grid-template-columns: repeat(4, 1fr); }
+  .calidades { grid-template-columns: repeat(5, 1fr); }
+  .calidades.grados { grid-template-columns: repeat(4, 1fr); }
 }
+
+/* El botón que abre los grados. Es la respuesta buena y se ve como tal,
+   pero SIN color propio: el color lo pone el grado que se elija abajo. */
+.calidad-boton.__salio.elegida {
+  border-color: var(--cal-c80); background: var(--cal-c80-f); color: var(--cal-c80);
+}
+
+/* La pregunta del segundo paso. Va más chica que la de arriba a propósito:
+   la de arriba decide si el hielo se vende, y ésta solo afina el registro
+   de cómo salió. Que se vean igual de importantes sería mentir. */
+.calidad-grado-label {
+  display: block; margin-top: 14px; font-size: 13px; font-weight: 700;
+}
+.calidad-grado-label small {
+  display: block; font-weight: 500; color: var(--suave); font-size: 12px;
+}
+.calidades.grados { margin-top: 6px; }
 .calidad-boton {
   width: 100%; min-width: 0; min-height: 66px; padding: 8px 6px;
   flex-direction: column; gap: 4px;

@@ -379,3 +379,52 @@ test('las horas de congelación son un ajuste, y de fábrica son 48', () => {
   assert.equal(fila?.valor, '48',
     'en mayo se van arriba de 48 y en enero bajan: tiene que poder cambiarse');
 });
+
+// ============================================================
+// LA PREGUNTA EN DOS PASOS  (v6.8.1)
+// ============================================================
+//
+// "Que 100% sellada, 80, 60 y 40 sea solo una opción. Eso lo quiero
+//  simplemente para llevar un registro de cómo más o menos está saliendo
+//  el hielo; una vez que se saca y está aceptable se va a meter al mismo
+//  precio sí o sí."
+
+test('el primer paso pregunta si se vende, no qué tan congelada', () => {
+  const calidad = require('../src/modulos/produccion/calidad');
+  const primerPaso = [calidad.SALIO, ...calidad.CALIDADES.filter((c) => !c.vendible)];
+
+  assert.deepEqual(primerPaso.map((c) => c.clave),
+    ['__salio', 'hueca', 'contaminada', 'aguada', 'otro'],
+    'cinco opciones: la que decide, y las cuatro que se botan');
+});
+
+test('el segundo paso son exactamente las que se venden', () => {
+  const calidad = require('../src/modulos/produccion/calidad');
+  const grados = calidad.CALIDADES.filter((c) => c.vendible).map((c) => c.clave);
+  assert.deepEqual(grados, calidad.VENDIBLES,
+    '«salió buena» quiere decir «se vende»: los grados y las vendibles son ' +
+    'la misma lista, no dos que se puedan quedar viejas una respecto de la otra');
+  assert.deepEqual(grados, ['sellada', 'c80', 'c60', 'c40']);
+  assert.ok(grados.includes(calidad.CALIDAD_POR_OMISION),
+    'y el segundo paso viene ya contestado con lo de siempre');
+});
+
+test('«salió buena» no es un estado y la base lo rebota', async () => {
+  const calidad = require('../src/modulos/produccion/calidad');
+  assert.ok(!calidad.CLAVES_CALIDAD.includes(calidad.SALIO.clave),
+    'no se guarda: es la pregunta, no la respuesta');
+
+  await entrarAdmin();
+  const { pano } = await elQueToca();
+  const r = await llamar(`/api/produccion/panos/${pano.id}/sacar`, {
+    method: 'POST', cuerpo: { calidad: calidad.SALIO.clave }
+  });
+  assert.equal(r.estado, 400, 'si se le escapara a la pantalla, no entra');
+});
+
+test('la pantalla recibe el botón del primer paso, no una lista suya', async () => {
+  const d = (await llamar(`/api/produccion/estado?tanque=${tanqueId}`)).json.datos;
+  assert.equal(d.calidadSalio.clave, '__salio');
+  assert.ok(d.calidadSalio.nombre);
+  assert.ok(d.preguntaGrado, 'y el texto del segundo paso');
+});
