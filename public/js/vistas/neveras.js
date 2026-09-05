@@ -21,10 +21,19 @@ import { mapa, enlaceMaps } from '../mapa.js';
 import { ubicacionDe, elegirEnMapa } from '../ubicacion.js';
 import { imprimirHoja } from '../imprimir.js';
 
-export async function vistaNeveras(pantalla) {
+export async function vistaNeveras(pantalla, estadoApp, opciones = {}) {
   let d;
   let verBaja = false;
+
+  // SE PUEDE LLEGAR CON UNA NEVERA YA ABIERTA  (v6.9.1): "#/neveras?nevera=abc",
+  // que es como se salta desde la ficha del cliente que la tiene prestada.
+  //
+  // La lista se carga igual aunque no se vea: la ficha lee de `d` cosas
+  // que solo trae la lista —los ajustes, el mensaje de WhatsApp— y sin
+  // ella se abría en blanco con un error que no dice nada.
   await lista();
+  const cual = opciones.parametros?.get('nevera');
+  if (cual) await ficha(cual);
 
   // ==========================================================
   // LA LISTA

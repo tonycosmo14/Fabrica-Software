@@ -17,9 +17,24 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '6.9';
+const VERSION_ACTUAL = '6.9.1';
 
 const VERSIONES = [
+  {
+    numero: '6.9.1',
+    nombre: 'La nevera del cliente, y el ancho de la ficha',
+    fecha: '2026-09-05',
+    resumen:
+      'Entregarle una nevera desde su propia ficha, y la ficha más ancha: '
+      + 'dos tercios la tabla y un tercio los datos, en proporción y no en '
+      + 'píxeles clavados.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'ENTREGARLE UNA NEVERA DESDE SU FICHA, en «Tarifas y envases». Salen solo las que están en bodega —una nevera prestada no se presta dos veces— y el comodato se arma con la dirección, el contacto y la ubicación que ya tiene capturados, así que no hay que volver a teclearlos.' },
+      { tipo: 'nuevo', texto: 'Y SE VEN LAS QUE TIENE: número, marca, cuántas bolsas le caben, número de serie y desde cuándo. Recogerla o sacar su contrato se sigue haciendo en «Las neveras», y la flecha del renglón lleva directo a esa nevera.' },
+      { tipo: 'mejora', texto: 'LA FICHA, MÁS ANCHA. Valía 400 píxeles clavados: en una laptop se veía bien y en un monitor grande se quedaba pinchada mientras la tabla se estiraba sola. Ahora son dos tercios y un tercio en proporción, y las dos crecen con la pantalla.' },
+      { tipo: 'arreglo', texto: 'EL BOTÓN DE «LEVANTAR PEDIDO» YA FUNCIONA. Llevaba a una dirección que el sistema no sabía leer y se caía al inicio. Ahora abre la caja CON EL CLIENTE YA PUESTO en el ticket: solo queda marcar lo que se lleva.' }
+    ]
+  },
   {
     numero: '6.9',
     nombre: 'Clientes, como los quiero ver',

@@ -1358,6 +1358,20 @@ debería haber − contado = FALTA</pre>
         cuenta se rehace sola. No se borra nada.</li>
       </ul>
 
+      <h4>Su nevera de bolsas</h4>
+      <p>En la misma pestaña, abajo: <b>las neveras que tiene prestadas</b>,
+      con su número, su marca, cuántas bolsas le caben, su número de serie y
+      desde cuándo la tiene. Con <b>Entregarle una</b> se le presta en el
+      momento: salen solo las que están <b>en bodega</b> —una nevera prestada
+      no se puede prestar dos veces— y el comodato se arma con la dirección,
+      el contacto y la ubicación de esta misma ficha, que ya están
+      capturados.</p>
+      <p class="ayuda-tip">Recogerla, cambiarle los datos o sacar su contrato
+      se sigue haciendo en <b>Las neveras</b>, y la ✕ del renglón lleva
+      directo a esa nevera. Ahí está su historia completa: sus servicios, sus
+      cortesías y por cuántas manos ha pasado. Aquí solo está el atajo de
+      entregarla, que es cuando estás mirando al cliente.</p>
+
       <h4>Su logo o su foto</h4>
       <p>Un mayorista es una tienda con rótulo. En su ficha, el botón
       <b>📷</b> de la esquina del retrato le pone <b>su logo o una foto</b>,

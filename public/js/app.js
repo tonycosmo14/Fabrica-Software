@@ -152,7 +152,16 @@ async function dibujar() {
     return vistaEntrar(pantalla, { alEntrar: entrar });
   }
 
-  const ruta = RUTAS[location.hash] || RUTAS['#/inicio'];
+  // EL HASH PUEDE TRAER PARÁMETROS  (v6.9.1)
+  //
+  // "#/neveras?nevera=abc" es la pantalla de neveras con una abierta. Sin
+  // partirlo, `RUTAS[location.hash]` no encuentra nada y se cae al inicio
+  // —que es lo que pasaba con el botón de levantar un pedido desde la
+  // ficha de un cliente—. La vista los recibe en `opciones.parametros` y
+  // los usa si sabe qué hacer con ellos.
+  const [camino, consulta = ''] = location.hash.split('?');
+  const parametros = new URLSearchParams(consulta);
+  const ruta = RUTAS[camino] || RUTAS['#/inicio'];
   // En el punto de venta la franja de arriba la pinta la vista, con el
   // reloj y el menú metidos entre sus propios botones: son 100 px de alto
   // que se ganan justo donde más falta hacen.
@@ -169,7 +178,7 @@ async function dibujar() {
   pintarBarra();
   medirBarra();
   document.getElementById('btn-atras').hidden =
-    location.hash === pantallaDeArranque() || location.hash === '#/inicio' || !location.hash;
+    camino === pantallaDeArranque() || camino === '#/inicio' || !camino;
   // Avisar a la vista que se va, para que suelte lo que haya enganchado
   // (el punto de venta escucha el teclado de toda la página).
   pantalla.dispatchEvent(new CustomEvent('vista-desmontada'));
@@ -181,6 +190,7 @@ async function dibujar() {
 
   try {
     await ruta.vista(pantalla, estado, {
+      parametros,
       // Al terminar un turno se sale del sistema, para que el cajero que
       // entra tenga que poner su PIN. Ese PIN es lo que abre su turno.
       alSalir: () => cerrarSesion({ aviso: 'Turno cerrado. Pasa el siguiente cajero.' })

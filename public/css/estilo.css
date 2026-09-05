@@ -5280,10 +5280,14 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 
 /* --- EL TABLERO: la tabla y la ficha --- */
 .cli-tablero { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: start; }
+/* DOS TERCIOS Y UN TERCIO, en porcentaje y no en píxeles fijos  (v6.9.1)
+   La ficha valía 400 px clavados: en una laptop se veía bien y en un
+   monitor grande se quedaba pinchada mientras la tabla se estiraba sola.
+   En proporción, las dos crecen. El mínimo de 360 es lo que hace falta
+   para que «Razón social / RFC / Contacto» no se parta en tres renglones
+   cada uno. */
 @media (min-width: 1100px) {
-  /* La ficha no se encoge por debajo de 380: con menos, los renglones de
-     «Razón social / RFC / Contacto» se parten en tres líneas cada uno. */
-  .cli-tablero { grid-template-columns: minmax(0, 1fr) 400px; }
+  .cli-tablero { grid-template-columns: minmax(0, 66fr) minmax(360px, 34fr); }
 }
 
 .cli-padron, .cli-ficha {
@@ -5462,6 +5466,22 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 }
 .barra-simple span { display: block; height: 100%; background: var(--primario); }
 .cli-garrafones.pasado .barra-simple span { background: var(--ambar); }
+
+/* --- LAS NEVERAS PRESTADAS  (v6.9.1) --- */
+.cli-neveras { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.cli-nevera {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 12px;
+  border: 1px solid var(--borde); background: var(--superficie-alt);
+}
+.cli-nevera-icono { font-size: 20px; }
+.cli-nevera strong { display: block; line-height: 1.25; }
+.cli-nevera small { display: block; font-size: 11.5px; color: var(--suave); }
+/* El botón de abrirla en «Las neveras» es un enlace, y un enlace no hereda
+   el alto ni el centrado de un botón. */
+.cli-nevera .cli-accion {
+  display: grid; place-items: center; text-decoration: none; flex: 0 0 auto;
+}
 
 /* ============================================================
    EL ALTA DE UN CLIENTE, PANTALLA ENTERA  (v6.9)

@@ -27,7 +27,7 @@ const { apuntarAbono } = require('./abonos');
 const { listasDeMayoreo, listaPorOmision } = require('../ventas/mayoreo');
 const {
   estadoCliente, cuentaCorriente, clientesConEstado, resumenCartera,
-  garrafonesDe, garrafonesHistorial, preciosDe, precioDeMostrador
+  garrafonesDe, garrafonesHistorial, preciosDe, precioDeMostrador, neverasDe
 } = require('./calculo');
 // Las mismas fotos que las de los productos: misma carpeta, mismas
 // comprobaciones y el mismo sitio para servirlas. Un logo de tienda no
@@ -199,6 +199,7 @@ router.get('/:id', verClientes, (req, res) => {
     cuenta: cuentaCorriente(c.id),
     precios: preciosDe(c.id),
     garrafones: { ...garrafonesDe(c.id, c), historial: garrafonesHistorial(c.id) },
+    neveras: neverasDe(c.id),
     ...CATALOGOS
   });
 });

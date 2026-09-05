@@ -28,7 +28,7 @@
  * carteras distintas (v5.4).
  */
 import { api } from '../api.js';
-import { esc, avisar, fecha as formatoFecha, colorDe } from '../util.js';
+import { esc, avisar, fecha as formatoFecha, soloDia, colorDe } from '../util.js';
 import { pedirTexto, pedirImporte, confirmar, menu, pedirContrasena } from '../dialogo.js';
 import { pesos, paraEditar } from '../fracciones.js';
 import { enlaceMaps } from '../mapa.js';
@@ -71,6 +71,9 @@ export async function vistaClientes(pantalla, estadoApp) {
   const cobra = puede('credito.cobrar');
   const corrige = puede('venta.cancelar');
   const tomaPedidos = puede('pedidos.tomar');
+  // Prestar una nevera es firmar un contrato y comprometer un fierro de
+  // veinte mil pesos: se pide el mismo permiso que en «Las neveras».
+  const prestaNeveras = puede('neveras.administrar');
   // Borrar de verdad es solo del administrador.
   const esAdmin = estadoApp.permisos.includes('*');
 
@@ -686,7 +689,61 @@ export async function vistaClientes(pantalla, estadoApp) {
                 <button class="cli-accion peligro" data-anular-garrafon="${esc(m.id)}"
                         aria-label="Anular este movimiento">×</button>` : ''}</td>
             </tr>`).join('')}
-        </table>` : ''}`;
+        </table>` : ''}
+
+      ${panelNeveras(c)}`;
+  }
+
+  /**
+   * LAS NEVERAS QUE TIENE PRESTADAS  (v6.9.1)
+   *
+   * "Falta poder asignarles igual una nevera de bolsas de hielo."
+   *
+   * La nevera se presta desde aquí, pero el comodato sigue viviendo en
+   * «Las neveras»: es un fierro con número de serie, su contrato, su
+   * historia de servicios y sus cortesías. Lo que se hace aquí es el
+   * atajo que faltaba —estás en la ficha del cliente, se la entregas— y
+   * los datos del préstamo salen de la propia ficha: su dirección, su
+   * contacto y su ubicación, que ya están capturados.
+   *
+   * Recogerla y todo lo demás se sigue haciendo allá, con las reglas que
+   * saben que una nevera prestada no se presta dos veces.
+   */
+  function panelNeveras(c) {
+    const suyas = ficha.neveras || [];
+
+    return `
+      <div class="cli-seccion-cabeza">
+        <h4 class="cfg-subtitulo">Neveras en comodato</h4>
+        ${prestaNeveras && c.activo
+          ? '<button class="enlace" id="prestar-nevera">Entregarle una</button>' : ''}
+      </div>
+
+      ${suyas.length ? `
+        <div class="cli-neveras">
+          ${suyas.map((n) => `
+            <div class="cli-nevera">
+              <span class="cli-nevera-icono">❄️</span>
+              <span class="crece">
+                <strong>Nevera ${esc(n.numero)}</strong>
+                <small>${esc([n.marca, n.modelo].filter(Boolean).join(' ')
+                  || 'sin marca')}${n.bolsas ? ` · ${n.bolsas} bolsas` : ''}${
+                  n.serie ? ` · serie ${esc(n.serie)}` : ''}</small>
+                <small>Desde ${esc(soloDia(n.desde, { conAnio: true }))}${
+                  n.hasta_previsto ? ` · se recoge el ${esc(soloDia(n.hasta_previsto))}` : ''}</small>
+              </span>
+              <a class="cli-accion" href="#/neveras?nevera=${esc(n.nevera_id)}"
+                 title="Abrirla en Las neveras">›</a>
+            </div>`).join('')}
+        </div>
+        <p class="ayuda" style="margin-top:8px">
+          Para recogerla, cambiarle los datos o sacar su contrato, se abre en
+          <b>Las neveras</b>: ahí está su historia completa.
+        </p>`
+      : `<p class="ayuda">
+           No tiene ninguna nevera de la fábrica.
+           ${prestaNeveras && c.activo ? 'Con «Entregarle una» se le presta.' : ''}
+         </p>`}`;
   }
 
   /**
@@ -947,6 +1004,8 @@ export async function vistaClientes(pantalla, estadoApp) {
 
     const editarPrecios = q('#editar-precios');
     if (editarPrecios) editarPrecios.onclick = editarTarifas;
+    const prestar = q('#prestar-nevera');
+    if (prestar) prestar.onclick = prestarNevera;
     const gMas = q('#garrafones-mas');
     if (gMas) gMas.onclick = () => moverGarrafones(1);
     const gMenos = q('#garrafones-menos');
@@ -1216,9 +1275,16 @@ export async function vistaClientes(pantalla, estadoApp) {
   // ACCIONES
   // ==========================================================
 
-  /** Levantar un pedido con este cliente ya puesto. */
+  /**
+   * LEVANTAR UN PEDIDO CON ESTE CLIENTE YA PUESTO.
+   *
+   * Se va a la caja, que es donde se toman los pedidos y las ventas: la
+   * pantalla de Pedidos es para prepararlos y entregarlos, no para
+   * capturarlos. El cliente viaja en el enlace y llega puesto en el
+   * ticket, así que lo único que queda es marcar lo que se lleva.
+   */
   function irAPedido(id) {
-    location.hash = `#/pedidos?cliente=${encodeURIComponent(id)}`;
+    location.hash = `#/venta?cliente=${encodeURIComponent(id)}`;
   }
 
   /**
@@ -1282,6 +1348,63 @@ export async function vistaClientes(pantalla, estadoApp) {
       await api.actualizar(`/clientes/${c.id}/precios`,
         { productoId: cual, precio, volumen });
       avisar(precio === '' ? 'Precio propio quitado' : 'Precio guardado', 'bien');
+      await abrir(c.id);
+    } catch (e) { avisar(e.message, 'error'); }
+  }
+
+  /**
+   * ENTREGARLE UNA NEVERA.
+   *
+   * Solo salen las que están LIBRES: una nevera prestada no se puede
+   * prestar dos veces, y enseñarla en la lista para que el servidor la
+   * rechace después es hacer perder el viaje.
+   *
+   * Los datos del préstamo salen de la propia ficha —dirección, contacto,
+   * teléfono, ubicación—: ya están capturados y volver a pedirlos es la
+   * forma más fácil de que el comodato quede con una dirección distinta a
+   * la del cliente.
+   */
+  async function prestarNevera() {
+    const c = ficha.cliente;
+
+    let d;
+    try { d = await api.obtener('/neveras'); }
+    catch (e) { return avisar(e.message, 'error'); }
+
+    const libres = (d.neveras || []).filter((n) => !n.comodato && n.estado === 'bodega');
+    if (!libres.length) {
+      return avisar('No hay ninguna nevera en bodega. Todas están prestadas, ' +
+                    'en reparación o dadas de baja.', 'error');
+    }
+
+    const cual = await menu({
+      titulo: `Entregarle una nevera a ${c.negocio || c.nombre}`,
+      texto: `${libres.length} en bodega. Se le entrega con su dirección y su ` +
+             'contacto, los de esta ficha.',
+      opciones: libres.map((n) => ({
+        valor: n.id,
+        texto: `❄️ Nevera ${n.numero}`,
+        detalle: [
+          [n.marca, n.modelo].filter(Boolean).join(' '),
+          n.bolsas ? `${n.bolsas} bolsas` : null,
+          n.serie ? `serie ${n.serie}` : null
+        ].filter(Boolean).join(' · ') || 'sin datos'
+      }))
+    });
+    if (!cual) return;
+
+    try {
+      await api.enviar(`/neveras/${cual}/entregar`, {
+        tipo: 'cliente',
+        clienteId: c.id,
+        direccion: c.direccion || '',
+        referencias: c.referencias || '',
+        latitud: c.latitud ?? '',
+        longitud: c.longitud ?? '',
+        responsable: c.nombre || '',
+        telefono: c.telefono || ''
+      });
+      avisar('Nevera entregada. Su contrato se saca desde «Las neveras».', 'bien');
       await abrir(c.id);
     } catch (e) { avisar(e.message, 'error'); }
   }

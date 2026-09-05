@@ -56,7 +56,18 @@ const FASES = {
   cobrada:   { enter: 'imprime el ticket',        esc: 'siguiente venta' }
 };
 
-export async function vistaVenta(pantalla, estadoApp) {
+export async function vistaVenta(pantalla, estadoApp, opciones = {}) {
+  // CON QUIÉN SE LLEGA  (v6.9.1). Desde la ficha de un cliente se entra
+  // aquí con él ya puesto: "#/venta?cliente=abc".
+  //
+  // VA AQUÍ ARRIBA, ANTES DEL PRIMER `await`, y no con el resto del estado
+  // más abajo: la carga del contexto la usa, y una `const` declarada
+  // después todavía no existe en ese momento — "Cannot access
+  // 'clienteDeLlegada' before initialization", que no le dice nada a
+  // nadie. Es la misma trampa que ya documenta la lista de LÍNEAS en
+  // clientes.js.
+  const clienteDeLlegada = opciones.parametros?.get('cliente') || null;
+
   const tiene = (p) => estadoApp.permisos.includes('*') || estadoApp.permisos.includes(p);
   const puedeOperarCaja = tiene('caja.operar');
   const puedeVerCaja = tiene('caja.ver');
@@ -159,7 +170,15 @@ export async function vistaVenta(pantalla, estadoApp) {
    * Siempre salen de la lista de clientes dados de alta, nunca de un nombre
    * escrito a mano con la gente esperando.
    */
-  let cliente = null;
+  // EL CLIENTE CON EL QUE SE LLEGÓ, si se entró desde su ficha (v6.9.1).
+  //
+  // Se resuelve en la misma declaración a propósito: el contexto —donde
+  // está la lista— ya se cargó arriba, y ponerlo en un renglón aparte más
+  // abajo lo dejaba antes de que `cliente` existiera. Se pone en silencio:
+  // quien tocó «Levantar pedido» en su ficha ya sabe de quién es el ticket.
+  let cliente = clienteDeLlegada
+    ? (ctx.clientes || []).find((c) => c.id === clienteDeLlegada) || null
+    : null;
   // CÓMO SE LLAMA ESTO EN LA PANTALLA  (v5.2.2)
   //
   // Lo que se lee dice «a crédito», nunca «fiado»: suena informal para un

@@ -1302,3 +1302,50 @@ test('el papel que se lleva el cliente trae su razón social y su RFC', async ()
   assert.match(papel, /OPERADORA GASTRON/, 'la razón social, para quien factura');
   assert.match(papel, /RFC: OGL180422K98/);
 });
+
+// ============================================================
+// LA NEVERA QUE SE LE PRESTA  (v6.9.1)
+// ============================================================
+//
+// "Falta poder asignarles igual una nevera de bolsas de hielo."
+//
+// El comodato sigue viviendo en su módulo —una nevera es un fierro con
+// número de serie— y aquí solo se mira y se entrega desde la ficha.
+
+test('la ficha del cliente enseña las neveras que tiene prestadas', async () => {
+  await entrarAdmin();
+  const nevera = (await llamar('/api/neveras', {
+    method: 'POST',
+    cuerpo: { numero: '09', marca: 'GlaciarPro', modelo: 'Arcon 30',
+              serie: 'GLAC-CF-2024-092', bolsas: 30 }
+  })).json.datos.nevera;
+
+  // Antes de entregarla, la ficha no enseña ninguna.
+  assert.equal((await ficha(faro.id)).neveras.length, 0);
+
+  const r = await llamar(`/api/neveras/${nevera.id}/entregar`, {
+    method: 'POST',
+    cuerpo: { tipo: 'cliente', clienteId: faro.id, responsable: 'Cap. Mateo' }
+  });
+  assert.equal(r.estado, 201);
+
+  const suyas = (await ficha(faro.id)).neveras;
+  assert.equal(suyas.length, 1);
+  assert.equal(suyas[0].numero, '09');
+  assert.equal(suyas[0].serie, 'GLAC-CF-2024-092');
+  assert.equal(suyas[0].bolsas, 30);
+  assert.ok(suyas[0].desde, 'y desde cuándo la tiene');
+});
+
+test('una nevera devuelta deja de salir en su ficha, y su historia se queda', async () => {
+  const co = (await ficha(faro.id)).neveras[0];
+  const r = await llamar(`/api/neveras/comodatos/${co.comodato_id}/devolver`, {
+    method: 'POST', cuerpo: {}
+  });
+  assert.equal(r.estado, 200);
+  assert.equal((await ficha(faro.id)).neveras.length, 0);
+
+  // No se borró: el comodato sigue ahí con su fecha de devolución.
+  const fila = bd.prepare('SELECT * FROM comodatos WHERE id = ?').get(co.comodato_id);
+  assert.ok(fila.devuelta_en, 'la historia de la nevera no se toca');
+});

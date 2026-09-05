@@ -251,6 +251,28 @@ function precioDeMostrador(producto) {
   return p.faltan?.length ? null : p.centavos;
 }
 
+/**
+ * LAS NEVERAS QUE TIENE PRESTADAS  (v6.9.1)
+ *
+ * El comodato de neveras vive en su propio módulo desde la v5.1 —una
+ * nevera es un fierro con número de serie y su propia historia— y aquí
+ * solo se MIRA: qué tiene este cliente, desde cuándo y con qué dirección.
+ * Prestarla y recogerla se sigue haciendo con las reglas de allá, que son
+ * las que saben que una nevera prestada no se puede prestar dos veces.
+ */
+function neverasDe(clienteId) {
+  return bd.prepare(`
+    SELECT co.id AS comodato_id, co.desde, co.hasta_previsto, co.direccion,
+           co.responsable, co.telefono, co.notas, co.documento,
+           n.id AS nevera_id, n.numero, n.marca, n.modelo, n.serie, n.bolsas,
+           n.estado, n.foto
+      FROM comodatos co
+      JOIN neveras n ON n.id = co.nevera_id
+     WHERE co.cliente_id = ? AND co.devuelta_en IS NULL
+     ORDER BY co.desde DESC
+  `).all(clienteId);
+}
+
 function estadoCliente(cliente) {
   const cargado = cargadoA(cliente.id);
   const abonado = abonadoPor(cliente.id);
@@ -416,5 +438,6 @@ module.exports = {
   cargadoA, abonadoPor, saldoDe, diasDebiendo, desdeCuandoDebe,
   estadoCliente, cabeElCredito, cuentaCorriente, clientesConEstado, resumenCartera,
   ritmoDe, cuantosParaSerDeSiempre,
-  garrafonesDe, garrafonesHistorial, consumoDe, preciosDe, precioDeMostrador
+  garrafonesDe, garrafonesHistorial, consumoDe, preciosDe, precioDeMostrador,
+  neverasDe
 };
