@@ -16,6 +16,99 @@ const { pendienteDe, adelantosDe } = require('../caja/vales');
 const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 
 /**
+ * LAS CUATRO FORMAS DE PAGO  (v6.8)
+ *
+ * "Hay trabajadores que se les paga por día, otros la quincena, otros a la
+ *  semana, otros por horas."
+ *
+ * `porDia` dice si el tipo cuenta días trabajados —y por tanto si le
+ * importa en qué día cayó el trabajo—. A quien se le paga la semana
+ * completa le da igual que un día haya sido domingo.
+ */
+const TIPOS_SUELDO = [
+  { clave: 'semanal', nombre: 'Por semana', unidad: 'la semana', porDia: false,
+    ayuda: 'Una cantidad fija cada semana, venga los días que venga.' },
+  { clave: 'quincenal', nombre: 'Por quincena', unidad: 'la quincena', porDia: false,
+    ayuda: 'Una cantidad fija cada quincena.' },
+  { clave: 'por_dia', nombre: 'Por día', unidad: 'el día', porDia: true,
+    ayuda: 'Tanto por cada día que trabaja. El sábado, el domingo y los días ' +
+           'especiales pueden pagarse distinto.' },
+  { clave: 'por_hora', nombre: 'Por hora', unidad: 'la hora', porDia: true,
+    ayuda: 'Tanto por cada hora trabajada. Se apunta la entrada y la salida, ' +
+           'o las horas a secas.' }
+];
+
+const CLAVES_SUELDO = TIPOS_SUELDO.map((t) => t.clave);
+const esPorDia = (tipo) => Boolean(TIPOS_SUELDO.find((t) => t.clave === tipo)?.porDia);
+
+/**
+ * LAS CLASES DE DÍA.
+ *
+ * El sábado y el domingo salen del calendario; el especial lo marca el
+ * dueño a mano, porque no hay lista fija: "los días feriados o días
+ * especiales entre la semana" cambian cada año y los decide él.
+ */
+const TIPOS_DIA = [
+  { clave: 'entre_semana', nombre: 'Entre semana', corto: 'normal' },
+  { clave: 'sabado', nombre: 'Sábado', corto: 'sábado' },
+  { clave: 'domingo', nombre: 'Domingo', corto: 'domingo' },
+  { clave: 'especial', nombre: 'Día especial', corto: 'especial' }
+];
+
+/** La columna del sueldo que lleva la tarifa de cada clase de día. */
+const COLUMNA_TARIFA = {
+  sabado: 'sabado_centavos',
+  domingo: 'domingo_centavos',
+  especial: 'especial_centavos'
+};
+
+/** Los días especiales marcados, del más nuevo al más viejo. */
+function diasEspeciales({ desde = null, hasta = null } = {}) {
+  const donde = [];
+  const args = [];
+  if (desde) { donde.push('d.dia >= ?'); args.push(desde); }
+  if (hasta) { donde.push('d.dia <= ?'); args.push(hasta); }
+  return bd.prepare(`
+    SELECT d.*, u.nombre AS capturista_nombre
+      FROM dias_especiales d
+      LEFT JOIN usuarios u ON u.id = d.capturista_id
+     ${donde.length ? `WHERE ${donde.join(' AND ')}` : ''}
+     ORDER BY d.dia DESC
+  `).all(...args);
+}
+
+/** ¿Ese día está marcado como especial? */
+function esEspecial(dia) {
+  return Boolean(bd.prepare('SELECT 1 FROM dias_especiales WHERE dia = ?').get(dia));
+}
+
+/**
+ * QUÉ CLASE DE DÍA ES.
+ *
+ * El especial manda sobre todo lo demás: un 16 de septiembre que cae en
+ * sábado se paga como especial, no como sábado.
+ */
+function tipoDeDia(dia) {
+  if (esEspecial(dia)) return 'especial';
+  const n = new Date(`${dia}T12:00:00`).getDay();
+  if (n === 0) return 'domingo';
+  if (n === 6) return 'sabado';
+  return 'entre_semana';
+}
+
+/**
+ * LO QUE VALE UN DÍA (o una hora) DE ESA CLASE.
+ *
+ * Sin tarifa propia se cobra la normal: quien gana lo mismo todos los días
+ * no tiene que capturar cuatro números iguales.
+ */
+function tarifaDe(sueldo, tipoDia) {
+  if (!sueldo) return 0;
+  const propia = sueldo[COLUMNA_TARIFA[tipoDia]];
+  return propia == null ? sueldo.centavos : propia;
+}
+
+/**
  * EL SUELDO QUE VALE HOY, o en la fecha que se pregunte.
  *
  * El más reciente cuya fecha ya pasó. Un aumento con fecha de mañana no
@@ -76,6 +169,82 @@ function horasEntre(entra, sale) {
   let d = min(sale) - min(entra);
   if (d < 0) d += 24 * 60;                 // el turno de noche cruza el día
   return Math.round((d / 60) * 100) / 100;
+}
+
+/**
+ * LO QUE TRABAJÓ DE VERDAD, día por día  (v6.8)
+ *
+ * El horario de costumbre dice qué días VIENE; esto dice qué días VINO, y
+ * a qué hora. Es de donde sale la raya del que cobra por día o por hora.
+ */
+function jornadasDe(usuarioId, desde, hasta) {
+  return bd.prepare(`
+    SELECT j.*, u.nombre AS capturista_nombre
+      FROM jornadas j
+      LEFT JOIN usuarios u ON u.id = j.capturista_id
+     WHERE j.usuario_id = ? AND j.dia >= ? AND j.dia <= ? AND j.anulada_en IS NULL
+     ORDER BY j.dia
+  `).all(usuarioId, desde, hasta);
+}
+
+/** Los días de calendario entre dos fechas, incluidas las dos. */
+function diasEntre(desde, hasta) {
+  const dias = [];
+  let d = desde;
+  // Un tope duro para que una fecha mal tecleada no se lleve el servidor
+  // por delante: nadie paga una raya de más de un año.
+  for (let i = 0; d <= hasta && i < 400; i++) {
+    dias.push(d);
+    d = masDias(d, 1);
+  }
+  return dias;
+}
+
+/**
+ * LA SEMANA (o la quincena) DÍA POR DÍA, para capturarla y para cobrarla.
+ *
+ * Devuelve TODOS los días del rango, con lo que se haya apuntado de cada
+ * uno y con lo que valdría. Los días sin apuntar salen igual: un hueco es
+ * lo que hay que ir a llenar, y esconderlo sería esconder el trabajo que
+ * falta pagar.
+ */
+function diasDeLaRaya(usuarioId, { desde, hasta, sueldo = null }) {
+  const apuntadas = new Map(jornadasDe(usuarioId, desde, hasta).map((j) => [j.dia, j]));
+  const horario = horarioDe(usuarioId);
+  const porHora = sueldo?.tipo === 'por_hora';
+
+  return diasEntre(desde, hasta).map((dia) => {
+    const j = apuntadas.get(dia) || null;
+    const tipo = j ? j.tipo_dia : tipoDeDia(dia);
+    const suyo = horario[new Date(`${dia}T12:00:00`).getDay()];
+    const tarifa = tarifaDe(sueldo, tipo);
+    const horas = j?.horas ?? null;
+
+    // Lo que se le paga por ese día: la tarifa completa si cobra por día,
+    // o las horas por la tarifa de la hora si cobra por hora.
+    const centavos = !j || !j.vino ? 0
+      : porHora ? Math.round((horas || 0) * tarifa)
+      : tarifa;
+
+    return {
+      dia,
+      nombreDia: DIAS[new Date(`${dia}T12:00:00`).getDay()],
+      tipoDia: tipo,
+      tipoDiaTexto: TIPOS_DIA.find((t) => t.clave === tipo)?.corto || tipo,
+      apuntado: Boolean(j),
+      jornadaId: j?.id || null,
+      vino: j ? Boolean(j.vino) : null,
+      entrada: j?.entrada || null,
+      salida: j?.salida || null,
+      horas,
+      notas: j?.notas || null,
+      // Lo que dice su horario de costumbre, para poder rellenar de un
+      // golpe sin teclear siete veces lo mismo.
+      deCostumbre: { viene: suyo.viene, entra: suyo.entra, sale: suyo.sale, horas: suyo.horas },
+      tarifa,
+      centavos
+    };
+  });
 }
 
 /** Las rayas que ya se le pagaron, de la más nueva a la más vieja. */
@@ -156,19 +325,65 @@ function balanceDe(usuarioId, { desde, hasta, dias = null, extras = 0, descuento
   const sueldo = sueldoVigente(usuarioId, hasta);
   const horario = horarioDe(usuarioId);
   const diasQueViene = horario.filter((d) => d.viene).length;
+  const tipo = sueldo?.tipo || 'semanal';
+  const cuentaDias = esPorDia(tipo);
 
-  // Cuánto le toca de sueldo. Por día, se multiplica por los días que se
-  // le cuenten —los de su horario, salvo que quien paga diga otra cosa—.
+  // Los días del rango, con lo apuntado de cada uno. Se calculan siempre,
+  // aunque cobre por semana: enseñar quién vino y quién no es la mitad de
+  // para qué sirve esta pantalla.
+  const detalleDias = diasDeLaRaya(usuarioId, { desde, hasta, sueldo });
+  const trabajados = detalleDias.filter((d) => d.vino);
+  const apuntados = detalleDias.filter((d) => d.apuntado);
+  const sinApuntar = detalleDias.filter((d) => !d.apuntado);
+
   let diasContados = null;
+  let horasContadas = null;
   let sueldoCentavos = 0;
+  // Cuando no se ha apuntado ni un día, la raya no puede salir de la nada:
+  // se cae al horario de costumbre y se dice bien claro que es una
+  // suposición. Es lo que hacía el sistema entero antes de la v6.8.
+  let porCostumbre = false;
+
   if (sueldo) {
-    if (sueldo.tipo === 'por_dia') {
-      diasContados = Number.isInteger(dias) && dias >= 0 ? dias : diasQueViene;
-      sueldoCentavos = sueldo.centavos * diasContados;
+    if (cuentaDias) {
+      if (apuntados.length) {
+        diasContados = trabajados.length;
+        horasContadas = tipo === 'por_hora'
+          ? Math.round(trabajados.reduce((n, d) => n + (d.horas || 0), 0) * 100) / 100
+          : null;
+        sueldoCentavos = trabajados.reduce((n, d) => n + d.centavos, 0);
+      } else {
+        porCostumbre = true;
+        diasContados = Number.isInteger(dias) && dias >= 0 ? dias : diasQueViene;
+        if (tipo === 'por_hora') {
+          horasContadas = Math.round(horario.reduce((n, d) => n + d.horas, 0) * 100) / 100;
+          sueldoCentavos = Math.round(horasContadas * sueldo.centavos);
+        } else {
+          sueldoCentavos = sueldo.centavos * diasContados;
+        }
+      }
+      // Quien paga puede decir otro número de días y manda sobre todo lo
+      // demás: a veces se acuerda pagarle completo aunque faltara un día.
+      if (Number.isInteger(dias) && dias >= 0 && tipo === 'por_dia' && apuntados.length) {
+        diasContados = dias;
+        sueldoCentavos = trabajados.slice(0, dias).reduce((n, d) => n + d.centavos, 0)
+          + Math.max(0, dias - trabajados.length) * tarifaDe(sueldo, 'entre_semana');
+      }
     } else {
       sueldoCentavos = sueldo.centavos;
     }
   }
+
+  // Cuánto de lo que se le paga vino de sábados, domingos y días
+  // especiales. Es lo que explica por qué esta semana salió más cara.
+  const porTipoDia = TIPOS_DIA.map((t) => {
+    const suyos = trabajados.filter((d) => d.tipoDia === t.clave);
+    return {
+      ...t, dias: suyos.length,
+      horas: Math.round(suyos.reduce((n, d) => n + (d.horas || 0), 0) * 100) / 100,
+      centavos: suyos.reduce((n, d) => n + d.centavos, 0)
+    };
+  }).filter((t) => t.dias);
 
   const vales = pendienteDe(usuarioId);
   const pagado = sueldoCentavos + extras - vales.centavos - descuentos;
@@ -178,12 +393,21 @@ function balanceDe(usuarioId, { desde, hasta, dias = null, extras = 0, descuento
     desde,
     hasta,
     sueldo,
+    tipo,
+    tipoTexto: TIPOS_SUELDO.find((t) => t.clave === tipo)?.nombre || tipo,
+    cuentaDias,
     // Sin sueldo capturado no se inventa un número: se dice que falta.
     sinSueldo: !sueldo,
     horario,
     diasQueViene,
     horasSemana: Math.round(horario.reduce((n, d) => n + d.horas, 0) * 100) / 100,
+    // El día por día del rango, y lo que falta por apuntar.
+    dias: detalleDias,
+    diasSinApuntar: sinApuntar.length,
+    porCostumbre,
+    porTipoDia,
     diasContados,
+    horasContadas,
     sueldoCentavos,
     extrasCentavos: extras,
     valesCentavos: vales.centavos,
@@ -198,6 +422,9 @@ function balanceDe(usuarioId, { desde, hasta, dias = null, extras = 0, descuento
 }
 
 module.exports = {
-  DIAS, sueldoVigente, historialDeSueldos, horarioDe, horasEntre,
+  DIAS, TIPOS_SUELDO, CLAVES_SUELDO, TIPOS_DIA, esPorDia,
+  sueldoVigente, historialDeSueldos, horarioDe, horasEntre,
+  diasEspeciales, esEspecial, tipoDeDia, tarifaDe,
+  jornadasDe, diasEntre, diasDeLaRaya,
   rayasDe, ultimaRaya, diaDePago, semanaQueTocaria, balanceDe, hoy, masDias
 };

@@ -2146,7 +2146,7 @@ DEBERIA HABER ..........................  $5,500
   {
     id: 'raya',
     titulo: 'Sueldos: cuánto gana cada quien y el pago de la semana',
-    busca: 'raya sueldo sueldos pago pagar semana semanal por dia dia horario horas entra sale turno empleados operarios colaboradores vales adelanto descuento extras balance recibo firmar cajon caja fuerte gasto empresa dia de pago sabado nomina',
+    busca: 'raya sueldo sueldos pago pagar semana semanal quincena quincenal por dia dia por hora horas horario entra sale turno empleados operarios colaboradores vales adelanto descuento extras balance recibo firmar cajon caja fuerte gasto empresa dia de pago sabado domingo feriado dia especial nomina jornada jornadas apuntar dias trabajados falto no vino enfermo rellenar costumbre',
     cuerpo: `
       <p>Aquí está <b>lo que se le paga a cada quien</b> — lo que en la fábrica
       se le dice «la raya». En una pantalla:
@@ -2170,13 +2170,25 @@ DEBERIA HABER ..........................  $5,500
       paga.</p>
 
       <h4>Cuánto gana</h4>
-      <p>Dos formas, y son distintas de verdad:</p>
+      <p><b>Cuatro formas de pago</b>, porque en la fábrica se paga de las
+      cuatro maneras:</p>
       <ul>
-        <li><b>A la semana</b> — gana lo mismo venga cinco días o seis.</li>
-        <li><b>Por día</b> — se multiplica por los días que se le cuenten.
-        Al pagarle se puede cambiar ese número, porque faltó un día o
-        porque entró uno extra.</li>
+        <li><b>Por semana</b> — gana lo mismo venga cinco días o seis.</li>
+        <li><b>Por quincena</b> — lo mismo, pero cada quince días.</li>
+        <li><b>Por día</b> — tanto por cada día que trabajó.</li>
+        <li><b>Por hora</b> — tanto por cada hora trabajada.</li>
       </ul>
+
+      <p>A los dos últimos —los que cuentan días— se les pueden poner
+      además <b>tarifas distintas para el sábado, el domingo y los días
+      especiales</b>. Se preguntan de una en una al ponerle sueldo y se
+      pueden dejar <b>vacías</b>: vacío quiere decir «ese día gana lo mismo
+      que un día normal», que es lo que pasa con casi todos.</p>
+
+      <pre class="ayuda-formula">Chuy, por día:  normal $300 · sábado $350 · domingo $400 · especial $500</pre>
+
+      <p>A quien cobra la semana o la quincena no se le preguntan: cobra lo
+      mismo caiga en el día que caiga.</p>
 
       <p class="ayuda-tip"><b>Un aumento no borra lo anterior.</b> Cada
       sueldo se guarda con la fecha <b>desde</b> cuándo vale, y la lista de
@@ -2184,16 +2196,85 @@ DEBERIA HABER ..........................  $5,500
       aumento con fecha de la semana que entra: la raya de esta semana se
       paga todavía con el sueldo viejo, que es lo correcto.</p>
 
-      <h4>Sus días y sus horas</h4>
+      <h4>Los días especiales los marca usted</h4>
+      <p><b>No hay lista fija.</b> Un 16 de septiembre, la feria del pueblo,
+      el día que se trabajó de más para sacar un pedido: lo que sea que se
+      pague distinto y no sea sábado ni domingo se marca a mano, desde el
+      botón <b>📅 Días especiales</b> de la lista de sueldos. Se pone la
+      fecha, se le pone nombre —«especial» a secas no dice nada dentro de un
+      año— y ya.</p>
+
+      <p>Un día marcado <b>manda sobre el sábado y el domingo</b>: si el 16
+      de septiembre cae en sábado, se paga como especial, no como sábado.</p>
+
+      <p class="ayuda-tip">Desmarcar un día <b>no cambia nada de lo que ya
+      pasó</b>. Cada día trabajado guardó su clase al apuntarse, y las
+      rayas ya pagadas están congeladas. Desmarcar solo cambia los días de
+      aquí en adelante.</p>
+
+      <h4>Su horario de costumbre</h4>
       <p>La semana se dibuja como una semana: siete casillas de domingo a
       sábado. Los días que viene salen en verde con la hora de entrada, la
       de salida y cuántas horas son; los que no viene, en gris. Un turno
       que cruza la medianoche —entra a las 22:00 y sale a las 6:00— se
       cuenta bien, son ocho horas.</p>
 
-      <p>Esto es <b>su horario de costumbre</b>, no una checadora: sirve
-      para saber a quién le toca mañana y para contarle los días a quien
-      gana por día. No es un registro de si llegó tarde.</p>
+      <p>Esto es <b>lo que se supone que hace</b>: qué días VIENE. No es lo
+      que trabajó, y no es una checadora. Sirve para saber a quién le toca
+      mañana y, sobre todo, para <b>rellenar la semana de un golpe</b> sin
+      teclear siete veces lo mismo.</p>
+
+      <h4>Lo que trabajó, día por día</h4>
+      <p>Ésta es la parte que de verdad paga: <b>qué días VINO</b> y a qué
+      hora. Un renglón por día de la semana, y los que nadie ha apuntado
+      salen igual, en ámbar — un hueco es trabajo pendiente de alguien, y
+      esconderlo sería esconder lo que falta pagar.</p>
+
+      <p>Se toca un día y se contesta:</p>
+      <ul>
+        <li><b>Vino, de tal hora a tal hora</b> — se escribe
+        «07:00 a 15:00» y <b>las horas salen de la resta</b>. Ya viene
+        propuesto lo que dice su horario de costumbre.</li>
+        <li><b>Vino, nada más las horas</b> — para el que llega y dice
+        «hice seis» y ya. Media hora se escribe <b>6.5</b>.</li>
+        <li><b>No vino</b> — con su nota, si hay que decir por qué. Un día
+        que no vino <b>también es un dato</b>: es la diferencia entre
+        «faltó» y «nadie lo apuntó».</li>
+        <li><b>Borrar lo apuntado</b> — el día vuelve a quedar en blanco.</li>
+      </ul>
+
+      <p>Las dos formas conviven a propósito, porque las dos se usan: unos
+      días se sabe la hora de entrada y la de salida, y otros nada más las
+      horas.</p>
+
+      <p class="ayuda-tip"><b>El botón que ahorra la semana entera:</b>
+      «Rellenar con su horario de costumbre» deja apuntados de un golpe
+      todos los días que le tocaban, con sus horas. Después solo se
+      corrigen las excepciones. <b>No pisa</b> lo que ya se había corregido
+      a mano, y no apunta días que todavía no llegan.</p>
+
+      <p>Con las flechas <b>‹ ›</b> de arriba se camina a la semana
+      anterior o a la siguiente, para apuntar una semana que se quedó
+      pendiente.</p>
+
+      <h4>De dónde sale el número</h4>
+      <p>Depende de cómo se le pague:</p>
+      <ul>
+        <li><b>Por día</b> — se suman los días que vino, cada uno con la
+        tarifa de su clase de día.</li>
+        <li><b>Por hora</b> — se suman las horas de cada día por la tarifa
+        de la hora de ese día.</li>
+        <li><b>Por semana o por quincena</b> — el número no cambia; lo
+        apuntado se sigue viendo, para saber quién vino.</li>
+      </ul>
+
+      <p>Debajo de la cuenta se ve <b>de eso, tantos días de sábado</b> y
+      <b>tantos de especial</b>, que es lo que explica por qué esta semana
+      salió más cara que la de siempre.</p>
+
+      <p class="ayuda-tip">Si <b>no se apuntó ni un día</b>, la cuenta se
+      cae a su horario de costumbre y lo dice con todas sus letras: es una
+      <b>suposición</b>, no lo que trabajó. Quien paga tiene que saberlo.</p>
 
       <h4>El pago de la semana</h4>
       <p>La cuenta se arma sola, y se lee como se dice de viva voz:</p>
@@ -2230,9 +2311,14 @@ DEBERIA HABER ..........................  $5,500
 
       <h4>El papel que firma</h4>
       <p>Al pagar sale su recibo por la impresora: su nombre, la semana,
-      los días, el sueldo, los extras, cada vale con su fecha, los
-      descuentos y lo que se le entregó, con la raya para firmar. Sin
-      impresora térmica se puede imprimir desde la computadora.</p>
+      <b>qué días trabajó uno por uno</b> con lo que valió cada uno, el
+      sueldo, los extras, cada vale con su fecha, los descuentos y lo que
+      se le entregó, con la raya para firmar. Sin impresora térmica se
+      puede imprimir desde la computadora.</p>
+
+      <p>Los días van en el papel a propósito: la pregunta que se hace al
+      recibirlo es <em>«¿me contaste el domingo?»</em>, y sin los días la
+      única respuesta era volver a la computadora.</p>
 
       <p>Se puede ver antes de pagar, para enseñárselo y que no haya
       sorpresas.</p>
@@ -2243,8 +2329,9 @@ DEBERIA HABER ..........................  $5,500
       vuelve a imprimir cuando se necesite.</p>
 
       <p class="ayuda-tip">Una raya pagada <b>se congela</b>. Si mañana le
-      suben el sueldo, la del sábado pasado sigue diciendo lo que decía: es
-      un papel que ya se firmó. Y si se pagó mal, <b>se anula con su
+      suben el sueldo o se desmarca aquel jueves feriado, la del sábado
+      pasado sigue diciendo lo que decía —con los mismos días y las mismas
+      tarifas—: es un papel que ya se firmó. Y si se pagó mal, <b>se anula con su
       motivo</b> — se deshace el movimiento de la caja o el gasto de la
       empresa, y sus vales vuelven a quedar pendientes. Nada se borra:
       queda quién la anuló y por qué.</p>`

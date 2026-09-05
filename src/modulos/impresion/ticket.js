@@ -743,7 +743,7 @@ function ticketAbono(a, { negocio = '', copia = false } = {}) {
 }
 
 /**
- * EL PAPEL DE LA RAYA  (v4.8)
+ * EL PAPEL DE LA RAYA  (v4.8 · con el día por día desde la v6.8)
  *
  * "Imprimir su balance para darle su sueldo."
  *
@@ -756,6 +756,11 @@ function ticketAbono(a, { negocio = '', copia = false } = {}) {
  * Y dice DE DÓNDE salió el dinero. En una fábrica donde a veces se paga del
  * cajón y a veces del dinero ya retirado, ese renglón es el que evita que
  * el mismo pago se busque dos veces.
+ *
+ * Desde la v6.8 lleva también QUÉ DÍAS TRABAJÓ, uno por uno, con lo que
+ * valió cada uno. Es la pregunta que se hace de verdad al recibir el
+ * papel —"¿me contaste el domingo?"— y sin los días la única respuesta
+ * era volver a la computadora.
  */
 function ticketRaya(raya, { negocio = '', copia = false, previa = false } = {}) {
   const cfg = configuracion();
@@ -775,9 +780,37 @@ function ticketRaya(raya, { negocio = '', copia = false, previa = false } = {}) 
   t.linea(`Del ${fechaDia(raya.desde)} al ${fechaDia(raya.hasta)}`);
   t.separador('.');
 
+  // QUÉ DÍAS TRABAJÓ. Va ANTES de la cuenta a propósito: es de donde sale
+  // el primer renglón, y leerlo después sería leer la comprobación antes
+  // que el número que comprueba.
+  const detalle = leerDetalle(raya.detalle);
+  const porHora = raya.tipo_sueldo === 'por_hora';
+
+  if (detalle?.dias?.length) {
+    t.negrita().separadorConTitulo('LO QUE TRABAJO').negrita(false);
+    for (const d of detalle.dias) {
+      const clase = d.tipo === 'entre_semana' ? '' : ` ${d.texto || d.tipo}`;
+      const horas = porHora && d.horas != null ? ` ${d.horas} h` : '';
+      t.columnas2(`  ${fechaDia(d.dia)}${clase}${horas}`, formato(d.centavos));
+    }
+    // Por qué esta semana salió más cara que la de siempre. Solo cuando
+    // hay más de un día de esa clase: con uno solo, el renglón de arriba
+    // ya lo dice, y repetirlo hace dudar de si se contó dos veces.
+    for (const x of (detalle.porTipoDia || [])) {
+      if (x.clave === 'entre_semana' || x.dias < 2) continue;
+      t.columnas2(`  ${x.dias} dias de ${x.corto}`, formato(x.centavos));
+    }
+    t.separador('.');
+  } else if (detalle?.porCostumbre) {
+    t.parrafo('No se apunto ningun dia: la cuenta salio de su horario de costumbre.');
+    t.separador('.');
+  }
+
   // LA CUENTA, en el orden en que se canta.
   t.bloqueDerecha([
-    [raya.dias_trabajados != null
+    [porHora && raya.horas_trabajadas != null
+      ? `Sueldo (${raya.horas_trabajadas} h)`
+      : raya.dias_trabajados != null
       ? `Sueldo (${raya.dias_trabajados} ${raya.dias_trabajados === 1 ? 'dia' : 'dias'})`
       : 'Sueldo',
      formato(raya.sueldo_centavos)],
@@ -823,6 +856,18 @@ function ticketRaya(raya, { negocio = '', copia = false, previa = false } = {}) 
   pie(t, negocio);
   t.izquierda().cortar(cfg.avanceCorte);
   return t.bytes();
+}
+
+/**
+ * EL DETALLE DE UNA RAYA, que se guarda como texto JSON.
+ *
+ * Aguanta que venga vacío o roto: las rayas de antes de la v6.8 no lo
+ * traen, y un papel viejo tiene que poder reimprimirse igual.
+ */
+function leerDetalle(v) {
+  if (!v) return null;
+  if (typeof v === 'object') return v;
+  try { return JSON.parse(v); } catch { return null; }
 }
 
 /**

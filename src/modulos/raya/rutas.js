@@ -50,6 +50,14 @@ function leerDia(v) {
   return /^\d{4}-\d{2}-\d{2}$/.test(t) ? t : null;
 }
 
+/** Una hora 'HH:MM', normalizada a dos dígitos. Null si no se entiende. */
+function leerHora(v) {
+  const t = String(v || '').trim();
+  if (!HORA.test(t)) return null;
+  const [h, m] = t.split(':');
+  return `${String(Number(h)).padStart(2, '0')}:${m}`;
+}
+
 function usuarioActivo(id) {
   return bd.prepare('SELECT id, nombre, rol, activo FROM usuarios WHERE id = ?').get(id) || null;
 }
@@ -71,6 +79,9 @@ router.get('/', verRaya, (req, res) => {
   return ok(res, {
     diaDePago: calculo.diaDePago(),
     dias: calculo.DIAS,
+    tiposSueldo: calculo.TIPOS_SUELDO,
+    tiposDia: calculo.TIPOS_DIA,
+    diasEspeciales: calculo.diasEspeciales(),
     gente: gente.map((u) => {
       const sueldo = calculo.sueldoVigente(u.id);
       const ultima = calculo.ultimaRaya(u.id);
@@ -88,6 +99,66 @@ router.get('/', verRaya, (req, res) => {
   });
 });
 
+// ============================================================
+// LOS DÍAS ESPECIALES  (v6.8)
+// ============================================================
+//
+// "No hay lista fija, los marco yo." Un día marcado aquí se paga con la
+// tarifa de especial para todo el que cobre por día o por hora, y manda
+// sobre el sábado y el domingo: un 16 de septiembre que cae en sábado se
+// paga como especial.
+//
+// Van ANTES de `/:id`: si no, Express leería «dias-especiales» como el
+// número de una persona y contestaría que esa persona no existe.
+
+router.get('/dias-especiales', verRaya, (req, res) => ok(res, {
+  dias: calculo.diasEspeciales({
+    desde: leerDia(req.query.desde), hasta: leerDia(req.query.hasta)
+  })
+}));
+
+router.post('/dias-especiales', pagarRaya, (req, res) => {
+  const dia = leerDia(req.body?.dia);
+  if (!dia) return error(res, 'Escribe qué día es, con su fecha.');
+  const nombre = String(req.body?.nombre || '').trim().slice(0, 80);
+  if (!nombre) return error(res, 'Ponle nombre: "16 de septiembre", "la feria".');
+
+  const ya = bd.prepare('SELECT * FROM dias_especiales WHERE dia = ?').get(dia);
+  if (ya) return error(res, `El ${dia} ya está marcado como «${ya.nombre}».`, 409);
+
+  const id = nuevoId();
+  bd.prepare(`
+    INSERT INTO dias_especiales (id, dia, nombre, notas, capturista_id, fecha_alta)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(id, dia, nombre, String(req.body?.notas || '').trim().slice(0, 200) || null,
+         req.usuario.id, ahora());
+
+  bitacora.registrar({
+    accion: 'raya.dia_especial', entidad: 'configuracion', entidadId: id,
+    ejecutorId: req.usuario.id, detalle: { dia, nombre }
+  });
+  return ok(res, { dias: calculo.diasEspeciales() }, 201);
+});
+
+/**
+ * Desmarcar un día.
+ *
+ * Se borra de verdad, y es la excepción a la regla 3.4 a propósito: esto
+ * no es un movimiento, es una etiqueta del calendario. Las rayas que ya se
+ * pagaron no se mueven, porque cada jornada copió su clase de día al
+ * guardarse.
+ */
+router.delete('/dias-especiales/:id', pagarRaya, (req, res) => {
+  const d = bd.prepare('SELECT * FROM dias_especiales WHERE id = ?').get(req.params.id);
+  if (!d) return error(res, 'Ese día no está marcado.', 404);
+  bd.prepare('DELETE FROM dias_especiales WHERE id = ?').run(d.id);
+  bitacora.registrar({
+    accion: 'raya.dia_especial_quitado', entidad: 'configuracion', entidadId: d.id,
+    ejecutorId: req.usuario.id, detalle: { dia: d.dia, nombre: d.nombre }
+  });
+  return ok(res, { dias: calculo.diasEspeciales() });
+});
+
 /** Todo lo de una persona: su sueldo, su horario, sus vales y sus rayas. */
 router.get('/:id', verRaya, (req, res) => {
   const u = usuarioActivo(req.params.id);
@@ -103,7 +174,9 @@ router.get('/:id', verRaya, (req, res) => {
     semana,
     balance: calculo.balanceDe(u.id, semana),
     diaDePago: calculo.diaDePago(),
-    dias: calculo.DIAS
+    dias: calculo.DIAS,
+    tiposSueldo: calculo.TIPOS_SUELDO,
+    tiposDia: calculo.TIPOS_DIA
   });
 });
 
@@ -122,24 +195,42 @@ router.post('/:id/sueldo', pagarRaya, (req, res) => {
   const u = usuarioActivo(req.params.id);
   if (!u) return error(res, 'Esa persona no existe.', 404);
 
-  const tipo = req.body?.tipo === 'por_dia' ? 'por_dia' : 'semanal';
+  const tipo = calculo.CLAVES_SUELDO.includes(req.body?.tipo) ? req.body.tipo : 'semanal';
   const centavos = leerImporte(req.body?.monto, { permitirCero: false });
   if (centavos === null) return error(res, 'Escribe cuánto gana.');
+
+  // LAS TARIFAS DE LOS DÍAS QUE SE PAGAN DISTINTO  (v6.8). Vacías quiere
+  // decir "lo mismo que un día normal", y solo tienen sentido cuando se
+  // cuentan días: al que cobra la semana completa le da igual el domingo.
+  const tarifa = (v) => {
+    if (v === undefined || v === null || String(v).trim() === '') return null;
+    return leerImporte(v, { permitirCero: false });
+  };
+  const sabado = calculo.esPorDia(tipo) ? tarifa(req.body?.sabado) : null;
+  const domingo = calculo.esPorDia(tipo) ? tarifa(req.body?.domingo) : null;
+  const especial = calculo.esPorDia(tipo) ? tarifa(req.body?.especial) : null;
+  for (const [que, v] of [['del sábado', sabado], ['del domingo', domingo],
+                          ['de los días especiales', especial]]) {
+    if (v === null && req.body?.[que] !== undefined) continue;
+    if (v !== null && !Number.isInteger(v)) return error(res, `La tarifa ${que} no se entiende.`);
+  }
 
   const desde = leerDia(req.body?.desde) || calculo.hoy();
 
   const id = nuevoId();
   bd.prepare(`
-    INSERT INTO sueldos (id, usuario_id, desde, tipo, centavos, notas, capturista_id, fecha_alta)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, u.id, desde, tipo, centavos,
+    INSERT INTO sueldos (id, usuario_id, desde, tipo, centavos,
+                         sabado_centavos, domingo_centavos, especial_centavos,
+                         notas, capturista_id, fecha_alta)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, u.id, desde, tipo, centavos, sabado, domingo, especial,
          String(req.body?.notas || '').trim().slice(0, 200) || null,
          req.usuario.id, ahora());
 
   bitacora.registrar({
     accion: 'raya.sueldo', entidad: 'usuario', entidadId: u.id,
     ejecutorId: u.id, capturistaId: req.usuario.id,
-    detalle: { tipo, centavos, desde, quien: u.nombre }
+    detalle: { tipo, centavos, sabado, domingo, especial, desde, quien: u.nombre }
   });
 
   return ok(res, { sueldo: calculo.sueldoVigente(u.id) }, 201);
@@ -239,6 +330,167 @@ router.get('/:id/balance', verRaya, (req, res) => {
   });
 });
 
+
+// ============================================================
+// LO QUE SE TRABAJÓ CADA DÍA  (v6.8)
+// ============================================================
+//
+// Las dos formas conviven, porque el dueño quiere las dos: hora de entrada
+// y salida —y las horas salen de la resta— o las horas a secas. Un día se
+// captura una vez: volver a mandarlo lo corrige.
+
+router.get('/:id/jornadas', verRaya, (req, res) => {
+  const u = usuarioActivo(req.params.id);
+  if (!u) return error(res, 'Esa persona no existe.', 404);
+  const semana = calculo.semanaQueTocaria(u.id);
+  const desde = leerDia(req.query.desde) || semana.desde;
+  const hasta = leerDia(req.query.hasta) || semana.hasta;
+  if (hasta < desde) return error(res, 'La fecha de fin va después de la de inicio.');
+
+  return ok(res, {
+    desde, hasta,
+    dias: calculo.diasDeLaRaya(u.id, {
+      desde, hasta, sueldo: calculo.sueldoVigente(u.id, hasta)
+    })
+  });
+});
+
+/**
+ * Apuntar (o corregir) un día.
+ *
+ * Cuerpo: { dia, vino, entrada, salida, horas, notas }
+ *
+ * Con entrada y salida las horas se calculan solas; sin ellas se toman las
+ * tecleadas. Si no viene ninguna de las dos cosas y sí vino a trabajar, se
+ * caen las de su horario de costumbre, que es lo que pasa el 90% de los
+ * días y ahorra teclear.
+ */
+router.put('/:id/jornadas', pagarRaya, (req, res) => {
+  const u = usuarioActivo(req.params.id);
+  if (!u) return error(res, 'Esa persona no existe.', 404);
+
+  const dia = leerDia(req.body?.dia);
+  if (!dia) return error(res, 'Falta decir qué día.');
+  if (dia > calculo.hoy()) return error(res, 'Ese día todavía no llega.');
+
+  const vino = req.body?.vino !== false;
+  const entrada = req.body?.entrada ? leerHora(req.body.entrada) : null;
+  const salida = req.body?.salida ? leerHora(req.body.salida) : null;
+  if (req.body?.entrada && !entrada) return error(res, 'La hora de entrada no se entiende.');
+  if (req.body?.salida && !salida) return error(res, 'La hora de salida no se entiende.');
+  if (Boolean(entrada) !== Boolean(salida)) {
+    return error(res, 'Si pones la hora de entrada, pon también la de salida.');
+  }
+
+  let horas = null;
+  if (vino) {
+    if (entrada && salida) horas = calculo.horasEntre(entrada, salida);
+    else if (req.body?.horas !== undefined && req.body?.horas !== null
+             && String(req.body.horas).trim() !== '') {
+      horas = Number(req.body.horas);
+      if (!Number.isFinite(horas) || horas < 0 || horas > 24) {
+        return error(res, 'Las horas de un día van de 0 a 24.');
+      }
+      horas = Math.round(horas * 100) / 100;
+    } else {
+      const suyo = calculo.horarioDe(u.id)[new Date(`${dia}T12:00:00`).getDay()];
+      horas = suyo.viene ? suyo.horas : null;
+    }
+  }
+
+  const anterior = bd.prepare(
+    'SELECT * FROM jornadas WHERE usuario_id = ? AND dia = ? AND anulada_en IS NULL'
+  ).get(u.id, dia);
+
+  const id = anterior?.id || nuevoId();
+  const tipoDia = anterior?.tipo_dia || calculo.tipoDeDia(dia);
+  const notas = String(req.body?.notas || '').trim().slice(0, 200) || null;
+
+  if (anterior) {
+    bd.prepare(`
+      UPDATE jornadas SET vino = ?, entrada = ?, salida = ?, horas = ?, notas = ?,
+                          capturista_id = ?
+       WHERE id = ?
+    `).run(vino ? 1 : 0, entrada, salida, horas, notas, req.usuario.id, id);
+  } else {
+    bd.prepare(`
+      INSERT INTO jornadas (id, usuario_id, dia, tipo_dia, vino, entrada, salida,
+                            horas, notas, capturista_id, fecha_alta)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, u.id, dia, tipoDia, vino ? 1 : 0, entrada, salida, horas, notas,
+           req.usuario.id, ahora());
+  }
+
+  return ok(res, {
+    dias: calculo.diasDeLaRaya(u.id, {
+      desde: leerDia(req.body?.desde) || dia,
+      hasta: leerDia(req.body?.hasta) || dia,
+      sueldo: calculo.sueldoVigente(u.id, dia)
+    })
+  }, anterior ? 200 : 201);
+});
+
+/**
+ * RELLENAR LA SEMANA CON SU HORARIO DE COSTUMBRE.
+ *
+ * El día normal es que cada quien vino los días que le tocan y a la hora
+ * que le toca. Apuntar siete días a mano cada semana, por cinco personas,
+ * es lo que hace que nadie apunte nada. Esto los deja puestos y solo se
+ * corrigen las excepciones.
+ *
+ * NO PISA lo que ya se apuntó: si alguien ya dijo que el martes no vino,
+ * ese martes se queda como está.
+ */
+router.post('/:id/jornadas/de-costumbre', pagarRaya, (req, res) => {
+  const u = usuarioActivo(req.params.id);
+  if (!u) return error(res, 'Esa persona no existe.', 404);
+
+  const semana = calculo.semanaQueTocaria(u.id);
+  const desde = leerDia(req.body?.desde) || semana.desde;
+  const hasta = leerDia(req.body?.hasta) || semana.hasta;
+  if (hasta < desde) return error(res, 'La fecha de fin va después de la de inicio.');
+
+  const horario = calculo.horarioDe(u.id);
+  const ya = new Set(calculo.jornadasDe(u.id, desde, hasta).map((j) => j.dia));
+  const hoy = calculo.hoy();
+  const meter = bd.prepare(`
+    INSERT INTO jornadas (id, usuario_id, dia, tipo_dia, vino, entrada, salida,
+                          horas, notas, capturista_id, fecha_alta)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
+  `);
+
+  let puestos = 0;
+  bd.transaction(() => {
+    for (const dia of calculo.diasEntre(desde, hasta)) {
+      // Los días que todavía no llegan no se apuntan: nadie ha trabajado
+      // el jueves que viene.
+      if (dia > hoy || ya.has(dia)) continue;
+      const suyo = horario[new Date(`${dia}T12:00:00`).getDay()];
+      meter.run(nuevoId(), u.id, dia, calculo.tipoDeDia(dia), suyo.viene ? 1 : 0,
+                suyo.viene ? suyo.entra : null, suyo.viene ? suyo.sale : null,
+                suyo.viene ? suyo.horas : null, req.usuario.id, ahora());
+      puestos++;
+    }
+  })();
+
+  return ok(res, {
+    puestos,
+    dias: calculo.diasDeLaRaya(u.id, {
+      desde, hasta, sueldo: calculo.sueldoVigente(u.id, hasta)
+    })
+  });
+});
+
+/** Un día mal capturado se borra del todo y se vuelve a apuntar. */
+router.post('/jornadas/:id/anular', pagarRaya, (req, res) => {
+  const j = bd.prepare('SELECT * FROM jornadas WHERE id = ?').get(req.params.id);
+  if (!j) return error(res, 'Ese día no está apuntado.', 404);
+  if (j.anulada_en) return error(res, 'Ese día ya estaba anulado.');
+  bd.prepare('UPDATE jornadas SET anulada_en = ?, anulada_por = ? WHERE id = ?')
+    .run(ahora(), req.usuario.id, j.id);
+  return ok(res, { anulada: true });
+});
+
 /**
  * PAGARLE LA SEMANA.
  *
@@ -322,15 +574,19 @@ router.post('/:id/pagar', pagarRaya, (req, res) => {
         (id, usuario_id, desde, hasta, sueldo_centavos, dias_trabajados,
          extras_centavos, extras_notas, vales_centavos, descuentos_centavos,
          descuentos_notas, pagado_centavos, de_donde, movimiento_id, gasto_empresa_id,
-         pagada_en, pagada_por, notas)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         pagada_en, pagada_por, notas, tipo_sueldo, horas_trabajadas, detalle)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(id, u.id, desde, hasta, b.sueldoCentavos, b.diasContados,
            extras, String(req.body?.extrasNotas || '').trim().slice(0, 200) || null,
            b.valesCentavos, descuentos,
            String(req.body?.descuentosNotas || '').trim().slice(0, 200) || null,
            b.pagadoCentavos, deDonde, movimientoId, gastoId,
            fecha, req.usuario.id,
-           String(req.body?.notas || '').trim().slice(0, 300) || null);
+           String(req.body?.notas || '').trim().slice(0, 300) || null,
+           // CÓMO SE SACÓ, copiado (regla 3.5): con esto se puede mirar una
+           // raya de hace tres meses y entender el número, aunque desde
+           // entonces le hayan cambiado el sueldo o desmarcado un feriado.
+           b.tipo, b.horasContadas, JSON.stringify(comoSeSaco(b)));
 
     // Los vales que se acaban de descontar quedan atados a esta raya.
     bd.prepare(`
@@ -353,6 +609,24 @@ router.post('/:id/pagar', pagarRaya, (req, res) => {
 
   return ok(res, { raya: rayaCompleta(id) }, 201);
 });
+
+/**
+ * CÓMO SE SACÓ EL NÚMERO, para congelarlo con la raya (regla 3.5).
+ *
+ * Con esto se puede mirar una raya de hace tres meses y entender de dónde
+ * salió, aunque desde entonces le hayan subido el sueldo o se haya
+ * desmarcado el feriado de ese jueves.
+ */
+function comoSeSaco(b) {
+  return {
+    porCostumbre: b.porCostumbre,
+    porTipoDia: b.porTipoDia,
+    dias: b.dias.filter((d) => d.vino).map((d) => ({
+      dia: d.dia, tipo: d.tipoDia, texto: d.tipoDiaTexto,
+      horas: d.horas, tarifa: d.tarifa, centavos: d.centavos
+    }))
+  };
+}
 
 /** Una raya con todo lo que necesita su papel. */
 function rayaCompleta(id) {
@@ -481,6 +755,11 @@ function balanceComoRaya(usuarioId, q = {}) {
     descuentos_centavos: b.descuentosCentavos,
     descuentos_notas: String(q.descuentosNotas || '').trim() || null,
     pagado_centavos: b.pagadoCentavos,
+    // Lo mismo que se congelaría al pagar, para que la previa y el papel
+    // de verdad se dibujen con el mismo código y digan lo mismo.
+    tipo_sueldo: b.tipo,
+    horas_trabajadas: b.horasContadas,
+    detalle: JSON.stringify(comoSeSaco(b)),
     de_donde: null,               // todavía no se ha decidido de dónde sale
     pagada_en: null,
     pagada_por_nombre: null,

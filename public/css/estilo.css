@@ -1563,6 +1563,77 @@ tr.anulada { opacity: .45; text-decoration: line-through; }
 .raya-accion.peligro:hover { border-color: var(--rojo); color: var(--rojo); }
 .raya-tabla tr.anulada .raya-accion { text-decoration: none; }
 
+/* ============================================================
+   LO QUE TRABAJÓ, DÍA POR DÍA  (v6.8)
+
+   Un renglón por día, no siete casillas: aquí no se pregunta "¿quién abre
+   el martes?" —eso lo contesta el horario de costumbre de arriba— sino
+   "¿qué pasó el martes?", y la respuesta trae hora de entrada, hora de
+   salida, horas y pesos. Eso no cabe en una casilla de 60 px.
+   ============================================================ */
+.raya-semana-barra { display: flex; align-items: center; gap: 10px; }
+.raya-semana-cual { flex: 1; text-align: center; line-height: 1.25; }
+.raya-semana-cual small { display: block; color: var(--suave); font-size: 12.5px; }
+.raya-semana-barra button { min-width: 40px; }
+
+.jornadas { display: flex; flex-direction: column; gap: 4px; }
+.jornada {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 8px 10px; border-radius: 10px; text-align: left;
+  background: var(--superficie-alt); border: 1px solid var(--borde);
+  color: var(--texto); box-shadow: none; font-size: 14px;
+}
+.jornada:hover:not([disabled]) { border-color: var(--primario); }
+.jornada[disabled] { opacity: .45; cursor: default; }
+/* El día que sí vino se marca en verde; el que no vino, apagado; el que
+   nadie ha apuntado, en ámbar, porque es trabajo pendiente de alguien. */
+.jornada.vino { border-left: 4px solid var(--verde); }
+.jornada.no-vino { border-left: 4px solid var(--borde); color: var(--suave); }
+.jornada.sin-apuntar { border-left: 4px solid var(--ambar); }
+
+.jornada-dia { display: flex; flex-direction: column; min-width: 82px; line-height: 1.2; }
+.jornada-dia b { text-transform: capitalize; font-size: 14px; }
+.jornada-dia small { color: var(--suave); font-size: 11.5px; }
+.jornada-clase { min-width: 0; }
+.jornada-que { flex: 1; display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.jornada-que b { font-variant-numeric: tabular-nums; font-size: 13.5px; }
+.jornada-que small { color: var(--suave); font-size: 11.5px; }
+.jornada-vale {
+  font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap;
+  min-width: 74px; text-align: right;
+}
+
+.jornadas-suma {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--borde);
+  font-variant-numeric: tabular-nums;
+}
+.jornadas-suma span { color: var(--suave); font-size: 13px; }
+.jornadas-suma strong { font-size: 19px; }
+
+/* La etiqueta de la clase de día. El sábado y el domingo salen del
+   calendario; el especial lo marcó el dueño, y por eso es el que grita. */
+.dia-chip {
+  display: inline-block; padding: 1px 7px; border-radius: 999px;
+  font-size: 11px; font-weight: 700; text-transform: capitalize; white-space: nowrap;
+  background: var(--superficie); border: 1px solid var(--borde); color: var(--suave);
+}
+.dia-sabado { background: var(--et-repartidor-f); color: var(--et-repartidor-t); border-color: transparent; }
+.dia-domingo { background: var(--et-operario-f); color: var(--et-operario-t); border-color: transparent; }
+.dia-especial { background: var(--et-admin-f); color: var(--et-admin-t); border-color: transparent; }
+
+/* El desglose del sueldo por clase de día: por qué esta semana salió más
+   cara que la de siempre. */
+.cuadre-linea.detalle-dia { color: var(--suave); font-size: 13px; padding-left: 10px; }
+.cuadre-linea.detalle-dia strong { font-weight: 600; }
+
+/* Marcar un día especial: dos campos y un botón, en una línea si cabe. */
+.esp-alta { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.esp-alta label { display: flex; flex-direction: column; gap: 4px; flex: 1 1 180px; }
+.esp-alta label span { font-size: 12.5px; color: var(--suave); font-weight: 600; }
+.esp-alta input { width: 100%; }
+.esp-alta button { flex: 0 0 auto; }
+
 .tanque-fila { display: flex; align-items: stretch; gap: 14px; margin-bottom: 12px; }
 .tanque-fila .tanque-tarjeta { margin-bottom: 0; flex: 1; min-width: 0; }
 /* Las flechas de orden, en columna al lado del tanque. `.tachita` nace

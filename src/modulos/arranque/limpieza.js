@@ -118,6 +118,7 @@ const MOVIMIENTOS = [
   // --- La gente ---
   { tabla: 'adelantos', grupo: 'Los vales de sueldo' },
   { tabla: 'rayas', grupo: 'Las semanas pagadas' },
+  { tabla: 'jornadas', grupo: 'Los días trabajados' },
 
   // --- Las neveras (lo que pasó, no dónde están) ---
   { tabla: 'nevera_servicios', grupo: 'Las neveras' },
@@ -159,6 +160,9 @@ const SE_QUEDA = {
   usuarios: 'la gente, con sus PIN',
   sueldos: 'cuánto gana cada quien',
   horarios_empleado: 'qué días viene cada quien',
+  // Los días especiales son el calendario que marcó el dueño, no algo que
+  // pasó: si ya apuntó la feria de diciembre, borrarla sería perdérsela.
+  dias_especiales: 'los días que se pagan distinto',
   sesiones_dispositivo: 'los dispositivos reconocidos',
 
   // Los fierros. Son el mundo real, no movimientos.

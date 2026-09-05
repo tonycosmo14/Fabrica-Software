@@ -17,9 +17,29 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '6.7';
+const VERSION_ACTUAL = '6.8';
 
 const VERSIONES = [
+  {
+    numero: '6.8',
+    nombre: 'La raya, como se paga de verdad',
+    fecha: '2026-09-05',
+    resumen:
+      'Cuatro formas de pago en vez de dos, tarifas distintas para el '
+      + 'sábado, el domingo y los días que tú marques, y la semana se apunta '
+      + 'día por día: lo que trabajó, no lo que le tocaba trabajar.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'CUATRO FORMAS DE PAGO: por semana, por quincena, por día y POR HORA. Antes solo había dos, y a quien se le paga la quincena o por horas no había dónde ponerlo.' },
+      { tipo: 'importante', texto: 'TARIFAS DISTINTAS PARA EL SÁBADO, EL DOMINGO Y LOS DÍAS ESPECIALES, para el que cobra por día o por hora. Se preguntan al ponerle sueldo y se pueden dejar vacías: vacío quiere decir «ese día gana lo mismo», que es lo que pasa con casi todos.' },
+      { tipo: 'nuevo', texto: 'LOS DÍAS ESPECIALES LOS MARCAS TÚ, con el botón 📅 de la lista de sueldos. No hay lista fija: un 16 de septiembre, la feria, el día que se trabajó de más. Un día marcado manda sobre el sábado y el domingo.' },
+      { tipo: 'importante', texto: 'LA SEMANA SE APUNTA DÍA POR DÍA: qué días VINO, no qué días le tocaba venir. Un renglón por día, y los que nadie apuntó salen en ámbar, porque un hueco es trabajo pendiente de alguien.' },
+      { tipo: 'nuevo', texto: 'LAS DOS FORMAS DE APUNTAR UN DÍA, porque las dos se usan: hora de entrada y hora de salida —y las horas salen de la resta— o las horas a secas, para el que dice «hice seis» y ya. El día que no vino también se apunta: es la diferencia entre «faltó» y «nadie lo apuntó».' },
+      { tipo: 'mejora', texto: 'EL BOTÓN QUE AHORRA LA SEMANA ENTERA: «Rellenar con su horario de costumbre» deja apuntados de un golpe los días que le tocaban, con sus horas, y después solo se corrigen las excepciones. No pisa lo que ya se corrigió a mano ni apunta días que no han llegado.' },
+      { tipo: 'mejora', texto: 'LA CUENTA ENSEÑA POR QUÉ SALIÓ ASÍ: «de eso, 1 día de sábado $350», «1 día de especial $500». Y si no se apuntó ni un día, dice claro que el número salió de su horario de costumbre y que es una suposición.' },
+      { tipo: 'mejora', texto: 'EL PAPEL QUE FIRMA LLEVA LOS DÍAS, uno por uno, con lo que valió cada uno. La pregunta al recibirlo es «¿me contaste el domingo?», y sin los días la única respuesta era volver a la computadora.' },
+      { tipo: 'mejora', texto: 'Con las flechas ‹ › se camina a la semana anterior, para apuntar una que se quedó pendiente. Y todo lo pagado sigue congelado: subirle el sueldo o desmarcar aquel feriado no cambia un papel ya firmado.' }
+    ]
+  },
   {
     numero: '6.7',
     nombre: 'Revisar el tanque',
