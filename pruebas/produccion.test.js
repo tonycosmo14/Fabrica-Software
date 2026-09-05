@@ -203,14 +203,14 @@ test('la merma se guarda y el molde recuerda que falló', async () => {
     cuerpo: {
       tipoAgua: 'purificada',
       autorizacion: { usuarioId: admin.id, pin: '1111', motivo: 'Prueba de merma' },
-      resultados: [{ moldeId: molde.id, resultado: 'merma' }]
+      resultados: [{ moldeId: molde.id, resultado: 'otro', nota: 'Se rompió' }]
     }
   });
 
   const d = await estadoTanque();
   const mismo = d.tanque.panos.find((p) => p.id === pano.id)
                   .canastas[0].moldes.find((m) => m.id === molde.id);
-  assert.equal(mismo.ultimoResultado, 'merma');
+  assert.equal(mismo.ultimoResultado, 'otro');
 });
 
 test('la captura en lote registra la jornada completa de un obrero', async () => {
@@ -363,7 +363,7 @@ test('el molde cuenta las veces SEGUIDAS que falla', async () => {
       cuerpo: {
         tipoAgua: 'purificada',
         autorizacion: { usuarioId: admin.id, pin: '1111', motivo: 'Prueba de racha' },
-        resultados: [{ moldeId: molde.id, resultado: 'merma' }]
+        resultados: [{ moldeId: molde.id, resultado: 'otro', nota: 'Se rompió' }]
       }
     });
   }
@@ -386,7 +386,7 @@ test('el molde cuenta las veces SEGUIDAS que falla', async () => {
   const m2 = d2.tanque.panos.find((p) => p.id === pano.id)
                .canastas[0].moldes.find((x) => x.id === molde.id);
   assert.equal(m2.rachaFallos, 0);
-  assert.equal(m2.ultimoResultado, 'normal');
+  assert.equal(m2.ultimoResultado, 'c80');
   assert.equal(m2.ultimoFallo, false);
 });
 

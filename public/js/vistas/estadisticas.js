@@ -418,7 +418,7 @@ export async function vistaEstadisticas(pantalla) {
     const p = d.produccion;
     const cal = d.calidades || [];
     const conAlgo = cal.filter((c) => p[c.clave] > 0);
-    const fuera = p.fueraDelAlmacen || 0;
+    const fuera = p.merma || 0;
     const total = p.salieron || 0;
     const porCiento = (n) => (total ? Math.round((n / total) * 100) : 0);
 
@@ -430,14 +430,14 @@ export async function vistaEstadisticas(pantalla) {
           <div class="hist-dato">
             <small>Salieron del molde</small>
             <strong>${p.producidas.toLocaleString('es-MX')}</strong>
-            <small>${p.rotas ? `${p.rotas} moldes no dieron nada` : 'ningún molde falló'}</small>
+            <small>${fuera ? `${fuera} se botaron` : 'no se botó ninguna'}</small>
           </div>
           <div class="hist-dato">
             <small>Sin una sola queja</small>
             <strong class="${p.porCientoSinQueja != null && p.porCientoSinQueja < 70 ? 'malo' : ''}">
               ${p.porCientoSinQueja != null ? `${p.porCientoSinQueja}%` : '—'}
             </strong>
-            <small>${p.sinQueja.toLocaleString('es-MX')} selladas o normales</small>
+            <small>${p.sinQueja.toLocaleString('es-MX')} selladas o del 80 al 90%</small>
           </div>
           <div class="hist-dato">
             <small>Se vendió</small>
@@ -446,20 +446,17 @@ export async function vistaEstadisticas(pantalla) {
           </div>
         </div>
 
-        ${conAlgo.length || p.rotas ? `
+        ${conAlgo.length ? `
           <div class="mezcla-barra" style="margin-top:16px">
             ${conAlgo.map((c) => `
               <span class="mezcla-tramo ${esc(c.clave)}" style="flex:${p[c.clave]}"
                     title="${esc(c.plural)}: ${p[c.clave].toLocaleString('es-MX')}"
                 >${porCiento(p[c.clave]) >= 8 ? porCiento(p[c.clave]) + '%' : ''}</span>`).join('')}
-            ${p.rotas ? `<span class="mezcla-tramo merma" style="flex:${p.rotas}"
-                               title="Rotas: ${p.rotas}"></span>` : ''}
           </div>
           <div class="mezcla-lista">
             ${conAlgo.map((c) => `
               <span class="mezcla-parte ${esc(c.clave)}"
                 >${p[c.clave].toLocaleString('es-MX')} ${esc(c.corto)}</span>`).join('')}
-            ${p.rotas ? `<span class="mezcla-parte merma">${p.rotas} rotas</span>` : ''}
           </div>` : ''}
 
         ${d.porObrero.length ? `
@@ -483,13 +480,12 @@ export async function vistaEstadisticas(pantalla) {
           varios días seguidos, algo está pasando (el amoniaco, un
           compresor, el calor de mayo) y se ve <b>antes</b> de que una
           máquina se pare.
-          ${fuera > 0 ? `<br><br>${fuera.toLocaleString('es-MX')} marquetas
-            ${fuera === 1 ? 'salió del molde pero no entró' : 'salieron del molde pero no entraron'}
-            al cuarto frío: cáscaras, contaminadas o lo que se anotó aparte, que
-            ${fuera === 1 ? 'se fue' : 'se fueron'} a los condensadores o
-            ${fuera === 1 ? 'se botó' : 'se botaron'}. Siguen contando para el costo por
-            marqueta —gastaron la misma agua, la misma luz y el mismo molde— pero no son
-            hielo que se pueda vender.` : ''}
+          ${fuera > 0 ? `<br><br>${fuera.toLocaleString('es-MX')}
+            ${fuera === 1 ? 'marqueta se botó' : 'marquetas se botaron'}:
+            ${fuera === 1 ? 'salió' : 'salieron'} huecas, saladas, aguadas, o
+            se ${fuera === 1 ? 'anotó' : 'anotaron'} aparte con lo que pasó.
+            Siguen contando para el costo por marqueta —gastaron la misma agua,
+            la misma luz y el mismo molde— pero no son hielo que se pueda vender.` : ''}
           <br><br>
           Lo producido y lo vendido <b>no tienen por qué cuadrar</b>: entre
           los dos está lo que quedó en el cuarto frío y lo que se derritió.

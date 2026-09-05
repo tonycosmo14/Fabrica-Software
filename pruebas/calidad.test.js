@@ -1,5 +1,5 @@
 /**
- * CÓMO SALIÓ EL HIELO  (v2.10)
+ * CÓMO SALIÓ EL HIELO  (v2.10, rehecho en la v6.5)
  *
  * Lo que se comprueba aquí es la diferencia entre TRES números que antes
  * eran uno solo, y que confundirlos costaría dinero de verdad:
@@ -8,10 +8,11 @@
  *   · lo que entró al cuarto frío — lo único que se puede vender
  *   · cómo salió — la mezcla, que es el aviso temprano de que algo falla
  *
- * El caso que lo resume: un paño entero de cáscaras que se va a los
- * condensadores costó lo mismo que uno de marquetas selladas, pero no
- * dejó ni una sola marqueta en el cuarto frío. Si el sistema las contara
- * como existencia, el conteo del cuarto frío no cuadraría nunca.
+ * Desde la v6.5 la regla es una sola y no hay pregunta de destino: o es de
+ * las cuatro que se venden —sellada, 80-90%, 60-80%, 40-60%— o se botó. El
+ * caso que lo resume: un paño entero de huecas costó lo mismo que uno de
+ * selladas, pero no dejó ni una sola marqueta en el cuarto frío. Si el
+ * sistema las contara como existencia, el conteo no cuadraría nunca.
  */
 const test = require('node:test');
 const assert = require('node:assert');
@@ -42,7 +43,21 @@ preparar(async () => {
   almacenId = a.json.datos.almacenes[0].id;
 });
 
-test('sin decir nada, el hielo sale normal', async () => {
+// ============================================================
+// LA ESCALA
+// ============================================================
+
+test('los ocho estados: cuatro se venden y cuatro se botan', () => {
+  const calidad = require('../src/modulos/produccion/calidad');
+  assert.deepEqual(calidad.VENDIBLES, ['sellada', 'c80', 'c60', 'c40']);
+  assert.deepEqual(calidad.MERMAS, ['hueca', 'contaminada', 'aguada', 'otro']);
+  assert.equal(calidad.CALIDADES.length, 8);
+  // Ni una sola pregunta de destino: eso se fue con la v6.5.
+  assert.ok(!calidad.DESTINOS, 'ya no hay destinos');
+  assert.ok(!calidad.alAlmacen('sm').includes('destino'));
+});
+
+test('sin decir nada, el hielo sale del 80 al 90%', async () => {
   await entrarAdmin();
   const { pano } = await elQueToca();
 
@@ -53,42 +68,43 @@ test('sin decir nada, el hielo sale normal', async () => {
   assert.equal(r.estado, 201);
   assert.equal(r.json.datos.marquetas, 6);
   assert.equal(r.json.datos.producidas, 6);
-  assert.equal(r.json.datos.mezcla.normal, 6,
+  assert.equal(r.json.datos.mezcla.c80, 6,
     'lo de siempre no debe costar ni un toque de más');
 });
 
-test('un paño de cáscaras al condensador NO es hielo del cuarto frío', async () => {
+test('un paño de huecas NO es hielo del cuarto frío, y no se pregunta nada', async () => {
   await entrarAdmin();
   const antes = await hoy();
   const { pano } = await elQueToca();
 
   const r = await llamar(`/api/produccion/panos/${pano.id}/sacar`, {
-    method: 'POST',
-    cuerpo: { tipoAgua: 'purificada', calidad: 'cascara', destino: 'condensadores' }
+    method: 'POST', cuerpo: { tipoAgua: 'purificada', calidad: 'hueca' }
   });
 
+  assert.equal(r.estado, 201);
   assert.equal(r.json.datos.producidas, 6, 'costaron lo mismo que seis selladas');
-  assert.equal(r.json.datos.marquetas, 0, 'ninguna se puede vender');
+  assert.equal(r.json.datos.marquetas, 0, 'ninguna se puede vender: se botaron');
+  assert.equal(r.json.datos.merma, 6);
 
   const d = await hoy();
-  assert.equal(d.mezcla.cascara - antes.mezcla.cascara, 6);
+  assert.equal(d.mezcla.hueca - antes.mezcla.hueca, 6);
   assert.equal(d.marquetas, antes.marquetas, 'el cuarto frío no creció');
 });
 
-test('la cáscara que se guarda sí entra al cuarto frío', async () => {
+test('las tres del medio se venden igual que la sellada', async () => {
   await entrarAdmin();
-  const antes = await hoy();
-  const { pano } = await elQueToca();
-
-  const r = await llamar(`/api/produccion/panos/${pano.id}/sacar`, {
-    method: 'POST',
-    cuerpo: { tipoAgua: 'purificada', calidad: 'cascara', destino: 'almacen' }
-  });
-
-  assert.equal(r.json.datos.marquetas, 6, 'se van a vender más baratas, pero se venden');
-  const d = await hoy();
-  assert.equal(d.marquetas - antes.marquetas, 6);
-  assert.equal(d.mezcla.guardadas, 6);
+  for (const [clave, cuantas] of [['sellada', 6], ['c60', 6], ['c40', 6]]) {
+    const antes = await hoy();
+    const { pano } = await elQueToca();
+    const r = await llamar(`/api/produccion/panos/${pano.id}/sacar`, {
+      method: 'POST', cuerpo: { tipoAgua: 'purificada', calidad: clave }
+    });
+    assert.equal(r.estado, 201, clave);
+    assert.equal(r.json.datos.marquetas, cuantas, `${clave} se vende`);
+    assert.equal(r.json.datos.merma, 0, `${clave} no es merma`);
+    const d = await hoy();
+    assert.equal(d.marquetas - antes.marquetas, cuantas);
+  }
 });
 
 test('la existencia esperada solo cuenta el hielo que se puede vender', async () => {
@@ -96,10 +112,10 @@ test('la existencia esperada solo cuenta el hielo que se puede vender', async ()
   const { json } = await llamar('/api/existencia');
   const a = json.datos.almacenes[0];
 
-  // Hasta aquí se sacaron tres paños de 6 moldes: normales, cáscaras al
-  // condensador y cáscaras guardadas. Solo dos de los tres son existencia.
-  assert.equal(a.producido, 12 * 16,
-    'las cáscaras del condensador no están en el cuarto frío por más que hayan costado');
+  // Hasta aquí: 80-90%, huecas, selladas, 60-80% y 40-60%. Solo el paño de
+  // huecas se quedó fuera.
+  assert.equal(a.producido, 24 * 16,
+    'las huecas no están en el cuarto frío por más que hayan costado igual');
 });
 
 test('un molde suelto manda sobre la calidad del paño', async () => {
@@ -112,29 +128,29 @@ test('un molde suelto manda sobre la calidad del paño', async () => {
       tipoAgua: 'purificada',
       calidad: 'sellada',
       resultados: [
-        { moldeId: moldes[0].id, resultado: 'merma' },
-        { moldeId: moldes[1].id, resultado: 'cascara', destino: 'botada' }
+        { moldeId: moldes[0].id, resultado: 'aguada' },
+        { moldeId: moldes[1].id, resultado: 'hueca' }
       ]
     }
   });
 
   const m = r.json.datos.mezcla;
   assert.equal(m.sellada, 4);
-  assert.equal(m.cascara, 1);
-  assert.equal(m.merma, 1);
-  assert.equal(m.producidas, 5, 'la rota no dio hielo; la cáscara sí, aunque se botara');
-  assert.equal(r.json.datos.marquetas, 4, 'la cáscara botada no llegó al cuarto frío');
+  assert.equal(m.hueca, 1);
+  assert.equal(m.aguada, 1);
+  assert.equal(m.producidas, 5, 'de la aguada no salió nada; la hueca sí salió');
+  assert.equal(r.json.datos.marquetas, 4, 'ni la hueca ni la aguada llegaron al cuarto frío');
 });
 
-test('el molde marcado cáscara sí cuenta como fallo de ESE molde', async () => {
+test('el molde marcado hueco sí cuenta como fallo de ESE molde', async () => {
   await entrarAdmin();
   const { json } = await llamar(`/api/produccion/estado?tanque=${tanqueId}`);
   const moldes = json.datos.tanque.panos.flatMap((p) => p.canastas.flatMap((c) => c.moldes));
   const conFallo = moldes.filter((m) => m.ultimoFallo);
 
-  // Del paño anterior: uno roto y uno de cáscara.
-  assert.equal(conFallo.length, 2);
-  assert.ok(conFallo.every((m) => m.rachaFallos >= 1));
+  // Del paño anterior: uno aguado y uno hueco, en un paño de selladas.
+  assert.ok(conFallo.length >= 2,
+    'salir peor que sus vecinos es lo que marca a un molde');
 });
 
 test('que el paño entero salga hueco NO es culpa de ningún molde', async () => {
@@ -161,22 +177,24 @@ test('la captura en lote también pregunta cómo salió', async () => {
 
   const r = await llamar('/api/produccion/lote', {
     method: 'POST',
-    cuerpo: { panos: [toca.id], tipoAgua: 'purificada', calidad: 'poco_hueca' }
+    cuerpo: { panos: [toca.id], tipoAgua: 'purificada', calidad: 'c60' }
   });
 
   assert.equal(r.estado, 201);
-  assert.equal(r.json.datos.calidad, 'poco_hueca');
-  assert.equal(r.json.datos.marquetas, 6, 'poco huecas se venden igual');
+  assert.equal(r.json.datos.calidad, 'c60');
+  assert.equal(r.json.datos.marquetas, 6, 'del 60 al 80% se vende igual');
 });
 
 test('un estado que no existe se rechaza en vez de guardarse', async () => {
   await entrarAdmin();
   const { pano, moldes } = await elQueToca();
 
-  const a = await llamar(`/api/produccion/panos/${pano.id}/sacar`, {
-    method: 'POST', cuerpo: { tipoAgua: 'purificada', calidad: 'ok' }
-  });
-  assert.equal(a.estado, 400, '"ok" era el nombre viejo: ya no significa nada');
+  for (const viejo of ['ok', 'normal', 'poco_hueca', 'cascara', 'merma']) {
+    const r = await llamar(`/api/produccion/panos/${pano.id}/sacar`, {
+      method: 'POST', cuerpo: { tipoAgua: 'purificada', calidad: viejo }
+    });
+    assert.equal(r.estado, 400, `"${viejo}" ya no significa nada`);
+  }
 
   const b = await llamar(`/api/produccion/panos/${pano.id}/sacar`, {
     method: 'POST',
@@ -184,12 +202,6 @@ test('un estado que no existe se rechaza en vez de guardarse', async () => {
               resultados: [{ moldeId: moldes[0].id, resultado: 'hueco' }] }
   });
   assert.equal(b.estado, 400);
-
-  const c = await llamar(`/api/produccion/panos/${pano.id}/sacar`, {
-    method: 'POST',
-    cuerpo: { tipoAgua: 'purificada', calidad: 'cascara', destino: 'a la basura' }
-  });
-  assert.equal(c.estado, 400);
 });
 
 test('el corte del día cuadra paño por paño', async () => {
@@ -200,15 +212,16 @@ test('el corte del día cuadra paño por paño', async () => {
   const { resumenDelDia } = require('../src/modulos/produccion/dia');
   const r = resumenDelDia();
 
-  assert.equal(r.rotas, r.panos.reduce((n, p) => n + p.rotas, 0));
+  assert.equal(r.merma, r.panos.reduce((n, p) => n + p.merma, 0));
   assert.equal(r.alAlmacen, r.panos.reduce((n, p) => n + p.alAlmacen, 0));
   assert.equal(r.producidas, r.panos.reduce((n, p) => n + p.producidas, 0));
   assert.equal(r.cuantos, r.panos.length);
   assert.ok(r.producidas > 0, 'esta prueba no sirve de nada con el día vacío');
+  assert.ok(r.merma > 0, 'y hoy sí se botaron varias');
 });
 
 // ============================================================
-// LOS ESTADOS QUE NO SON DE FRÍO  (v3.1)
+// LOS ESTADOS QUE NO SON DE FRÍO
 // ============================================================
 
 test('una aguada no es hielo: no cuenta ni para el costo', async () => {
@@ -230,29 +243,28 @@ test('una aguada no es hielo: no cuenta ni para el costo', async () => {
   assert.equal(d.marquetas, antes.marquetas, 'el cuarto frío no creció');
 });
 
-test('la contaminada sí es hielo, aunque no se tome', async () => {
+test('la contaminada salió hielo, pero se bota igual', async () => {
   await entrarAdmin();
   const { pano } = await elQueToca();
 
   const r = await llamar(`/api/produccion/panos/${pano.id}/sacar`, {
-    method: 'POST',
-    cuerpo: { tipoAgua: 'purificada', calidad: 'contaminada', destino: 'almacen' }
+    method: 'POST', cuerpo: { tipoAgua: 'purificada', calidad: 'contaminada' }
   });
 
   assert.equal(r.json.datos.producidas, 6,
     'costó la misma agua y la misma luz: cuenta para el costo por marqueta');
-  assert.equal(r.json.datos.marquetas, 6,
-    'se guardó para quien solo quiere enfriar, así que sí es existencia');
+  assert.equal(r.json.datos.marquetas, 0,
+    'pero con salmuera adentro no se vende: se bota');
 });
 
 test('el molde contaminado se señala aunque el paño entero lo esté', async () => {
   // La contaminación es la excepción a la regla del "peor que su paño": un
   // molde roto por el que entra salmuera está roto, y si están rotos varios
-  // hay que verlos todos, no ninguno.
+  // hay que verlos todos.
   await entrarAdmin();
   const { json } = await llamar(`/api/produccion/estado?tanque=${tanqueId}`);
-  const t = json.datos.tanque;
-  const suyos = t.panos.flatMap((p) => p.canastas.flatMap((c) => c.moldes))
+  const suyos = json.datos.tanque.panos
+    .flatMap((p) => p.canastas.flatMap((c) => c.moldes))
     .filter((m) => m.ultimoResultado === 'contaminada');
 
   assert.ok(suyos.length, 'el paño anterior salió contaminado entero');
@@ -277,7 +289,7 @@ test('"otro" sin explicación no se guarda', async () => {
   assert.equal(b.estado, 400, 'ni escrito con puros espacios');
 });
 
-test('"otro" con su explicación queda guardado tal cual', async () => {
+test('"otro" da de baja esa marqueta, con lo que pasó escrito', async () => {
   await entrarAdmin();
   const { pano, moldes } = await elQueToca();
 
@@ -286,7 +298,7 @@ test('"otro" con su explicación queda guardado tal cual', async () => {
     cuerpo: {
       tipoAgua: 'purificada',
       resultados: [{ moldeId: moldes[0].id, resultado: 'otro',
-                     destino: 'botada', nota: 'Se cayó de la grúa' }]
+                     nota: 'Se cayó de la grúa' }]
     }
   });
   assert.equal(r.estado, 201);
@@ -294,30 +306,13 @@ test('"otro" con su explicación queda guardado tal cual', async () => {
   assert.equal(r.json.datos.marquetas, 5, 'la que se cayó no llegó al cuarto frío');
 
   const guardada = bd.prepare(
-    "SELECT nota, destino FROM sacadas_moldes WHERE resultado = 'otro'").get();
+    "SELECT nota FROM sacadas_moldes WHERE resultado = 'otro'").get();
   assert.equal(guardada.nota, 'Se cayó de la grúa');
-  assert.equal(guardada.destino, 'botada');
 });
 
-test('el molde suelto hereda el destino del paño si no dice otro', async () => {
-  await entrarAdmin();
-  const { pano, moldes } = await elQueToca();
-
-  await llamar(`/api/produccion/panos/${pano.id}/sacar`, {
-    method: 'POST',
-    cuerpo: {
-      tipoAgua: 'purificada', calidad: 'cascara', destino: 'almacen',
-      resultados: [{ moldeId: moldes[0].id, resultado: 'cascara' }]
-    }
-  });
-
-  const fila = bd.prepare(`
-    SELECT sm.destino FROM sacadas_moldes sm
-      JOIN sacadas s ON s.id = sm.sacada_id
-     WHERE sm.molde_id = ? ORDER BY s.fecha DESC LIMIT 1`).get(moldes[0].id);
-  assert.equal(fila.destino, 'almacen',
-    'si el paño se guardó, la cáscara de ese molde también: es lo que uno espera');
-});
+// ============================================================
+// LA FICHA DEL PAÑO
+// ============================================================
 
 test('la ficha del paño se abre sin autorización de nadie', async () => {
   await entrarAdmin();
@@ -345,6 +340,7 @@ test('la ficha dice cuándo, quién y cómo salió cada molde', async () => {
   assert.ok(d.ultima.quienes.length, 'y quién lo sacó');
   assert.equal(d.moldes.length, 6, 'molde por molde, como salió');
   assert.ok(d.moldes.every((m) => m.resultado));
+  assert.ok(!('destino' in d.moldes[0]), 'el destino ya no existe');
 });
 
 test('el renglón del paño trae su última sacada', async () => {
@@ -358,67 +354,28 @@ test('el renglón del paño trae su última sacada', async () => {
   assert.ok(t.ultimaSalida, 'y el tanque dice cuándo salió hielo por última vez');
 });
 
-test('las marquetas de antes del cambio se leen como normales', async () => {
-  // La migración 025 tradujo lo viejo: 'ok' pasó a 'normal' y 'hueco' a
-  // 'hueca'. Lo que no se puede es adivinar hacia atrás qué era sellada y
-  // qué cáscara, y no se adivina: nadie lo estaba anotando.
-  const quedan = bd.prepare(
-    "SELECT COUNT(*) n FROM sacadas_moldes WHERE resultado IN ('ok','hueco')"
-  ).get().n;
+test('de los estados viejos no queda ni uno en la base', () => {
+  // La migración 050 tradujo lo de antes con las definiciones que el propio
+  // dueño les había dado: normal → 80-90%, poco hueca → 60-80%, cáscara →
+  // hueca, y "se rompió" → otro con su nota.
+  const quedan = bd.prepare(`
+    SELECT COUNT(*) n FROM sacadas_moldes
+     WHERE resultado IN ('ok','hueco','normal','poco_hueca','cascara','merma')
+  `).get().n;
   assert.equal(quedan, 0);
 
   const columnas = bd.prepare('SELECT * FROM pragma_table_info(?)').all('sacadas_moldes')
     .map((c) => c.name);
-  assert.ok(columnas.includes('destino'));
+  assert.ok(!columnas.includes('destino'), 'la columna del destino se fue');
 });
 
 // ============================================================
-// LA HUECA ES MERMA  (v6.0)
-// "La hueca y la cáscara no se cuentan, son mermas."
+// CUÁNTO TARDA EN CONGELAR  (v6.5)
 // ============================================================
 
-test('un paño hueco NO entra al cuarto frío si no se dice que se guardó', async () => {
-  await entrarAdmin();
-  const antes = await hoy();
-  const { pano } = await elQueToca();
-
-  // Sin destino: se va a donde va por omisión, que son los condensadores.
-  const r = await llamar(`/api/produccion/panos/${pano.id}/sacar`, {
-    method: 'POST', cuerpo: { tipoAgua: 'purificada', calidad: 'hueca' }
-  });
-  assert.equal(r.estado, 201);
-  assert.equal(r.json.datos.producidas, 6, 'costó lo mismo que seis selladas');
-  assert.equal(r.json.datos.marquetas, 0, 'pero no es existencia: es merma');
-
-  const d = await hoy();
-  assert.equal(d.marquetas, antes.marquetas, 'el cuarto frío no creció');
-
-  const destino = bd.prepare(`
-    SELECT sm.destino FROM sacadas_moldes sm
-      JOIN sacadas s ON s.id = sm.sacada_id
-     WHERE s.sacada_pano_id = (SELECT id FROM sacadas_pano WHERE pano_id = ? ORDER BY rowid DESC LIMIT 1)
-     LIMIT 1`).get(pano.id);
-  assert.equal(destino?.destino, 'condensadores');
-});
-
-test('la hueca que se guarda a propósito sí cuenta', async () => {
-  await entrarAdmin();
-  const antes = await hoy();
-  const { pano } = await elQueToca();
-
-  const r = await llamar(`/api/produccion/panos/${pano.id}/sacar`, {
-    method: 'POST',
-    cuerpo: { tipoAgua: 'purificada', calidad: 'hueca', destino: 'almacen' }
-  });
-  assert.equal(r.json.datos.marquetas, 6, 'se dijo «al cuarto frío», así que entra');
-  const d = await hoy();
-  assert.equal(d.marquetas - antes.marquetas, 6);
-});
-
-test('lo que cuenta como existencia son la sellada, la normal y la poco hueca', () => {
-  const calidad = require('../src/modulos/produccion/calidad');
-  const vendibles = calidad.CALIDADES.filter((c) => c.vendible).map((c) => c.clave);
-  assert.deepEqual(vendibles, ['sellada', 'normal', 'poco_hueca']);
-  const merma = calidad.CALIDADES.filter((c) => !c.vendible).map((c) => c.clave);
-  assert.deepEqual(merma, ['hueca', 'cascara', 'contaminada', 'aguada', 'otro']);
+test('las horas de congelación son un ajuste, y de fábrica son 48', () => {
+  const fila = bd.prepare(
+    "SELECT valor FROM configuracion WHERE clave = 'horas_congelacion'").get();
+  assert.equal(fila?.valor, '48',
+    'en mayo se van arriba de 48 y en enero bajan: tiene que poder cambiarse');
 });

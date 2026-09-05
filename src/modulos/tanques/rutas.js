@@ -87,9 +87,56 @@ function validarPlantilla(plantilla) {
 // TANQUES
 // ============================================================
 
+/**
+ * CUÁNTO TARDA EN CONGELAR, EN GENERAL  (v6.5)
+ *
+ * "Dependiendo del año las marquetas pueden congelarse en treinta o en
+ *  cuarenta y ocho horas. En enero y febrero se congelan más rápido; en
+ *  mayo se van hasta arriba de cuarenta y ocho."
+ *
+ * Un solo número para toda la fábrica, que se cambia cuando cambia el
+ * tiempo. Cada tanque guarda además el suyo —es lo que leen el reloj de
+ * congelación y la rotación— y cambiar el general se lo pone a todos: los
+ * tres tanques están en el mismo patio y les pega el mismo calor.
+ */
+function horasGenerales() {
+  const f = bd.prepare("SELECT valor FROM configuracion WHERE clave = 'horas_congelacion'").get();
+  const n = Number(f?.valor);
+  return Number.isFinite(n) && n > 0 ? n : 48;
+}
+
 router.get('/', verTanques, (req, res) => {
   const tanques = listarTanques({ incluirInactivos: req.query.incluirInactivos === '1' });
-  return ok(res, { tanques, totalMoldes: totalMoldesFabrica() });
+  return ok(res, {
+    tanques, totalMoldes: totalMoldesFabrica(), horasCongelacion: horasGenerales()
+  });
+});
+
+/** Cambiar las horas generales, y con ellas las de todos los tanques. */
+router.put('/horas-congelacion', configurar, (req, res) => {
+  const horas = Number(req.body?.horas);
+  if (!Number.isFinite(horas) || horas <= 0 || horas > 240) {
+    return error(res, 'Las horas de congelación deben ser un número mayor que cero.');
+  }
+  const antes = horasGenerales();
+
+  bd.transaction(() => {
+    bd.prepare(`
+      INSERT INTO configuracion (clave, valor, descripcion, actualizado_en, actualizado_por)
+      VALUES ('horas_congelacion', ?, 'Cuántas horas tarda en congelar un paño, en general', ?, ?)
+      ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor,
+        actualizado_en = excluded.actualizado_en, actualizado_por = excluded.actualizado_por
+    `).run(String(horas), ahora(), req.usuario.id);
+    bd.prepare('UPDATE tanques SET horas_congelacion = ? WHERE activo = 1').run(horas);
+  })();
+
+  bitacora.registrar({
+    accion: 'tanque.horas_congelacion', entidad: 'configuracion',
+    entidadId: 'horas_congelacion', ejecutorId: req.usuario.id,
+    detalle: { antes, despues: horas }
+  });
+
+  return ok(res, { horasCongelacion: horas, tanques: listarTanques() });
 });
 
 router.get('/:id', verTanques, (req, res) => {
@@ -113,7 +160,10 @@ router.post('/', configurar, (req, res) => {
   const problema = validarPlantilla(plantilla);
   if (problema) return error(res, problema);
 
-  const horas = Number(horasCongelacion);
+  // Sin decir nada, el tanque nuevo congela lo que congela la fábrica.
+  const horas = horasCongelacion === undefined || horasCongelacion === null
+                || horasCongelacion === ''
+    ? horasGenerales() : Number(horasCongelacion);
   if (!Number.isFinite(horas) || horas <= 0 || horas > 240) {
     return error(res, 'Las horas de congelación deben ser un número mayor que cero.');
   }

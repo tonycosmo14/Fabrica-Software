@@ -90,7 +90,7 @@ export async function vistaTanques(pantalla, estado) {
   // 1. LISTA DE TANQUES
   // ==========================================================
   async function lista() {
-    const { tanques, totalMoldes } = await api.obtener('/tanques');
+    const { tanques, totalMoldes, horasCongelacion } = await api.obtener('/tanques');
 
     pantalla.innerHTML = `
       <div class="cfg-tanques">
@@ -106,6 +106,26 @@ export async function vistaTanques(pantalla, estado) {
         </p>
 
         ${bloqueQueEsQue()}
+
+        <!-- CUÁNTO TARDA EN CONGELAR  (v6.5). Cambia con el año: en enero
+             y febrero se congela más rápido, en mayo se va arriba de las
+             48. Un solo número para toda la fábrica, aquí arriba, porque
+             es lo que se toca cada temporada. -->
+        <div class="tarjeta cfg-horas">
+          <div class="crece">
+            <strong>Cuánto tarda en congelar</strong>
+            <small class="ayuda">
+              De esto salen el reloj de cada canasta y el aviso de que un paño
+              ya está listo. En enero y febrero baja; en mayo sube de 48.
+            </small>
+          </div>
+          <div class="cfg-horas-campo">
+            <input id="horas-general" type="number" min="1" max="240" step="0.5"
+                   value="${esc(horasCongelacion)}" ${puedeConfigurar ? '' : 'disabled'}>
+            <span>horas</span>
+            ${puedeConfigurar ? '<button class="secundario chico" id="guardar-horas">Guardar</button>' : ''}
+          </div>
+        </div>
 
         ${tanques.length ? `
           <div class="resumen-fabrica">
@@ -158,6 +178,16 @@ export async function vistaTanques(pantalla, estado) {
       </div>`;
 
     if (puedeConfigurar) pantalla.querySelector('#nuevo').onclick = formularioTanque;
+
+    const guardarHoras = pantalla.querySelector('#guardar-horas');
+    if (guardarHoras) guardarHoras.onclick = async () => {
+      const horas = Number(pantalla.querySelector('#horas-general').value);
+      try {
+        await api.actualizar('/tanques/horas-congelacion', { horas });
+        avisar(`Ahora la fábrica congela en ${horas} h`, 'bien');
+        lista();
+      } catch (e) { avisar(e.message, 'error'); }
+    };
     pantalla.querySelectorAll('.tanque-tarjeta').forEach((b) => {
       b.onclick = () => detalle(b.dataset.id);
     });
@@ -604,6 +634,8 @@ export async function vistaTanques(pantalla, estado) {
 
           <label for="horas">Horas de congelación</label>
           <input id="horas" type="number" min="1" max="240" step="0.5" value="${esc(tanque.horas_congelacion)}">
+          <small class="ayuda">Solo para este tanque. Cambiar las horas generales
+            —arriba, en la lista— se las pone a todos.</small>
 
           <label for="notas">Notas</label>
           <input id="notas" value="${esc(tanque.notas || '')}" placeholder="Opcional" autocomplete="off">

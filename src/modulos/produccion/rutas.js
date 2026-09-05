@@ -104,7 +104,7 @@ router.get('/estado', verProduccion, (req, res) => {
     // copiados a mano en el JavaScript de enfrente: así hay un solo
     // lugar donde dicen cómo se llaman y qué significan (calidad.js).
     calidades: calidad.CALIDADES,
-    destinos: calidad.DESTINOS,
+    calidadPorOmision: calidad.CALIDAD_POR_OMISION,
     // CUÁNTO HIELO QUEDA EN EL CUARTO FRÍO  (v4.1)
     //
     // Va aquí y no detrás del permiso de existencia a propósito: el operario
@@ -234,8 +234,7 @@ router.get('/panos/:id/ficha', verProduccion, (req, res) => {
 
   const cuentaDe = bd.prepare(`
     SELECT ${calidad.columnasMezcla('sm')},
-           ${calidad.columnaGuardadas('sm')} AS guardadas,
-           AVG(s.horas_congelacion)          AS horas
+           AVG(s.horas_congelacion) AS horas
       FROM sacadas_moldes sm
       JOIN sacadas s ON s.id = sm.sacada_id
      WHERE s.sacada_pano_id = ?
@@ -272,7 +271,7 @@ router.get('/panos/:id/ficha', verProduccion, (req, res) => {
       autorizo: sp.autorizo || null,
       motivoOrden: sp.motivo_orden || null,
       horas: cuenta.horas,
-      mezcla: calidad.resumir(cuenta, cuenta.guardadas)
+      mezcla: calidad.resumir(cuenta)
     };
   });
 
@@ -281,7 +280,7 @@ router.get('/panos/:id/ficha', verProduccion, (req, res) => {
   const ultima = historial.find((x) => !x.anulada) || null;
   const moldes = ultima ? bd.prepare(`
     SELECT c.numero AS canasta, m.numero AS molde,
-           sm.resultado, sm.destino, sm.nota
+           sm.resultado, sm.nota
       FROM sacadas_moldes sm
       JOIN sacadas s  ON s.id = sm.sacada_id
       JOIN moldes m   ON m.id = sm.molde_id
@@ -298,7 +297,7 @@ router.get('/panos/:id/ficha', verProduccion, (req, res) => {
     },
     ultima, moldes, historial,
     calidades: calidad.CALIDADES,
-    destinos: calidad.DESTINOS
+    calidadPorOmision: calidad.CALIDAD_POR_OMISION
   });
 });
 
@@ -311,12 +310,10 @@ router.get('/panos/:id/ficha', verProduccion, (req, res) => {
  *   tipoAgua     'purificada' | 'potable'
  *   rellenar     false para dejarlo fuera (limpieza, se acabó el agua)
  *   canastas     ids concretos; si no se manda, todas las que falten
- *   calidad      cómo salió el paño en general (por omisión 'normal')
- *   destino      a dónde fue el hielo que no se vende solo (cáscara,
- *                contaminada, otro)
+ *   calidad      cómo salió el paño en general (por omisión, del 80 al 90%)
  *   nota         qué pasó; obligatoria si la calidad es 'otro'
- *   resultados   [{ moldeId, resultado, destino, nota }] los moldes que
- *                salieron distintos del resto del paño
+ *   resultados   [{ moldeId, resultado, nota }] los moldes que salieron
+ *                distintos del resto del paño
  *   motivo       obligatorio si se saca un paño que no toca
  */
 router.post('/panos/:id/sacar', registrar, (req, res) => {
@@ -404,16 +401,13 @@ router.post('/panos/:id/sacar', registrar, (req, res) => {
   const marcas = new Map();
   try {
     porOmision = calidad.interpretar(req.body?.calidad
-      ? { resultado: req.body.calidad, destino: req.body.destino, nota: req.body.nota }
-      : { destino: req.body?.destino, nota: req.body?.nota });
+      ? { resultado: req.body.calidad, nota: req.body.nota }
+      : { nota: req.body?.nota });
 
     for (const r of req.body?.resultados || []) {
-      marcas.set(r.moldeId, calidad.interpretar(r, {
-        destino: porOmision.destino || req.body?.destino,
-        // La nota del paño NO se hereda: si un molde salió con otra cosa,
-        // lo que pasó ahí no es lo que pasó en el resto.
-        nota: null
-      }));
+      // La nota del paño NO se hereda: si un molde salió con otra cosa,
+      // lo que pasó ahí no es lo que pasó en el resto.
+      marcas.set(r.moldeId, calidad.interpretar(r, { nota: null }));
     }
   } catch (e) { return error(res, e.message); }
 
@@ -432,7 +426,6 @@ router.post('/panos/:id/sacar', registrar, (req, res) => {
   ).get(pano.id);
 
   const mezcla = Object.fromEntries(calidad.RESULTADOS.map((c) => [c, 0]));
-  let guardadas = 0;
 
   const guardar = bd.transaction(() => {
     if (!sacadaPano) {
@@ -452,8 +445,8 @@ router.post('/panos/:id/sacar', registrar, (req, res) => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const insertarMolde = bd.prepare(
-      `INSERT INTO sacadas_moldes (id, sacada_id, molde_id, resultado, destino, nota)
-       VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO sacadas_moldes (id, sacada_id, molde_id, resultado, nota)
+       VALUES (?, ?, ?, ?, ?)`
     );
     const insertarRellenado = bd.prepare(`
       INSERT INTO rellenados (id, canasta_id, fecha, ejecutor_id, capturista_id,
@@ -474,10 +467,8 @@ router.post('/panos/:id/sacar', registrar, (req, res) => {
 
       for (const m of c.moldes) {
         const marca = marcas.get(m.id) || porOmision;
-        insertarMolde.run(nuevoId(), sacadaId, m.id,
-                          marca.resultado, marca.destino, marca.nota);
+        insertarMolde.run(nuevoId(), sacadaId, m.id, marca.resultado, marca.nota);
         mezcla[marca.resultado]++;
-        if (marca.destino === 'almacen') guardadas++;
       }
 
       // Los moldes se vuelven a llenar en el mismo movimiento, salvo que se
@@ -523,12 +514,12 @@ router.post('/panos/:id/sacar', registrar, (req, res) => {
     }
   });
 
-  const cuenta = calidad.resumir(mezcla, guardadas);
+  const cuenta = calidad.resumir(mezcla);
 
   return ok(res, {
     // "marquetas" siguió llamándose así, pero ahora quiere decir lo que de
-    // verdad entró al cuarto frío: las cáscaras que se fueron a los
-    // condensadores no están ahí, y contarlas descuadraría el conteo.
+    // verdad entró al cuarto frío: lo que salió hueco o salado no está ahí,
+    // y contarlo descuadraría el conteo.
     marquetas: cuenta.alAlmacen,
     producidas: cuenta.producidas,
     merma: cuenta.merma,
@@ -614,7 +605,7 @@ router.post('/lote', registrar, (req, res) => {
   let comoSalio;
   try {
     comoSalio = calidad.interpretar({
-      resultado: req.body?.calidad, destino: req.body?.destino, nota: req.body?.nota
+      resultado: req.body?.calidad, nota: req.body?.nota
     });
   } catch (e) { return error(res, e.message); }
   const general = comoSalio.resultado;
@@ -667,9 +658,9 @@ router.post('/lote', registrar, (req, res) => {
                previo ? horasDesde(previo.fecha, new Date(fecha)) : null, sacadaPanoId);
 
         for (const m of c.moldes) {
-          bd.prepare(`INSERT INTO sacadas_moldes (id, sacada_id, molde_id, resultado, destino, nota)
-                      VALUES (?, ?, ?, ?, ?, ?)`)
-            .run(nuevoId(), sacadaId, m.id, general, comoSalio.destino, comoSalio.nota);
+          bd.prepare(`INSERT INTO sacadas_moldes (id, sacada_id, molde_id, resultado, nota)
+                      VALUES (?, ?, ?, ?, ?)`)
+            .run(nuevoId(), sacadaId, m.id, general, comoSalio.nota);
           producidas++;
         }
 
@@ -692,15 +683,12 @@ router.post('/lote', registrar, (req, res) => {
     accion: 'produccion.captura_lote', entidad: 'usuario', entidadId: ejecutorId,
     ejecutorId, capturistaId: req.usuario.id,
     detalle: { panos: hechos, moldes: producidas, calidad: general,
-               destino: comoSalio.destino, nota: comoSalio.nota, tipoAgua }
+               nota: comoSalio.nota, tipoAgua }
   });
 
   // Toda la captura salió igual, así que basta con resumir un solo estado
   // repetido tantas veces como moldes se abrieron.
-  const cuenta = calidad.resumir(
-    { [general]: producidas },
-    comoSalio.destino === 'almacen' ? producidas : 0
-  );
+  const cuenta = calidad.resumir({ [general]: producidas });
 
   return ok(res, {
     panos: hechos, marquetas: cuenta.alAlmacen, producidas: cuenta.producidas,
@@ -785,7 +773,7 @@ function anularSacadaPano(req, res) {
  *
  * Anular y volver a sacar no sirve: la rotación ya pasó de ese paño, y la
  * sacada nueva saldría con la fecha de hoy. Lo que se corrige es CÓMO
- * SALIÓ: el estado de todos sus moldes, con su destino y su nota. La
+ * SALIÓ: el estado de todos sus moldes, con su nota. La
  * sacada guarda cuándo se corrigió, quién y por qué, y en la bitácora
  * queda la mezcla de antes y la de después.
  *
@@ -812,25 +800,25 @@ router.post('/sacadas-pano/:id/corregir', exigirPermiso('produccion.corregir'), 
   let como;
   try {
     como = calidad.interpretar({
-      resultado: req.body.calidad, destino: req.body.destino, nota: req.body.nota
+      resultado: req.body.calidad, nota: req.body.nota
     });
   } catch (e) { return error(res, e.message); }
 
   const cuentaDe = bd.prepare(`
-    SELECT ${calidad.columnasMezcla('sm')}, ${calidad.columnaGuardadas('sm')} AS guardadas,
+    SELECT ${calidad.columnasMezcla('sm')},
            MIN(s.fecha) AS primera
       FROM sacadas_moldes sm JOIN sacadas s ON s.id = sm.sacada_id
      WHERE s.sacada_pano_id = ?
   `);
   const antesFila = cuentaDe.get(sp.id);
   if (!antesFila.primera) return error(res, 'Esa sacada no tiene moldes registrados.', 409);
-  const antes = calidad.resumir(antesFila, antesFila.guardadas);
+  const antes = calidad.resumir(antesFila);
 
   bd.transaction(() => {
     bd.prepare(`
-      UPDATE sacadas_moldes SET resultado = ?, destino = ?, nota = ?
+      UPDATE sacadas_moldes SET resultado = ?, nota = ?
        WHERE sacada_id IN (SELECT id FROM sacadas WHERE sacada_pano_id = ?)
-    `).run(como.resultado, como.destino, como.nota, sp.id);
+    `).run(como.resultado, como.nota, sp.id);
     bd.prepare(`
       UPDATE sacadas_pano
          SET corregida_en = ?, corregida_por = ?, motivo_correccion = ?,
@@ -840,7 +828,7 @@ router.post('/sacadas-pano/:id/corregir', exigirPermiso('produccion.corregir'), 
   })();
 
   const despuesFila = cuentaDe.get(sp.id);
-  const despues = calidad.resumir(despuesFila, despuesFila.guardadas);
+  const despues = calidad.resumir(despuesFila);
 
   // Los conteos que ya contaban esa sacada se vuelven a sacar solos.
   const { corregirConteosQueAbarcan } = require('../existencia/correccion');
@@ -855,7 +843,7 @@ router.post('/sacadas-pano/:id/corregir', exigirPermiso('produccion.corregir'), 
     detalle: {
       tanque: sp.tanque_nombre, pano: sp.pano_numero, motivo,
       antes: { alAlmacen: antes.alAlmacen, producidas: antes.producidas },
-      ahora: { resultado: como.resultado, destino: como.destino,
+      ahora: { resultado: como.resultado,
                alAlmacen: despues.alAlmacen, producidas: despues.producidas },
       conteosCorregidos: conteos.length
     }
@@ -881,14 +869,13 @@ router.get('/hoy', verProduccion, (req, res) => {
   // La mezcla del día en una sola pasada: cuántas de cada estado, y
   // cuántas cáscaras se guardaron en vez de irse a los condensadores.
   const cuenta = bd.prepare(`
-    SELECT ${calidad.columnasMezcla('sm')},
-           ${calidad.columnaGuardadas('sm')} AS guardadas
+    SELECT ${calidad.columnasMezcla('sm')}
       FROM sacadas_moldes sm
       JOIN sacadas s ON s.id = sm.sacada_id
      WHERE s.fecha >= ?
   `).get(desde);
 
-  const mezcla = calidad.resumir(cuenta, cuenta.guardadas);
+  const mezcla = calidad.resumir(cuenta);
   const marquetas = mezcla.alAlmacen;
   const merma = mezcla.merma;
 

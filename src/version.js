@@ -17,9 +17,27 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '6.4';
+const VERSION_ACTUAL = '6.5';
 
 const VERSIONES = [
+  {
+    numero: '6.5',
+    nombre: 'Los estados del hielo, como son',
+    fecha: '2026-09-05',
+    resumen:
+      'Ocho estados y ninguna pregunta de destino: o se vende, o se botó. '
+      + 'Y las horas de congelación se cambian en configuración, que en mayo '
+      + 'no son las de enero.',
+    cambios: [
+      { tipo: 'importante', texto: 'HUECA Y CÁSCARA SON LO MISMO, y son merma. Se juntaron en un solo estado: «hueca o cáscara», menos del 40%. Cuando sale así se botó, y no cuenta como existencia, vaya a donde vaya.' },
+      { tipo: 'importante', texto: 'SE FUE LA PREGUNTA DEL DESTINO. Ya no hay que decir si el hielo se fue a los condensadores, al cuarto frío o a la basura. Era una pregunta de más de pie y con las manos mojadas, y de ella dependía si el conteo cuadraba. Ahora la regla es una: o es de las cuatro que se venden, o se botó.' },
+      { tipo: 'nuevo', texto: 'DONDE DECÍA «NORMAL» AHORA SE PREGUNTA EL PORCENTAJE: del 80 al 90%, del 60 al 80%, o del 40 al 60%. Del 90 para arriba ya es 100% sellada. Las cuatro se venden igual; el porcentaje es lo que avisa que el frío se está corriendo.' },
+      { tipo: 'mejora', texto: 'SE QUITARON «un poco hueca» y «se rompió». Lo que se rompe se anota como «Otro» y se escribe qué pasó, que es lo que de verdad sirve para darle de baja a esa marqueta.' },
+      { tipo: 'nuevo', texto: 'CUÁNTO TARDA EN CONGELAR, EN CONFIGURACIÓN. Arriba de la lista de tanques, un solo número para toda la fábrica: en enero y febrero baja, en mayo sube de 48. De fábrica son 48 horas. Al guardarlo se les pone a todos los tanques.' },
+      { tipo: 'mejora', texto: 'La merma del día ya es un número visible —«6 se botaron»— en el panel, en el corte y en Los números. Antes quedaba escondida detrás del destino.' },
+      { tipo: 'importante', texto: 'LO QUE YA ESTABA CAPTURADO se traduce con tus propias definiciones: normal → 80 al 90%, un poco hueca → 60 al 80%, cáscara → hueca, y «se rompió» → otro con su nota.' }
+    ]
+  },
   {
     numero: '6.4',
     nombre: 'Los de siempre y los de una vez',

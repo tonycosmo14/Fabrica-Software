@@ -139,16 +139,16 @@ test('la producción cuenta moldes, y separa los que salieron mal', async () => 
   await llamar(`/api/produccion/panos/${pano.id}/sacar`, {
     method: 'POST',
     cuerpo: { tipoAgua: 'purificada',
-              resultados: [{ moldeId: moldes[0].id, resultado: 'merma' }] } });
+              resultados: [{ moldeId: moldes[0].id, resultado: 'aguada' }] } });
 
   const p = (await hoy()).produccion;
   assert.equal(p.alAlmacen, 5);
-  assert.equal(p.producidas, 5);
-  assert.equal(p.rotas, 1);
+  assert.equal(p.producidas, 5, 'de la aguada no salió marqueta');
+  assert.equal(p.merma, 1);
   assert.equal(p.salieron, 6);
-  assert.equal(p.normal, 5, 'sin decir nada, el hielo sale normal');
+  assert.equal(p.c80, 5, 'sin decir nada, el hielo sale del 80 al 90%');
   assert.equal(p.porCientoSinQueja, 100,
-    'cinco normales de cinco producidas: nadie se queja de ninguna');
+    'cinco del 80 al 90% de cinco producidas: nadie se queja de ninguna');
 });
 
 test('los paños fijados en la puesta en marcha no son producción', async () => {

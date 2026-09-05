@@ -55,14 +55,14 @@ test('un paño normal, contado, y el corte firmado con su faltante', async () =>
 
   const pano = await elQueToca();
   const r = await llamar(`/api/produccion/panos/${pano.id}/sacar`, {
-    method: 'POST', cuerpo: { tipoAgua: 'purificada', calidad: 'normal' }
+    method: 'POST', cuerpo: { tipoAgua: 'purificada', calidad: 'c80' }
   });
   assert.equal(r.estado, 201);
   assert.equal(r.json.datos.marquetas, 6);
   sacadaId = bd.prepare(
     'SELECT id FROM sacadas_pano WHERE pano_id = ? ORDER BY iniciada_en DESC LIMIT 1').get(pano.id).id;
 
-  // Se cuenta el cuarto frío y no hay NADA: las seis "normales" en
+  // Se cuenta el cuarto frío y no hay NADA: las seis del 80 al 90% en
   // realidad eran agua. El corte sale seis marquetas corto.
   const caja = (await llamar("/api/caja")).json.datos.abierta.caja;
   const c = await llamar('/api/existencia/conteos', {
@@ -79,7 +79,7 @@ test('un paño normal, contado, y el corte firmado con su faltante', async () =>
 
 test('corregir cómo salió la sacada vuelve a sacar el cuadre del corte solo', async () => {
   const r = await llamar(`/api/produccion/sacadas-pano/${sacadaId}/corregir`, {
-    method: 'POST', cuerpo: { calidad: 'aguada', motivo: 'Era agua, se marcó normal por error' }
+    method: 'POST', cuerpo: { calidad: 'aguada', motivo: 'Era agua, se marcó al 80% por error' }
   });
   assert.equal(r.estado, 200, JSON.stringify(r.json));
   assert.equal(r.json.datos.antes.alAlmacen, 6);
@@ -111,19 +111,19 @@ test('corregir cómo salió la sacada vuelve a sacar el cuadre del corte solo', 
 
 test('corregir dos veces conserva lo ORIGINAL, no lo de la corrección anterior', async () => {
   const r = await llamar(`/api/produccion/sacadas-pano/${sacadaId}/corregir`, {
-    method: 'POST', cuerpo: { calidad: 'hueca', destino: 'almacen', motivo: 'Al final sí hubo hielo' }
+    method: 'POST', cuerpo: { calidad: 'c40', motivo: 'Al final sí hubo hielo' }
   });
   assert.equal(r.estado, 200);
   const conteo = bd.prepare('SELECT * FROM conteos WHERE caja_id = ?').get(corteHielo.caja.id);
   assert.equal(JSON.parse(conteo.original).producido, 96, 'lo del papel firmado');
-  assert.equal(conteo.producido, 96, 'ahora vuelve a contar: se guardó al cuarto frío');
+  assert.equal(conteo.producido, 96, 'ahora vuelve a contar: al 40-60% sí se vende');
   assert.equal(conteo.correcciones, 2);
   assert.equal(bd.prepare('SELECT correcciones FROM sacadas_pano WHERE id = ?').get(sacadaId).correcciones, 2);
 });
 
 test('corregir sin motivo o sin decir cómo salió se rechaza', async () => {
   let r = await llamar(`/api/produccion/sacadas-pano/${sacadaId}/corregir`, {
-    method: 'POST', cuerpo: { calidad: 'normal' }
+    method: 'POST', cuerpo: { calidad: 'c80' }
   });
   assert.equal(r.estado, 400);
   r = await llamar(`/api/produccion/sacadas-pano/${sacadaId}/corregir`, {
@@ -139,7 +139,7 @@ test('corregir sin motivo o sin decir cómo salió se rechaza', async () => {
 test('el cajero no corrige sacadas', async () => {
   await entrarPorNombre('Rosa', '4444');
   const r = await llamar(`/api/produccion/sacadas-pano/${sacadaId}/corregir`, {
-    method: 'POST', cuerpo: { calidad: 'normal', motivo: 'yo sé' }
+    method: 'POST', cuerpo: { calidad: 'c80', motivo: 'yo sé' }
   });
   assert.equal(r.estado, 403);
   await entrarAdmin();

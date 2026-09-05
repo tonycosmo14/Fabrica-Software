@@ -45,7 +45,7 @@ const TEMAS = [
   {
     id: 'produccion',
     titulo: 'Producción de hielo: sacar el hielo de los tanques',
-    busca: 'producción tanque paño canasta molde sacar rellenar rotación intercalado merma agua purificada potable congelación quién lo sacó otro eventual nombre calidad sellada normal hueca cáscara aguada salada contaminada salmuera condensadores destino cómo salió el hielo mezcla ojo ficha historia última vez F2 atajo panel canastas pendientes a medias turno canasta por canasta terminar',
+    busca: 'producción tanque paño canasta molde sacar rellenar rotación intercalado merma agua purificada potable congelación horas cuánto tarda en congelar 48 quién lo sacó otro eventual nombre calidad sellada 80 90 60 40 por ciento porcentaje hueca cáscara aguada ahogada salada contaminada salmuera se botó cómo salió el hielo mezcla ojo ficha historia última vez F2 atajo panel canastas pendientes a medias turno canasta por canasta terminar',
     cuerpo: `
       <h4>Cómo está armado un tanque</h4>
       <p>Un <b>tanque</b> tiene varios <b>paños</b>. Cada paño tiene
@@ -99,43 +99,45 @@ const TEMAS = [
       día siguiente.</p>
 
       <h4>Cómo salió el hielo</h4>
-      <p>Antes el sistema solo sabía tres cosas —salió, se rompió, salió
-      hueca— y la fábrica distingue cinco. Ahora al sacar un paño se dice
-      <b>cómo salió</b>, con un toque:</p>
-      <p>Los seis primeros hablan del <b>frío de esa noche</b>, de mejor a peor:</p>
+      <p>Al sacar un paño se dice <b>cómo salió</b>, con un toque. Son ocho
+      estados, y la regla es una sola: <b>o se vende, o se botó</b>. No hay
+      ninguna pregunta más.</p>
+
+      <p><b>Las cuatro que se venden</b> hablan del frío de esa noche, de
+      mejor a peor:</p>
       <ul>
-        <li><b>100% selladas.</b> Bien congeladas, el centro cerrado a tope.
-        Salen cuando llueve mucho, cuando no hay venta, o cuando las máquinas
-        están congelando muy bien.</li>
-        <li><b>Normales.</b> Casi selladas, o les falta poquito. Es lo de
-        siempre: con estas no hay quejas. <b>Es lo que el sistema pone solo</b>,
-        así que el día normal no cuesta ni un toque de más.</li>
-        <li><b>Un poco huecas.</b> Del 70% al 60% selladas. Con una noche más
-        hubieran quedado mejor. Alguna gente se queja.</li>
-        <li><b>Huecas.</b> El centro casi atraviesa la marqueta, y algunas sí
-        lo hacen. <b>Es merma</b>: no cuenta como existencia. El sistema
-        pregunta a dónde fue, y por omisión va a los condensadores; solo si
-        se dice «al cuarto frío» entra a la existencia.</li>
-        <li><b>Cáscaras.</b> 30% de congelación o menos: el centro atraviesa y
-        los laterales están delgados. Merma, igual que la hueca.</li>
-        <li><b>Aguadas o ahogadas.</b> No congeló nada, o se ahogó: sale agua
-        del molde. No es "muy hueca", es que <b>no hay marqueta</b>. Por eso
-        una aguada no cuenta ni siquiera para el costo, ni se resta de
-        nada: no se puede repartir el gasto entre marquetas que no
-        existen.</li>
+        <li><b>100% sellada.</b> Bien congelada, el centro cerrado a tope.
+        Sale cuando llueve mucho, cuando no hay venta, o cuando las máquinas
+        están congelando muy bien. Del 90% para arriba ya es esto.</li>
+        <li><b>Del 80 al 90%.</b> Casi sellada, le falta poquito. Es lo de
+        siempre: con estas no hay quejas. <b>Es lo que el sistema pone
+        solo</b>, así que el día normal no cuesta ni un toque de más.</li>
+        <li><b>Del 60 al 80%.</b> Con una noche más hubieran quedado mejor.
+        Alguna gente se queja.</li>
+        <li><b>Del 40 al 60%.</b> Se vende, pero se nota. Si varios días
+        seguidos sale así, algo está pasando con el frío.</li>
       </ul>
 
-      <p>Y dos que <b>no son de frío</b>:</p>
+      <p><b>Las cuatro que se botan</b> no entran al cuarto frío. Da igual a
+      dónde vayan después —al condensador, a la basura, a enfriar algo—: para
+      la existencia se botaron, y por eso <b>ya no se pregunta</b>.</p>
       <ul>
+        <li><b>Hueca o cáscara.</b> Menos del 40%: el centro atraviesa la
+        marqueta y los laterales están delgados. Son la misma cosa y se
+        anotan igual.</li>
         <li><b>Salada o contaminada.</b> Se rompió el molde y le entró
-        salmuera, se oxidó el fondo, o le cayó algo. <b>Puede estar
-        perfectamente congelada</b>: el problema no es el frío, es el molde.
-        No se toma; a veces se vende a quien solo quiere enfriar y no la va
-        a consumir.</li>
-        <li><b>Otra cosa.</b> Para lo que no está en la lista. Pide
-        <b>escribir qué pasó</b>, y sin eso no se guarda: un "otro" en blanco
-        no dice nada dentro de un año. Si resulta que ese "otro" se repite
-        treinta veces, ahí está la razón para volverlo un estado propio.</li>
+        salmuera, se oxidó el fondo, o le cayó algo. Puede estar
+        perfectamente congelada: el problema no es el frío, es el molde. No
+        se vende.</li>
+        <li><b>Aguada o ahogada.</b> No congeló nada, o se ahogó: sale agua
+        del molde. No es "muy hueca", es que <b>no hay marqueta</b>. Por eso
+        una aguada no cuenta ni siquiera para el costo: no se puede repartir
+        el gasto entre marquetas que no existen.</li>
+        <li><b>Otro.</b> Para darle de baja esa marqueta por lo que sea que
+        le pasó. Pide <b>escribir qué fue</b>, y sin eso no se guarda: un
+        "otro" en blanco no dice nada dentro de un año. Si ese "otro" se
+        repite treinta veces, ahí está la razón para volverlo un estado
+        propio.</li>
       </ul>
 
       <p>Eso vale para <b>todo el paño</b>, que es lo que pasa de verdad: la
@@ -143,35 +145,33 @@ const TEMAS = [
       salió distinto del resto, se toca ese molde y se elige lo suyo. Los que
       no se tocan van como el paño.</p>
 
-      <h4>Qué se hace con ese hielo</h4>
-      <p>Cuando el hielo sale <b>hueco</b>, en <b>cáscaras</b>,
-      <b>contaminado</b> o marcado como <b>otra cosa</b>, el sistema pregunta
-      qué se hizo con él, porque no todo acaba igual:</p>
-      <ul>
-        <li><b>A los condensadores</b> — lo normal. No se tiran del todo:
-        trabajan enfriando.</li>
-        <li><b>Al cuarto frío</b> — cuando hay demanda y se van a vender más
-        baratas. Entran a la existencia como una marqueta más.</li>
-        <li><b>Se botó</b> — no se aprovechó de ninguna manera.</li>
-      </ul>
-      <p class="ayuda-tip"><b>Lo que cuenta como existencia</b>, en corto:
-      las <b>selladas</b>, las <b>normales</b> y las <b>un poco huecas</b>.
-      Todo lo demás —hueca, cáscara, salada o contaminada, aguada— es merma
-      y <b>no entra al cuarto frío</b>, salvo que al sacarla se diga «al
-      cuarto frío» a propósito.</p>
-      <p class="ayuda-tip">Una cáscara <b>costó lo mismo</b> que una sellada:
+      <p class="ayuda-tip"><b>Lo que cuenta como existencia</b>, en corto: la
+      <b>sellada</b> y las <b>tres de porcentaje</b>. Todo lo demás es merma
+      y no entra al cuarto frío. Antes había que decir además si la cáscara
+      se iba al condensador o al cuarto frío, y de esa respuesta dependía si
+      contaba: era una pregunta de más de pie y con las manos mojadas, y una
+      forma de que el conteo no cuadrara. Se fue.</p>
+      <p class="ayuda-tip">Una hueca <b>costó lo mismo</b> que una sellada:
       la misma agua, la misma luz, el mismo molde. Por eso cuenta para el
-      costo por marqueta aunque se haya ido al condensador. Lo que <b>no</b>
-      hace es contar como hielo del cuarto frío: si contara, el conteo no
-      cuadraría nunca y andarías buscando marquetas que no existen. La
-      <b>aguada</b> es el único caso que no pregunta destino: de ahí no salió
-      nada que mandar a ningún lado.</p>
+      <b>costo por marqueta</b> aunque se haya botado. Lo que no hace es
+      contar como hielo del cuarto frío. La <b>aguada</b> es la única que no
+      cuenta ni para el costo: de ahí no salió marqueta.</p>
+
+      <h4>Cuánto tarda en congelar</h4>
+      <p>En <b>Configurar tanques</b>, arriba de la lista, está
+      <b>cuánto tarda en congelar</b> la fábrica. De ese número salen el
+      reloj de cada canasta y el aviso de que un paño ya está listo.</p>
+      <p>Se cambia con la temporada, que es como pasa de verdad: en enero y
+      febrero el hielo se congela más rápido; en mayo se va arriba de las 48
+      horas. <b>De fábrica son 48.</b> Al guardarlo se les pone a todos los
+      tanques de un jalón; si uno se porta distinto, en su ficha se le puede
+      dejar el suyo.</p>
 
       <h4>Por qué importa anotarlo</h4>
-      <p>Una marqueta hueca <b>se cobra igual</b> que una sellada, así que en
-      el dinero no se nota. Se nota en el mostrador, en las quejas — y esa
+      <p>Una marqueta al 60% <b>se cobra igual</b> que una sellada, así que
+      en el dinero no se nota. Se nota en el mostrador, en las quejas — y esa
       información se perdía el mismo día. Ahora queda escrita, y cuando la
-      mezcla se corre hacia lo hueco varios días seguidos, algo está pasando
+      mezcla se corre hacia abajo varios días seguidos, algo está pasando
       (el amoniaco, un compresor, el calor de mayo) y se ve <b>antes</b> de
       que una máquina se pare.</p>
 
@@ -3110,8 +3110,8 @@ DEBERIA HABER ..........................  $5,500
       oscuro (mal), para que se lea igual en la impresora en blanco y
       negro.</p>
       <p>Lo producido y lo vendido <b>no tienen por qué cuadrar</b>: entre
-      los dos está lo que quedó en el cuarto frío, lo que se derritió y las
-      cáscaras que se fueron a los condensadores.</p>
+      los dos está lo que quedó en el cuarto frío, lo que se derritió y lo
+      que se botó por salir hueco o salado.</p>
 
       <h4>Imprimirla o guardarla en PDF</h4>
       <p>El botón de arriba la saca en hoja carta como se ve: sin el menú,

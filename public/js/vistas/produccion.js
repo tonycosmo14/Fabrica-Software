@@ -90,11 +90,13 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
   // en cuando, sin horario: aquí solo se enseña cuándo fue y cuánto dio.
   let ultimaSalmuera = {};
 
-  // Los estados del hielo y sus destinos los manda el servidor con el
-  // estado del tanque: aquí no hay una segunda copia de los nombres que
-  // pueda quedarse vieja. Se guardan al pintar y los usa todo el archivo.
+  // Los estados del hielo los manda el servidor con el estado del tanque:
+  // aquí no hay una segunda copia de los nombres que pueda quedarse vieja.
+  // Se guardan al pintar y los usa todo el archivo.
   let CALIDADES = [];
-  let DESTINOS = [];
+  // Cuál es la de por omisión también la manda el servidor: si mañana
+  // cambia la escala, aquí no hay un nombre viejo que corregir.
+  let POR_OMISION = 'c80';
 
   // F2 SACA LOS NÚMEROS. Es lo que más veces al día se hace desde esta
   // pantalla, y con el operario enfrente esperando, un atajo ahorra el viaje
@@ -133,7 +135,7 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
     if (!datos.tanques.length) return sinTanques();
 
     CALIDADES = datos.calidades || [];
-    DESTINOS = datos.destinos || [];
+    POR_OMISION = datos.calidadPorOmision || POR_OMISION;
 
     const { tanques, tanque, fuera } = datos;
     tanqueActivo = tanque.id;
@@ -318,18 +320,16 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
               <span><strong>${hoy.marquetas}</strong><small>al cuarto frío</small></span>
               <span><strong>${hoy.mezcla.producidas}</strong><small>salieron</small></span>
             </div>
-            ${conAlgo.length || m.merma ? `
+            ${conAlgo.length ? `
               <div class="mezcla-barra" style="margin-top:10px">
                 ${conAlgo.map((c) => `
                   <span class="mezcla-tramo ${esc(c.clave)}" style="flex:${m[c.clave]}"
                         title="${esc(c.plural)}: ${m[c.clave]}"></span>`).join('')}
-                ${m.merma ? `<span class="mezcla-tramo merma" style="flex:${m.merma}"
-                                   title="Rotas: ${m.merma}"></span>` : ''}
               </div>
               <div class="mezcla-lista">
                 ${conAlgo.map((c) => `
                   <span class="mezcla-parte ${esc(c.clave)}">${m[c.clave]} ${esc(c.corto)}</span>`).join('')}
-                ${m.merma ? `<span class="mezcla-parte merma">${m.merma} rotas</span>` : ''}
+                ${m.merma ? `<span class="mezcla-parte merma">${m.merma} se botaron</span>` : ''}
               </div>` : '<p class="ayuda" style="margin:8px 0 0">Todavía no se ha sacado nada hoy.</p>'}
           </div>` : ''}
 
@@ -535,8 +535,7 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
     // que es lo que de verdad pasa —la fábrica congela bien o mal esa
     // noche y el paño sale parejo—, y encima las excepciones molde por
     // molde. Al revés sería pedir doce respuestas para contestar una.
-    let calidadPano = 'normal';
-    let destinoPano = 'condensadores';
+    let calidadPano = POR_OMISION;
     let notaPano = '';
     const marcas = new Map();          // moldeId -> { resultado, destino, nota }
 
@@ -571,7 +570,6 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
     /** Lo que le toca a un molde: su marca propia, o la del paño. */
     const deMolde = (id) => marcas.get(id) || {
       resultado: calidadPano,
-      destino: pideDestino(calidadPano) ? destinoPano : null,
       nota: notaPano || null
     };
 
@@ -584,7 +582,6 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
           const r = deMolde(m.id);
           cuenta[r.resultado] = (cuenta[r.resultado] || 0) + 1;
           if (esVendible(r.resultado)) alAlmacen++;
-          else if (pideDestino(r.resultado) && r.destino === 'almacen') alAlmacen++;
         }
       }
       return { cuenta, alAlmacen };
@@ -593,7 +590,6 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
     const dibujar = () => {
       const { cuenta, alAlmacen } = contar();
       const elegida = CALIDADES.find((c) => c.clave === calidadPano);
-      const destino = DESTINOS.find((d) => d.clave === destinoPano);
       const marcadas = porSacar.filter((c) => elegidas.has(c.id));
       const totalMoldes = marcadas.reduce((n, c) => n + c.moldes.length, 0);
       const quedarian = porSacar.length - marcadas.length;
@@ -643,14 +639,6 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
                   <p class="nota-escrita">✎ ${esc(notaPano)}
                     <button class="enlace" id="editar-nota">cambiar</button></p>` : ''}
 
-                ${pideDestino(calidadPano) ? `
-                  <label style="margin-top:12px">¿Qué se hizo con ese hielo?</label>
-                  <div class="fila-botones">
-                    ${DESTINOS.map((d) => `
-                      <button class="${d.clave === destinoPano ? '' : 'secundario'}"
-                              data-destino="${esc(d.clave)}">${d.icono} ${esc(d.nombre)}</button>`).join('')}
-                  </div>
-                  <p class="ayuda">${esc(destino ? destino.nota : '')}</p>` : ''}
               </div>
             </div>` : ''}
 
@@ -684,7 +672,7 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
                   </div>
                   <div class="moldes-detalle">
                     ${c.moldes.map((m) => `
-                      <span class="molde-boton ${esc(m.ultimoResultado || 'normal')} sin-tocar"
+                      <span class="molde-boton ${esc(m.ultimoResultado || POR_OMISION)} sin-tocar"
                             title="${esc(nombreLargo({ resultado: m.ultimoResultado }))}">
                         <span class="molde-num">${m.numero}</span>
                         <span class="molde-estado">${esc(etiqueta({ resultado: m.ultimoResultado }))}</span>
@@ -753,7 +741,7 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
                   ${CALIDADES.filter((c) => cuenta[c.clave])
                       .map((c) => `<span class="mezcla-parte ${esc(c.clave)}"
                                          >${cuenta[c.clave]} ${esc(c.corto)}</span>`).join('')}
-                  ${cuenta.merma ? `<span class="mezcla-parte merma">${cuenta.merma} rotas</span>` : ''}
+
                 </div>
               </div>
               <div class="cierre-botones">
@@ -858,9 +846,6 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
         const texto = await pedirNota(notaPano);
         if (texto) { notaPano = texto; dibujar(); }
       };
-      pantalla.querySelectorAll('[data-destino]').forEach((b) => {
-        b.onclick = () => { destinoPano = b.dataset.destino; dibujar(); };
-      });
 
       pantalla.querySelectorAll('[data-canasta]').forEach((casilla) => {
         casilla.onchange = () => {
@@ -880,7 +865,6 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
             titulo: `Molde ${numero}`,
             texto: 'Cómo salió ESTE molde, si salió distinto del resto del paño.',
             conIgual: marcas.has(id),
-            destinoSugerido: destinoPano
           });
           if (elegido === undefined) return;         // se canceló
           if (elegido === null) marcas.delete(id);   // "como el resto"
@@ -930,16 +914,14 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
 
       try {
         const r = await api.enviar(`/produccion/panos/${pano.id}/sacar`, {
-          tipoAgua: agua, calidad: calidadPano, destino: destinoPano,
+          tipoAgua: agua, calidad: calidadPano,
           nota: notaPano || null, canastas: [...elegidas],
           resultados, ejecutorId: quienId || null,
           ejecutorNombre: quienNombre || null, vale, ...opciones, autorizacion
         });
-        const fuera = r.mezcla.fueraDelAlmacen;
         avisar(
           `Paño ${pano.numero}: ${r.marquetas} al cuarto frío` +
-          (fuera ? ` · ${fuera} no entraron` : '') +
-          (r.merma ? ` · ${r.merma} rotas` : '') +
+          (r.merma ? ` · ${r.merma} se botaron` : '') +
           (r.faltan ? ` · quedan ${r.faltan} canastas pendientes` : ''), 'bien');
         await pintar();
       } catch (e) {
@@ -976,7 +958,7 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
 
       try {
         const r = await api.enviar(`/produccion/sacadas-pano/${sacadaId}/corregir`, {
-          calidad: como.resultado, destino: como.destino, nota: como.nota, motivo
+          calidad: como.resultado, nota: como.nota, motivo
         });
         const c = r.conteos?.[0];
         avisar(`Corregido: ${r.antes.alAlmacen} → ${r.despues.alAlmacen} al cuarto frío` +
@@ -1156,7 +1138,7 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
                     ${CALIDADES.filter((c) => h.mezcla[c.clave])
                       .map((c) => `<span class="mezcla-parte ${esc(c.clave)}"
                                         >${h.mezcla[c.clave]} ${esc(c.corto)}</span>`).join('')}
-                    ${h.mezcla.merma ? `<span class="mezcla-parte merma">${h.mezcla.merma} rotas</span>` : ''}
+
                     ${h.corregidaEn ? '<small class="ayuda">✏️ corregida</small>' : ''}
                   </span>`}</td>
                 ${puedeCorregir ? `<td class="der">${h.anulada ? '' :
@@ -1181,7 +1163,6 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
   // ==========================================================
 
   const deCatalogo = (clave) => CALIDADES.find((c) => c.clave === clave);
-  const pideDestino = (clave) => Boolean(deCatalogo(clave)?.pideDestino);
   const pideNota = (clave) => Boolean(deCatalogo(clave)?.pideNota);
   const esVendible = (clave) => Boolean(deCatalogo(clave)?.vendible);
 
@@ -1190,19 +1171,11 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
    * 62 píxeles, así que son una o dos palabras; el nombre entero sale en el
    * título al pasar el ratón.
    */
-  const etiqueta = (r) =>
-    (r.resultado === 'merma' ? 'rota' : deCatalogo(r.resultado)?.boton) || r.resultado;
+  const etiqueta = (r) => deCatalogo(r.resultado)?.boton || r.resultado;
 
-  /** El nombre completo, con el destino y la nota cuando los hay. */
+  /** El nombre completo, con la nota cuando la hay. */
   function nombreLargo(r) {
-    if (r.resultado === 'merma') return 'Se rompió';
-    const c = deCatalogo(r.resultado);
-    let texto = c?.nombre || r.resultado;
-    if (c?.pideDestino && r.destino) {
-      const d = DESTINOS.find((x) => x.clave === r.destino);
-      if (d) texto += ` — ${d.nombre.toLowerCase()}`;
-    }
-    return texto;
+    return deCatalogo(r.resultado)?.nombre || r.resultado;
   }
 
   /** Pide el texto de "Otro": sin él, ese estado no dice nada. */
@@ -1222,9 +1195,9 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
    * la mayoría se contesta con un solo toque y solo tres siguen preguntando.
    *
    * Devuelve `undefined` si se canceló, `null` si se eligió "como el resto
-   * del paño", o { resultado, destino, nota }.
+   * del paño", o { resultado, nota }.
    */
-  async function preguntarComoSalio({ titulo, texto, conIgual, destinoSugerido }) {
+  async function preguntarComoSalio({ titulo, texto, conIgual }) {
     const opciones = [];
     if (conIgual) {
       opciones.push({ valor: 'igual', texto: '↩ Como el resto del paño',
@@ -1233,26 +1206,9 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
     for (const c of CALIDADES) {
       opciones.push({ valor: c.clave, texto: `${c.icono} ${c.nombre}`, detalle: c.nota });
     }
-    opciones.push({ valor: 'merma', texto: '💔 Se rompió',
-                    detalle: 'No dio nada aprovechable. No es una calidad: es una pérdida.',
-                    peligro: true });
-
     const elegido = await menu({ titulo, texto, opciones });
     if (!elegido) return undefined;
     if (elegido === 'igual') return null;
-
-    let destino = null;
-    if (pideDestino(elegido)) {
-      const sug = DESTINOS.find((d) => d.clave === destinoSugerido);
-      destino = await menu({
-        titulo: '¿Qué se hizo con ese hielo?',
-        texto: sug ? `El resto del paño se fue ${sug.nombre.toLowerCase()}.` : '',
-        opciones: DESTINOS.map((d) => ({
-          valor: d.clave, texto: `${d.icono} ${d.nombre}`, detalle: d.nota
-        }))
-      });
-      if (!destino) return undefined;
-    }
 
     let nota = null;
     if (pideNota(elegido)) {
@@ -1260,7 +1216,7 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
       if (!nota) return undefined;
     }
 
-    return { resultado: elegido, destino, nota };
+    return { resultado: elegido, nota };
   }
 
   /**
@@ -1511,11 +1467,11 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
     const cal = r.calidades || [];
     const m = r.mezcla || {};
     const conAlgo = cal.filter((c) => m[c.clave] > 0);
-    if (!conAlgo.length && !m.merma) return '';
+    if (!conAlgo.length) return '';
 
-    const total = conAlgo.reduce((n, c) => n + m[c.clave], 0) + (m.merma || 0);
+    const total = conAlgo.reduce((n, c) => n + m[c.clave], 0);
     const porCiento = (n) => Math.round((n / total) * 100);
-    const fuera = m.fueraDelAlmacen || 0;
+    const fuera = m.merma || 0;
 
     return `
       <h3>Cómo salió el hielo</h3>
@@ -1525,8 +1481,6 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
             <span class="mezcla-tramo ${esc(c.clave)}" style="flex:${m[c.clave]}"
                   title="${esc(c.plural)}: ${m[c.clave]} de ${total}"
               >${porCiento(m[c.clave]) >= 8 ? porCiento(m[c.clave]) + '%' : ''}</span>`).join('')}
-          ${m.merma ? `<span class="mezcla-tramo merma" style="flex:${m.merma}"
-                             title="Rotas: ${m.merma}"></span>` : ''}
         </div>
 
         <div class="mezcla-lista">
@@ -1534,16 +1488,14 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
             <span class="mezcla-parte ${esc(c.clave)}">
               ${m[c.clave]} ${esc(c.corto)}
             </span>`).join('')}
-          ${m.merma ? `<span class="mezcla-parte merma">${m.merma} rotas</span>` : ''}
         </div>
 
         ${fuera > 0 ? `
           <p class="ayuda" style="margin:10px 0 0">
-            ${fuera} ${fuera === 1 ? 'marqueta salió del molde pero no entró'
-                                   : 'marquetas salieron del molde pero no entraron'} al
-            cuarto frío: ${fuera === 1 ? 'se fue' : 'se fueron'} a los condensadores o
-            ${fuera === 1 ? 'se botó' : 'se botaron'}. Contaron para el costo —gastaron la
-            misma agua y la misma luz— pero no hay que ir a buscarlas al cuarto frío.
+            ${fuera} ${fuera === 1 ? 'marqueta se botó' : 'marquetas se botaron'}:
+            ${fuera === 1 ? 'no entró' : 'no entraron'} al cuarto frío. Contaron para el
+            costo —gastaron la misma agua y la misma luz— pero no hay que ir a
+            buscarlas.
           </p>` : ''}
       </div>`;
   }
@@ -1561,7 +1513,7 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
       <div class="resumen-fabrica">
         <div><strong>${r.marquetas}</strong><small>al cuarto frío</small></div>
         <div><strong>${r.mezcla.producidas}</strong><small>salieron del molde</small></div>
-        <div><strong>${r.merma}</strong><small>rotas</small></div>
+        <div><strong>${r.merma}</strong><small>se botaron</small></div>
         <div><strong>${r.fuera}</strong><small>canastas fuera</small></div>
       </div>
 

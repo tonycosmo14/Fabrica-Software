@@ -1,5 +1,5 @@
 /**
- * CÓMO SALIÓ EL HIELO  (v3.1)
+ * CÓMO SALIÓ EL HIELO  (v3.1, rehecho en la v6.5)
  *
  * La única fuente de verdad de los estados del hielo. Las pantallas, los
  * tickets, las estadísticas y la existencia leen de aquí; si mañana cambia
@@ -9,29 +9,42 @@
  * salió hueca— y la fábrica distingue muchas más. La diferencia importa
  * por dos razones muy concretas:
  *
- *   · SE VENDEN AL MISMO PRECIO PERO NO SON LO MISMO. Una marqueta un poco
- *     hueca se cobra igual que una sellada, así que en el dinero no se
- *     nota; se nota en el mostrador, en las quejas. Sin anotarlo, esa
- *     información se pierde el mismo día.
+ *   · SE VENDEN AL MISMO PRECIO PERO NO SON LO MISMO. Una marqueta al 60%
+ *     se cobra igual que una sellada, así que en el dinero no se nota; se
+ *     nota en el mostrador, en las quejas. Sin anotarlo, esa información
+ *     se pierde el mismo día.
  *
- *   · ES EL AVISO TEMPRANO. Cuando la mezcla se corre hacia lo hueco varios
+ *   · ES EL AVISO TEMPRANO. Cuando la mezcla se corre hacia abajo varios
  *     días seguidos, algo está pasando —el amoniaco, un compresor, el calor
  *     de mayo— y se nota ANTES de que la máquina se pare. Un número de
  *     marquetas a secas no lo enseña: son las mismas marquetas, peores.
  *
- * DOS COSAS DISTINTAS SE ANOTAN JUNTAS, y conviene no confundirlas:
+ * ============================================================
+ * LA ESCALA, COMO LA DICTÓ EL DUEÑO  (v6.5)
+ * ============================================================
  *
- *   CÓMO CONGELÓ    sellada · normal · un poco hueca · hueca · cáscara ·
- *                   aguada. Es un solo carril, de mejor a peor, y habla de
- *                   la fábrica: del frío de esa noche.
- *   QUÉ LE PASÓ     contaminada (se rompió el molde, le entró salmuera, se
- *                   oxidó el fondo, le cayó algo) y "otro". Eso no habla de
- *                   la fábrica: habla de UN MOLDE, y puede pasarle a hielo
- *                   perfectamente congelado.
+ * "Hueca y cáscara son lo mismo, y cuando salen así no se cuentan: damos
+ *  por entendido que se botaron, sea a donde sea que vayan. Salada y
+ *  contaminada igual: es merma. Aguada o ahogada lo mismo. Quitamos el
+ *  estado un poco hueco. Se queda 100% sellada, y donde decía normal que
+ *  pregunte mejor el estado de congelación."
  *
- * Van en la misma lista porque en la grúa se contesta una sola pregunta —
- * "¿cómo salió?"— y partirla en dos haría más lento justo el momento en
- * que hay menos tiempo. Pero por dentro se tratan distinto: mira `esFallo`.
+ * De ahí salen dos grupos y ninguna pregunta más:
+ *
+ *   LO QUE SE VENDE    100% sellada · del 80 al 90% · del 60 al 80% ·
+ *                      del 40 al 60%. Es un solo carril, de mejor a peor,
+ *                      y habla de la fábrica: del frío de esa noche.
+ *   LO QUE SE BOTA     hueca o cáscara (menos del 40%), salada o
+ *                      contaminada, aguada o ahogada, y "otro" con lo que
+ *                      haya pasado escrito. Nada de esto entra al cuarto
+ *                      frío.
+ *
+ * YA NO SE PREGUNTA A DÓNDE FUE. Antes, de una cáscara había que decir si
+ * se iba a los condensadores, al cuarto frío o a la basura, y de esa
+ * respuesta dependía si contaba como existencia. Era una pregunta de más
+ * en el peor momento —de pie, con las manos mojadas— y una forma de que el
+ * conteo no cuadrara si alguien contestaba de prisa. Ahora la regla es una
+ * sola: si no es de las cuatro primeras, no está en el cuarto frío.
  *
  * EL ORDEN DEL ARREGLO ES EL ORDEN REAL, de más a menos aprovechable.
  * Varias pantallas dependen de eso para dibujar la mezcla: no se reordena.
@@ -49,122 +62,96 @@ const CALIDADES = [
     corto: 'selladas', boton: 'sellada', icono: '🧊',
     nota: 'Bien congelada, el centro cerrado a tope. Sale cuando llueve ' +
           'mucho, cuando no hay venta, o cuando las máquinas están ' +
-          'congelando muy bien.'
+          'congelando muy bien. Del 90% para arriba ya es esto.'
   },
   {
-    clave: 'normal', nombre: 'Normal', plural: 'Normales',
-    corto: 'normales', boton: 'normal', icono: '✓',
-    nota: 'Casi selladas, o les falta poquito. Es lo de siempre: con estas ' +
-          'no hay quejas.'
+    clave: 'c80', nombre: 'Del 80 al 90% congelada', plural: 'Del 80 al 90%',
+    corto: 'del 80 al 90%', boton: '80-90%', icono: '◕',
+    nota: 'Casi sellada, le falta poquito. Es lo de siempre: con estas no ' +
+          'hay quejas.'
   },
   {
-    clave: 'poco_hueca', nombre: 'Un poco hueca', plural: 'Un poco huecas',
-    corto: 'poco huecas', boton: 'poco hueca', icono: '◔',
-    nota: 'Del 70% al 60% selladas. Con una noche más hubieran quedado ' +
-          'mejor. Alguna gente se queja.'
+    clave: 'c60', nombre: 'Del 60 al 80% congelada', plural: 'Del 60 al 80%',
+    corto: 'del 60 al 80%', boton: '60-80%', icono: '◑',
+    nota: 'Con una noche más hubieran quedado mejor. Alguna gente se queja.'
   },
   {
-    clave: 'hueca', nombre: 'Hueca', plural: 'Huecas',
-    corto: 'huecas', boton: 'hueca', icono: '◯',
-    nota: 'El centro casi atraviesa la marqueta, y algunas sí lo hacen. Es ' +
-          'merma: no cuenta como existencia, salvo que se guarde a propósito.'
+    clave: 'c40', nombre: 'Del 40 al 60% congelada', plural: 'Del 40 al 60%',
+    corto: 'del 40 al 60%', boton: '40-60%', icono: '◔',
+    nota: 'Se vende, pero se nota. Si varios días seguidos sale así, algo ' +
+          'está pasando con el frío.'
   },
   {
-    clave: 'cascara', nombre: 'Cáscara', plural: 'Cáscaras',
-    corto: 'cáscaras', boton: 'cáscara', icono: '⚠',
-    nota: '30% de congelación o menos: el centro atraviesa y los laterales ' +
-          'están delgados. Por lo general no se venden.'
+    clave: 'hueca', nombre: 'Hueca o cáscara', plural: 'Huecas o cáscaras',
+    corto: 'huecas', boton: 'hueca', icono: '◯', merma: true,
+    nota: 'Menos del 40%: el centro atraviesa la marqueta y los laterales ' +
+          'están delgados. No se cuenta: se botó.'
   },
   {
     clave: 'contaminada', nombre: 'Salada o contaminada', plural: 'Saladas o contaminadas',
-    corto: 'contaminadas', boton: 'salada', icono: '🧂',
+    corto: 'contaminadas', boton: 'salada', icono: '🧂', merma: true,
     nota: 'Se rompió el molde y le entró salmuera, se oxidó el fondo, o le ' +
           'cayó algo. Puede estar bien congelada: el problema no es el ' +
-          'frío. No se toma; a veces se vende a quien solo quiere enfriar.'
+          'frío. No se cuenta: se botó.'
   },
   {
     clave: 'aguada', nombre: 'Aguada o ahogada, pura agua', plural: 'Aguadas',
-    corto: 'aguadas', boton: 'aguada', icono: '💧',
+    corto: 'aguadas', boton: 'aguada', icono: '💧', merma: true,
     nota: 'No congeló nada, o se ahogó. Sale agua del molde: no hay ' +
-          'marqueta que sacar, ni que restar de nada.'
+          'marqueta que sacar.'
   },
   {
     clave: 'otro', nombre: 'Otro… (escribir qué pasó)', plural: 'Otra cosa',
-    corto: 'otra cosa', boton: 'otro', icono: '✎', pideNota: true,
-    nota: 'Para lo que no está en la lista. Hay que escribir qué pasó, y ' +
-          'eso queda guardado con el paño.'
+    corto: 'otra cosa', boton: 'otro', icono: '✎', pideNota: true, merma: true,
+    nota: 'Para darle de baja esa marqueta por lo que sea que le pasó. Hay ' +
+          'que escribir qué fue, y eso queda guardado con el paño.'
   }
 ];
 
-/** Un molde que no dio nada aprovechable. No es una calidad: es una pérdida. */
-const MERMA = 'merma';
-
 const CLAVES_CALIDAD = CALIDADES.map((c) => c.clave);
-const RESULTADOS = [...CLAVES_CALIDAD, MERMA];
-
-/** Lo que por omisión sale de un molde: lo de siempre. */
-const CALIDAD_POR_OMISION = 'normal';
 
 /**
- * NO TODO LO QUE SALE DEL MOLDE ES HIELO QUE SE PUEDA VENDER.
- *
- * Estos estados obligan a decir A DÓNDE FUE ese hielo, porque la respuesta
- * cambia de un día a otro y de ella depende que el conteo del cuarto frío
- * cuadre. Los otros no se preguntan: una marqueta entera siempre entra al
- * cuarto frío, y de una aguada no hay nada que mandar a ningún lado.
- *
- * LA HUECA ESTÁ AQUÍ DESDE LA v6.0, por el dueño: "la hueca y la cáscara
- * no se cuentan, son mermas". Antes entraba al cuarto frío como una
- * marqueta más, y el día que un paño hueco se marcaba mal, el conteo
- * salía cinco marquetas y media corto. Ahora la hueca va por omisión a
- * los condensadores, como la cáscara; si un día se guarda para venderla,
- * se dice «al cuarto frío» y entonces sí cuenta.
+ * Se llamaba RESULTADOS porque además de las calidades había un "se rompió"
+ * que no era una calidad. Ese se fue en la v6.5 —lo que se rompe se anota
+ * como "otro" con su explicación— así que hoy resultados y calidades son
+ * exactamente lo mismo. El nombre se queda porque es el de la columna.
  */
-const PIDEN_DESTINO = ['hueca', 'cascara', 'contaminada', 'otro'];
+const RESULTADOS = CLAVES_CALIDAD;
 
-/** Los que no dejaron ni una marqueta: el molde se abrió para nada. */
-const SIN_HIELO = ['aguada', MERMA];
+/** Lo que por omisión sale de un molde: lo de siempre. */
+const CALIDAD_POR_OMISION = 'c80';
 
-/** Los que se venden sin preguntar nada. */
-const VENDIBLES = CLAVES_CALIDAD.filter(
-  (c) => !PIDEN_DESTINO.includes(c) && !SIN_HIELO.includes(c));
+/** Lo que entra al cuarto frío y se puede vender. */
+const VENDIBLES = CALIDADES.filter((c) => !c.merma).map((c) => c.clave);
+
+/** Lo que se botó: no es existencia, se venga de donde se venga. */
+const MERMAS = CALIDADES.filter((c) => c.merma).map((c) => c.clave);
 
 /** Los que obligan a escribir qué pasó. */
 const PIDEN_NOTA = CALIDADES.filter((c) => c.pideNota).map((c) => c.clave);
 
-const DESTINOS = [
-  {
-    clave: 'condensadores', nombre: 'A los condensadores', icono: '💨',
-    nota: 'Lo normal con las cáscaras. Se echa a los condensadores para ' +
-          'enfriarlos: no se tira del todo, trabaja.'
-  },
-  {
-    clave: 'almacen', nombre: 'Al cuarto frío', icono: '❄️',
-    nota: 'Cuando hay demanda y se va a vender más barata, o para quien ' +
-          'solo quiere enfriar y no lo va a consumir. Entra a la ' +
-          'existencia como una marqueta más.'
-  },
-  {
-    clave: 'botada', nombre: 'Se botó', icono: '🗑️',
-    nota: 'No se aprovechó de ninguna manera.'
-  }
-];
-
-const CLAVES_DESTINO = DESTINOS.map((d) => d.clave);
-const DESTINO_POR_OMISION = 'condensadores';
+/**
+ * De estos NO SALE NI UNA MARQUETA.
+ *
+ * Solo la aguada: de un molde que no congeló sale agua y nada más. Las
+ * demás mermas sí dieron una marqueta —gastaron la misma agua, la misma
+ * luz y el mismo molde— aunque después se haya ido a la basura, y por eso
+ * cuentan para el costo por marqueta y no para la existencia.
+ */
+const SIN_HIELO = ['aguada'];
 
 /**
  * EL CATÁLOGO VIAJA A LA PANTALLA CON LAS REGLAS YA RESUELTAS.
  *
- * La pantalla no tiene por qué saber cuáles estados piden destino ni cuáles
- * se venden solos: si lo supiera, sería una segunda copia de estas listas,
- * y el día que cambiara una, la otra se quedaría vieja sin que nadie se
- * diera cuenta. Cada estado carga sus banderas y se acabó.
+ * La pantalla no tiene por qué saber cuáles cuentan y cuáles no: si lo
+ * supiera, sería una segunda copia de estas listas, y el día que cambiara
+ * una, la otra se quedaría vieja sin que nadie se diera cuenta. Cada estado
+ * carga sus banderas y se acabó.
  */
 for (const c of CALIDADES) {
-  c.pideDestino = PIDEN_DESTINO.includes(c.clave);
+  c.merma = Boolean(c.merma);
   c.pideNota = Boolean(c.pideNota);
-  c.vendible = VENDIBLES.includes(c.clave);
+  c.vendible = !c.merma;
   c.sinHielo = SIN_HIELO.includes(c.clave);
 }
 
@@ -172,11 +159,9 @@ const CATALOGO = new Map(CALIDADES.map((c) => [c.clave, c]));
 
 /** El nombre que se le enseña a una persona. */
 function nombreDe(resultado) {
-  if (resultado === MERMA) return 'Se rompió';
   return CATALOGO.get(resultado)?.nombre || resultado;
 }
 
-const pideDestino = (r) => PIDEN_DESTINO.includes(r);
 const pideNota = (r) => PIDEN_NOTA.includes(r);
 
 // ============================================================
@@ -188,26 +173,23 @@ const lista = (claves) => claves.map((c) => `'${c}'`).join(',');
 /**
  * LO QUE DE VERDAD ENTRA AL CUARTO FRÍO.
  *
- * Las marquetas enteras entran siempre. Las cáscaras, las contaminadas y
- * las de "otra cosa", solo si se decidió guardarlas: la mayoría se va a los
- * condensadores, y contarlas como existencia haría que el conteo del cuarto
- * frío no cuadrara jamás.
+ * Las cuatro que se venden, y nada más. Contar aquí una hueca o una salada
+ * haría que el conteo del cuarto frío no cuadrara jamás, y andarías
+ * buscando marquetas que alguien botó.
  *
  * Se pasa el alias que use la consulta (casi siempre `sm`).
  */
 function alAlmacen(a = 'sm') {
-  return `(${a}.resultado IN (${lista(VENDIBLES)})` +
-         ` OR (${a}.resultado IN (${lista(PIDEN_DESTINO)}) AND ${a}.destino = 'almacen'))`;
+  return `${a}.resultado IN (${lista(VENDIBLES)})`;
 }
 
 /**
  * LO QUE SALIÓ HECHO HIELO, se venda o no.
  *
- * Es el número que se usa para el costo por marqueta: una cáscara que se
- * fue al condensador gastó la misma agua, la misma luz y el mismo molde que
- * una sellada. Las aguadas y las rotas NO están aquí porque de ellas no
- * salió marqueta ninguna — y no se puede repartir un costo entre marquetas
- * que no existen.
+ * Es el número que se usa para el costo por marqueta: una hueca que se
+ * botó gastó la misma agua, la misma luz y el mismo molde que una sellada.
+ * Las aguadas NO están aquí porque de ellas no salió marqueta ninguna — y
+ * no se puede repartir un costo entre marquetas que no existen.
  */
 function salioHielo(a = 'sm') {
   return `${a}.resultado NOT IN (${lista(SIN_HIELO)})`;
@@ -218,12 +200,6 @@ function columnasMezcla(a = 'sm') {
   return RESULTADOS
     .map((c) => `COUNT(CASE WHEN ${a}.resultado = '${c}' THEN 1 END) AS ${c}`)
     .join(',\n      ');
-}
-
-/** Cuántas de las que piden destino se guardaron para vender. */
-function columnaGuardadas(a = 'sm') {
-  return `COUNT(CASE WHEN ${a}.resultado IN (${lista(PIDEN_DESTINO)})` +
-         ` AND ${a}.destino = 'almacen' THEN 1 END)`;
 }
 
 /**
@@ -242,12 +218,12 @@ function columnaGuardadas(a = 'sm') {
  *   · "falló si no salió sellada" — en mayo, cuando calientan los tanques,
  *     no sale una sola sellada en toda la fábrica y la pantalla se pintaría
  *     entera de rojo, señalando cien moldes que no tienen nada.
- *   · "falló si salió cáscara o rota" — igual de malo el día en que el paño
- *     ENTERO sale en cáscaras: eso es la fábrica, no el molde.
+ *   · "falló si salió hueca" — igual de malo el día en que el paño ENTERO
+ *     sale hueco: eso es la fábrica, no el molde.
  *
  * Comparándolo contra su paño, las dos cosas quedan bien dichas: la noche
- * mala no señala a nadie, y el molde que sale cáscara mientras sus vecinos
- * salen normales queda marcado al instante.
+ * mala no señala a nadie, y el molde que sale hueco mientras sus vecinos
+ * salen al 80% queda marcado al instante.
  *
  * LA CONTAMINACIÓN ES LA EXCEPCIÓN, y por eso lleva su propio renglón
  * abajo: un molde roto por el que entra salmuera está roto aunque el paño
@@ -255,8 +231,8 @@ function columnaGuardadas(a = 'sm') {
  * marcarlos todos es exactamente lo que uno quiere.
  */
 const RANGO = new Map([
-  ['sellada', 0], ['normal', 1], ['poco_hueca', 2], ['hueca', 3],
-  ['cascara', 4], ['otro', 4], ['contaminada', 5], ['aguada', 6], [MERMA, 7]
+  ['sellada', 0], ['c80', 1], ['c60', 2], ['c40', 3],
+  ['hueca', 4], ['otro', 4], ['contaminada', 5], ['aguada', 6]
 ]);
 
 function rangoDe(resultado) {
@@ -272,7 +248,7 @@ function esFallo(resultado, referencia) {
 /**
  * Cómo salió LA MAYORÍA de un montón de resultados: la vara contra la que
  * se mide cada molde. Se toma el más repetido, y si hay empate el mejor de
- * los empatados —así una mitad normal y una mitad hueca deja marcada la
+ * los empatados —así una mitad al 80% y una mitad hueca deja marcada la
  * mitad hueca, que es la que hay que mirar—.
  */
 function comoSalioLaMayoria(resultados = []) {
@@ -293,25 +269,17 @@ function comoSalioLaMayoria(resultados = []) {
  * LEE LO QUE MANDÓ LA PANTALLA y lo deja listo para guardar, o explica en
  * castellano qué está mal.
  *
- * Está aquí y no en las rutas porque son dos las que guardan hielo —la del
- * paño y la captura en lote— y una regla escrita dos veces es una regla que
- * tarde o temprano dice dos cosas distintas.
+ * Está aquí y no en las rutas porque son tres las que guardan hielo —la del
+ * paño, la captura en lote y la corrección— y una regla escrita tres veces
+ * es una regla que tarde o temprano dice tres cosas distintas.
  *
  * `omision` es lo que se eligió para el paño entero: un molde suelto que no
- * diga a dónde fue su cáscara sigue al del paño, que es lo que uno espera.
+ * diga nada sigue al del paño, que es lo que uno espera.
  */
 function interpretar(entrada = {}, omision = {}) {
   const resultado = String(entrada.resultado || omision.resultado || CALIDAD_POR_OMISION);
   if (!RESULTADOS.includes(resultado)) {
     throw new Error(`No conozco ese estado del hielo: ${resultado}.`);
-  }
-
-  let destino = null;
-  if (pideDestino(resultado)) {
-    destino = String(entrada.destino || omision.destino || DESTINO_POR_OMISION);
-    if (!CLAVES_DESTINO.includes(destino)) {
-      throw new Error(`No conozco ese destino: ${entrada.destino || destino}.`);
-    }
   }
 
   // La nota es obligatoria en "otro" —un "otro" sin explicación no sirve
@@ -322,42 +290,39 @@ function interpretar(entrada = {}, omision = {}) {
     throw new Error('Elegiste "Otro": escribe qué pasó, aunque sea corto.');
   }
 
-  return { resultado, destino, nota: escrita || null };
+  return { resultado, nota: escrita || null };
 }
 
 /**
  * El resumen de una mezcla, con los totales que de verdad se enseñan.
- * `mezcla` es un objeto { sellada, normal, ..., merma }.
+ * `mezcla` es un objeto { sellada, c80, ..., otro }.
  */
-function resumir(mezcla = {}, guardadas = 0) {
+function resumir(mezcla = {}) {
   const n = (c) => Number(mezcla[c] || 0);
-  const guardo = Number(guardadas || 0);
 
   const salieron = RESULTADOS.reduce((t, c) => t + n(c), 0);
   const sinHielo = SIN_HIELO.reduce((t, c) => t + n(c), 0);
-  const conDestino = PIDEN_DESTINO.reduce((t, c) => t + n(c), 0);
   const vendibles = VENDIBLES.reduce((t, c) => t + n(c), 0);
 
   return {
     ...Object.fromEntries(RESULTADOS.map((c) => [c, n(c)])),
-    // De las que pedían destino, las que sí se guardaron para vender.
-    guardadas: guardo,
     // Los moldes que se abrieron, incluidos los que no dieron nada.
     salieron,
-    // Todo lo que salió hecho hielo, aunque acabara en el condensador.
+    // Todo lo que salió hecho hielo, aunque se haya botado.
     producidas: salieron - sinHielo,
-    // Lo que quedó guardado para vender.
-    alAlmacen: vendibles + guardo,
-    // Hielo que se hizo pero que no se puede ir a buscar al cuarto frío.
-    fueraDelAlmacen: conDestino - guardo
+    // Lo que quedó en el cuarto frío para vender.
+    alAlmacen: vendibles,
+    // Lo que se botó: hueca, salada, aguada y "otro". Es el número que dice
+    // cómo va el frío, y antes quedaba escondido detrás del destino.
+    merma: salieron - vendibles,
+    porcientoMerma: salieron ? Math.round(((salieron - vendibles) / salieron) * 100) : 0
   };
 }
 
 module.exports = {
-  CALIDADES, CLAVES_CALIDAD, RESULTADOS, MERMA, CALIDAD_POR_OMISION,
-  DESTINOS, CLAVES_DESTINO, DESTINO_POR_OMISION,
-  PIDEN_DESTINO, PIDEN_NOTA, SIN_HIELO, VENDIBLES,
-  nombreDe, pideDestino, pideNota,
-  alAlmacen, salioHielo, columnasMezcla, columnaGuardadas,
+  CALIDADES, CLAVES_CALIDAD, RESULTADOS, CALIDAD_POR_OMISION,
+  PIDEN_NOTA, SIN_HIELO, VENDIBLES, MERMAS,
+  nombreDe, pideNota,
+  alAlmacen, salioHielo, columnasMezcla,
   esFallo, comoSalioLaMayoria, interpretar, resumir
 };

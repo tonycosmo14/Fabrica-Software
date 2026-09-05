@@ -956,7 +956,7 @@ function ticketResumenDia(datos, { negocio = '' } = {}) {
 
   // ---- LOS PAÑOS DEL DÍA ----
   t.separador();
-  const p = datos.produccion || { panos: [], cuantos: 0, alAlmacen: 0, rotas: 0 };
+  const p = datos.produccion || { panos: [], cuantos: 0, alAlmacen: 0, merma: 0 };
   t.negrita().linea('PANOS SACADOS HOY').negrita(false);
 
   if (!p.cuantos) {
@@ -965,7 +965,7 @@ function ticketResumenDia(datos, { negocio = '' } = {}) {
     for (const uno of p.panos) {
       // Un renglón por paño: tanque, número, y lo que dio. Apretado a
       // propósito, que de estos salen varios al día.
-      const roto = uno.rotas ? ` -${uno.rotas}` : '';
+      const roto = uno.merma ? ` -${uno.merma}` : '';
       t.columnas2(`${uno.tanque} #${uno.pano}${uno.enProceso ? ' (a medias)' : ''}`,
                   `${uno.alAlmacen}${roto}`);
       // QUIÉN LO SACÓ, en su propio renglón (v4.7). Estaba en el papel del
@@ -977,7 +977,7 @@ function ticketResumenDia(datos, { negocio = '' } = {}) {
     t.bloqueDerecha([
       ['Panos', String(p.cuantos)],
       ['Al cuarto frio', String(p.alAlmacen)],
-      p.rotas ? ['Rotas', String(p.rotas)] : null
+      p.merma ? ['Se botaron', String(p.merma)] : null
     ]);
 
     // ---- CÓMO SALIÓ EL HIELO ----

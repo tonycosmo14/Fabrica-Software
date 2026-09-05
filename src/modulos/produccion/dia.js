@@ -48,10 +48,9 @@ function armar(cuando, valores) {
            COALESCE(u.nombre, sp.ejecutor_libre) AS quien,
            sp.terminada_en,
            sp.notas,
-           COUNT(*) FILTER (WHERE ${calidad.alAlmacen('sm')})  AS al_almacen,
-           COUNT(*) FILTER (WHERE ${calidad.salioHielo('sm')}) AS producidas,
-           COUNT(*) FILTER (WHERE sm.resultado = 'merma')      AS rotas,
-           ${calidad.columnaGuardadas('sm')}                   AS guardadas,
+           COUNT(*) FILTER (WHERE ${calidad.alAlmacen('sm')})      AS al_almacen,
+           COUNT(*) FILTER (WHERE ${calidad.salioHielo('sm')})     AS producidas,
+           COUNT(*) FILTER (WHERE NOT (${calidad.alAlmacen('sm')})) AS merma,
            ${calidad.columnasMezcla('sm')}
       FROM sacadas_pano sp
       JOIN panos p          ON p.id = sp.pano_id
@@ -93,24 +92,16 @@ function resumenEntre(desde, hasta) {
 function resumirPanos(panos) {
   const suma = (campo) => panos.reduce((n, p) => n + (p[campo] || 0), 0);
 
-  // OJO con el nombre de la merma: en el renglón de cada paño la columna se
-  // llama `rotas` —es la palabra que va impresa en el papel— y `resumir`
-  // espera la clave `merma`, que es como se llama en la base. Sin esta
-  // traducción el total de rotas del día salía en cero mientras cada paño
-  // sí las enseñaba, que es la peor forma de estar mal: parece que cuadra.
+  // La merma sale de la propia mezcla desde la v6.5: es todo lo que no
+  // entró al cuarto frío —hueca, salada, aguada y "otro"—, y ya no hay un
+  // renglón aparte de "rotas" que pudiera contarse dos veces.
   const mezcla = calidad.resumir(
-    {
-      ...Object.fromEntries(calidad.CLAVES_CALIDAD.map((c) => [c, suma(c)])),
-      merma: suma('rotas')
-    },
-    suma('guardadas')
-  );
+    Object.fromEntries(calidad.CLAVES_CALIDAD.map((c) => [c, suma(c)])));
 
   return {
     panos,
     cuantos: panos.length,
     ...mezcla,
-    rotas: mezcla.merma,
     enProceso: panos.filter((p) => p.enProceso).length
   };
 }

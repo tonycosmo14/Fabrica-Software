@@ -22,7 +22,7 @@
  *     marcado como incompleto en vez de salir más barato de lo que es.
  */
 const { bd } = require('../../db/conexion');
-const { alAlmacen, columnasMezcla, columnaGuardadas, resumir } = require('../produccion/calidad');
+const { alAlmacen, columnasMezcla, resumir } = require('../produccion/calidad');
 const { instantes } = require('../../lib/periodos');
 const { DIECISEISAVOS_POR_MARQUETA } = require('../../lib/fracciones');
 const { luzEnPeriodo, totalGastado, gastosParejos } = require('../empresa/calculo');
@@ -109,16 +109,15 @@ function abonos({ desde, hasta }) {
  *   producidas  todo lo que salió hecho hielo, cáscaras incluidas. Es el
  *               que sirve para el costo: una cáscara gastó la misma agua,
  *               la misma luz y el mismo molde que una sellada.
- *   alAlmacen   lo que de verdad quedó para vender. Las cáscaras que se
- *               fueron a los condensadores no están aquí.
+ *   alAlmacen   lo que de verdad quedó para vender. Lo que se botó
+ *               —hueca, salada, aguada— no está aquí.
  *   la mezcla   cuántas de cada estado. Sin ella, un mes malo y uno bueno
  *               se ven idénticos, porque son los mismos moldes.
  */
 function produccion({ desde, hasta }) {
   const r = bd.prepare(`
     SELECT
-      ${columnasMezcla('sm')},
-      ${columnaGuardadas('sm')} AS guardadas
+      ${columnasMezcla('sm')}
       FROM sacadas_moldes sm
       JOIN sacadas s       ON s.id = sm.sacada_id
       JOIN sacadas_pano sp ON sp.id = s.sacada_pano_id
@@ -126,17 +125,16 @@ function produccion({ desde, hasta }) {
        AND sp.anulada_en IS NULL
   `).get(desde, hasta);
 
-  const m = resumir(r, r.guardadas);
+  const m = resumir(r);
 
-  // DE CADA CIEN MARQUETAS, CUÁNTAS SALIERON SIN QUEJA. Selladas y normales
-  // son las que nadie reclama en el mostrador; de las poco huecas para
+  // DE CADA CIEN MARQUETAS, CUÁNTAS SALIERON SIN QUEJA. Las selladas y las
+  // del 80 al 90% son las que nadie reclama en el mostrador; del 60 para
   // abajo, alguien se queja. Es el número que avisa antes de que una
   // máquina se pare: baja días antes, con las mismas marquetas.
-  const sinQueja = m.sellada + m.normal;
+  const sinQueja = m.sellada + m.c80;
 
   return {
     ...m,
-    rotas: m.merma,
     sinQueja,
     porCientoSinQueja: m.producidas
       ? Math.round((sinQueja / m.producidas) * 1000) / 10 : null
