@@ -17,9 +17,30 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '6.9.1';
+const VERSION_ACTUAL = '7.0';
 
 const VERSIONES = [
+  {
+    numero: '7.0',
+    nombre: 'Pedidos, como los quiero ver',
+    fecha: '2026-09-05',
+    resumen:
+      'El control y despacho entero en una pantalla: las seis etapas del '
+      + 'flujo arriba, el padrón de pedidos en tabla y la inspección al '
+      + 'lado, con lo que lleva y lo que se hace al llegar.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'LAS SEIS ETAPAS DEL FLUJO, arriba y con cuántos hay en cada una: todos, pendientes, en preparación, en ruta, entregados y cancelados. SE TOCAN Y FILTRAN la lista — es la pregunta de todos los días y por eso está a la vista, no escondida en un desplegable. Tocar otra vez la encendida la apaga.' },
+      { tipo: 'importante', texto: '«EN PREPARACIÓN» Y «EN RUTA» NO SE APUNTAN A MANO: salen solas de en qué salida va el pedido y de cómo va esa salida. Si hubiera que marcarlas, el día que a alguien se le olvidara la pantalla diría que un pedido sigue en la planta mientras va llegando a la puerta del cliente.' },
+      { tipo: 'nuevo', texto: 'EL PADRÓN EN TABLA: número de guía (#GL-) y hora, cliente y giro, cuánto es y cómo se cobra, y en qué camioneta va con su parada. El atrasado lleva su guía en rojo. Al tocar un renglón se abre su inspección al lado.' },
+      { tipo: 'nuevo', texto: 'LA INSPECCIÓN DEL PEDIDO: a dónde va, su horario, sus referencias, QUÉ SE HACE AL LLEGAR, y qué lleva línea por línea con precio unitario y subtotal. Y los botones: remisión, contactar al chofer, subirlo a una camioneta, entregado o cancelar.' },
+      { tipo: 'nuevo', texto: 'LAS INSTRUCCIONES DE DESCARGA del cliente: «entrar por la rampa trasera, pedir firma a Don Arturo». Se escriben una vez en su ficha y salen en cada pedido suyo. No son las referencias: aquellas dicen cómo encontrar la puerta y se leen buscando la dirección; éstas se leen ya en la puerta, con el hielo en las manos.' },
+      { tipo: 'nuevo', texto: 'EL GIRO DEL CLIENTE («Horeca / Cadena Puerto», «Conveniencia Express»). En una lista de pedidos dice más que el nombre: quien arma la ruta sabe que a un restaurante hay que llegarle antes de que abra la cocina.' },
+      { tipo: 'nuevo', texto: 'BUSCAR por número de guía —«8», «#GL-0008» o «gl-8», como salga—, por cliente, por giro o por dirección. Y FILTRAR POR PRODUCTO: «¿quién pidió garrafones hoy?», que es la pregunta cuando la planta va corta de algo.' },
+      { tipo: 'nuevo', texto: 'EXPORTAR A EXCEL, con los filtros que estés viendo. Sale un archivo que Excel abre en columnas y con los acentos bien puestos, con guía, fechas, cliente, giro, zona, dirección, etapa, cobro, unidad, chofer y total.' },
+      { tipo: 'nuevo', texto: 'CONTACTAR AL CHOFER por WhatsApp desde el pedido que lleva. El teléfono se le pone a cada quien en Usuarios.' },
+      { tipo: 'mejora', texto: 'La hoja de preparación sigue donde debe: en un botón de imprimir. Es un papel que se lee en la planta con las manos mojadas, no una vista más de la lista.' }
+    ]
+  },
   {
     numero: '6.9.1',
     nombre: 'La nevera del cliente, y el ancho de la ficha',

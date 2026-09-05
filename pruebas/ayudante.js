@@ -88,10 +88,15 @@ function fabricaDePrueba(nombre, opciones = {}) {
     if (puesta) cookie = puesta.split(';')[0];
 
     const tipo = r.headers.get('content-type') || '';
+    // El cuerpo se lee UNA vez: o como JSON o como texto. Lo segundo hace
+    // falta para lo que no es JSON —un CSV que se baja, por ejemplo— y sin
+    // esto la prueba no tenía forma de mirarlo.
+    const esJson = tipo.includes('json');
     return {
       estado: r.status,
       cabeceras: r.headers,
-      json: tipo.includes('json') ? await r.json() : null
+      json: esJson ? await r.json() : null,
+      texto: esJson ? null : await r.text()
     };
   }
 

@@ -18,7 +18,7 @@ const router = express.Router();
 router.use(exigirPermiso('usuarios.administrar'));
 
 const CAMPOS_PUBLICOS = `
-  id, nombre, usuario, rol, activo, fecha_alta, fecha_baja,
+  id, nombre, usuario, rol, telefono, activo, fecha_alta, fecha_baja,
   (pin_hash IS NOT NULL) AS tiene_pin,
   (contrasena_hash IS NOT NULL) AS tiene_contrasena
 `;
@@ -237,10 +237,11 @@ router.post('/', (req, res) => {
   const c = contrasena ? hashear(contrasena) : { hash: null, sal: null };
 
   bd.prepare(`
-    INSERT INTO usuarios (id, nombre, usuario, rol, pin_hash, pin_sal,
+    INSERT INTO usuarios (id, nombre, usuario, rol, telefono, pin_hash, pin_sal,
                           contrasena_hash, contrasena_sal, activo, fecha_alta, creado_por)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
   `).run(id, String(nombre).trim(), usuario ? String(usuario).trim() : null, rol,
+         String(req.body?.telefono || '').trim().slice(0, 30) || null,
          p.hash, p.sal, c.hash, c.sal, ahora(), req.usuario.id);
 
   bitacora.registrar({
@@ -251,12 +252,12 @@ router.post('/', (req, res) => {
   return ok(res, { usuario: bd.prepare(`SELECT ${CAMPOS_PUBLICOS} FROM usuarios WHERE id = ?`).get(id) }, 201);
 });
 
-/** Editar nombre y rol. El ID nunca cambia (regla 3.3). */
+/** Editar nombre, rol y teléfono. El ID nunca cambia (regla 3.3). */
 router.put('/:id', (req, res) => {
   const u = bd.prepare('SELECT * FROM usuarios WHERE id = ?').get(req.params.id);
   if (!u) return error(res, 'Usuario no encontrado.', 404);
 
-  const { nombre, rol } = req.body || {};
+  const { nombre, rol, telefono } = req.body || {};
   if (nombre !== undefined && !String(nombre).trim()) return error(res, 'El nombre no puede quedar vacío.');
   if (rol !== undefined && !ROLES.includes(rol)) return error(res, 'Rol inválido.');
 
@@ -266,8 +267,13 @@ router.put('/:id', (req, res) => {
     if (otros === 0) return error(res, 'Es el único administrador activo. Crea otro antes de cambiarle el rol.');
   }
 
-  bd.prepare('UPDATE usuarios SET nombre = ?, rol = ? WHERE id = ?')
-    .run(nombre !== undefined ? String(nombre).trim() : u.nombre, rol || u.rol, u.id);
+  // EL TELÉFONO  (v7.0): para marcarle al chofer desde el pedido que
+  // lleva, sin ir a buscar el número a otro lado.
+  bd.prepare('UPDATE usuarios SET nombre = ?, rol = ?, telefono = ? WHERE id = ?')
+    .run(nombre !== undefined ? String(nombre).trim() : u.nombre, rol || u.rol,
+         telefono !== undefined
+           ? (String(telefono).trim().slice(0, 30) || null) : u.telefono,
+         u.id);
 
   bitacora.registrar({
     accion: 'usuario.edicion', entidad: 'usuario', entidadId: u.id,

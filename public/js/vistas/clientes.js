@@ -353,8 +353,8 @@ export async function vistaClientes(pantalla, estadoApp) {
             ${avatar(c)}
             <span>
               <strong>${esc(c.negocio || c.nombre)}</strong>
-              <small>${esc(c.razon_social || (c.negocio ? c.nombre : '') || 'sin razón social')}${
-                c.rfc ? ` · RFC: ${esc(c.rfc)}` : ''}</small>
+              <small>${esc(c.giro || c.razon_social || (c.negocio ? c.nombre : '')
+                || 'sin razón social')}${c.rfc ? ` · RFC: ${esc(c.rfc)}` : ''}</small>
             </span>
           </div>
         </td>
@@ -497,6 +497,7 @@ export async function vistaClientes(pantalla, estadoApp) {
 
       <div class="cli-datos-clave">
         ${[
+          ['Giro', c.giro || '—'],
           ['Razón social', c.razon_social || '—'],
           ['RFC', c.rfc || '—'],
           ['Contacto clave', c.nombre],
@@ -759,6 +760,9 @@ export async function vistaClientes(pantalla, estadoApp) {
         <div class="cli-campos">
           ${campo('Nombre comercial o rótulo', 'negocio', c.negocio,
                   { marcador: 'Mariscos El Faro' })}
+          ${campo('Giro', 'giro', c.giro,
+                  { marcador: 'Horeca / Cadena Puerto',
+                    ayuda: 'a qué se dedica; sale en la lista de pedidos' })}
           ${campo('Razón social fiscal', 'razonSocial', c.razon_social,
                   { marcador: 'OPERADORA GASTRONÓMICA S.A. DE C.V.' })}
           ${campo('RFC', 'rfc', c.rfc, { marcador: 'OGL180422K98' })}
@@ -787,6 +791,11 @@ export async function vistaClientes(pantalla, estadoApp) {
           ${campo('Referencias', 'referencias', c.referencias,
                   { ancho: true, marcador: 'La de la puerta azul, junto a la tortillería',
                     ayuda: 'lo que hace que se encuentre la puerta' })}
+          ${campo('Instrucciones de descarga', 'instrucciones', c.instrucciones,
+                  { ancho: true, largo: true,
+                    marcador: 'Entrar por la rampa trasera. Llenar el congelador del muelle. ' +
+                              'Pedir firma a Don Arturo.',
+                    ayuda: 'qué se hace al llegar; sale en su nota de entrega' })}
         </div>
 
         <div class="cli-ubicacion">
@@ -1045,9 +1054,9 @@ export async function vistaClientes(pantalla, estadoApp) {
 
   function abrirAlta() {
     alta = {
-      negocio: '', razonSocial: '', rfc: '', regimenFiscal: '',
+      negocio: '', giro: '', razonSocial: '', rfc: '', regimenFiscal: '',
       nombre: '', telefono: '', correo: '',
-      direccion: '', zona: '', referencias: '',
+      direccion: '', zona: '', referencias: '', instrucciones: '',
       horaDesde: '', horaHasta: '', horarioEntrega: '', frecuencia: '',
       metodoPago: '', diasPlazo: '', limite: '',
       garrafonesLimite: '', garrafonDeposito: '',
@@ -1089,6 +1098,9 @@ export async function vistaClientes(pantalla, estadoApp) {
               <div class="cli-campos">
                 ${campoA('Nombre comercial o rótulo', 'negocio',
                          { marcador: 'Mariscos El Faro Muelle Azul' })}
+                ${campoA('Giro', 'giro',
+                         { marcador: 'Horeca / Cadena Puerto',
+                           ayuda: 'a qué se dedica' })}
                 ${campoA('Razón social fiscal', 'razonSocial',
                          { marcador: 'OPERADORA GASTRONÓMICA S.A. DE C.V.' })}
                 ${campoA('RFC', 'rfc', { marcador: 'OGL180422K98' })}
@@ -1121,6 +1133,10 @@ export async function vistaClientes(pantalla, estadoApp) {
                          { ancho: true, marcador: 'de 8 a 2 y de 5 a 8, los domingos no abre' })}
                 ${campoA('Referencias', 'referencias',
                          { ancho: true, marcador: 'La de la puerta azul, junto a la tortillería' })}
+                ${campoA('Instrucciones de descarga', 'instrucciones',
+                         { ancho: true, largo: true,
+                           marcador: 'Entrar por la rampa trasera. Pedir firma a Don Arturo.',
+                           ayuda: 'qué se hace al llegar; sale en su nota de entrega' })}
               </div>
             </section>
 
@@ -1203,6 +1219,7 @@ export async function vistaClientes(pantalla, estadoApp) {
   function resumenAlta(a) {
     const nombreDe = (lista, clave) => lista.find((x) => x.clave === clave)?.nombre;
     const renglones = [
+      ['Giro', a.giro || '—'],
       ['Contacto', a.nombre || '—'],
       ['Teléfono', a.telefono || '—'],
       ['Zona', a.zona || '—'],

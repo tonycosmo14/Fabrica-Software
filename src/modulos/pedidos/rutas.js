@@ -63,17 +63,85 @@ const texto = (v, largo = 300) => {
 // VER
 // ============================================================
 
-router.get('/', ver, (req, res) => ok(res, {
-  pedidos: calculo.lista({
-    estado: texto(req.query.estado, 20) || 'pendiente',
-    hasta: texto(req.query.hasta, 10),
-    cliente: texto(req.query.cliente, 60),
-    tipo: texto(req.query.tipo, 20)
-  }),
-  pendientes: calculo.cuantosPendientes(),
-  areas: calculo.AREAS,
-  tipos: calculo.TIPOS
-}));
+/** Los filtros de la pantalla de despacho, leídos una vez (v7.0). */
+function filtrosDe(q) {
+  return {
+    estado: texto(q.estado, 20) || 'todos',
+    etapa: texto(q.etapa, 20) || null,
+    hasta: texto(q.hasta, 10),
+    desde: texto(q.desde, 10),
+    cliente: texto(q.cliente, 60),
+    tipo: texto(q.tipo, 20),
+    busca: texto(q.busca, 80),
+    producto: texto(q.producto, 60)
+  };
+}
+
+router.get('/', ver, (req, res) => {
+  const f = filtrosDe(req.query);
+  return ok(res, {
+    pedidos: calculo.lista(f),
+    // Los números de arriba se cuentan sobre el mismo rango de fechas
+    // pero SIN el resto de filtros: si al tocar «En ruta» los seis
+    // contadores se recalcularan sobre lo filtrado, cinco se pondrían en
+    // cero y no habría forma de volver.
+    resumen: calculo.resumen({ hasta: f.hasta, desde: f.desde }),
+    pendientes: calculo.cuantosPendientes(),
+    areas: calculo.AREAS,
+    tipos: calculo.TIPOS,
+    etapas: calculo.ETAPAS,
+    // Para el filtro por producto: lo que de verdad se ha pedido alguna
+    // vez, no el catálogo entero. Un desplegable con cuarenta productos
+    // de los que treinta nunca se piden no sirve de nada.
+    productos: bd.prepare(`
+      SELECT DISTINCT p.id, p.nombre
+        FROM pedido_lineas pl
+        JOIN productos p ON p.id = pl.producto_id
+       ORDER BY p.nombre
+    `).all()
+  });
+});
+
+/**
+ * LA MISMA LISTA, PARA ABRIRLA EN EXCEL  (v7.0)
+ *
+ * Sale como CSV con punto y coma y con el BOM del principio: es lo que
+ * hace que Excel en español lo abra en columnas y con los acentos bien
+ * puestos. Con coma y sin BOM, se abre todo en la columna A y las eñes
+ * salen rotas — y quien lo recibe piensa que el sistema está mal.
+ */
+router.get('/exportar', ver, (req, res) => {
+  const pedidos = calculo.lista({ ...filtrosDe(req.query), limite: 5000 });
+
+  const campo = (v) => {
+    const t = String(v ?? '');
+    // Un punto y coma o un salto dentro de un dato parte la columna en
+    // dos. Entre comillas no, y las comillas de dentro se duplican.
+    return /[";\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
+  };
+  const pesos = (c) => (c / 100).toFixed(2);
+
+  const renglones = [[
+    'Guia', 'Tomado', 'Para cuando', 'Cliente', 'Rotulo', 'Giro', 'Zona',
+    'Direccion', 'Etapa', 'Como paga', 'Unidad', 'Chofer', 'Total'
+  ].join(';')];
+
+  for (const p of pedidos) {
+    renglones.push([
+      `GL-${String(p.folio).padStart(4, '0')}`,
+      p.fecha, p.para_cuando,
+      p.cliente_nombre, p.cliente_negocio, p.cliente_giro, p.cliente_zona,
+      p.direccion, p.etapaTexto?.nombre || p.etapa, p.forma_pago,
+      p.salida?.vehiculo_nombre, p.salida?.repartidor_nombre,
+      pesos(p.total)
+    ].map(campo).join(';'));
+  }
+
+  const nombre = `pedidos-${calculo.hoy()}.csv`;
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${nombre}"`);
+  return res.send(`\uFEFF${renglones.join('\r\n')}\r\n`);
+});
 
 /**
  * LO QUE HAY QUE PREPARAR. Va antes que /:id porque Express prueba en
@@ -137,14 +205,17 @@ router.post('/', tomar, (req, res) => {
     bd.prepare(`
       INSERT INTO pedidos (id, folio, fecha, para_cuando, cliente_id,
                            direccion, referencias, horario, telefono,
-                           latitud, longitud, estado, notas, forma_pago,
+                           latitud, longitud, instrucciones,
+                           estado, notas, forma_pago,
                            ejecutor_id, capturista_id, tipo)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', ?, ?, ?, ?, ?)
     `).run(id, folio, fecha, paraCuando, cliente.id,
-           // COPIADOS del cliente (regla 3.5): si se muda, la nota de este
-           // pedido sigue diciendo a dónde se llevó.
+           // COPIADOS del cliente (regla 3.5): si se muda —o si mañana
+           // cambian las instrucciones de descarga— la nota de este pedido
+           // sigue diciendo lo que se le dijo al repartidor de hoy.
            cliente.direccion, cliente.referencias, cliente.horario_entrega,
            cliente.telefono, cliente.latitud, cliente.longitud,
+           cliente.instrucciones,
            texto(req.body?.notas, 500), formaPago,
            req.body?.ejecutorId || req.usuario.id, req.usuario.id, tipo);
 

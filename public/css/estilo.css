@@ -4915,6 +4915,220 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
    LOS PEDIDOS  (v5.6)
    ============================================================ */
 
+/* ============================================================
+   CONTROL Y DESPACHO DE PEDIDOS  (v7.0 — el diseño del dueño)
+
+   Las seis etapas arriba, la tabla debajo y la inspección al lado. Lo que
+   se pregunta aquí —«¿este ya salió?», «¿en qué camioneta va?», «¿cuánto
+   le cobro?»— se contesta comparando renglones, y las etapas son el
+   filtro de todos los días puesto a la vista y no escondido.
+   ============================================================ */
+.ped-pantalla { width: 100%; }
+
+.ped-cabecera {
+  display: flex; gap: 16px; align-items: flex-end; justify-content: space-between;
+  flex-wrap: wrap; margin-bottom: 16px;
+}
+.ped-cabecera h2 { margin: 0; }
+.ped-kicker {
+  margin: 0 0 2px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--suave); font-weight: 700;
+}
+.ped-cabecera-acciones { display: flex; gap: 8px; flex-wrap: wrap; }
+.ped-cabecera-acciones button { margin: 0; white-space: nowrap; }
+
+/* --- LAS SEIS ETAPAS --- */
+.ped-etapas {
+  display: grid; gap: 10px; margin-bottom: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+.ped-etapa {
+  display: flex; flex-direction: column; gap: 1px; align-items: stretch;
+  padding: 12px 14px; min-width: 0; text-align: left;
+  background: var(--superficie); border: 1px solid var(--borde);
+  border-top: 3px solid var(--borde-fuerte);
+  border-radius: 12px; color: var(--texto); font-weight: 600;
+}
+.ped-etapa:hover { border-color: var(--primario); }
+.ped-etapa-cabeza { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.ped-etapa-nombre {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--suave);
+}
+.ped-etapa-icono { font-size: 14px; opacity: .8; }
+.ped-etapa strong {
+  font-size: 27px; line-height: 1.1; margin-top: 4px; font-variant-numeric: tabular-nums;
+}
+.ped-etapa-pie { font-size: 11.5px; font-weight: 500; color: var(--suave); }
+
+/* Cada etapa con su color, el mismo que se usa en el resto del sistema:
+   ámbar lo que espera, azul lo que se mueve, verde lo hecho, rojo lo que
+   se cayó. Elegida, el filo de arriba se enciende y el fondo la levanta. */
+.ped-etapa.etapa-pendiente { border-top-color: var(--ambar); }
+.ped-etapa.etapa-preparacion { border-top-color: var(--cal-sellada, var(--primario)); }
+.ped-etapa.etapa-ruta { border-top-color: var(--primario); }
+.ped-etapa.etapa-entregado { border-top-color: var(--verde); }
+.ped-etapa.etapa-cancelado { border-top-color: var(--rojo); }
+.ped-etapa.activa {
+  background: var(--et-operario-f); border-color: var(--primario);
+  box-shadow: inset 0 0 0 1px var(--primario);
+}
+
+/* --- LOS FILTROS --- */
+.ped-filtros {
+  display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+/* `.buscador` nace como bloque al 100%: dentro de un flex eso lo empuja a
+   su propio renglón y deja los dos desplegables solos arriba. */
+.ped-filtros .buscador { margin: 0; flex: 1 1 300px; width: auto; min-width: 240px; }
+.ped-filtro { display: flex; flex-direction: column; gap: 3px; }
+.ped-filtro span { font-size: 11.5px; color: var(--suave); font-weight: 600; }
+.ped-filtro select { margin: 0; }
+.ped-filtros button { margin: 0; }
+
+/* --- EL TABLERO --- */
+.ped-tablero { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: start; }
+@media (min-width: 1100px) {
+  /* Dos tercios la lista y un tercio la inspección, en proporción: en un
+     monitor grande las dos crecen en vez de estirarse solo la tabla. */
+  .ped-tablero { grid-template-columns: minmax(0, 64fr) minmax(370px, 36fr); }
+}
+.ped-lista, .ped-inspeccion {
+  background: var(--superficie); border: 1px solid var(--borde);
+  border-radius: 14px; padding: 14px 16px; min-width: 0;
+}
+@media (min-width: 1100px) {
+  .ped-inspeccion {
+    position: sticky; top: var(--alto-barra, 64px);
+    max-height: calc(100vh - var(--alto-barra, 64px) - 24px); overflow-y: auto;
+  }
+}
+.ped-lista-cabeza {
+  display: flex; gap: 12px; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; margin-bottom: 12px;
+}
+.ped-lista-cabeza h3 { margin: 0; font-size: 16px; }
+.ped-lista-cabeza h3 small {
+  display: block; font-size: 12px; font-weight: 400; color: var(--suave);
+}
+.ped-lista-acciones { display: flex; gap: 8px; flex-wrap: wrap; }
+.ped-lista-acciones button { margin: 0; }
+
+/* --- LA TABLA --- */
+/* El marco es quien se desplaza a lo ancho, no la página: cinco columnas
+   no caben en una tablet y el resto de la pantalla no tiene por qué
+   moverse. */
+.ped-tabla-marco { overflow-x: auto; margin: 0 -16px; padding: 0 16px; }
+.ped-tabla { width: 100%; min-width: 720px; border-collapse: collapse; font-size: 13.5px; }
+.ped-tabla th {
+  text-align: left; padding: 8px 10px; font-size: 11px; font-weight: 700;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--suave);
+  border-bottom: 1px solid var(--borde); white-space: nowrap;
+}
+.ped-tabla th.der, .ped-tabla td.der { text-align: right; }
+.ped-tabla td { padding: 10px; border-bottom: 1px solid var(--borde); vertical-align: middle; }
+.ped-tabla td small { display: block; font-size: 11.5px; color: var(--suave); }
+.ped-tabla td strong { display: block; line-height: 1.25; }
+
+.ped-fila { cursor: pointer; }
+.ped-fila:hover td { background: var(--superficie-alt); }
+.ped-fila.activa td { background: var(--et-operario-f); border-bottom-color: var(--primario); }
+/* Un pedido de ayer que no salió sigue debiéndose, y tiene que saltar. */
+.ped-fila.atrasada .ped-guia { color: var(--rojo); }
+
+.ped-guia {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 12.5px; font-weight: 700; white-space: nowrap; color: var(--primario);
+}
+.ped-monto strong { font-variant-numeric: tabular-nums; }
+
+/* Cómo se cobra, en dos palabras y con su punto de color: es lo que el
+   repartidor mira antes de salir. */
+.ped-cobro { font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+.ped-cobro.ok { color: var(--verde); }
+.ped-cobro.credito { color: var(--ambar); }
+.ped-cobro.contado { color: var(--suave); }
+
+.ped-unidad { display: flex; align-items: center; gap: 8px; }
+.ped-unidad-num {
+  display: grid; place-items: center; flex: 0 0 26px; width: 26px; height: 26px;
+  border-radius: 7px; background: var(--et-operario-f); color: var(--et-operario-t);
+  font-size: 11.5px; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.ped-sin { color: var(--suave); font-style: italic; }
+
+.ped-acciones-celda { white-space: nowrap; text-align: right; }
+.ped-accion {
+  position: static; width: 30px; min-width: 30px; height: 30px; padding: 0;
+  border-radius: 8px; font-size: 13px; line-height: 1; margin-left: 4px;
+  background: var(--superficie-alt); color: var(--suave);
+  border: 1px solid var(--borde); box-shadow: none;
+}
+.ped-accion:hover { border-color: var(--primario); color: var(--primario); }
+
+/* --- LA INSPECCIÓN --- */
+.ped-inspeccion-vacia {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 48px 20px; text-align: center; color: var(--suave);
+}
+.ped-inspeccion-vacia span { font-size: 34px; opacity: .5; }
+.ped-inspeccion-vacia p { margin: 0; font-size: 13.5px; max-width: 30ch; }
+
+.ped-insp-cabeza {
+  display: flex; align-items: flex-start; gap: 10px; justify-content: space-between;
+  padding-bottom: 10px; border-bottom: 1px solid var(--borde);
+}
+.ped-insp-cabeza h3 { margin: 0; font-size: 16px; }
+.ped-insp-estado { margin: 2px 0 0; font-size: 12px; font-weight: 700; color: var(--suave); }
+.ped-insp-estado.ruta, .ped-insp-estado.preparacion { color: var(--primario); }
+.ped-insp-estado.entregado { color: var(--verde); }
+.ped-insp-estado.cancelado { color: var(--rojo); }
+.ped-insp-guia {
+  font-family: var(--mono, ui-monospace, monospace); font-size: 12px; font-weight: 700;
+  padding: 3px 9px; border-radius: 999px;
+  background: var(--et-operario-f); color: var(--et-operario-t); white-space: nowrap;
+}
+
+.ped-insp-cliente { margin-top: 12px; }
+.ped-insp-cliente strong { display: block; font-size: 16px; line-height: 1.25; }
+.ped-insp-cliente > small { display: block; font-size: 12px; color: var(--suave); }
+.ped-insp-dir { margin: 6px 0 0; font-size: 12.5px; color: var(--texto); }
+
+/* Lo que se hace al llegar. Va en caja aparte y con filo a la izquierda
+   porque se lee de pie, con el hielo en las manos, y tiene que
+   encontrarse sin buscarla. */
+.ped-instrucciones {
+  margin-top: 12px; padding: 10px 12px; border-radius: 10px;
+  background: var(--superficie-alt); border-left: 3px solid var(--primario);
+}
+.ped-instrucciones.nota { border-left-color: var(--ambar); }
+.ped-instrucciones p { margin: 4px 0 0; font-size: 12.5px; line-height: 1.45; }
+
+.ped-desglose { margin-top: 6px; }
+.ped-desglose td, .ped-desglose th { vertical-align: middle; }
+.ped-desglose small { display: block; font-size: 11px; color: var(--suave); }
+.ped-desglose td.der { font-variant-numeric: tabular-nums; }
+
+.ped-insp-total {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--borde);
+}
+.ped-insp-total > span { font-size: 12.5px; color: var(--suave); }
+.ped-insp-total .ped-cobro { display: block; }
+.ped-insp-total strong { font-size: 24px; font-variant-numeric: tabular-nums; }
+.ped-insp-total strong small { font-size: 12px; color: var(--suave); }
+
+.ped-insp-unidad {
+  margin-top: 12px; padding: 10px 12px; border-radius: 10px;
+  background: var(--superficie-alt);
+}
+.ped-insp-unidad strong { display: block; }
+.ped-insp-unidad small { display: block; font-size: 11.5px; color: var(--suave); }
+
+.ped-insp-botones { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.ped-insp-botones button, .ped-insp-botones .boton-enlace { margin: 0; width: 100%; }
+
 /* Las dos formas de mirar la misma lista. Dos pestañas grandes y no un
    selector: se toca con el dedo en la pantalla del mostrador, y la de
    preparar se usa cincuenta veces al día. */

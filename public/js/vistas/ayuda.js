@@ -2911,7 +2911,10 @@ DEBERIA HABER ..........................  $5,500
     busca: 'pedido pedidos apartar reparto repartidor nota de entrega qr codigo qr ubicacion '
          + 'google maps mapa preparar preparacion garrafones bolsas botellones llamada telefono '
          + 'whatsapp encargo entregar entregado cancelar promesa para manana atrasado horario '
-         + 'referencias direccion cobrar credito transferencia folio',
+         + 'referencias direccion cobrar credito transferencia folio guia GL despacho '
+         + 'etapas pendiente en preparacion en ruta entregados cancelados unidad asignada '
+         + 'chofer contactar exportar excel csv instrucciones de descarga giro inspeccion '
+         + 'buscar filtrar por producto',
     cuerpo: `
       <p>Un pedido es cuando alguien <b>pide por teléfono, por WhatsApp, manda
       a alguien, o llega y dice «déjame veinte para el sábado»</b>. Se apunta,
@@ -2972,18 +2975,84 @@ DEBERIA HABER ..........................  $5,500
       áreas con dos personas. Y eso lo decide el producto: en la ficha de cada
       producto se marca si <b>se prepara en el agua</b>.</p>
 
-      <h4>Las dos formas de verlos</h4>
-      <p>En <b>📦 Los pedidos</b> hay dos pestañas, que son el mismo trabajo
-      mirado desde dos sitios:</p>
+      <h4>La pantalla de despacho</h4>
+      <p>En <b>📦 Los pedidos</b> está todo el flujo en una pantalla:</p>
       <ul>
-        <li><b>Para preparar</b> — todo sumado por producto y partido en Agua
-        y Hielo: «40 garrafones, 180 bolsas». Es lo que se lee en la planta,
-        de pie y con las manos mojadas, y ahí a nadie le importa de quién es
-        cada cosa. Con su hoja impresa para llevarla.</li>
-        <li><b>Las notas de entrega</b> — una por cliente, con su dirección,
-        su horario y su precio. Es lo que va en la mano del repartidor, y ahí
-        lo que no importa es el total.</li>
+        <li><b>Las seis etapas</b>, arriba, con cuántos hay en cada una.
+        <b>Se tocan y filtran la lista</b> — es la pregunta de todos los días
+        («¿qué falta por salir?») y por eso está a la vista y no escondida en
+        un desplegable. Tocar otra vez la que está encendida la apaga.</li>
+        <li><b>La tabla</b>: número de guía y hora, cliente y giro, cuánto es
+        y cómo se cobra, y en qué camioneta va con su parada. Un pedido
+        atrasado lleva su guía en rojo.</li>
+        <li><b>La inspección</b>, al lado: a dónde va, qué se hace al llegar,
+        qué lleva línea por línea con precio unitario y subtotal, y los
+        botones de lo que se hace con él.</li>
       </ul>
+
+      <h4>Las seis etapas, y por qué son seis</h4>
+      <p>En el sistema un pedido tiene <b>tres</b> estados de verdad —tomado,
+      entregado, cancelado—, que son los tres que mueven dinero. Pero para
+      despachar hacen falta seis, porque <b>un pendiente que sigue en la
+      planta y uno que ya va en la camioneta no se atienden igual</b>:</p>
+      <ul>
+        <li><b>Pendientes</b> — tomado y sin camioneta todavía.</li>
+        <li><b>En preparación</b> — ya está metido en una salida que se está
+        cargando.</li>
+        <li><b>En ruta</b> — su salida ya salió. Debajo dice cuántas unidades
+        andan en la calle.</li>
+        <li><b>Entregados</b> — llegó y ya es una venta.</li>
+        <li><b>Cancelados</b> — con su porcentaje del flujo: cero es la
+        respuesta buena.</li>
+      </ul>
+      <p class="ayuda-tip">Las dos de en medio <b>no se apuntan a mano</b>:
+      salen solas de en qué salida va el pedido. Si hubiera que marcarlas,
+      el día que a alguien se le olvidara, la pantalla diría que un pedido
+      sigue en la planta mientras va llegando a la puerta del cliente.</p>
+
+      <h4>Buscar y filtrar</h4>
+      <ul>
+        <li><b>Buscar</b> por número de guía —«8», «#GL-0008» o «gl-8», como
+        salga—, por cliente, por giro o por dirección.</li>
+        <li><b>Para cuándo</b>: hoy con lo atrasado, hasta mañana, la semana,
+        o todo.</li>
+        <li><b>Por producto</b>: «¿quién pidió garrafones hoy?», que es la
+        pregunta cuando la planta va corta de algo. El desplegable solo trae
+        lo que de verdad se ha pedido alguna vez.</li>
+      </ul>
+
+      <h4>La hoja de preparación</h4>
+      <p>Con el botón <b>🖨️ Hoja de preparación</b>: todo sumado por producto
+      y partido en Agua y Hielo —«40 garrafones, 180 bolsas»—. Es lo que se
+      lee en la planta, de pie y con las manos mojadas, y ahí a nadie le
+      importa de quién es cada cosa. No es una vista más de la lista: es un
+      papel, y por eso está en un botón de imprimir.</p>
+
+      <h4>Bajarla a Excel</h4>
+      <p><b>⬇ Exportar a Excel</b> baja la lista <b>con los filtros que estés
+      viendo</b>: si tienes puesto «En ruta», baja lo que va en ruta. Sale un
+      archivo que Excel abre en columnas, con guía, fechas, cliente, giro,
+      zona, dirección, etapa, forma de cobro, unidad, chofer y total.</p>
+
+      <h4>Las instrucciones de descarga</h4>
+      <p>Son <b>qué se hace al llegar</b>: «entrar por la rampa trasera,
+      llenar el congelador del muelle, pedir firma a Don Arturo». Se escriben
+      una vez en la ficha del cliente y salen en cada pedido suyo, en su
+      caja aparte, arriba de lo que lleva.</p>
+      <p class="ayuda-tip">No es lo mismo que las <b>referencias</b>, y por
+      eso son dos campos. Las referencias son <b>cómo se encuentra la
+      puerta</b> —«la de la puerta azul, junto a la tortillería»— y se leen
+      mientras se busca la dirección. Las instrucciones se leen ya en la
+      puerta, con el hielo en las manos. Juntarlas obligaría a leer un
+      párrafo entero para encontrar el dato que hace falta en cada
+      momento.</p>
+      <p>Se copian al pedido al tomarlo: si mañana cambian, la nota que se
+      imprimió hoy sigue diciendo lo que se le dijo al repartidor de hoy.</p>
+
+      <h4>Contactar al chofer</h4>
+      <p>Cuando el pedido ya va en una camioneta, en su inspección sale
+      <b>📲 Contactar al chofer</b>, que abre WhatsApp con su número. El
+      teléfono se le pone a cada quien en <b>👥 Usuarios</b>.</p>
 
       <h4>La nota de entrega y su QR</h4>
       <p>La nota contesta las tres preguntas en el orden en que se hacen

@@ -273,7 +273,8 @@ const CAMPOS_TEXTO = [
   ['direccion', 'direccion', 200], ['notas', 'notas', 500],
   ['horarioEntrega', 'horario_entrega', 120], ['referencias', 'referencias', 300],
   ['razonSocial', 'razon_social', 160], ['rfc', 'rfc', 13],
-  ['correo', 'correo', 120], ['zona', 'zona', 60]
+  ['correo', 'correo', 120], ['zona', 'zona', 60],
+  ['giro', 'giro', 60], ['instrucciones', 'instrucciones', 500]
 ];
 
 /** Una hora 'HH:MM' normalizada, o null si no se entiende. */

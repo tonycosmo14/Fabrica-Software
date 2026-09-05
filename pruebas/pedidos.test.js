@@ -35,6 +35,7 @@ const { llamar, entrarAdmin, entrarPorNombre, crearUsuario, bd,
         preparar } = fabricaDePrueba('pedidos');
 
 let tienda, sinUbicacion, garrafon, bolsa, mayoreo;
+let conInstrucciones;
 
 const hoy = () => new Date().toISOString().slice(0, 10);
 const manana = () => {
@@ -728,4 +729,135 @@ test('la nota de entrega dice para qué día es', async () => {
   const papel = (await llamar(`/api/impresion/pedido/${p.id}/previa`))
     .json.datos.renglones.map((x) => x.t).join('\n');
   assert.match(papel, /Para el 12\/Sep/);
+});
+
+// ============================================================
+// EL CONTROL Y DESPACHO  (v7.0)
+// ============================================================
+//
+// "Te comparto igual cómo se va a ver la parte de pedidos."
+
+test('las instrucciones de descarga se copian del cliente al pedido', async () => {
+  await entrarAdmin();
+  await llamar(`/api/clientes/${tienda.id}`, {
+    method: 'PUT',
+    cuerpo: { giro: 'Conveniencia Express',
+              instrucciones: 'Entrar por la rampa trasera. Firma Don Arturo.' }
+  });
+
+  const r = await llamar('/api/pedidos', {
+    method: 'POST',
+    cuerpo: { clienteId: tienda.id, lineas: [{ productoId: bolsa.id, cantidad: 4 }] }
+  });
+  assert.equal(r.estado, 201);
+  const p = r.json.datos.pedido;
+  assert.match(p.instrucciones, /rampa trasera/,
+    'el repartidor las lleva escritas en su nota');
+
+  // Y quedan CONGELADAS: cambiarlas mañana no toca la nota de hoy.
+  await llamar(`/api/clientes/${tienda.id}`, {
+    method: 'PUT', cuerpo: { instrucciones: 'Ahora se entra por delante.' }
+  });
+  const otra = (await llamar(`/api/pedidos/${p.id}`)).json.datos.pedido;
+  assert.match(otra.instrucciones, /rampa trasera/);
+
+  conInstrucciones = p;
+});
+
+test('las etapas se deducen de la salida, no de una columna', async () => {
+  const calculo = require('../src/modulos/pedidos/calculo');
+  assert.deepEqual(calculo.ETAPAS.map((e) => e.clave),
+    ['todos', 'pendiente', 'preparacion', 'ruta', 'entregado', 'cancelado']);
+
+  // Sin salida, pendiente.
+  assert.equal(calculo.etapaDe({ estado: 'pendiente', salida: null }), 'pendiente');
+  // En una salida que se está cargando, en preparación.
+  assert.equal(
+    calculo.etapaDe({ estado: 'pendiente', salida: { estado: 'cargando' } }), 'preparacion');
+  // Ya salió.
+  assert.equal(
+    calculo.etapaDe({ estado: 'pendiente', salida: { estado: 'en_ruta' } }), 'ruta');
+  // Y el estado de verdad manda sobre todo lo demás.
+  assert.equal(
+    calculo.etapaDe({ estado: 'entregado', salida: { estado: 'en_ruta' } }), 'entregado');
+  assert.equal(calculo.etapaDe({ estado: 'cancelado', salida: null }), 'cancelado');
+
+  // La columna de la base sigue teniendo TRES estados y nada más: las dos
+  // de en medio no se guardan.
+  const check = bd.prepare(
+    "SELECT sql FROM sqlite_master WHERE type='table' AND name='pedidos'").get().sql;
+  assert.ok(!check.includes('preparacion'), 'no hay estado «preparacion» en la base');
+});
+
+test('los seis números de arriba salen del mismo rango que la lista', async () => {
+  const d = (await llamar('/api/pedidos?estado=todos&hasta=2999-12-31')).json.datos;
+  assert.ok(d.resumen, 'la pantalla recibe su resumen');
+  assert.equal(d.resumen.todos, d.pedidos.length);
+
+  // Los seis suman el total: cada pedido está en una etapa y solo en una.
+  const suma = ['pendiente', 'preparacion', 'ruta', 'entregado', 'cancelado']
+    .reduce((n, k) => n + d.resumen[k], 0);
+  assert.equal(suma, d.resumen.todos);
+  assert.equal(typeof d.resumen.porCobrar, 'number');
+  assert.equal(typeof d.resumen.porcentajeCancelados, 'number');
+});
+
+test('se busca por número de guía, por cliente y por giro', async () => {
+  const p = conInstrucciones;
+
+  // Por el folio, escrito de las tres formas en que uno lo dice.
+  for (const como of [String(p.folio), `#GL-${String(p.folio).padStart(4, '0')}`,
+                      `gl-${p.folio}`]) {
+    const r = (await llamar(
+      `/api/pedidos?estado=todos&hasta=2999-12-31&busca=${encodeURIComponent(como)}`)).json.datos;
+    assert.ok(r.pedidos.some((x) => x.id === p.id), `no lo encontró con «${como}»`);
+    assert.equal(r.pedidos.length, 1, `«${como}» trajo de más`);
+  }
+
+  // Por el giro, que es de la ficha del cliente.
+  const porGiro = (await llamar(
+    '/api/pedidos?estado=todos&hasta=2999-12-31&busca=conveniencia')).json.datos;
+  assert.ok(porGiro.pedidos.length >= 1);
+  assert.ok(porGiro.pedidos.every((x) => /Conveniencia/i.test(x.cliente_giro || '')));
+
+  // Y algo que no existe no trae nada.
+  const nada = (await llamar(
+    '/api/pedidos?estado=todos&hasta=2999-12-31&busca=zzzzz')).json.datos;
+  assert.equal(nada.pedidos.length, 0);
+});
+
+test('se filtra por producto: quién pidió garrafones', async () => {
+  await entrarAdmin();
+  await llamar('/api/pedidos', {
+    method: 'POST',
+    cuerpo: { clienteId: tienda.id, lineas: [{ productoId: garrafon.id, cantidad: 3 }] }
+  });
+
+  const r = (await llamar(
+    `/api/pedidos?estado=todos&hasta=2999-12-31&producto=${garrafon.id}`)).json.datos;
+  assert.ok(r.pedidos.length >= 1);
+  assert.ok(r.pedidos.every((p) => p.lineas.some((l) => l.producto_id === garrafon.id)),
+    'todos los que trae llevan garrafones');
+
+  // El desplegable ofrece lo que de verdad se ha pedido, no el catálogo.
+  assert.ok(r.productos.some((p) => p.id === garrafon.id));
+});
+
+test('la lista se baja como CSV que Excel abre en columnas', async () => {
+  const r = await llamar('/api/pedidos/exportar?estado=todos&hasta=2999-12-31');
+  assert.equal(r.estado, 200);
+  assert.match(r.cabeceras.get('content-type'), /text\/csv/);
+  assert.match(r.cabeceras.get('content-disposition'), /attachment; filename="pedidos-/,
+    'se baja como archivo con su nombre, no se abre en la pantalla');
+
+  // OJO: el CSV sale con el BOM del principio —sin él Excel en español
+  // rompe los acentos— pero `fetch().text()` se lo come al decodificar,
+  // así que aquí no se puede comprobar. Lo que sí se comprueba es lo
+  // otro que Excel necesita: el punto y coma como separador.
+  const csv = r.texto ?? '';
+  const renglones = csv.trim().split('\r\n');
+  assert.match(renglones[0], /^Guia;Tomado;Para cuando;Cliente/,
+    'punto y coma, que es lo que Excel en español entiende como columna');
+  assert.ok(renglones.length > 1, 'y trae los pedidos debajo');
+  assert.match(renglones[1], /^GL-\d{4};/);
 });
