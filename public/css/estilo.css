@@ -4846,16 +4846,22 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
    LOS CLIENTES, POR LO QUE COMPRAN  (v5.4)
    ============================================================ */
 
-/* DOS Y DOS, no cuatro en fila: la columna de la izquierda mide unos 330
-   px y "Marquetas" no cabe en ochenta. En cuatro se salían dos pestañas
-   fuera de la caja y no había forma de tocarlas. */
+/* LAS PESTAÑAS, EN FILA Y A LO ANCHO  (v6.9)
+   Desde que la cartera ocupa la pantalla entera caben las seis en un
+   renglón. En pantallas chicas se parten en dos y tres, que sigue siendo
+   legible; lo que no puede pasar es que una se salga de la caja y no haya
+   forma de tocarla. */
 .cli-pestanas {
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px;
-  margin-bottom: 10px;
+  margin-bottom: 14px;
 }
-@media (min-width: 1500px) {
-  .cli-pestanas { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (min-width: 760px) {
+  .cli-pestanas { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+@media (min-width: 1180px) {
+  .cli-pestanas { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+.cli-pestanas-ficha { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
 .cli-pestana {
   display: flex; flex-direction: column; align-items: center; gap: 1px;
   padding: 7px 4px; width: 100%;
@@ -5220,6 +5226,287 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 @media (max-width: 720px) {
   .cli-campos { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   LA CARTERA DE CLIENTES  (v6.9 — el diseño del dueño)
+
+   La pantalla entera, no una columna: cuatro números arriba, las
+   pestañas, la tabla del padrón y la ficha al lado. Las preguntas de
+   todos los días —«¿a quién le toca hoy?», «¿cuánto se lleva?», «¿quién
+   me debe más?»— se contestan comparando columnas, y eso una lista de
+   renglones no lo deja hacer.
+   ============================================================ */
+.cli-pantalla { width: 100%; }
+
+/* --- LOS CUATRO NÚMEROS DE ARRIBA --- */
+.cli-kpis {
+  display: grid; gap: 12px; margin-bottom: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+.cli-kpi {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 14px 16px; border-radius: 14px;
+  background: var(--superficie); border: 1px solid var(--borde);
+  /* El filo de arriba es lo que los hace leerse como cuatro tarjetas y no
+     como una tira: sin él, con el fondo del panel detrás, se funden. */
+  border-top: 3px solid var(--primario);
+}
+.cli-kpi.kpi-mal { border-top-color: var(--rojo); }
+.cli-kpi-cabeza { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cli-kpi-titulo {
+  font-size: 11.5px; font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--suave);
+}
+.cli-kpi-icono { font-size: 16px; opacity: .75; }
+.cli-kpi-valor {
+  font-size: 30px; line-height: 1.1; margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.cli-kpi-valor small { font-size: 15px; color: var(--suave); font-weight: 600; }
+.cli-kpi-pie { font-size: 12.5px; color: var(--texto); margin-top: 4px; }
+.cli-kpi-nota { font-size: 11.5px; color: var(--suave); }
+.cli-kpi.kpi-mal .cli-kpi-nota { color: var(--rojo); font-weight: 600; }
+
+/* --- EL TÍTULO Y EL BUSCADOR --- */
+.cli-titulo {
+  display: flex; gap: 16px; align-items: flex-end; justify-content: space-between;
+  flex-wrap: wrap; margin-bottom: 14px;
+}
+.cli-titulo h2 { margin: 0; }
+.cli-titulo .ayuda { margin: 4px 0 0; max-width: 60ch; }
+.cli-titulo-acciones { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.cli-titulo-acciones .buscador { margin: 0; min-width: 260px; }
+.cli-titulo-acciones button { margin: 0; white-space: nowrap; }
+
+/* --- EL TABLERO: la tabla y la ficha --- */
+.cli-tablero { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: start; }
+@media (min-width: 1100px) {
+  /* La ficha no se encoge por debajo de 380: con menos, los renglones de
+     «Razón social / RFC / Contacto» se parten en tres líneas cada uno. */
+  .cli-tablero { grid-template-columns: minmax(0, 1fr) 400px; }
+}
+
+.cli-padron, .cli-ficha {
+  background: var(--superficie); border: 1px solid var(--borde);
+  border-radius: 14px; padding: 14px 16px; min-width: 0;
+}
+/* La ficha se queda a la vista mientras se recorre la tabla: se compara un
+   cliente con la lista, y perderlo de vista al bajar obliga a volver. */
+@media (min-width: 1100px) {
+  .cli-ficha { position: sticky; top: var(--alto-barra, 64px); max-height: calc(100vh - var(--alto-barra, 64px) - 24px); overflow-y: auto; }
+}
+
+.cli-padron-cabeza {
+  display: flex; gap: 12px; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; margin-bottom: 12px;
+}
+.cli-padron-cabeza h3 { margin: 0; font-size: 16px; }
+.cli-padron-cabeza h3 small {
+  display: block; font-size: 12px; font-weight: 400; color: var(--suave);
+}
+.cli-padron-filtros { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.cli-padron-filtros button { margin: 0; }
+.cli-orden { display: flex; align-items: center; gap: 6px; }
+.cli-orden span { font-size: 12px; color: var(--suave); }
+.cli-orden select { margin: 0; padding: 5px 8px; font-size: 12.5px; }
+
+/* --- LA TABLA DEL PADRÓN --- */
+/* El marco es quien se desplaza a lo ancho, no la página: ocho columnas no
+   caben en una tablet y el resto de la pantalla no tiene por qué moverse. */
+.cli-tabla-marco { overflow-x: auto; margin: 0 -16px; padding: 0 16px; }
+.cli-tabla { width: 100%; min-width: 860px; border-collapse: collapse; font-size: 13.5px; }
+.cli-tabla th {
+  text-align: left; padding: 8px 10px; font-size: 11px; font-weight: 700;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--suave);
+  border-bottom: 1px solid var(--borde); white-space: nowrap;
+}
+.cli-tabla th.der, .cli-tabla td.der { text-align: right; }
+.cli-tabla td { padding: 10px; border-bottom: 1px solid var(--borde); vertical-align: middle; }
+.cli-tabla td small {
+  display: block; font-size: 11.5px; color: var(--suave);
+  /* Una dirección larga partida en tres renglones estira la fila al triple
+     y la tabla deja de poderse recorrer con la vista. Se recorta con
+     puntos suspensivos y entera se lee en la ficha de al lado. */
+  max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cli-quien-celda small { max-width: 26ch; }
+
+.cli-fila { cursor: pointer; }
+.cli-fila:hover td { background: var(--superficie-alt); }
+.cli-fila.activa td {
+  background: var(--et-operario-f);
+  border-bottom-color: var(--primario);
+}
+.cli-fila.de-baja { opacity: .55; }
+
+.cli-codigo {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 12px; color: var(--suave); white-space: nowrap;
+}
+.cli-quien-celda { display: flex; align-items: center; gap: 10px; min-width: 220px; }
+.cli-quien-celda .cli-cara { width: 34px; height: 34px; flex: 0 0 34px; font-size: 13px; }
+.cli-quien-celda strong { display: block; line-height: 1.25; }
+.cli-consumo strong { font-variant-numeric: tabular-nums; }
+.cli-saldo-celda strong { font-variant-numeric: tabular-nums; }
+.cli-saldo-celda.debe strong { color: var(--ambar); }
+.cli-saldo-celda.vencido strong { color: var(--rojo); }
+.cli-ok { font-size: 12px; color: var(--verde); }
+
+.cli-chip {
+  display: inline-block; padding: 2px 9px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 700; white-space: nowrap;
+  background: var(--et-operario-f); color: var(--et-operario-t);
+}
+.cli-chip.suave { background: var(--superficie-alt); color: var(--suave); }
+
+.cli-estado { font-size: 12px; font-weight: 700; white-space: nowrap; }
+.cli-estado.si { color: var(--verde); }
+.cli-estado.no { color: var(--suave); }
+
+.cli-acciones-celda { white-space: nowrap; text-align: right; }
+.cli-accion {
+  position: static; width: 30px; min-width: 30px; height: 30px; padding: 0;
+  border-radius: 8px; font-size: 14px; line-height: 1; margin-left: 4px;
+  background: var(--superficie-alt); color: var(--suave);
+  border: 1px solid var(--borde); box-shadow: none;
+}
+.cli-accion:hover { border-color: var(--primario); color: var(--primario); }
+/* La ✕ de un renglón NO es `.tachita`: aquella nace `position: absolute`
+   —es la que va encima de una foto— y dentro de la ficha, que es pegajosa
+   y por tanto un bloque contenedor, se va volando a la esquina del panel.
+   Ya pasó una vez con los botones de la raya. */
+.cli-accion.peligro { font-size: 17px; font-weight: 700; }
+.cli-accion.peligro:hover { border-color: var(--rojo); color: var(--rojo); }
+
+/* --- LA FICHA DE LA DERECHA --- */
+.cli-ficha-vacia {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 48px 20px; text-align: center; color: var(--suave);
+}
+.cli-ficha-vacia span { font-size: 34px; opacity: .5; }
+.cli-ficha-vacia p { margin: 0; font-size: 13.5px; max-width: 30ch; }
+
+.cli-ficha-cabeza { display: flex; gap: 14px; align-items: flex-start; }
+.cli-codigo-ficha {
+  margin: 0 0 2px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-family: var(--mono, ui-monospace, monospace); font-size: 11.5px; color: var(--suave);
+}
+.cli-ficha-cabeza .cli-cara.grande { width: 60px; height: 60px; flex: 0 0 60px; font-size: 22px; }
+.cli-ficha-cabeza h3 { margin: 0; font-size: 19px; line-height: 1.2; }
+
+/* Los datos duros, en renglones etiqueta/valor. Se leen de un vistazo y
+   son los que se dictan por teléfono. */
+.cli-datos-clave { margin-top: 14px; }
+.cli-dato-clave {
+  display: flex; gap: 12px; justify-content: space-between; align-items: baseline;
+  padding: 6px 0; border-bottom: 1px solid var(--borde); font-size: 13px;
+}
+.cli-dato-clave span { color: var(--suave); white-space: nowrap; }
+.cli-dato-clave strong { text-align: right; min-width: 0; word-break: break-word; }
+.cli-dato-clave a { color: var(--primario); font-weight: 700; text-decoration: none; }
+
+.cli-ventana {
+  margin: 12px 0 0; padding: 8px 12px; border-radius: 10px;
+  background: var(--superficie-alt); font-size: 12.5px; color: var(--texto);
+}
+.cli-ventana small { display: block; color: var(--suave); margin-top: 2px; }
+
+.cli-saldo-panel {
+  margin-bottom: 14px; padding: 12px 14px; border-radius: 12px;
+  border: 1px solid var(--borde); background: var(--superficie-alt);
+}
+.cli-saldo-panel span { font-size: 12px; color: var(--suave); display: block; }
+.cli-saldo-panel strong {
+  display: block; font-size: 27px; line-height: 1.15; font-variant-numeric: tabular-nums;
+}
+.cli-saldo-panel strong small { font-size: 13px; color: var(--suave); }
+.cli-saldo-panel > div > small { display: block; font-size: 11.5px; color: var(--suave); }
+.cli-saldo-panel.debe { border-color: var(--ambar); }
+.cli-saldo-panel.debe strong { color: var(--ambar); }
+.cli-saldo-panel.vencido { border-color: var(--rojo); background: var(--et-baja-f); }
+.cli-saldo-panel.vencido strong { color: var(--et-baja-t); }
+
+.cli-botonera { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.cli-botonera button { margin: 0; }
+.cli-botonera #levantar-pedido { flex: 1 1 100%; }
+
+.cli-seccion-cabeza {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap;
+}
+.cli-seccion-cabeza h3 { margin: 0; font-size: 15px; }
+.cli-seccion-cabeza .cfg-subtitulo { margin-bottom: 0; }
+
+/* --- LAS TARIFAS ACORDADAS --- */
+.cli-tarifas td, .cli-tarifas th { vertical-align: middle; }
+.cli-tarifas small { display: block; font-size: 11px; color: var(--suave); }
+/* El precio de lista va tachado al lado del acordado: es lo que hace ver
+   de un golpe si el trato sigue siendo un trato o ya se quedó regalado. */
+.cli-tachado { color: var(--suave); text-decoration: line-through; }
+
+/* --- LOS GARRAFONES --- */
+.cli-garrafones {
+  margin-top: 10px; padding: 12px 14px; border-radius: 12px;
+  border: 1px solid var(--borde); background: var(--superficie-alt);
+}
+.cli-garrafones.pasado { border-color: var(--ambar); }
+.cli-garrafones-cuenta { display: flex; align-items: baseline; gap: 8px; }
+.cli-garrafones-cuenta strong { font-size: 26px; font-variant-numeric: tabular-nums; }
+.cli-garrafones-cuenta span { font-size: 12.5px; color: var(--suave); }
+.cli-garrafones .fila-botones { margin-top: 10px; }
+.cli-garrafones .ayuda { margin: 8px 0 0; }
+
+.barra-simple {
+  height: 7px; border-radius: 99px; background: var(--borde);
+  overflow: hidden; margin-top: 8px;
+}
+.barra-simple span { display: block; height: 100%; background: var(--primario); }
+.cli-garrafones.pasado .barra-simple span { background: var(--ambar); }
+
+/* ============================================================
+   EL ALTA DE UN CLIENTE, PANTALLA ENTERA  (v6.9)
+
+   Dar de alta a un mayorista es capturar datos fiscales, ventana de
+   recepción, esquema de pago y envases. Eso no cabe en un diálogo de una
+   línea, y pedirlo campo por campo desde la ficha es la forma más segura
+   de que la mitad se quede sin llenar.
+   ============================================================ */
+.cli-alta { width: 100%; }
+.cli-miga {
+  margin: 0 0 4px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--suave); font-weight: 700;
+}
+.cli-alta-cabeza {
+  display: flex; gap: 16px; align-items: flex-start; justify-content: space-between;
+  flex-wrap: wrap; margin-bottom: 18px;
+}
+.cli-alta-cabeza h2 { margin: 0; }
+.cli-alta-cabeza .ayuda { margin: 6px 0 0; max-width: 62ch; }
+.cli-alta-cabeza .fila-botones { margin: 0; flex-wrap: nowrap; }
+
+.cli-alta-cuerpo { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: start; }
+@media (min-width: 1100px) {
+  .cli-alta-cuerpo { grid-template-columns: minmax(0, 1fr) 360px; }
+}
+.cli-alta-form { display: flex; flex-direction: column; gap: 16px; }
+.cli-alta-form .tarjeta { margin: 0; }
+
+/* El resumen se queda a la vista mientras se rellena: quien captura ve
+   cómo va quedando la cuenta sin tener que imaginárselo. */
+.cli-alta-resumen .tarjeta { margin: 0; }
+@media (min-width: 1100px) {
+  .cli-alta-resumen { position: sticky; top: var(--alto-barra, 64px); }
+}
+.cli-alta-quien { display: flex; gap: 12px; align-items: center; margin: 10px 0 14px; }
+.cli-alta-quien .cli-cara.grande { width: 48px; height: 48px; flex: 0 0 48px; font-size: 18px; }
+.cli-alta-quien strong { display: block; line-height: 1.25; }
+.cli-alta-quien small { display: block; font-size: 11.5px; color: var(--suave); }
+.cli-alta-linea {
+  display: flex; justify-content: space-between; gap: 12px; align-items: baseline;
+  padding: 6px 0; border-bottom: 1px solid var(--borde); font-size: 12.5px;
+}
+.cli-alta-linea span { color: var(--suave); white-space: nowrap; }
+.cli-alta-linea strong { text-align: right; min-width: 0; word-break: break-word; }
 
 /* CORREGIR UNA SACADA, MOLDE POR MOLDE  (v6.6)
    Aquí las canastas se apilan en vez de correrse a lo ancho: se van a

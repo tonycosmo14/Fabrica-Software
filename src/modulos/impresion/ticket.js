@@ -369,6 +369,7 @@ function ticketVenta(venta, { copia = false, negocio = '' } = {}) {
     t.centro().negrita().tamano(2, 1).linea('A CREDITO').normal();
     if (venta.cliente_negocio) t.centro().linea(venta.cliente_negocio);
     t.izquierda();
+    datosFiscales(t, venta);
 
     // SI DEJÓ UNA PARTE, EL PAPEL LO DICE  (v5.3).
     //
@@ -706,6 +707,7 @@ function ticketAbono(a, { negocio = '', copia = false } = {}) {
   t.negrita().tamano(2, 1).parrafo(String(a.cliente_nombre || '?').slice(0, 40));
   t.normal();
   if (a.cliente_negocio) t.parrafo(a.cliente_negocio);
+  datosFiscales(t, a);
 
   t.saltos(1);
   t.izquierda().negrita().tamano(3, 2).linea(formato(a.centavos)).normal();
@@ -856,6 +858,21 @@ function ticketRaya(raya, { negocio = '', copia = false, previa = false } = {}) 
   pie(t, negocio);
   t.izquierda().cortar(cfg.avanceCorte);
   return t.bytes();
+}
+
+/**
+ * LOS DATOS FISCALES DEL CLIENTE, cuando los tiene  (v6.9)
+ *
+ * El sistema NO factura y esto no lo cambia: es para que el papel que se
+ * lleva el cliente ya traiga su razón social y su RFC, y no haya que
+ * buscarlos en un WhatsApp de hace ocho meses el día que pida factura.
+ *
+ * Solo se imprime lo que hay: un renglón "RFC: —" solo gasta papel.
+ */
+function datosFiscales(t, c) {
+  if (!c?.cliente_razon_social && !c?.cliente_rfc) return;
+  if (c.cliente_razon_social) t.parrafo(c.cliente_razon_social);
+  if (c.cliente_rfc) t.linea(`RFC: ${c.cliente_rfc}`);
 }
 
 /**

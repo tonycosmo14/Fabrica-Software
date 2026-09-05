@@ -75,7 +75,10 @@ const RUTAS = {
   '#/reparto':   { titulo: 'El reparto',         vista: vistaReparto,   permiso: 'reparto.ver' },
   // El cajero entra con vista limitada: ve cuántas hay e imprime la hoja.
   '#/productos': { titulo: 'Productos y precios', vista: vistaProductos, permiso: 'inventario.ver', fija: true },
-  '#/clientes':  { titulo: 'Clientes',           vista: vistaClientes,  permiso: 'clientes.ver', fija: true },
+  // Clientes YA NO es de alto fijo (v6.9): la cartera es una página que se
+  // desplaza —cuatro números, las pestañas, la tabla y la ficha— y con el
+  // alto clavado la mitad quedaba fuera sin forma de llegar a ella.
+  '#/clientes':  { titulo: 'Clientes',           vista: vistaClientes,  permiso: 'clientes.ver' },
   '#/historial': { titulo: 'Historial',          vista: vistaHistorial, permiso: 'historial.ver' },
   // Es una página larga que se rueda con la rueda del ratón, como el
   // historial: NO lleva 'fija', porque esa deja la pantalla sin rodar y los

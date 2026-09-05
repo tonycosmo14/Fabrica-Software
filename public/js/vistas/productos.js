@@ -288,7 +288,6 @@ export async function vistaProductos(pantalla, estadoApp) {
             : ''}`}
       </div>
 
-      ${!esDeHielo ? panelArea(p) : ''}
 
       ${administra ? `
         <div class="fila-botones" style="margin-top:14px;flex-wrap:wrap">
@@ -338,54 +337,19 @@ export async function vistaProductos(pantalla, estadoApp) {
       </div>`;
   }
 
-  /**
-   * DE QUÉ NEGOCIO ES ESTE PRODUCTO  (v5.6, mejor explicado en la v6.8.1)
+  /*
+   * LO QUE SE FUE EN LA v6.9: «¿de cuál de los dos negocios es?»
    *
-   * Aquí son dos negocios en un mismo catálogo —la fábrica de hielo y la
-   * planta de agua— y esto es lo único que dice cuál es cuál. Hace dos
-   * cosas de verdad:
+   * "Toda la fábrica es una misma, no hay dos partes. Un cliente puede
+   *  pedir en la caja agua, hielo, refrescos, lo que quiera, y creo que es
+   *  obvio con lo que compre."
    *
-   *   · PARTE EN DOS LA HOJA DE PREPARACIÓN de los pedidos: el del agua
-   *     lee su bloque y el del hielo el suyo, sin buscar entre lo del otro.
-   *   · MARCA AL CLIENTE COMO «💧 agua» en cuanto le compra algo de aquí,
-   *     y con eso se puede buscar después quién compra agua.
-   *
-   * Y NO DECIDE NADA DE LOS PEDIDOS: cualquier producto de los dos lados
-   * se puede pedir. Se decía "¿dónde se prepara?" y sonaba a que era una
-   * cosa de la pantalla de pedidos y a que dejaba fuera al otro lado.
-   *
-   * Se marca a mano y no se adivina por el nombre. Adivinar funcionaría
-   * hasta el día que alguien dé de alta "Hielo en botella", y el garrafón
-   * se iría a la lista del cuarto frío sin que nadie entendiera por qué.
+   * La marca sigue existiendo —de ella salen la pestaña de «clientes de
+   * agua» y el bloque del agua en la hoja de preparación— pero ya no se
+   * pregunta: el servidor la deduce del nombre al dar de alta o al
+   * renombrar. Una pregunta que no cambia nada de lo que se vende no vale
+   * el renglón que ocupa en la ficha.
    */
-  function panelArea(p) {
-    const agua = Boolean(p.para_agua);
-    if (!administra) {
-      return `
-        <div class="cuadre">
-          <div class="cuadre-linea">
-            <span>Es de</span>
-            <strong>${agua ? '💧 La planta de agua' : '🧊 La fábrica de hielo'}</strong>
-          </div>
-        </div>`;
-    }
-    return `
-      <h4 class="cfg-subtitulo">¿De cuál de los dos negocios es?</h4>
-      <p class="ayuda">
-        Parte en dos la hoja de preparación de los pedidos —cada quien lee
-        su bloque— y marca como «💧 agua» al cliente que compra de esto.
-        <b>No limita nada:</b> cualquier producto de los dos lados se puede
-        vender y se puede pedir.
-      </p>
-      <div class="prod-areas">
-        <button class="prod-area ${agua ? '' : 'activa'}" data-area="hielo">
-          <span class="emoji">🧊</span><strong>La fábrica de hielo</strong>
-        </button>
-        <button class="prod-area ${agua ? 'activa' : ''}" data-area="agua">
-          <span class="emoji">💧</span><strong>La planta de agua</strong>
-        </button>
-      </div>`;
-  }
 
   /** Para el hielo, el inventario ES la existencia del cuarto frío. */
   /**
@@ -736,20 +700,6 @@ export async function vistaProductos(pantalla, estadoApp) {
     const apagar = q('#apagar-inv');
     if (apagar) apagar.onclick = () => apagarInventario(seleccionado);
 
-    // DE QUÉ NEGOCIO ES  (v5.6). Se guarda al tocarlo, sin botón de
-    // guardar: es un interruptor de dos, y un "guardar" aparte solo sirve
-    // para que alguien lo cambie y se vaya sin darle.
-    pantalla.querySelectorAll('[data-area]').forEach((b) => {
-      b.onclick = async () => {
-        const agua = b.dataset.area === 'agua';
-        if (Boolean(seleccionado?.para_agua) === agua) return;
-        try {
-          await api.actualizar(`/catalogo/productos/${seleccionado.id}`, { paraAgua: agua });
-          avisar(agua ? 'Es de la planta de agua' : 'Es de la fábrica de hielo', 'bien');
-          cargar();
-        } catch (e) { avisar(e.message, 'error'); }
-      };
-    });
     const entrada = q('#inv-entrada');
     if (entrada) entrada.onclick = () => movimientoInventario(seleccionado, 'entrada');
     const salida = q('#inv-salida');

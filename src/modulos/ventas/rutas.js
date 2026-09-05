@@ -205,7 +205,7 @@ router.post('/', vender, (req, res) => {
 
   const listaMayoreo = conMayoreo ? listaDeMayoreo(clienteDelTicket) : null;
 
-  const preparadas = prepararLineas(lineas, lista, listaMayoreo);
+  const preparadas = prepararLineas(lineas, lista, listaMayoreo, clienteDelTicket);
   if (preparadas.error) return error(res, preparadas.error, preparadas.codigo || 400);
 
   // ---- EL PRECIO ESPECIAL LO PONE UN RESPONSABLE  (v6.2) ----
@@ -486,9 +486,19 @@ function revisarCredito(req, total, cliente) {
  * EL PRECIO SE CALCULA AQUÍ, en el servidor, no se cree lo que mande la
  * pantalla. Devuelve { lineas, total } o { error } — nunca a medias.
  */
-function prepararLineas(lineas, lista, listaMayoreo = null) {
+function prepararLineas(lineas, lista, listaMayoreo = null, cliente = null) {
   const preparadas = [];
   let total = 0;
+
+  // SUS PRECIOS ACORDADOS  (v6.9). Se leen una vez para todo el ticket y
+  // no producto por producto: un ticket de veinte renglones haría veinte
+  // consultas para leer la misma tabla de cuatro filas.
+  const acordados = new Map(
+    cliente?.id && cliente.activo
+      ? bd.prepare('SELECT producto_id, centavos FROM cliente_precios WHERE cliente_id = ?')
+          .all(cliente.id).map((f) => [f.producto_id, f.centavos])
+      : []
+  );
 
   for (const l of lineas) {
     // Una línea puede venir de un botón del catálogo (productoId o código)
@@ -538,11 +548,21 @@ function prepararLineas(lineas, lista, listaMayoreo = null) {
       };
     }
 
-    // EL PRECIO ESPECIAL DE UNA VEZ  (v6.2). Viene por pieza en los
-    // productos y como total del renglón en el hielo suelto. Lo de lista
-    // se guarda al lado: es lo que permite decir mañana que fue un
-    // descuento y no el precio de entonces.
+    // EL PRECIO ACORDADO CON ESTE CLIENTE  (v6.9).
+    //
+    // Gana a la lista de mayoreo y al mostrador: es el trato más
+    // particular que hay, y por eso está más abajo en la cascada. Va por
+    // pieza y se multiplica por las que se lleve.
+    //
+    // NO se guarda como "precio especial" ni pide autorización: eso es
+    // para el descuento de una vez, que lleva su porqué escrito. Éste es
+    // el precio normal DE ESTE CLIENTE, igual que el de mayoreo es el
+    // normal de quien trae esa lista. Pedir un PIN cada vez que compra el
+    // de siempre sería pedirlo veinte veces al día.
     let centavos = c.centavos;
+    if (producto && acordados.has(producto.id)) {
+      centavos = acordados.get(producto.id) * cantidad;
+    }
     let precioLista = null;
     let motivoPrecio = null;
     if (l.precioEspecial !== undefined && l.precioEspecial !== null && l.precioEspecial !== '') {
@@ -554,7 +574,10 @@ function prepararLineas(lineas, lista, listaMayoreo = null) {
       if (!motivoPrecio) {
         return { error: 'Un precio especial lleva su porqué: escribe por qué se cobra distinto.' };
       }
-      precioLista = c.centavos;
+      // Lo que se habría cobrado: su precio acordado si lo tiene, y si no
+      // el de la lista. Comparar contra el mostrador diría que se le hizo
+      // un descuento del 40% cuando de los suyos fue del 5%.
+      precioLista = centavos;
       centavos = producto && producto.tipo !== 'hielo' ? especial * cantidad : especial;
     }
 

@@ -116,6 +116,141 @@ function ritmoDe(clienteId, tope = cuantosParaSerDeSiempre()) {
   };
 }
 
+/**
+ * LOS GARRAFONES QUE TRAE  (v6.9)
+ *
+ * No hay contador: se suman los movimientos. Positivo es lo que se le
+ * entregó, negativo lo que devolvió, y la resta es lo que hay en su patio.
+ * Un contador editable acabaría diciendo 15 con 9 en el patio, y nadie
+ * sabría desde cuándo.
+ */
+function garrafonesDe(clienteId, cliente = null) {
+  const c = cliente || bd.prepare(
+    'SELECT garrafones_limite, garrafon_deposito_centavos FROM clientes WHERE id = ?'
+  ).get(clienteId) || {};
+
+  const fila = bd.prepare(`
+    SELECT COALESCE(SUM(cuantos), 0) AS retenidos, MAX(fecha) AS ultimo
+      FROM garrafones_movimientos
+     WHERE cliente_id = ? AND anulado_en IS NULL
+  `).get(clienteId);
+
+  const retenidos = fila.retenidos;
+  const limite = c.garrafones_limite ?? null;
+  const deposito = c.garrafon_deposito_centavos ?? null;
+
+  return {
+    retenidos,
+    limite,
+    // Sin límite escrito no hay de qué pasarse, igual que con el crédito.
+    pasado: limite !== null && retenidos > limite,
+    depositoUnitario: deposito,
+    // Lo que el cliente dejó en garantía por los que trae. Va APARTE del
+    // saldo a propósito: una garantía no es una deuda, y sumarla al saldo
+    // haría que la cobranza saliera a cobrar dinero que nadie debe.
+    depositoCentavos: deposito === null ? null : Math.max(0, retenidos) * deposito,
+    ultimoMovimiento: fila.ultimo || null
+  };
+}
+
+/** Sus movimientos de garrafones, del más nuevo al más viejo. */
+function garrafonesHistorial(clienteId, limite = 30) {
+  return bd.prepare(`
+    SELECT g.*, u.nombre AS ejecutor_nombre, a.nombre AS anulado_por_nombre
+      FROM garrafones_movimientos g
+      LEFT JOIN usuarios u ON u.id = g.ejecutor_id
+      LEFT JOIN usuarios a ON a.id = g.anulado_por
+     WHERE g.cliente_id = ?
+     ORDER BY g.fecha DESC
+     LIMIT ?
+  `).all(clienteId, limite);
+}
+
+/**
+ * LO QUE SE LLEVA AL MES, en las dos unidades que se usan aquí.
+ *
+ * El hielo se cuenta en KILOS y no en marquetas porque es como lo pide el
+ * cliente ("mándame tres toneladas") y como se compara entre uno que lleva
+ * barras y otro que lleva bolsas. Los garrafones van aparte: no son kilos
+ * de nada y juntarlos sería sumar peras con agua.
+ *
+ * Sale de los últimos 30 días de tickets no cancelados.
+ */
+function consumoDe(clienteId) {
+  const kilosPorMarqueta = 150;   // una marqueta entera
+
+  const fila = bd.prepare(`
+    SELECT COALESCE(SUM(vl.dieciseisavos), 0) AS dieciseisavos,
+           COALESCE(SUM(CASE WHEN p.para_agua = 1 THEN vl.cantidad ELSE 0 END), 0) AS garrafones,
+           COUNT(DISTINCT v.id) AS tickets
+      FROM venta_lineas vl
+      JOIN ventas v ON v.id = vl.venta_id
+      LEFT JOIN productos p ON p.id = vl.producto_id
+     WHERE v.cliente_id = ? AND v.cancelada_en IS NULL
+       AND v.fecha >= datetime('now', '-30 days')
+  `).get(clienteId);
+
+  return {
+    kilos: Math.round((fila.dieciseisavos / 16) * kilosPorMarqueta),
+    dieciseisavos: fila.dieciseisavos,
+    garrafones: fila.garrafones,
+    tickets: fila.tickets
+  };
+}
+
+/**
+ * SUS PRECIOS PROPIOS, producto por producto.
+ *
+ * Trae al lado el precio de mostrador para poder enseñar los dos y la
+ * diferencia: un precio acordado sin el de lista al lado no dice si es un
+ * buen trato o un regalo.
+ */
+function preciosDe(clienteId) {
+  return bd.prepare(`
+    SELECT cp.*, p.nombre AS producto_nombre, p.codigo, p.tipo AS producto_tipo,
+           p.dieciseisavos, p.precio_centavos, p.activo AS producto_activo,
+           u.nombre AS actualizado_por_nombre
+      FROM cliente_precios cp
+      JOIN productos p ON p.id = cp.producto_id
+      LEFT JOIN usuarios u ON u.id = cp.actualizado_por
+     WHERE cp.cliente_id = ?
+     ORDER BY p.tipo DESC, p.dieciseisavos DESC, p.nombre
+  `).all(clienteId).map((f) => {
+    // OJO: la consulta trae el tipo como `producto_tipo` para no chocar con
+    // nada; `precioDeMostrador` espera un producto tal cual.
+    const lista = precioDeMostrador({
+      tipo: f.producto_tipo,
+      dieciseisavos: f.dieciseisavos,
+      precio_centavos: f.precio_centavos
+    });
+    return {
+      ...f,
+      lista_centavos: lista,
+      // Cuánto por debajo del mostrador quedó. Es el número que dice si un
+      // trato viejo se quedó regalado cuando subieron los precios.
+      diferencia: lista
+        ? Math.round(((f.centavos - lista) / lista) * 1000) / 10 : null
+    };
+  });
+}
+
+/**
+ * LO QUE ESE PRODUCTO CUESTA DE MOSTRADOR.
+ *
+ * Un refresco lo lleva en su propia columna. El hielo NO: su precio sale
+ * de la lista activa según la fracción, así que hay que ir a buscarlo. Sin
+ * esto la tabla de tarifas enseñaba "—" en la columna de lista justo para
+ * los productos que más se negocian.
+ */
+function precioDeMostrador(producto) {
+  if (producto.tipo !== 'hielo') return producto.precio_centavos || null;
+  const { listaActiva, precioDe } = require('../ventas/precios');
+  const lista = listaActiva();
+  if (!lista || !producto.dieciseisavos) return null;
+  const p = precioDe(producto.dieciseisavos, lista.id);
+  return p.faltan?.length ? null : p.centavos;
+}
+
 function estadoCliente(cliente) {
   const cargado = cargadoA(cliente.id);
   const abonado = abonadoPor(cliente.id);
@@ -137,7 +272,9 @@ function estadoCliente(cliente) {
     diasDebiendo: dias,
     vencido: Boolean(cliente.dias_plazo) && saldo > 0 && dias > cliente.dias_plazo,
     desdeCuandoDebe: desdeCuandoDebe(cliente.id),
-    ritmo: ritmoDe(cliente.id)
+    ritmo: ritmoDe(cliente.id),
+    consumo: consumoDe(cliente.id),
+    garrafones: garrafonesDe(cliente.id, cliente)
   };
 }
 
@@ -227,22 +364,57 @@ function clientesConEstado({ incluirBajas = false } = {}) {
   return clientes.map((c) => ({ ...c, estado: estadoCliente(c) }));
 }
 
-/** Lo que la fábrica tiene en la calle, de un vistazo. */
+/**
+ * LO QUE LA FÁBRICA TIENE EN LA CALLE, de un vistazo.
+ *
+ * Los cuatro números de arriba de la pantalla de clientes. Cada uno lleva
+ * su renglón chico —el "de qué" — porque un número solo no dice nada: 84
+ * cuentas con crédito no significa lo mismo si son 84 de 100 que 84 de 342.
+ */
 function resumenCartera() {
-  const todos = clientesConEstado();
-  const deben = todos.filter((c) => c.estado.saldo > 0);
+  const todos = clientesConEstado({ incluirBajas: true });
+  const activos = todos.filter((c) => c.activo);
+  const deben = activos.filter((c) => c.estado.saldo > 0);
+  const vencidos = deben.filter((c) => c.estado.vencido);
+  const conCredito = activos.filter((c) => c.limite_centavos != null || c.dias_plazo != null);
+  const enLaCalle = deben.reduce((t, c) => t + c.estado.saldo, 0);
+  const vencidoCentavos = vencidos.reduce((t, c) => t + c.estado.saldo, 0);
+
+  // LOS NUEVOS: este mes y el anterior, para poder decir si se está
+  // creciendo o solo se está reponiendo lo que se cae.
+  const nuevos = (desde, hasta) => bd.prepare(`
+    SELECT COUNT(*) n FROM clientes
+     WHERE fecha_alta >= datetime('now', ?) ${hasta ? "AND fecha_alta < datetime('now', ?)" : ''}
+  `).get(...(hasta ? [desde, hasta] : [desde])).n;
+
+  const esteMes = nuevos('-30 days', null);
+  const mesPrevio = nuevos('-60 days', '-30 days');
+
   return {
-    clientes: todos.length,
+    clientes: activos.length,
     deudores: deben.length,
-    enLaCalle: deben.reduce((t, c) => t + c.estado.saldo, 0),
-    vencidos: deben.filter((c) => c.estado.vencido).length,
-    vencidoCentavos: deben.filter((c) => c.estado.vencido)
-                          .reduce((t, c) => t + c.estado.saldo, 0)
+    enLaCalle,
+    vencidos: vencidos.length,
+    vencidoCentavos,
+    // Cuántos de los dados de alta siguen operando. Un padrón de 342 con
+    // 40 dados de baja no es un padrón de 342.
+    total: todos.length,
+    operativos: todos.length ? Math.round((activos.length / todos.length) * 1000) / 10 : 100,
+    conCredito: conCredito.length,
+    // Cuánto de lo que está en la calle todavía no se ha pasado del plazo.
+    alCorriente: enLaCalle ? Math.round(((enLaCalle - vencidoCentavos) / enLaCalle) * 100) : 100,
+    nuevosMes: esteMes,
+    nuevosMesPrevio: mesPrevio,
+    // Sin mes previo no hay contra qué comparar, y un "+100%" sacado de
+    // cero no significa nada.
+    variacionNuevos: mesPrevio
+      ? Math.round(((esteMes - mesPrevio) / mesPrevio) * 1000) / 10 : null
   };
 }
 
 module.exports = {
   cargadoA, abonadoPor, saldoDe, diasDebiendo, desdeCuandoDebe,
   estadoCliente, cabeElCredito, cuentaCorriente, clientesConEstado, resumenCartera,
-  ritmoDe, cuantosParaSerDeSiempre
+  ritmoDe, cuantosParaSerDeSiempre,
+  garrafonesDe, garrafonesHistorial, consumoDe, preciosDe, precioDeMostrador
 };

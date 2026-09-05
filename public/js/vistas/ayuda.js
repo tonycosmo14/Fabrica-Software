@@ -1271,17 +1271,92 @@ debería haber − contado = FALTA</pre>
   {
     id: 'clientes',
     titulo: 'Clientes y crédito: a quién se le da y cuánto debe',
-    busca: 'clientes crédito a credito fiar fiado deuda debe abono abonar abona parte paga una parte deja algo pago parcial cobranza límite de crédito credito disponible plazo vencido saldo cuenta a favor cartera calle logo foto imagen retrato telefono marcar llamar',
+    busca: 'clientes crédito a credito fiar fiado deuda debe abono abonar abona parte paga una parte deja algo pago parcial cobranza límite de crédito credito disponible plazo vencido saldo cuenta a favor cartera calle logo foto imagen retrato telefono marcar llamar padron razon social rfc regimen fiscal factura facturacion correo zona ruta frecuencia ventana horaria recepcion garrafones envases comodato garantia deposito tarifas precios acordados preferenciales consumo alta registrar nuevo cliente',
     cuerpo: `
       <p>La regla de la fábrica es que <b>solo se le da crédito a los clientes que
       damos de alta</b>. Al público en general no. Por eso en la caja el
       botón de crédito abre una lista: no hay forma de escribir un nombre a
       mano con gente esperando.</p>
 
+      <h4>La cartera, de un vistazo</h4>
+      <p>Arriba de todo, cuatro números con lo que se pregunta uno al abrir
+      la pantalla:</p>
+      <ul>
+        <li><b>Padrón comercial</b> — cuántos clientes hay, y qué parte
+        sigue operando (los dados de baja no cuentan).</li>
+        <li><b>Cuentas con crédito</b> — a cuántos se les puso límite o
+        plazo, de todos.</li>
+        <li><b>Saldo por cobrar</b> — lo que hay en la calle, y qué parte
+        va todavía dentro del plazo.</li>
+        <li><b>Nuevos clientes</b> — las altas de los últimos 30 días,
+        comparadas con los 30 anteriores.</li>
+      </ul>
+      <p>Debajo, el <b>padrón</b> en tabla: código, cliente, contacto y
+      zona, frecuencia, lo que se lleva al mes, su saldo y su estado. Se
+      ordena por <b>saldo mayor</b> (el día de cobrar), por <b>consumo</b>,
+      por <b>nombre</b> o por <b>quién compró hace poco</b>. Al tocar un
+      renglón, su ficha se abre al lado y se queda a la vista mientras se
+      recorre la lista.</p>
+
       <h4>Dar de alta a alguien</h4>
-      <p>En <b>Clientes</b>, botón <b>＋ Cliente</b>. Solo se pide el nombre;
-      lo demás —negocio, teléfono, límite, plazo— se llena tocándolo en su
-      ficha, y casi nunca se sabe todo el primer día.</p>
+      <p>Botón <b>＋ Registrar nuevo cliente</b>. Se abre una pantalla
+      entera con cuatro bloques, y a la derecha el <b>resumen</b> de la
+      cuenta armándose conforme se escribe:</p>
+      <ul>
+        <li><b>Información comercial y fiscal</b> — el rótulo del local, su
+        razón social, RFC, régimen, con quién se trata y el correo de
+        facturación.</li>
+        <li><b>Reparto y descarga</b> — dirección, zona, cada cuánto se le
+        surte y <b>de qué hora a qué hora recibe</b>.</li>
+        <li><b>Esquema de pago y plazo</b> — cómo paga, los días de plazo y
+        su límite.</li>
+        <li><b>Envases en comodato</b> — cuántos garrafones se le autorizan
+        y cuánto deja de garantía por cada uno.</li>
+      </ul>
+      <p class="ayuda-tip"><b>Solo el nombre comercial es obligatorio.</b>
+      Todo lo demás se puede llenar después desde su ficha, y casi nunca se
+      sabe todo el primer día. Nada de esto impide venderle; el crédito sí,
+      que necesita límite o plazo.</p>
+
+      <h4>Los datos fiscales</h4>
+      <p><b>El sistema no factura</b>: no emite CFDI, no habla con el SAT ni
+      con un PAC. Lo que hace es <b>guardar</b> la razón social, el RFC, el
+      régimen y el correo, y <b>sacarlos impresos</b> en el ticket a crédito
+      y en el recibo de abono. Sirve para pasárselos a quien factura sin
+      andar buscando el RFC en un WhatsApp de hace ocho meses.</p>
+
+      <h4>Sus tarifas acordadas</h4>
+      <p>En su ficha, pestaña <b>🏷️ Tarifas</b>: el precio que se le acordó
+      <b>producto por producto</b>, con el de mostrador tachado al lado y la
+      diferencia en porcentaje. Ese número al lado es lo que hace ver de un
+      golpe si el trato sigue siendo un trato o ya se quedó regalado cuando
+      subieron los precios.</p>
+      <p>El orden con que se cobra, de lo más particular a lo más general:</p>
+      <pre class="ayuda-formula">1. su precio propio en ese producto
+2. la lista de mayoreo que trae asignada
+3. el precio de mostrador</pre>
+      <p class="ayuda-tip">Un precio acordado <b>no pide autorización</b>:
+      es su precio normal, igual que el de mayoreo es el normal de quien
+      trae esa lista. El PIN se pide para el <b>descuento de una vez</b>,
+      que lleva su porqué escrito — eso no cambió. Y quitarle el precio
+      propio lo devuelve al de mostrador, no lo deja en cero.</p>
+
+      <h4>Los garrafones que trae</h4>
+      <p>El garrafón no se vende: se presta y se cambia lleno por vacío. En
+      su ficha se apunta <b>cuántos se le dejaron</b> y <b>cuántos trajo</b>,
+      y la cuenta sale de sumar esos movimientos — no hay un contador que
+      alguien pueda editar, porque un contador acaba diciendo 15 con 9 en el
+      patio y nadie sabe desde cuándo.</p>
+      <ul>
+        <li><b>Límite acordado</b> — cuántos como máximo. Pasarse
+        <b>no se rechaza</b>: el garrafón ya se lo llevó y esconderlo no lo
+        trae de vuelta. Se avisa, se apunta y se ve en su ficha.</li>
+        <li><b>Garantía</b> — lo que dejó por cada uno. Se enseña aparte del
+        saldo <b>a propósito</b>: una garantía no es una deuda, y sumarla
+        mandaría a la cobranza a cobrar dinero que nadie debe.</li>
+        <li>Un movimiento mal capturado <b>se anula</b> con su motivo y la
+        cuenta se rehace sola. No se borra nada.</li>
+      </ul>
 
       <h4>Su logo o su foto</h4>
       <p>Un mayorista es una tienda con rótulo. En su ficha, el botón
@@ -1341,10 +1416,11 @@ debería haber − contado = FALTA</pre>
       deja de comprar se mueve solo a «de una vez» conforme pasan los días,
       que es justo lo que avisa que algo pasó con él.</p>
 
-      <h4>Las tres pestañas: qué le compra cada quien</h4>
-      <p>Después vienen las de <b>qué le compra</b>: <b>Todos</b>,
-      <b>🧊 Marquetas</b>, <b>🧊 Bolsas</b> y <b>💧 Agua</b>. Cada una enseña
-      solo los suyos, con su cuenta al lado.</p>
+      <h4>Las pestañas: qué le compra cada quien</h4>
+      <p>Están las de <b>qué le compra</b>: <b>Todos</b>,
+      <b>🧊 Mayoristas de marquetas</b>, <b>🧊 Reparto de bolsas</b> y
+      <b>💧 Clientes de agua</b>. Cada una enseña solo los suyos, con su
+      cuenta al lado.</p>
       <p>Lo que decide en qué pestaña sale es <b>lo que le has vendido</b>, y
       se marca solo: cada venta y cada pedido lo apuntan. El que se lleva un
       garrafón es cliente del agua desde ese momento. Puede estar en las tres
@@ -1359,14 +1435,29 @@ debería haber − contado = FALTA</pre>
       descubriera, serían meses de historias separadas.</p>
       <p>Un cliente nuevo, sin un solo ticket, cae en Marquetas —es a lo que
       se dedica la fábrica— y se mueve solo con su primera compra.</p>
+      <p class="ayuda-tip">La fábrica es <b>una sola</b>: cualquier cliente
+      puede pedir en la caja hielo, agua, refrescos o lo que sea, y nadie
+      tiene que marcar nada. Las pestañas son para preparar el reparto, no
+      un permiso de lo que puede comprar.</p>
 
       <h4>El horario de entrega y la ubicación</h4>
       <p>En su ficha, junto a la dirección:</p>
       <ul>
-        <li><b>Horario de entrega</b> — como lo dirías: «de 8 a 2 y de 5 a 8»,
-        «no antes de las 10». No es un adorno: una ruta corta que llega a las
-        dos a una tienda que cierra a la una <b>no es corta</b>, es un viaje
-        perdido y hay que volver.</li>
+        <li><b>Zona o sector</b> — «Zona Costa (Muelle 4)». Se escribe libre
+        a propósito: las zonas las inventa quien reparte, no un catálogo, y
+        cambian cuando se abre un cliente grande.</li>
+        <li><b>Recibe desde / hasta</b> — la ventana en horas de reloj. Es lo
+        que se puede ordenar y comparar, y lo que deja armar una ruta por
+        quién cierra primero.</li>
+        <li><b>Horario, con sus rarezas</b> — lo que no cabe en dos horas de
+        reloj: «de 8 a 2 y de 5 a 8, los domingos no abre». Los dos conviven.
+        No es un adorno: una ruta corta que llega a las dos a una tienda que
+        cierra a la una <b>no es corta</b>, es un viaje perdido y hay que
+        volver.</li>
+        <li><b>Frecuencia acordada</b> — cada cuánto quedó en que se le
+        surte. No es lo mismo que su ritmo, que sale de los tickets: el que
+        quedó en diario y lleva cuatro días sin pedir es una llamada que
+        hacer.</li>
         <li><b>Referencias</b> — «la de la puerta azul, junto a la
         tortillería». La dirección lleva al rumbo; esto es lo que hace que se
         encuentre la puerta.</li>

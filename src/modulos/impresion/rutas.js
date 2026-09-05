@@ -52,6 +52,7 @@ function ventaCompleta(id) {
   const venta = bd.prepare(`
     SELECT v.*, u.nombre AS cajero_nombre,
            cl.nombre AS cliente_nombre, cl.negocio AS cliente_negocio,
+           cl.razon_social AS cliente_razon_social, cl.rfc AS cliente_rfc,
            lp.tipo AS lista_tipo, lp.nombre AS lista_nombre,
            viejo.serie  AS cambio_de_serie,
            viejo.folio_anual AS cambio_de_anual,
@@ -370,6 +371,7 @@ router.post('/encomienda/:id', puedeImprimir, async (req, res) => {
 function abonoParaPapel(id) {
   const a = bd.prepare(`
     SELECT ab.*, c.nombre AS cliente_nombre, c.negocio AS cliente_negocio,
+           c.razon_social AS cliente_razon_social, c.rfc AS cliente_rfc,
            u.nombre AS capturista_nombre, e.nombre AS ejecutor_nombre
       FROM abonos ab
       LEFT JOIN clientes c ON c.id = ab.cliente_id

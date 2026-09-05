@@ -119,6 +119,7 @@ const MOVIMIENTOS = [
   { tabla: 'adelantos', grupo: 'Los vales de sueldo' },
   { tabla: 'rayas', grupo: 'Las semanas pagadas' },
   { tabla: 'jornadas', grupo: 'Los días trabajados' },
+  { tabla: 'garrafones_movimientos', grupo: 'Los garrafones prestados' },
 
   // --- Las neveras (lo que pasó, no dónde están) ---
   { tabla: 'nevera_servicios', grupo: 'Las neveras' },
@@ -155,6 +156,9 @@ const SE_QUEDA = {
   conceptos_empresa: 'los conceptos de gasto de la empresa',
   proveedores: 'los proveedores',
   clientes: 'los clientes, con su crédito',
+  // Los precios acordados son parte del trato con el cliente, igual que su
+  // límite: se quedan con él. Lo que se borra son sus compras.
+  cliente_precios: 'los precios acordados con cada cliente',
 
   // La gente
   usuarios: 'la gente, con sus PIN',

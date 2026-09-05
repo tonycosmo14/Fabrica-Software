@@ -207,15 +207,26 @@ function leerProducto(cuerpo, anterior = null) {
   if (cuerpo?.llevaInventario !== undefined) llevaInventario = cuerpo.llevaInventario ? 1 : 0;
   if (tipo === 'hielo') llevaInventario = 0;
 
-  // ¿SE PREPARA EN EL ÁREA DEL AGUA?  (v5.6)
+  // ¿ESTO ES AGUA?  (v5.6, y desde la v6.9 ya no se pregunta)
   //
-  // Es lo que parte la hoja de preparación en dos: el del agua lee su
-  // bloque y el del hielo el suyo. Se marca en el producto y no se adivina
-  // por el nombre — adivinar funcionaría hasta el día que alguien dé de
-  // alta "Hielo en botella".
+  // "Toda la fábrica es una misma, no hay dos partes. Un cliente puede
+  //  pedir en la caja agua, hielo, refrescos, lo que quiera, y creo que es
+  //  obvio con lo que compre."
   //
-  // El hielo de marqueta nunca: sale del cuarto frío por definición.
-  let paraAgua = anterior?.para_agua ?? 0;
+  // Tiene razón, así que la pregunta se fue de la ficha del producto. La
+  // marca se queda porque de ella salen dos cosas útiles —la pestaña de
+  // «clientes de agua» y el bloque del agua en la hoja de preparación— y
+  // se DEDUCE del nombre, que es de donde salió la primera vez (043).
+  //
+  // Adivinar por el nombre falla el día que alguien dé de alta "Hielo en
+  // botella", y se asume: lo único que se equivoca entonces es en qué
+  // pestaña sale un cliente. Ni un peso depende de esto. Y se puede
+  // seguir mandando `paraAgua` a mano, que gana a la deducción.
+  const suenaAAgua = /garraf|botell|agua/i.test(nombre);
+  let paraAgua = anterior ? anterior.para_agua : (suenaAAgua ? 1 : 0);
+  // Al renombrar un producto se vuelve a deducir: "Coca" que pasa a
+  // llamarse "Agua Ciel" es agua desde ese día.
+  if (anterior && nombre !== anterior.nombre) paraAgua = suenaAAgua ? 1 : 0;
   if (cuerpo?.paraAgua !== undefined) paraAgua = cuerpo.paraAgua ? 1 : 0;
   if (tipo === 'hielo') paraAgua = 0;
 

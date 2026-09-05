@@ -900,6 +900,7 @@ verdad de qué hay en cada versión. Escrita a mano se quedaba atrás.
 | **v6.7** | Revisar el tanque | ✅ listo |
 | **v6.8** | La raya, como se paga de verdad | ✅ listo |
 | **v6.8.1** | Tres cosas que estorbaban | ✅ listo |
+| **v6.9** | Clientes, como los quiero ver | ✅ listo |
 
 **Lo que falta:** el instalador para Windows, y la
 importación de lo que hay en Aronium la noche antes de arrancar.

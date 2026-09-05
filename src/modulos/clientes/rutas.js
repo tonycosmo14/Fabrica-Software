@@ -26,7 +26,8 @@ const { sesionAbierta } = require('../caja/calculo');
 const { apuntarAbono } = require('./abonos');
 const { listasDeMayoreo, listaPorOmision } = require('../ventas/mayoreo');
 const {
-  estadoCliente, cuentaCorriente, clientesConEstado, resumenCartera
+  estadoCliente, cuentaCorriente, clientesConEstado, resumenCartera,
+  garrafonesDe, garrafonesHistorial, preciosDe, precioDeMostrador
 } = require('./calculo');
 // Las mismas fotos que las de los productos: misma carpeta, mismas
 // comprobaciones y el mismo sitio para servirlas. Un logo de tienda no
@@ -35,6 +36,47 @@ const {
 const fotos = require('../catalogo/fotos');
 
 const router = express.Router();
+
+/**
+ * CADA CUÁNTO SE LE SURTE, dicho por él  (v6.9)
+ *
+ * Es el ACUERDO, no lo que pasó: lo que pasó sale de los tickets y vive en
+ * `estado.ritmo`. Los dos hacen falta y dicen cosas distintas — el que
+ * quedó en diario y lleva cuatro días sin pedir es una llamada que hacer.
+ */
+const FRECUENCIAS = [
+  { clave: 'diario', nombre: 'Diario (lunes a domingo)', corto: 'Diario' },
+  { clave: 'lun_sab', nombre: 'Diario (lunes a sábado)', corto: 'Lun a Sáb' },
+  { clave: '3x_semana', nombre: 'Tres veces por semana', corto: '3x Semana' },
+  { clave: 'semanal', nombre: 'Una vez por semana', corto: 'Semanal' },
+  { clave: 'quincenal', nombre: 'Cada quince días', corto: 'Quincenal' },
+  { clave: 'fines', nombre: 'Fines de semana', corto: 'Fines de sem.' },
+  { clave: 'eventual', nombre: 'Cuando llama', corto: 'Eventual' }
+];
+
+/** Cómo se acordó que paga. */
+const METODOS_PAGO = [
+  { clave: 'contado', nombre: 'De contado, al entregar' },
+  { clave: 'credito', nombre: 'Línea de crédito' },
+  { clave: 'transferencia', nombre: 'Transferencia' }
+];
+
+/**
+ * Los regímenes del SAT que se ven aquí. No es la lista completa —son
+ * cincuenta y tantos— sino los que le tocan a una fábrica de hielo y a sus
+ * clientes: restaurantes, tienditas y personas físicas.
+ */
+const REGIMENES = [
+  { clave: '601', nombre: '601 - General de Ley Personas Morales' },
+  { clave: '603', nombre: '603 - Personas Morales con Fines no Lucrativos' },
+  { clave: '605', nombre: '605 - Sueldos y Salarios' },
+  { clave: '612', nombre: '612 - Actividades Empresariales y Profesionales' },
+  { clave: '616', nombre: '616 - Sin obligaciones fiscales' },
+  { clave: '621', nombre: '621 - Incorporación Fiscal' },
+  { clave: '626', nombre: '626 - Régimen Simplificado de Confianza (RESICO)' }
+];
+
+const CATALOGOS = { frecuencias: FRECUENCIAS, metodosPago: METODOS_PAGO, regimenes: REGIMENES };
 
 const verClientes = exigirPermiso('clientes.ver');
 const administrar = exigirPermiso('clientes.administrar');
@@ -126,7 +168,8 @@ router.get('/', verClientes, (req, res) => {
     porLinea,
     cartera: resumenCartera(),
     listas: listasDeMayoreo().map((l) => ({ id: l.id, nombre: l.nombre })),
-    mayoreoPorOmision: listaPorOmision()?.nombre || null
+    mayoreoPorOmision: listaPorOmision()?.nombre || null,
+    ...CATALOGOS
   });
 });
 
@@ -151,7 +194,13 @@ router.post('/ubicacion', verClientes, async (req, res) => {
 router.get('/:id', verClientes, (req, res) => {
   const c = clientePorId(req.params.id);
   if (!c) return error(res, 'Ese cliente no existe.', 404);
-  return ok(res, { cliente: conEstado(c), cuenta: cuentaCorriente(c.id) });
+  return ok(res, {
+    cliente: conEstado(c),
+    cuenta: cuentaCorriente(c.id),
+    precios: preciosDe(c.id),
+    garrafones: { ...garrafonesDe(c.id, c), historial: garrafonesHistorial(c.id) },
+    ...CATALOGOS
+  });
 });
 
 /**
@@ -208,6 +257,93 @@ function leerCompra(cuerpo, { porOmision = false } = {}) {
   };
   if (porOmision && !c.marqueta && !c.bolsa && !c.agua) c.marqueta = 1;
   return c;
+}
+
+/**
+ * LOS CAMPOS DE TEXTO QUE SE GUARDAN TAL CUAL  (v6.9)
+ *
+ * Uno por renglón, con su largo, para que agregar el siguiente sea agregar
+ * un renglón y no tocar tres sitios. El largo no es capricho: un RFC son
+ * 13 caracteres y un campo de 200 solo sirve para que alguien pegue ahí un
+ * párrafo entero.
+ */
+const CAMPOS_TEXTO = [
+  ['negocio', 'negocio', 80], ['telefono', 'telefono', 30],
+  ['direccion', 'direccion', 200], ['notas', 'notas', 500],
+  ['horarioEntrega', 'horario_entrega', 120], ['referencias', 'referencias', 300],
+  ['razonSocial', 'razon_social', 160], ['rfc', 'rfc', 13],
+  ['correo', 'correo', 120], ['zona', 'zona', 60]
+];
+
+/** Una hora 'HH:MM' normalizada, o null si no se entiende. */
+function leerHora(v) {
+  const t = String(v ?? '').trim();
+  if (!t) return null;
+  const m = /^([01]?\d|2[0-3]):([0-5]\d)$/.exec(t);
+  return m ? `${m[1].padStart(2, '0')}:${m[2]}` : undefined;   // undefined = mal escrita
+}
+
+/** Uno de una lista cerrada, vacío, o `undefined` si no está en la lista. */
+function leerDeCatalogo(v, catalogo) {
+  const t = String(v ?? '').trim();
+  if (!t) return null;
+  return catalogo.some((x) => x.clave === t) ? t : undefined;
+}
+
+/**
+ * Los campos del alta y de la edición que van a columnas, resueltos una
+ * sola vez para los dos sitios. Devuelve { campos } o { error }.
+ */
+function leerCamposNuevos(cuerpo, { soloLosQueVienen = true } = {}) {
+  const campos = {};
+  const puesto = (k) => !soloLosQueVienen || cuerpo?.[k] !== undefined;
+
+  for (const [clave, columna, largo] of CAMPOS_TEXTO) {
+    if (!puesto(clave)) continue;
+    campos[columna] = String(cuerpo?.[clave] ?? '').trim().slice(0, largo) || null;
+  }
+  // El RFC se guarda en mayúsculas siempre: es como viene en la constancia
+  // y como se busca, y así dos capturas del mismo RFC no se ven distintas.
+  if (campos.rfc) campos.rfc = campos.rfc.toUpperCase();
+
+  for (const [clave, columna, catalogo, queEs] of [
+    ['frecuencia', 'frecuencia', FRECUENCIAS, 'La frecuencia'],
+    ['metodoPago', 'metodo_pago', METODOS_PAGO, 'El método de pago'],
+    ['regimenFiscal', 'regimen_fiscal', REGIMENES, 'El régimen fiscal']
+  ]) {
+    if (!puesto(clave)) continue;
+    const v = leerDeCatalogo(cuerpo?.[clave], catalogo);
+    if (v === undefined) return { error: `${queEs} no es de las que conozco.` };
+    campos[columna] = v;
+  }
+
+  for (const [clave, columna] of [['horaDesde', 'hora_desde'], ['horaHasta', 'hora_hasta']]) {
+    if (!puesto(clave)) continue;
+    const h = leerHora(cuerpo?.[clave]);
+    if (h === undefined) return { error: 'La hora se escribe así: 06:30' };
+    campos[columna] = h;
+  }
+
+  // LOS GARRAFONES: cuántos como máximo y cuánto dejó por cada uno. Los que
+  // trae AHORA no se ponen aquí: eso son movimientos, y tienen su ruta.
+  if (puesto('garrafonesLimite')) {
+    const n = leerEnteroOpcional(cuerpo?.garrafonesLimite, 9999);
+    if (n.error) return { error: 'El límite de garrafones se escribe con números.' };
+    // `omitido` solo pasa en el alta, donde se leen todos los campos vengan
+    // o no: sin límite escrito, no hay límite.
+    campos.garrafones_limite = n.omitido ? null : n.valor;
+  }
+  if (puesto('garrafonDeposito')) {
+    const crudo = String(cuerpo?.garrafonDeposito ?? '').trim();
+    if (crudo === '') campos.garrafon_deposito_centavos = null;
+    else {
+      const centavos = leerPesos(crudo, { permitirCero: true });
+      if (centavos === null) return { error: 'La garantía del garrafón no es un importe válido.' };
+      campos.garrafon_deposito_centavos = centavos;
+    }
+  }
+
+  return { campos };
 }
 
 /** Una coordenada creíble, o null. La misma regla que en las neveras. */
@@ -268,26 +404,29 @@ router.post('/', puedeDarDeAlta, (req, res) => {
   // de escribir "Pescadería Chuc" con gente esperando. Se toma DENTRO de la
   // transacción, igual que el folio de un ticket, y no se reusa nunca: el
   // número es del cliente aunque se dé de baja (regla 3.3).
+  // Los campos de la ficha larga (v6.9). En el alta se leen TODOS, vengan
+  // o no: lo que no venga queda vacío, que es lo correcto en un renglón
+  // recién creado.
+  const nuevos = leerCamposNuevos(req.body, { soloLosQueVienen: false });
+  if (nuevos.error) return error(res, nuevos.error);
+  const extra = nuevos.campos;
+  const columnasExtra = Object.keys(extra);
+
   const alta = bd.transaction(() => {
     const numero = bd.prepare('SELECT COALESCE(MAX(numero), 0) n FROM clientes').get().n + 1;
     bd.prepare(`
-      INSERT INTO clientes (id, numero, nombre, negocio, telefono, direccion, notas,
+      INSERT INTO clientes (id, numero, nombre,
                             limite_centavos, dias_plazo, fecha_alta, creado_por,
                             compra_marqueta, compra_bolsa, compra_agua,
-                            horario_entrega, referencias, latitud, longitud)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            latitud, longitud${columnasExtra.map((k) => `, ${k}`).join('')})
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${columnasExtra.map(() => ', ?').join('')})
     `).run(id, numero, nombre.slice(0, 80),
-           (req.body?.negocio || '').trim().slice(0, 80) || null,
-           (req.body?.telefono || '').trim().slice(0, 30) || null,
-           (req.body?.direccion || '').trim().slice(0, 200) || null,
-           (req.body?.notas || '').trim().slice(0, 500) || null,
            limiteCentavos,
            plazo.omitido ? null : plazo.valor,
            ahora(), req.usuario.id,
            compra.marqueta, compra.bolsa, compra.agua,
-           (req.body?.horarioEntrega || '').trim().slice(0, 120) || null,
-           (req.body?.referencias || '').trim().slice(0, 300) || null,
-           coordenada(req.body?.latitud, 90), coordenada(req.body?.longitud, 180));
+           coordenada(req.body?.latitud, 90), coordenada(req.body?.longitud, 180),
+           ...columnasExtra.map((k) => extra[k]));
     return numero;
   });
   alta();
@@ -316,15 +455,9 @@ router.put('/:id', administrar, (req, res) => {
     if (!nombre) return error(res, 'El cliente tiene que llevar nombre.');
     campos.nombre = nombre.slice(0, 80);
   }
-  for (const [clave, columna, largo] of [
-    ['negocio', 'negocio', 80], ['telefono', 'telefono', 30],
-    ['direccion', 'direccion', 200], ['notas', 'notas', 500],
-    ['horarioEntrega', 'horario_entrega', 120], ['referencias', 'referencias', 300]
-  ]) {
-    if (req.body?.[clave] !== undefined) {
-      campos[columna] = String(req.body[clave]).trim().slice(0, largo) || null;
-    }
-  }
+  const nuevos = leerCamposNuevos(req.body);
+  if (nuevos.error) return error(res, nuevos.error);
+  Object.assign(campos, nuevos.campos);
 
   if (req.body?.limite !== undefined) {
     const crudo = String(req.body.limite).trim();
@@ -570,6 +703,199 @@ router.delete('/:id', administrar, (req, res) => {
   });
 
   return ok(res, { eliminado: c.nombre });
+});
+
+// ============================================================
+// LOS PRECIOS ACORDADOS, PRODUCTO POR PRODUCTO  (v6.9)
+// ============================================================
+//
+// "Personalice los precios directos acordados para este cliente. Estos
+//  valores reemplazarán automáticamente la tarifa de mostrador."
+//
+// Es lo más particular que hay, y por eso gana a todo lo demás. El orden
+// completo, de lo más particular a lo más general:
+//
+//   1. el precio propio de este cliente en este producto   ← esto
+//   2. la lista de mayoreo que trae asignada
+//   3. el precio de mostrador
+//
+// Solo el gerente y el administrador: bajarle el precio a alguien es
+// decidir cuánto gana la fábrica con él.
+
+/** Los productos a los que se les puede poner precio propio. */
+router.get('/:id/precios', administrar, (req, res) => {
+  const c = clientePorId(req.params.id);
+  if (!c) return error(res, 'Ese cliente no existe.', 404);
+
+  return ok(res, {
+    precios: preciosDe(c.id),
+    // El catálogo entero, para poder agregar uno que todavía no tiene
+    // precio propio. Sin esto la pantalla tendría que pedirlo aparte.
+    productos: bd.prepare(`
+      SELECT p.id, p.nombre, p.codigo, p.tipo, p.dieciseisavos,
+             p.precio_centavos, c.nombre AS categoria
+        FROM productos p
+        LEFT JOIN categorias c ON c.id = p.categoria_id
+       WHERE p.activo = 1
+       ORDER BY c.orden, p.orden, p.nombre
+    `).all().map((p) => ({ ...p, lista_centavos: precioDeMostrador(p) }))
+  });
+});
+
+/**
+ * Ponerle o cambiarle el precio de un producto.
+ *
+ * Se manda el producto y el precio; volver a mandarlo lo corrige. Un
+ * precio en blanco lo QUITA, y entonces ese producto vuelve a cobrarse por
+ * su lista o por el mostrador — que es lo que se quiere al terminar un
+ * trato, y no dejarlo en cero.
+ */
+router.put('/:id/precios', administrar, (req, res) => {
+  const c = clientePorId(req.params.id);
+  if (!c) return error(res, 'Ese cliente no existe.', 404);
+
+  const producto = bd.prepare('SELECT * FROM productos WHERE id = ? AND activo = 1')
+    .get(String(req.body?.productoId || ''));
+  if (!producto) return error(res, 'Ese producto no existe.', 404);
+
+  const crudo = String(req.body?.precio ?? '').trim();
+  const volumen = String(req.body?.volumen || '').trim().slice(0, 60) || null;
+
+  if (crudo === '') {
+    bd.prepare('DELETE FROM cliente_precios WHERE cliente_id = ? AND producto_id = ?')
+      .run(c.id, producto.id);
+    bitacora.registrar({
+      accion: 'cliente.precio_quitado', entidad: 'cliente', entidadId: c.id,
+      ejecutorId: req.usuario.id,
+      detalle: { cliente: c.nombre, producto: producto.nombre }
+    });
+    return ok(res, { precios: preciosDe(c.id) });
+  }
+
+  // Cero sí se permite: hay clientes a los que se les regala el garrafón
+  // de cortesía, y eso es un acuerdo, no un error de dedo.
+  const centavos = leerPesos(crudo, { permitirCero: true });
+  if (centavos === null) return error(res, 'Ese precio no se entiende.');
+
+  bd.prepare(`
+    INSERT INTO cliente_precios (id, cliente_id, producto_id, centavos, volumen,
+                                 actualizado_en, actualizado_por)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(cliente_id, producto_id) DO UPDATE SET
+      centavos = excluded.centavos, volumen = excluded.volumen,
+      actualizado_en = excluded.actualizado_en, actualizado_por = excluded.actualizado_por
+  `).run(nuevoId(), c.id, producto.id, centavos, volumen, ahora(), req.usuario.id);
+
+  bitacora.registrar({
+    accion: 'cliente.precio', entidad: 'cliente', entidadId: c.id,
+    ejecutorId: req.usuario.id,
+    detalle: {
+      cliente: c.nombre, producto: producto.nombre,
+      centavos, lista: producto.precio_centavos, volumen
+    }
+  });
+
+  return ok(res, { precios: preciosDe(c.id) });
+});
+
+// ============================================================
+// LOS GARRAFONES EN RESGUARDO  (v6.9)
+// ============================================================
+//
+// El garrafón de policarbonato no se vende: se presta y se cambia lleno
+// por vacío. Lo que importa es cuántos trae el cliente, porque el día que
+// cierre el negocio se va con ellos.
+//
+// No hay contador: se apuntan los movimientos y el número se saca de
+// sumarlos (regla 3.2).
+
+router.get('/:id/garrafones', verClientes, (req, res) => {
+  const c = clientePorId(req.params.id);
+  if (!c) return error(res, 'Ese cliente no existe.', 404);
+  return ok(res, {
+    ...garrafonesDe(c.id, c),
+    historial: garrafonesHistorial(c.id)
+  });
+});
+
+/**
+ * Apuntar garrafones entregados o devueltos.
+ *
+ * `cuantos` en positivo son los que se le dejaron; en negativo, los que
+ * trajo de vuelta. Se manda con signo y no con un "tipo" aparte porque es
+ * una sola cuenta que sube y baja, y dos campos para un signo es la forma
+ * más fácil de apuntar una devolución como una entrega.
+ */
+router.post('/:id/garrafones', cobrar, (req, res) => {
+  const c = clientePorId(req.params.id);
+  if (!c) return error(res, 'Ese cliente no existe.', 404);
+
+  const n = Number(req.body?.cuantos);
+  if (!Number.isInteger(n) || n === 0) {
+    return error(res, 'Escribe cuántos garrafones, en positivo si se le dejaron ' +
+                      'y en negativo si los trajo.');
+  }
+  if (Math.abs(n) > 999) return error(res, 'Eso son demasiados garrafones de un jalón.');
+
+  const antes = garrafonesDe(c.id, c);
+  if (antes.retenidos + n < 0) {
+    return error(res,
+      `${c.nombre} solo tiene ${antes.retenidos} garrafón${antes.retenidos === 1 ? '' : 'es'} ` +
+      'en resguardo: no puede devolver más de los que trae.', 409);
+  }
+
+  const id = nuevoId();
+  bd.prepare(`
+    INSERT INTO garrafones_movimientos
+      (id, cliente_id, fecha, cuantos, motivo, ejecutor_id, capturista_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(id, c.id, ahora(), n,
+         String(req.body?.motivo || '').trim().slice(0, 200) || null,
+         String(req.body?.ejecutorId || '').trim() || req.usuario.id,
+         req.usuario.id);
+
+  const despues = garrafonesDe(c.id, c);
+  bitacora.registrar({
+    accion: n > 0 ? 'cliente.garrafones_entregados' : 'cliente.garrafones_devueltos',
+    entidad: 'cliente', entidadId: c.id, ejecutorId: req.usuario.id,
+    detalle: { cliente: c.nombre, cuantos: n, quedan: despues.retenidos }
+  });
+
+  // Pasarse del límite NO se rechaza: el garrafón ya se lo llevó y
+  // esconderlo no lo trae de vuelta. Se avisa y queda apuntado.
+  return ok(res, {
+    ...despues,
+    historial: garrafonesHistorial(c.id),
+    aviso: despues.pasado
+      ? `${c.nombre} trae ${despues.retenidos} y se le habían autorizado ${despues.limite}.`
+      : null
+  }, 201);
+});
+
+/** Un movimiento mal capturado se anula; la cuenta se rehace sola. */
+router.post('/garrafones/:id/anular', cobrar, (req, res) => {
+  const m = bd.prepare('SELECT * FROM garrafones_movimientos WHERE id = ?').get(req.params.id);
+  if (!m) return error(res, 'Ese movimiento no existe.', 404);
+  if (m.anulado_en) return error(res, 'Ese movimiento ya está anulado.');
+
+  const motivo = String(req.body?.motivo || '').trim().slice(0, 200);
+  if (!motivo) return error(res, 'Escribe por qué se anula.');
+
+  bd.prepare(`
+    UPDATE garrafones_movimientos
+       SET anulado_en = ?, anulado_por = ?, motivo_anulacion = ?
+     WHERE id = ?
+  `).run(ahora(), req.usuario.id, motivo, m.id);
+
+  bitacora.registrar({
+    accion: 'cliente.garrafones_anulado', entidad: 'cliente', entidadId: m.cliente_id,
+    ejecutorId: req.usuario.id, detalle: { cuantos: m.cuantos, motivo }
+  });
+
+  return ok(res, {
+    ...garrafonesDe(m.cliente_id),
+    historial: garrafonesHistorial(m.cliente_id)
+  });
 });
 
 module.exports = router;

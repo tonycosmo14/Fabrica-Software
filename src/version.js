@@ -17,9 +17,31 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '6.8.1';
+const VERSION_ACTUAL = '6.9';
 
 const VERSIONES = [
+  {
+    numero: '6.9',
+    nombre: 'Clientes, como los quiero ver',
+    fecha: '2026-09-05',
+    resumen:
+      'La cartera entera en una pantalla: cuatro números arriba, el padrón '
+      + 'en tabla y la ficha al lado. Cada cliente con sus datos fiscales, su '
+      + 'zona, su ventana de recepción, SUS PRECIOS producto por producto y '
+      + 'los garrafones que trae.',
+    cambios: [
+      { tipo: 'nuevo', texto: 'LA CARTERA, EN UNA SOLA PANTALLA. Arriba, cuatro números: padrón comercial, cuentas con crédito, saldo por cobrar y altas de los últimos 30 días — cada uno con su renglón chico, porque un número solo no dice nada. Debajo, el padrón en tabla y la ficha del que toques al lado.' },
+      { tipo: 'mejora', texto: 'EL PADRÓN EN TABLA, no en lista: código, cliente y razón social, contacto y zona, frecuencia, lo que se lleva al mes, saldo y estado. Se ordena por saldo mayor, por consumo, por nombre o por quién compró hace poco. Las preguntas de todos los días se contestan comparando columnas, y eso una lista de renglones no lo deja hacer.' },
+      { tipo: 'nuevo', texto: 'EL ALTA ES UNA PANTALLA ENTERA, con el resumen de la cuenta armándose a la derecha conforme escribes. Cuatro bloques: información comercial y fiscal, reparto y descarga, esquema de pago, y envases en comodato. Solo el nombre comercial es obligatorio.' },
+      { tipo: 'importante', texto: 'PRECIOS ACORDADOS PRODUCTO POR PRODUCTO. Antes solo se le podía pegar una lista de mayoreo entera, y esas listas solo saben de hielo por fracción: la bolsa y el garrafón no cabían. Ahora cada cliente puede tener su precio en el producto que sea, y gana a la lista y al mostrador. Al lado sale el de mostrador tachado y la diferencia en porcentaje.' },
+      { tipo: 'mejora', texto: 'Y ese precio NO pide autorización: es su precio normal, igual que el de mayoreo. El PIN se sigue pidiendo para el descuento de una vez, que lleva su porqué escrito. Quitarle el precio propio lo devuelve al de mostrador, no lo deja en cero.' },
+      { tipo: 'nuevo', texto: 'LOS GARRAFONES QUE TRAE EL CLIENTE, con su límite acordado y su garantía. La cuenta sale de sumar entregas y devoluciones, no de un contador que alguien pueda editar. Pasarse del límite avisa pero no se rechaza: el garrafón ya se lo llevó. La garantía va APARTE del saldo, porque una garantía no es una deuda.' },
+      { tipo: 'nuevo', texto: 'DATOS FISCALES: razón social, RFC, régimen y correo de facturación. El sistema NO factura —no emite CFDI ni habla con el SAT— pero los guarda y los saca impresos en el ticket a crédito y en el recibo de abono, para pasárselos a quien factura.' },
+      { tipo: 'nuevo', texto: 'ZONA, FRECUENCIA ACORDADA Y VENTANA DE RECEPCIÓN en horas de reloj. La ventana se puede ordenar y comparar —sirve para armar la ruta por quién cierra primero— y el horario de texto libre se queda para las rarezas.' },
+      { tipo: 'mejora', texto: 'LO QUE SE LLEVA AL MES, en kilos de hielo y garrafones aparte, sacado de sus tickets de 30 días. Sale en la tabla y en su ficha.' },
+      { tipo: 'mejora', texto: 'SE FUE «¿DÓNDE SE PREPARA?» de la ficha del producto. La fábrica es una sola y cualquier cliente puede pedir lo que quiera; la marca de agua se deduce sola del nombre y sigue sirviendo para la pestaña de clientes de agua y para partir la hoja de preparación.' }
+    ]
+  },
   {
     numero: '6.8.1',
     nombre: 'Tres cosas que estorbaban',

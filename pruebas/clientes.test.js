@@ -20,6 +20,7 @@ const { fabricaDePrueba } = require('./ayudante');
 const { llamar, entrarAdmin, entrarPorNombre, bd, preparar } = fabricaDePrueba('clientes');
 
 let mary, publico;
+let faro, garrafonId;
 
 
 /** Fía una marqueta ($264) al cliente. */
@@ -1051,4 +1052,253 @@ test('el número de tickets que hace a uno «de siempre» se configura', async (
   const siempre = (await llamar('/api/clientes?ritmo=frecuente')).json.datos;
   assert.equal(siempre.clientes.length, 0, 'con veinte, nadie llega');
   bd.prepare("UPDATE configuracion SET valor = '4' WHERE clave = 'clientes_frecuente_tickets'").run();
+});
+
+// ============================================================
+// LA FICHA COMPLETA  (v6.9)
+// ============================================================
+//
+// "Por fin terminé el diseño que quiero para clientes. Tenemos casi todos
+//  los datos, los que no tengamos los agregas."
+
+test('se dan de alta los datos fiscales, la zona y la ventana de recepción', async () => {
+  await entrarAdmin();
+  const r = await llamar('/api/clientes', {
+    method: 'POST',
+    cuerpo: {
+      nombre: 'Cap. Mateo Villanueva', negocio: 'Mariscos El Faro',
+      razonSocial: 'OPERADORA GASTRONÓMICA DEL LITORAL S.A. DE C.V.',
+      rfc: 'ogl180422k98', regimenFiscal: '601',
+      correo: 'facturas@elfaro.com.mx',
+      zona: 'Sector 03 (Muelle Pesquero)', frecuencia: 'diario',
+      horaDesde: '6:30', horaHasta: '09:00',
+      metodoPago: 'credito', diasPlazo: 15, limite: 45000,
+      garrafonesLimite: 20, garrafonDeposito: 120
+    }
+  });
+  assert.equal(r.estado, 201);
+  const c = r.json.datos.cliente;
+
+  assert.equal(c.razon_social, 'OPERADORA GASTRONÓMICA DEL LITORAL S.A. DE C.V.');
+  assert.equal(c.rfc, 'OGL180422K98', 'el RFC se guarda en mayúsculas, como la constancia');
+  assert.equal(c.regimen_fiscal, '601');
+  assert.equal(c.zona, 'Sector 03 (Muelle Pesquero)');
+  assert.equal(c.frecuencia, 'diario');
+  assert.equal(c.hora_desde, '06:30', 'la hora se normaliza a dos dígitos');
+  assert.equal(c.hora_hasta, '09:00');
+  assert.equal(c.metodo_pago, 'credito');
+  assert.equal(c.garrafones_limite, 20);
+  assert.equal(c.garrafon_deposito_centavos, 12000);
+
+  faro = c;
+});
+
+test('una hora mal escrita o un régimen inventado no pasan', async () => {
+  let r = await llamar(`/api/clientes/${faro.id}`, {
+    method: 'PUT', cuerpo: { horaDesde: 'a las seis' }
+  });
+  assert.equal(r.estado, 400);
+
+  r = await llamar(`/api/clientes/${faro.id}`, {
+    method: 'PUT', cuerpo: { regimenFiscal: '999' }
+  });
+  assert.equal(r.estado, 400);
+
+  r = await llamar(`/api/clientes/${faro.id}`, {
+    method: 'PUT', cuerpo: { frecuencia: 'cuando sea' }
+  });
+  assert.equal(r.estado, 400);
+});
+
+test('la pantalla recibe los catálogos y los cuatro números de arriba', async () => {
+  const d = (await llamar('/api/clientes')).json.datos;
+  assert.ok(d.frecuencias.some((f) => f.clave === 'diario'));
+  assert.ok(d.metodosPago.some((m) => m.clave === 'credito'));
+  assert.ok(d.regimenes.some((x) => x.clave === '601'));
+
+  const c = d.cartera;
+  assert.equal(typeof c.conCredito, 'number');
+  assert.equal(typeof c.nuevosMes, 'number');
+  assert.equal(typeof c.operativos, 'number');
+  assert.ok(c.conCredito >= 1, 'El Faro tiene límite y plazo');
+});
+
+// ---------- LOS PRECIOS ACORDADOS ----------
+
+test('el precio acordado con un cliente le gana a la lista y al mostrador', async () => {
+  await entrarAdmin();
+  // Un producto de piezas, que es donde las listas de mayoreo no llegaban.
+  const cat = (await llamar('/api/catalogo/categorias', {
+    method: 'POST', cuerpo: { nombre: 'Agua' } })).json.datos.categoria;
+  const garrafon = (await llamar('/api/catalogo/productos', {
+    method: 'POST',
+    cuerpo: { nombre: 'Garrafón 20L', categoriaId: cat.id, tipo: 'simple',
+              precio: 42, codigo: 'G20' } })).json.datos.producto;
+
+  // De mostrador cuesta $42; a El Faro se le deja en $35.
+  const r = await llamar(`/api/clientes/${faro.id}/precios`, {
+    method: 'PUT', cuerpo: { productoId: garrafon.id, precio: 35, volumen: '12 por semana' }
+  });
+  assert.equal(r.estado, 200);
+  const suyo = r.json.datos.precios.find((p) => p.producto_id === garrafon.id);
+  assert.equal(suyo.centavos, 3500);
+  assert.equal(suyo.lista_centavos, 4200);
+  assert.equal(suyo.volumen, '12 por semana');
+  assert.ok(suyo.diferencia < 0, 'y se ve cuánto por debajo del mostrador quedó');
+
+  // Al cobrarle, se le cobra el suyo. Dos piezas: el precio es por pieza.
+  const venta = await llamar('/api/ventas', {
+    method: 'POST',
+    cuerpo: { lineas: [{ productoId: garrafon.id, cantidad: 2 }],
+              formaPago: 'efectivo', pago: 100, clienteId: faro.id }
+  });
+  assert.equal(venta.estado, 201);
+  assert.equal(venta.json.datos.venta.total_centavos, 7000, '2 × $35, no 2 × $42');
+
+  // Y a otro cliente se le sigue cobrando el de mostrador.
+  const otra = await llamar('/api/ventas', {
+    method: 'POST',
+    cuerpo: { lineas: [{ productoId: garrafon.id, cantidad: 2 }],
+              formaPago: 'efectivo', pago: 100, clienteId: mary.id }
+  });
+  assert.equal(otra.json.datos.venta.total_centavos, 8400, 'a Mary, $42 cada uno');
+
+  garrafonId = garrafon.id;
+});
+
+test('quitar el precio acordado devuelve al de mostrador, no lo deja en cero', async () => {
+  const r = await llamar(`/api/clientes/${faro.id}/precios`, {
+    method: 'PUT', cuerpo: { productoId: garrafonId, precio: '' }
+  });
+  assert.equal(r.estado, 200);
+  assert.equal(r.json.datos.precios.length, 0);
+
+  const venta = await llamar('/api/ventas', {
+    method: 'POST',
+    cuerpo: { lineas: [{ productoId: garrafonId, cantidad: 1 }],
+              formaPago: 'efectivo', pago: 100, clienteId: faro.id }
+  });
+  assert.equal(venta.json.datos.venta.total_centavos, 4200);
+});
+
+test('el precio acordado NO pide autorización: es su precio normal', async () => {
+  await entrarAdmin();
+  await llamar(`/api/clientes/${faro.id}/precios`, {
+    method: 'PUT', cuerpo: { productoId: garrafonId, precio: 35 }
+  });
+  // La cajera, que no puede poner precios especiales, le cobra el suyo sin
+  // que nadie le pida un PIN: es lo que compra todos los días.
+  await entrarPorNombre('Mari', '7777');
+  const venta = await llamar('/api/ventas', {
+    method: 'POST',
+    cuerpo: { lineas: [{ productoId: garrafonId, cantidad: 1 }],
+              formaPago: 'efectivo', pago: 100, clienteId: faro.id }
+  });
+  assert.equal(venta.estado, 201);
+  assert.equal(venta.json.datos.venta.total_centavos, 3500);
+
+  const linea = bd.prepare(`
+    SELECT * FROM venta_lineas WHERE venta_id = ?`).get(venta.json.datos.venta.id);
+  assert.equal(linea.precio_lista_centavos, null,
+    'no es un descuento de una vez: es su precio, y no lleva ni motivo ni autorización');
+  await entrarAdmin();
+});
+
+// ---------- LOS GARRAFONES EN RESGUARDO ----------
+
+test('los garrafones se suman de sus movimientos, no de un contador', async () => {
+  let r = await llamar(`/api/clientes/${faro.id}/garrafones`, {
+    method: 'POST', cuerpo: { cuantos: 12, motivo: 'Primera entrega' }
+  });
+  assert.equal(r.estado, 201);
+  assert.equal(r.json.datos.retenidos, 12);
+  assert.equal(r.json.datos.limite, 20);
+  assert.equal(r.json.datos.depositoCentavos, 12 * 12000, '12 garrafones × $120 de garantía');
+  assert.equal(r.json.datos.pasado, false);
+
+  // Devuelve cinco.
+  r = await llamar(`/api/clientes/${faro.id}/garrafones`, {
+    method: 'POST', cuerpo: { cuantos: -5 }
+  });
+  assert.equal(r.json.datos.retenidos, 7);
+
+  // No puede devolver más de los que trae.
+  r = await llamar(`/api/clientes/${faro.id}/garrafones`, {
+    method: 'POST', cuerpo: { cuantos: -20 }
+  });
+  assert.equal(r.estado, 409);
+});
+
+test('pasarse del límite avisa pero NO se rechaza: el garrafón ya se lo llevó', async () => {
+  const r = await llamar(`/api/clientes/${faro.id}/garrafones`, {
+    method: 'POST', cuerpo: { cuantos: 20 }
+  });
+  assert.equal(r.estado, 201, 'esconderlo no lo trae de vuelta');
+  assert.equal(r.json.datos.retenidos, 27);
+  assert.equal(r.json.datos.pasado, true);
+  assert.match(r.json.datos.aviso, /27/);
+});
+
+test('un movimiento mal capturado se anula y la cuenta se rehace sola', async () => {
+  const historial = (await llamar(`/api/clientes/${faro.id}/garrafones`)).json.datos.historial;
+  const ultimo = historial[0];
+  assert.equal(ultimo.cuantos, 20);
+
+  let r = await llamar(`/api/clientes/garrafones/${ultimo.id}/anular`, {
+    method: 'POST', cuerpo: {}
+  });
+  assert.equal(r.estado, 400, 'sin motivo no se anula');
+
+  r = await llamar(`/api/clientes/garrafones/${ultimo.id}/anular`, {
+    method: 'POST', cuerpo: { motivo: 'Se apuntó dos veces' }
+  });
+  assert.equal(r.estado, 200);
+  assert.equal(r.json.datos.retenidos, 7, 'vuelve a lo que había');
+  assert.equal(r.json.datos.pasado, false);
+
+  // No se borra: sigue ahí, marcado.
+  const quedan = bd.prepare(
+    'SELECT COUNT(*) n FROM garrafones_movimientos WHERE cliente_id = ?').get(faro.id).n;
+  assert.equal(quedan, 3, 'los tres movimientos siguen guardados');
+});
+
+test('la garantía de los envases va APARTE del saldo', async () => {
+  const f = await ficha(faro.id);
+  assert.equal(f.garrafones.retenidos, 7);
+  assert.equal(f.garrafones.depositoCentavos, 7 * 12000);
+  // Su deuda es de lo que compró, no de lo que dejó en garantía: una
+  // garantía no es una deuda, y sumarla mandaría a cobrar dinero que
+  // nadie debe.
+  assert.equal(f.cliente.estado.saldo, 0);
+});
+
+test('la ficha trae su consumo de los últimos 30 días', async () => {
+  const f = await ficha(faro.id);
+  assert.equal(typeof f.cliente.estado.consumo.kilos, 'number');
+  assert.ok(f.cliente.estado.consumo.garrafones >= 1,
+    'los garrafones que compró se cuentan aparte de los kilos de hielo');
+});
+
+test('solo el gerente pone precios acordados', async () => {
+  await entrarPorNombre('Mari', '7777');
+  const r = await llamar(`/api/clientes/${faro.id}/precios`, {
+    method: 'PUT', cuerpo: { productoId: garrafonId, precio: 1 }
+  });
+  assert.equal(r.estado, 403, 'bajarle el precio a alguien es decidir cuánto gana la fábrica');
+  await entrarAdmin();
+});
+
+test('el papel que se lleva el cliente trae su razón social y su RFC', async () => {
+  await entrarAdmin();
+  const venta = await llamar('/api/ventas', {
+    method: 'POST',
+    cuerpo: { lineas: [{ dieciseisavos: 16 }], formaPago: 'credito', clienteId: faro.id }
+  });
+  assert.equal(venta.estado, 201);
+
+  const { renglones } = (await llamar(
+    `/api/impresion/venta/${venta.json.datos.venta.id}/previa`)).json.datos;
+  const papel = renglones.map((x) => x.t).join('\n');
+  assert.match(papel, /OPERADORA GASTRON/, 'la razón social, para quien factura');
+  assert.match(papel, /RFC: OGL180422K98/);
 });
