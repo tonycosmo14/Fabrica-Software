@@ -45,7 +45,7 @@ const TEMAS = [
   {
     id: 'produccion',
     titulo: 'Producción de hielo: sacar el hielo de los tanques',
-    busca: 'producción tanque paño canasta molde sacar rellenar rotación intercalado merma agua purificada potable congelación horas cuánto tarda en congelar 48 revisar el tanque revisión robo faltante quién lo sacó otro eventual nombre calidad sellada 80 90 60 40 por ciento porcentaje hueca cáscara aguada ahogada salada contaminada salmuera se botó cómo salió el hielo mezcla ojo ficha historia última vez F2 atajo panel canastas pendientes a medias turno canasta por canasta terminar',
+    busca: 'producción tanque paño canasta molde sacar rellenar rotación intercalado merma agua purificada potable congelación horas cuánto tarda en congelar 48 revisar el tanque revisión robo faltante quién lo sacó otro eventual nombre calidad sellada 80 90 60 40 por ciento porcentaje hueca cáscara aguada ahogada salada contaminada salmuera se botó cómo salió el hielo mezcla ojo ficha historia última vez F2 atajo panel canastas pendientes a medias turno canasta por canasta terminar pantalla fija no se desplaza scroll botones grandes de tanque sacar el paño siguiente en turno molde marcado alerta última extracción capacidad',
     cuerpo: `
       <h4>Cómo está armado un tanque</h4>
       <p>Un <b>tanque</b> tiene varios <b>paños</b>. Cada paño tiene
@@ -92,11 +92,43 @@ const TEMAS = [
       ni decir qué le pasó a un molde, ni mandar una cáscara al condensador—
       y tener dos maneras de anotar lo mismo solo servía para que la mitad de
       las veces se anotara por la que menos cuenta.</p>
-      <p>Arriba, las <b>pestañas de los tanques</b> van grandes y la del
-      tanque en el que estás, más grande todavía y en azul. Y al abrir un
-      paño, el nombre del tanque va en el título junto al número: anotar en
-      el tanque equivocado cuesta un paño entero y no se descubre hasta el
-      día siguiente.</p>
+      <h4>La pantalla no se mueve <small>(v7.2)</small></h4>
+      <p>Es como la de vender: <b>la página entera no se desplaza</b>. Lo
+      único que rueda es la <b>lista de paños</b>, dentro de su propia caja.
+      Así, en un tanque de dieciocho, nunca se pierden de vista las dos cosas
+      que hacen falta: <b>en qué tanque estás</b> y <b>qué paño sigue</b>.</p>
+      <ul class="instrucciones">
+        <li><b>Arriba, los tanques</b>, y son lo más grande de la pantalla.
+        El encendido va en azul y con su nombre más grande: anotar en el
+        tanque equivocado cuesta un paño entero y no se descubre hasta el día
+        siguiente. Al lado, la <b>tuerca ⚙</b> para configurarlos.</li>
+        <li><b>Debajo, el renglón verde</b>: «2N (B) sigue paño 5», y en
+        chiquito la <b>última extracción</b> —qué paño, hace cuánto, quién y
+        cuántas marquetas—. A la derecha, el agua con la que se rellena y
+        los tres papeles que se sacan desde aquí.</li>
+        <li><b>En medio, los paños</b>, que es lo único que se desplaza. La
+        lista <b>se abre puesta en el paño que toca</b>, aunque sea el doce
+        de dieciocho.</li>
+        <li><b>A la derecha, el panel</b>: cómo está el tanque, la salmuera,
+        el cuarto frío y cómo salió el hielo hoy.</li>
+      </ul>
+      <p class="ayuda-tip">En el celular sí se desplaza la página entera,
+      como cualquier otra pantalla: cuatro franjas y dos columnas en un alto
+      fijo no caben en una mano.</p>
+
+      <h4>El paño que toca lleva el botón <small>(v7.2)</small></h4>
+      <p>No es solo un aro verde que haya que saber interpretar: el renglón
+      dice <b>«✓ Sacar el paño 5»</b> con todas sus letras y del tamaño de una
+      mano. Es la única acción que se hace aquí cincuenta veces al día.</p>
+      <p>Los demás paños llevan a la derecha en qué están: <b>10 h</b> de
+      congelación, <b>listo</b>, <b>a medias</b> o <b>fuera</b>. Y al abrir un
+      paño, el nombre del tanque va en el título junto al número.</p>
+
+      <h4>El molde que falla se ve desde la lista <small>(v7.2)</small></h4>
+      <p>Si un molde viene saliendo peor que sus vecinos, el renglón se marca
+      en rojo y dice <b>cuál es</b>: «⚠ molde 2 (canasta 1)». Antes había que
+      entrar al paño a buscarlo. El panel de la derecha lo repite y lleva
+      directo al paño donde está.</p>
 
       <h4>Cómo salió el hielo</h4>
       <p>Al sacar un paño se dice <b>cómo salió</b>. La pregunta va en

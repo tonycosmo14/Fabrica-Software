@@ -5946,3 +5946,330 @@ button.chico.pos-btn-entrada, button.chico.pos-btn-salida { min-width: 0; paddin
 @media (max-width: 620px) {
   .prod-volumen-campos { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   PRODUCCIÓN DE HIELO  (v7.2 — el diseño del dueño)
+
+   "Que la página sea como el módulo de vender: fija, que no se le pueda
+    hacer scroll. A lo que sí, únicamente a la parte de los tanques que
+    tengan muchos paños. Así siempre tengo visible qué paño debe seguir y
+    en qué tanque estoy."
+
+   Cuatro franjas y una sola que rueda. La página completa mide el alto
+   exacto de la ventana; los paños se desplazan dentro de su caja.
+   ============================================================ */
+.prd {
+  display: grid; grid-template-rows: auto auto minmax(0, 1fr);
+  /* UNA SOLA COLUMNA, Y QUE NO PUEDA CRECER. Sin el `minmax(0, 1fr)` la
+     columna implícita de una rejilla se estira hasta el contenido más ancho
+     que tenga dentro: en un celular, los tres nombres de tanque sin partir
+     empujaban la pantalla entera a 460 px y todo se salía por la derecha. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px; padding: 12px; width: 100%;
+}
+/* Solo cuando la pantalla es fija toma el alto de la ventana. Dentro del
+   corte de caja (`en-corte`) esta misma vista va empotrada en otra que sí
+   se desplaza, y ahí un alto de 100% la dejaría de dos centímetros. */
+body.pantalla-fija .prd { height: 100%; min-height: 0; }
+.prd.en-corte { height: auto; grid-template-rows: auto auto auto minmax(0, 1fr); }
+/* Y ahí las dos cajas miden lo suyo: estiradas a la más alta dejaban medio
+   metro de blanco debajo de los paños. */
+.prd.en-corte .prd-cuerpo { align-items: start; }
+
+/* ------------------------------------------------------------
+   1 · LOS TANQUES, LO MÁS GRANDE DE LA PANTALLA
+   "Los botones de cada tanque me quedaron muy pequeños; más grandes,
+    deben ser lo más grande."
+   Se reparten TODO el ancho: con tres tanques cada botón mide un tercio
+   de la pantalla, y desde el otro lado del pasillo se ve cuál está
+   encendido sin acercarse a leer.
+   ------------------------------------------------------------ */
+.prd-tanques { display: flex; gap: 10px; align-items: stretch; }
+.prd-tanque {
+  /* Se reparten el ancho, pero con tope: en una fábrica con un solo tanque
+     un botón de mil píxeles no se lee mejor, se lee raro. */
+  flex: 1 1 0; min-width: 0; max-width: 340px; margin: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; min-height: 70px; padding: 7px 12px;
+  background: var(--superficie); color: var(--suave);
+  border: 2px solid var(--borde); border-radius: 14px;
+  text-transform: none; letter-spacing: 0;
+}
+.prd-tanque-nombre {
+  font-size: 30px; font-weight: 900; line-height: 1.05; letter-spacing: .5px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+}
+.prd-tanque small {
+  font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  opacity: .75;
+}
+.prd-tanque:hover { border-color: var(--primario); color: var(--texto); }
+/* Y EL ACTIVO CANTA CUÁL ES. Que sea distinto no basta: es donde se está
+   anotando, y equivocarse de tanque no se descubre hasta el día siguiente. */
+.prd-tanque.activo {
+  background: var(--primario); border-color: var(--primario); color: var(--primario-texto);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .16);
+}
+.prd-tanque.activo .prd-tanque-nombre { font-size: 34px; }
+.prd-tanque.activo small { opacity: .9; }
+
+.prd-tuerca {
+  flex: 0 0 auto; width: 56px; padding: 0; margin-left: auto;
+  display: grid; place-items: center; font-size: 20px; line-height: 1;
+  background: var(--superficie); color: var(--suave); text-decoration: none;
+  border: 2px solid var(--borde); border-radius: 14px;
+}
+.prd-tuerca:hover { border-color: var(--acento); color: var(--acento); }
+
+/* ------------------------------------------------------------
+   2 · LA BARRA: qué sigue, con qué agua, y los tres papeles
+   ------------------------------------------------------------ */
+.prd-barra {
+  display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap;
+  padding: 7px 10px; border-radius: 14px;
+  background: var(--superficie); border: 1px solid var(--borde);
+}
+/* EL RENGLÓN QUE CONTESTA LAS DOS PREGUNTAS DEL DÍA. Verde y con punto,
+   como un semáforo en marcha: se encuentra sin buscarlo. */
+/* LA ÚLTIMA EXTRACCIÓN VA DENTRO DEL MISMO RECUADRO, y no en una columna
+   aparte: en un monitor de 1024 esa columna se quedaba con ochenta píxeles
+   y enseñaba «Es el pr…», que no le sirve a nadie. Aquí abajo cabe entera
+   y las dos frases se leen juntas, que es como se piensan: «sigue el 5, y
+   el anterior salió hace dos horas». */
+.prd-sigue {
+  display: flex; align-items: center; gap: 9px; flex: 0 1 auto; min-width: 0;
+  padding: 7px 14px; border-radius: 10px;
+  background: var(--cal-c80-f, var(--et-cajero-f)); border: 2px solid var(--verde);
+}
+.prd-sigue-texto { display: flex; flex-direction: column; min-width: 0; }
+.prd-sigue strong {
+  font-size: 19px; font-weight: 800; color: var(--verde); line-height: 1.2;
+  font-family: var(--mono, ui-monospace, monospace); white-space: nowrap;
+}
+.prd-sigue small {
+  font-size: 11.5px; color: var(--suave); line-height: 1.3;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.prd-sigue small:empty { display: none; }
+.prd-sigue.sin { border-color: var(--borde); background: var(--superficie-alt); }
+.prd-sigue.sin strong { color: var(--suave); font-size: 15px; }
+.prd-sigue-punto {
+  width: 9px; height: 9px; border-radius: 50%; background: var(--verde); flex: none;
+}
+
+.prd-barra-acciones { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.prd-barra-acciones .agua-boton { margin: 0; min-height: 48px; }
+/* Debajo de un monitor ancho los tres papeles pierden su segundo renglón y
+   caben junto al «sigue paño N». Vale más el alto que gana la lista de
+   paños que un subtítulo que se lee una vez en la vida. */
+@media (max-width: 1319px) {
+  .prd-accion-texto small { display: none; }
+  .prd-accion { padding: 6px 11px; gap: 7px; }
+  .prd-accion-texto strong { font-size: 13px; }
+  .prd-accion > span:first-child { font-size: 17px; }
+  .prd-sigue { padding: 7px 12px; }
+  .prd-sigue strong { font-size: 17px; }
+  .prd-cuenta small { font-size: 9px; }
+}
+/* Los tres papeles: icono grande y dos renglones. No son «botones
+   secundarios» —son lo que más veces al día se aprieta desde aquí— pero
+   tampoco pueden competir con el verde de sacar el paño. */
+.prd-accion {
+  display: flex; align-items: center; gap: 9px; margin: 0;
+  width: auto; min-width: 0; min-height: 48px; padding: 7px 14px;
+  background: var(--superficie-alt); color: var(--texto);
+  border: 1px solid var(--borde-fuerte); border-radius: 12px;
+  text-transform: none; letter-spacing: 0; text-align: left;
+}
+.prd-accion:hover { border-color: var(--primario); }
+.prd-accion > span:first-child { font-size: 19px; line-height: 1; flex: none; }
+.prd-accion-texto { display: flex; flex-direction: column; min-width: 0; }
+.prd-accion-texto strong { font-size: 13.5px; font-weight: 700; white-space: nowrap; }
+.prd-accion-texto small { font-size: 11px; color: var(--suave); white-space: nowrap; }
+
+/* ------------------------------------------------------------
+   3 y 4 · LOS PAÑOS (que ruedan) Y EL PANEL (que también, por dentro)
+   ------------------------------------------------------------ */
+.prd-cuerpo { display: grid; gap: 12px; align-items: stretch; min-height: 0; }
+@media (min-width: 1000px) {
+  .prd-cuerpo { grid-template-columns: minmax(0, 1fr) minmax(320px, 360px); }
+}
+.prd-panos, .prd-panel {
+  min-width: 0; min-height: 0;
+  background: var(--superficie); border: 1px solid var(--borde);
+  border-radius: 14px;
+}
+/* FLEXBOX Y NO REJILLA, y esto importa: el aviso de «canastas fuera del
+   tanque» solo existe algunos días. Con filas fijas, el día que no está,
+   la lista caía en la fila `auto` y la leyenda en la de `1fr` — la lista
+   crecía sin rodar y la leyenda quedaba aplastada en nueve píxeles. En
+   columna flexible cada pieza mide lo suyo esté quien esté. */
+.prd-panos {
+  display: flex; flex-direction: column; padding: 10px 12px;
+}
+.prd-panos > .alerta-fuera, .prd-panos > .leyenda { flex: 0 0 auto; }
+.prd-panos-lista { flex: 1 1 auto; }
+/* AQUÍ, Y SOLO AQUÍ, SE RUEDA. */
+.prd-panos-lista {
+  overflow-y: auto; min-height: 0;
+  display: flex; flex-direction: column; gap: 6px;
+  /* Sitio para el aro verde y la etiqueta del que toca, que se salen un
+     pelo del renglón: sin esto se recortan contra el borde de la caja. */
+  padding: 2px 2px 4px;
+}
+.prd-panos .alerta-fuera { margin-bottom: 8px; }
+.prd-panos .leyenda { margin-top: 8px; padding-top: 8px; font-size: 11.5px; gap: 10px; }
+
+.prd-panel {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 12px; overflow-y: auto;
+}
+.prd-tarjeta {
+  background: var(--superficie-alt); border: 1px solid var(--borde);
+  border-radius: 12px; padding: 12px 14px;
+}
+.prd-tarjeta-cabeza {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; margin-bottom: 10px;
+}
+.prd-tarjeta-cabeza h3 { margin: 0; font-size: 16px; font-weight: 800; }
+.prd-capacidad {
+  font-size: 11px; font-weight: 700; color: var(--suave); white-space: nowrap;
+  background: var(--superficie); border: 1px solid var(--borde);
+  border-radius: 999px; padding: 2px 9px;
+}
+.prd-etiqueta {
+  display: block; font-size: 10.5px; font-weight: 800; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--suave);
+}
+
+/* Los cuatro números del tanque: cada uno en su casilla y con su color,
+   que es como se leen de un vistazo mientras se camina el pasillo. */
+.prd-cuentas { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.prd-cuenta {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  padding: 8px 3px; border-radius: 10px; min-width: 0;
+  background: var(--superficie); border: 1px solid var(--borde);
+}
+.prd-cuenta strong { font-size: 25px; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.prd-cuenta small {
+  font-size: 9.5px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase;
+  color: var(--suave); text-align: center; line-height: 1.2;
+}
+.prd-cuenta.lista strong { color: var(--est-lista); }
+.prd-cuenta.congelando strong { color: var(--est-congelando); }
+.prd-cuenta.proceso strong { color: var(--ambar); }
+.prd-cuenta.fuera strong { color: var(--est-fuera); }
+.prd-cuenta.malo strong { color: var(--rojo); }
+
+.prd-alerta {
+  margin-top: 10px; padding: 9px 11px; border-radius: 10px;
+  background: var(--est-fuera-f); border-left: 3px solid var(--ambar);
+}
+.prd-alerta strong { display: block; font-size: 12.5px; line-height: 1.4; color: var(--ambar); }
+.prd-alerta small { display: block; font-size: 11.5px; color: var(--suave); margin-top: 2px; }
+.prd-alerta .enlace { margin-top: 6px; display: inline-block; }
+
+.prd-frio { text-align: center; }
+.prd-frio-numero {
+  display: block; font-size: 40px; font-weight: 900; line-height: 1.05;
+  margin: 4px 0 2px; color: var(--primario); font-variant-numeric: tabular-nums;
+}
+.prd-frio-numero.malo { color: var(--rojo); }
+.prd-frio small { display: block; font-size: 11.5px; color: var(--suave); }
+
+/* CÓMO SALIÓ EL HIELO HOY. El porcentaje es lo que entró al cuarto frío
+   entre lo que se abrió — no un promedio de los grados, que juntaría
+   «80-90%» con «40-60%» en un número que no significa nada. */
+.prd-conforme {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 10px; margin: 12px 0 6px;
+}
+.prd-conforme > span { font-size: 11.5px; color: var(--suave); font-weight: 600; }
+.prd-conforme strong { font-size: 20px; font-variant-numeric: tabular-nums; }
+.prd-conforme strong.bien { color: var(--verde); }
+.prd-conforme strong.malo { color: var(--rojo); }
+.prd-conforme strong small { font-size: 11px; color: var(--suave); font-weight: 600; margin-left: 5px; }
+.prd-nota { margin: 8px 0 0; font-size: 11.5px; color: var(--suave); line-height: 1.45; }
+
+.prd-panel-botones { display: flex; flex-direction: column; gap: 8px; margin-top: auto; }
+.prd-panel-botones .boton, .prd-panel-botones button {
+  width: 100%; margin: 0; text-align: center; min-height: 46px;
+}
+
+/* ------------------------------------------------------------
+   EL RENGLÓN DEL PAÑO, con el botón de sacar en el que toca
+   ------------------------------------------------------------ */
+.pano-prod { position: relative; }
+/* En la pantalla fija cada renglón que se ahorra es un paño más a la
+   vista, pero sin bajar del tamaño que se toca con el dedo. */
+.prd-panos-lista .pano-prod-cuerpo { padding: 4px 8px; min-height: 44px; }
+.prd-panos-lista .pano-prod-historia { font-size: 11px; }
+/* El de arriba lleva sitio para su etiqueta, que se apoya en el borde. */
+.pano-prod.toca-este { margin-top: 10px; }
+.pano-prod-turno {
+  position: absolute; top: -9px; left: 12px; z-index: 1;
+  font-size: 9.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  background: var(--verde); color: #fff; padding: 2px 9px; border-radius: 999px;
+}
+/* Un molde que viene fallando se ve desde la lista: el renglón se marca en
+   rojo suave. No es una alarma —el paño se saca igual— es un «mira esto». */
+.pano-prod.con-fallo { border-color: var(--rojo); }
+.pano-prod-fallo { color: var(--rojo); font-weight: 700; }
+
+/* EL BOTÓN QUE SE APRIETA CINCUENTA VECES AL DÍA. Verde, con todas sus
+   letras, y del tamaño de una mano: es la única acción de esta pantalla. */
+.pano-prod-sacar {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 10px 16px; border-radius: 10px; white-space: nowrap;
+  background: var(--verde); color: #fff;
+  font-size: 14.5px; font-weight: 800; letter-spacing: .2px;
+}
+.pano-prod-cuerpo:hover .pano-prod-sacar { filter: brightness(1.07); }
+
+/* El estado, en pastilla: se compara de un golpe entre renglones. */
+.prd-chip {
+  display: inline-block; min-width: 62px; text-align: center;
+  padding: 5px 10px; border-radius: 999px; white-space: nowrap;
+  font-size: 12.5px; font-weight: 800; font-variant-numeric: tabular-nums;
+  background: var(--superficie-alt); color: var(--suave); border: 1px solid var(--borde);
+}
+.prd-chip.congelando { color: var(--est-congelando); border-color: var(--est-congelando); }
+.prd-chip.fuera { color: var(--est-fuera); border-color: var(--est-fuera); }
+.prd-chip.proceso { color: var(--ambar); border-color: var(--ambar); }
+
+/* ------------------------------------------------------------
+   EN PANTALLA ANGOSTA VUELVE A DESPLAZARSE
+   Cuatro franjas apiladas y dos columnas no caben en un celular con un
+   alto fijo: ahí la página rueda entera, como cualquier otra.
+   ------------------------------------------------------------ */
+@media (max-width: 999px) {
+  body.pantalla-fija:has(.prd) { height: auto; overflow: auto; display: block; }
+  body.pantalla-fija:has(.prd) main { overflow: visible; }
+  .prd, body.pantalla-fija .prd { height: auto; }
+  .prd-panos, .prd-panel { display: block; overflow: visible; }
+  .prd-panos-lista { overflow: visible; }
+  .prd-tanque-nombre, .prd-tanque.activo .prd-tanque-nombre { font-size: 24px; }
+  .prd-tanque { min-height: 64px; }
+  .prd-barra-acciones { margin-left: 0; width: 100%; }
+  .prd-accion { flex: 1 1 140px; min-width: 0; }
+  .prd-accion-texto strong { overflow: hidden; text-overflow: ellipsis; }
+  .prd-panel-botones { margin-top: 14px; }
+}
+
+/* EN EL CELULAR los tres tanques siguen siendo lo más grande de la
+   pantalla, pero caben los tres: sin el «ir a este tanque» debajo y con el
+   nombre a la medida del ancho que hay. Partir el nombre o dejar dos
+   tanques fuera sería peor que letra más chica. */
+@media (max-width: 620px) {
+  .prd { padding: 10px; gap: 8px; }
+  .prd-tanque { min-height: 56px; padding: 6px 8px; }
+  .prd-tanque small { display: none; }
+  .prd-tanque-nombre, .prd-tanque.activo .prd-tanque-nombre { font-size: 21px; }
+  /* El encendido se lleva algo más de ancho: es el único cuyo nombre hay
+     que poder leer entero, porque es donde se está anotando. */
+  .prd-tanque.activo { flex-grow: 1.5; }
+  .prd-tuerca { width: 46px; }
+  .prd-sigue { flex: 1 1 100%; }
+  .prd-cuentas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

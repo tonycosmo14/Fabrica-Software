@@ -17,9 +17,51 @@
  * algo que ya estaba, o para cambios de puro aspecto.
  */
 
-const VERSION_ACTUAL = '7.1';
+const VERSION_ACTUAL = '7.2';
 
 const VERSIONES = [
+  {
+    numero: '7.2',
+    nombre: 'Producción, como la quiero ver',
+    fecha: '2026-09-05',
+    resumen:
+      'La pantalla de los tanques ya no se desplaza: los tanques arriba, '
+      + 'grandes, y el paño que sigue siempre a la vista. Lo único que '
+      + 'rueda es la lista de paños, dentro de su propia caja.',
+    cambios: [
+      { tipo: 'mejora', texto:
+        'LA PANTALLA NO SE MUEVE, como la de vender. Antes, con dieciocho '
+        + 'paños, al bajar la lista se perdían de vista los tanques y el '
+        + 'paño que tocaba. Ahora esos dos se quedan quietos arriba y solo '
+        + 'la lista de paños se desplaza.' },
+      { tipo: 'mejora', texto:
+        'LOS TANQUES, LO MÁS GRANDE DE LA PANTALLA. Se reparten todo el '
+        + 'ancho y el encendido canta cuál es: anotar en el tanque que no '
+        + 'es cuesta un paño entero y no se descubre hasta el día '
+        + 'siguiente.' },
+      { tipo: 'nuevo', texto:
+        'EL PAÑO QUE TOCA LLEVA EL BOTÓN. Ya no es solo un aro verde que '
+        + 'había que saber interpretar: dice «✓ Sacar el paño 5» con todas '
+        + 'sus letras, y la lista se abre puesta en él aunque sea el doce '
+        + 'de dieciocho.' },
+      { tipo: 'nuevo', texto:
+        'EL MOLDE QUE FALLA SE VE DESDE LA LISTA. El renglón se marca en '
+        + 'rojo y dice cuál es —«⚠ molde 2 (canasta 1)»— sin tener que '
+        + 'entrar al paño a buscarlo.' },
+      { tipo: 'nuevo', texto:
+        'LA ÚLTIMA EXTRACCIÓN, junto al paño que sigue: «Paño 3 hace 2 h '
+        + '15 min · Nael · 13 marq». Es la pregunta que viene enseguida.' },
+      { tipo: 'mejora', texto:
+        'EL PANEL DE AL LADO, ordenado: los cuatro números del tanque en '
+        + 'casillas con su color, cuántos paños tiene, la salmuera, el '
+        + 'cuarto frío en grande, y cómo salió el hielo hoy con su '
+        + 'porcentaje —cuánto de lo que se abrió entró al cuarto frío—.' },
+      { tipo: 'mejora', texto:
+        'Los tres papeles que se sacan desde aquí —números a sacar, revisar '
+        + 'el tanque y el día— pasaron a la barra de arriba, en un renglón, '
+        + 'para dejarle el alto a la lista de paños.' }
+    ]
+  },
   {
     numero: '7.1',
     nombre: 'Productos y precios, como los quiero ver',

@@ -1,18 +1,34 @@
 /**
- * PRODUCCIÓN  (v3.1 — ordenado para la pantalla que de verdad se usa)
+ * PRODUCCIÓN  (v3.1 · rediseñada en la v7.2 con el diseño del dueño)
  *
- * Lo primero que se ve es lo que más se usa:
+ * ============================================================
+ * LA PANTALLA NO SE DESPLAZA  (v7.2)
+ * ============================================================
  *
- *   1. NÚMEROS A SACAR — el papel que se imprime a cada rato y se le
- *      entrega al operario. Va primero, y tiene atajo de teclado (F2),
- *      porque es lo que más veces al día se hace desde aquí.
- *   2. REGISTRAR LO QUE SE SACÓ — el flujo de las 3 de la tarde. El operario
- *      llega con su papel, dice los números y se capturan todos de golpe.
- *      Va en el MISMO renglón, a la derecha: dos botones grandes uno
- *      encima del otro se comían media pantalla sin decir nada más.
- *   3. LOS TANQUES — la vista del estado, con un panel al lado. Los paños
- *      no llegan al ancho de un monitor, y ese hueco vacío puede llevar lo
- *      que uno viene a mirar: cómo va el tanque y cómo salió el hielo hoy.
+ * "Que la página sea como el módulo de vender: fija, que no se le pueda
+ *  hacer scroll. A lo que sí, únicamente a la parte de los tanques que
+ *  tengan muchos paños. Así siempre tengo visible qué paño debe seguir y
+ *  en qué tanque estoy."
+ *
+ * Cuatro franjas de arriba abajo, y solo la tercera rueda:
+ *
+ *   1. LOS TANQUES — lo más grande de la pantalla. Anotar en el tanque
+ *      equivocado cuesta un paño entero y no se descubre hasta el día
+ *      siguiente: el nombre se tiene que leer desde donde uno está
+ *      parado, no de cerca.
+ *   2. LA BARRA — en qué tanque estoy, qué paño sigue, cuándo salió el
+ *      anterior, con qué agua se rellena, y los tres papeles que se
+ *      sacan desde aquí (números a sacar con su F2, revisar el tanque,
+ *      el día).
+ *   3. LOS PAÑOS — lo único que se desplaza, dentro de su propia caja.
+ *      Dieciocho paños no caben en una pantalla, pero la pantalla entera
+ *      no tiene por qué irse con ellos.
+ *   4. EL PANEL — al lado: cómo está el tanque, la salmuera, el cuarto
+ *      frío y cómo salió el hielo hoy.
+ *
+ * EL PAÑO QUE TOCA LLEVA EL BOTÓN, NO UNA ETIQUETA. Antes se distinguía
+ * con un aro verde y había que saber que tocarlo entraba a sacarlo; ahora
+ * dice «✓ Sacar el paño 5» con todas sus letras.
  *
  * CADA PAÑO DICE SU HISTORIA en el renglón: cuándo se sacó la última vez,
  * quién lo sacó y cuántas horas llevaba congelando. Antes había que entrar
@@ -125,6 +141,25 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
     document.removeEventListener('keydown', atajo);
   }, { once: true });
 
+  /**
+   * LA PANTALLA FIJA ES SOLO LA LISTA DE TANQUES  (v7.2)
+   *
+   * De este archivo salen cinco pantallas —la lista, el detalle de un paño,
+   * medir la salmuera, revisar el tanque y lo de hoy— y solo la primera
+   * está pensada para no desplazarse. Las otras son formularios largos: con
+   * el alto clavado, el botón de guardar se quedaba debajo del borde y no
+   * había forma de llegar a él.
+   *
+   * El enrutador vuelve a poner la clase que le toque a cada ruta al
+   * cambiar de pantalla, así que aquí solo hay que quitarla y ponerla
+   * mientras se está dentro. Dentro del corte de caja no se toca: ahí manda
+   * la pantalla de la caja, que sí se desplaza.
+   */
+  function fijar(si) {
+    if (enCorte) return;
+    document.body.classList.toggle('pantalla-fija', si);
+  }
+
   await pintar();
 
   // ==========================================================
@@ -148,115 +183,120 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
     SALIO = datos.calidadSalio || SALIO;
     PREGUNTA_GRADO = datos.preguntaGrado || PREGUNTA_GRADO;
 
+    fijar(true);
     const { tanques, tanque, fuera } = datos;
     tanqueActivo = tanque.id;
     localStorage.setItem('tanque_activo', tanqueActivo);
     const toca = tanque.siguiente;
 
     pantalla.innerHTML = `
-      ${enCorte ? `
-        <div class="corte-paso">
-          <div class="crece">
-            <span class="corte-paso-num">Paso 1 de 4</span>
-            <strong>¿Qué paños se sacaron?</strong>
-            <small>
-              Toca cada paño que salió y anótalo como siempre: quién lo sacó,
-              cómo salió el hielo, canasta por canasta si hace falta. Cuando
-              termines, sigue.
-            </small>
-          </div>
-          <button id="seguir-corte">Ya anoté los paños →</button>
-        </div>` : ''}
+      <div class="prd ${enCorte ? 'en-corte' : ''}">
+        ${enCorte ? `
+          <div class="corte-paso">
+            <div class="crece">
+              <span class="corte-paso-num">Paso 1 de 4</span>
+              <strong>¿Qué paños se sacaron?</strong>
+              <small>
+                Toca cada paño que salió y anótalo como siempre: quién lo sacó,
+                cómo salió el hielo, canasta por canasta si hace falta. Cuando
+                termines, sigue.
+              </small>
+            </div>
+            <button id="seguir-corte">Ya anoté los paños →</button>
+          </div>` : ''}
 
-      <div class="prod-acciones">
-        ${puedeVerNumeros ? `
-          <button id="siguientes" class="accion-principal">
-            <span class="accion-icono">🖨️</span>
-            <span class="accion-texto">
-              <strong>Números a sacar</strong>
-              <small>El papel para el operario · tecla F2</small>
-            </span>
-          </button>` : ''}
+        <!-- ============================================================
+             LOS TANQUES, LO MÁS GRANDE DE LA PANTALLA  (v7.2)
 
-        <!-- LA REVISIÓN DEL TANQUE  (v6.7). Corregir sirve para arreglar;
-             esto sirve para descubrir. No se anuncia: se agarra el
-             teléfono, se camina el tanque y se va marcando. -->
-        ${puedeRevisar ? `
-          <button id="revisar" class="accion-principal">
-            <span class="accion-icono">🔎</span>
-            <span class="accion-texto">
-              <strong>Revisar el tanque</strong>
-              <small>Comprobar que lo reportado es lo que hay</small>
-            </span>
-          </button>` : ''}
+             "Los botones de cada tanque me quedaron muy pequeños; más
+              grandes, deben ser lo más grande."
 
-        <!-- EL PAPEL DEL DÍA  (v4.7). Ya no sale pegado al corte: es una
-             foto de cómo va el día y se saca cuando se quiera, no al
-             cerrar el turno de alguien. -->
-        <button id="papel-dia" class="accion-principal">
-          <span class="accion-icono">🧾</span>
-          <span class="accion-texto">
-            <strong>El día</strong>
-            <small>Cuánto hielo queda y qué paños salieron hoy</small>
-          </span>
-        </button>
-      </div>
-
-      <!-- EL TANQUE SE QUEDA A LA VISTA  (v6.5.1). "Los tanques muy largos
-           que tienen muchos paños, hasta dieciocho, al desplazar de repente
-           me perdía y no sabía en qué tanque estaba." Las pestañas y el
-           renglón del paño que toca se pegan debajo de la barra de arriba;
-           todo lo demás se desliza. -->
-      <div class="prod-fijo">
-        <div class="pestanas-fila">
-          <div class="pestanas">
-            ${tanques.map((t) => `
-              <button class="pestana ${t.id === tanque.id ? 'activa' : ''}"
-                      data-tanque="${esc(t.id)}">${esc(t.nombre)}</button>`).join('')}
-          </div>
+             Y tiene razón: anotar en el tanque que no es cuesta un paño
+             entero y no se descubre hasta el día siguiente. El nombre se
+             tiene que leer desde donde uno está parado, no de cerca.
+             ============================================================ -->
+        <div class="prd-tanques">
+          ${tanques.map((t) => `
+            <button class="prd-tanque ${t.id === tanque.id ? 'activo' : ''}"
+                    data-tanque="${esc(t.id)}">
+              <span class="prd-tanque-nombre">${esc(t.nombre)}</span>
+              <small>${t.id === tanque.id ? 'estás aquí' : 'ir a este tanque'}</small>
+            </button>`).join('')}
           ${puedeConfigurar ? `
-            <a class="tuerca" href="#/config-tanques"
+            <a class="prd-tuerca" href="#/config-tanques"
                title="Configurar los tanques, paños y canastas">⚙</a>` : ''}
         </div>
 
-        <div class="barra-produccion">
-        ${toca ? `
-          <div class="toca">
-            <span class="toca-etiqueta">toca</span>
-            <strong>paño ${toca.numero}</strong>
-            <small>${esc(toca.porque)}${
-              tanque.ultimaSalida ? ` · ${esc(formatoFecha(tanque.ultimaSalida))}` : ''}</small>
-          </div>` : '<div class="toca"><small>Este tanque no tiene paños.</small></div>'}
+        <!-- LO QUE NO SE PUEDE PERDER DE VISTA: en qué tanque estoy y qué
+             paño sigue. Es el renglón que contesta las dos preguntas de
+             todos los días, y por eso vive fuera de lo que se desplaza. -->
+        <div class="prd-barra">
+          <div class="prd-sigue ${toca ? '' : 'sin'}">
+            ${toca ? '<span class="prd-sigue-punto"></span>' : ''}
+            <span class="prd-sigue-texto">
+              <strong>${toca
+                ? `${esc(tanque.nombre)} sigue paño ${toca.numero}`
+                : 'Este tanque no tiene paños'}</strong>
+              <small>${tanque.ultimaSalida
+                ? `Última: ${esc(ultimaFrase(tanque))}`
+                : (toca ? esc(toca.porque) : '')}</small>
+            </span>
+          </div>
 
-        ${puedeRegistrar ? `
-          <button class="agua-boton ${agua}" id="agua" title="Cambiar el agua">
-            <span class="agua-icono">💧</span>
-            <span>${agua === 'purificada' ? 'Purificada' : 'Potable'}</span>
-          </button>` : ''}
-        </div>
-      </div>
-
-      ${fuera ? `
-        <div class="alerta-fuera">
-          ⚠️ ${fuera} ${fuera === 1 ? 'canasta quedó fuera del tanque' : 'canastas quedaron fuera del tanque'}
-        </div>` : ''}
-
-      <div class="prod-cuerpo">
-        <div class="panos-produccion">
-          ${tanque.panos.map((p) => filaPano(p, toca)).join('') ||
-            '<p class="vacio">Este tanque no tiene paños.</p>'}
-
-          <div class="leyenda">
-            <span><i class="punto-estado congelando"></i> congelando</span>
-            <span><i class="punto-estado potable"></i> con potable</span>
-            <span><i class="punto-estado lista"></i> lista</span>
-            <span><i class="punto-estado fuera"></i> fuera del tanque</span>
-            <span><i class="punto-estado proceso"></i> a medias</span>
-            <span><i class="punto-estado merma"></i> molde que falla</span>
+          <div class="prd-barra-acciones">
+            ${puedeRegistrar ? `
+              <button class="agua-boton ${agua}" id="agua" title="Cambiar el agua con la que se rellena">
+                <span class="agua-icono">💧</span>
+                <span>${agua === 'purificada' ? 'Purificada' : 'Potable'}</span>
+              </button>` : ''}
+            ${puedeVerNumeros ? `
+              <button class="prd-accion" id="siguientes">
+                <span>🖨️</span>
+                <span class="prd-accion-texto">
+                  <strong>Números a sacar</strong><small>el papel del operario · F2</small>
+                </span>
+              </button>` : ''}
+            ${puedeRevisar ? `
+              <button class="prd-accion" id="revisar">
+                <span>🔎</span>
+                <span class="prd-accion-texto">
+                  <strong>Revisar el tanque</strong><small>comprobar lo reportado</small>
+                </span>
+              </button>` : ''}
+            <button class="prd-accion" id="papel-dia">
+              <span>🧾</span>
+              <span class="prd-accion-texto">
+                <strong>El día</strong><small>cuánto queda y qué salió</small>
+              </span>
+            </button>
           </div>
         </div>
 
-        ${panelTanque(tanque)}
+        <div class="prd-cuerpo">
+          <!-- LO ÚNICO QUE RUEDA. Dieciocho paños no caben en una pantalla,
+               pero la pantalla entera no tiene por qué moverse con ellos. -->
+          <section class="prd-panos">
+            ${fuera ? `
+              <div class="alerta-fuera">
+                ⚠️ ${fuera} ${fuera === 1
+                  ? 'canasta quedó fuera del tanque' : 'canastas quedaron fuera del tanque'}
+              </div>` : ''}
+            <div class="prd-panos-lista">
+              ${tanque.panos.map((p) => filaPano(p, toca)).join('') ||
+                '<p class="vacio">Este tanque no tiene paños.</p>'}
+            </div>
+            <div class="leyenda">
+              <span><i class="punto-estado congelando"></i> congelando</span>
+              <span><i class="punto-estado potable"></i> con potable</span>
+              <span><i class="punto-estado lista"></i> lista</span>
+              <span><i class="punto-estado fuera"></i> fuera del tanque</span>
+              <span><i class="punto-estado proceso"></i> a medias</span>
+              <span><i class="punto-estado merma"></i> molde que falla</span>
+            </div>
+          </section>
+
+          ${panelTanque(tanque)}
+        </div>
       </div>`;
 
     const seguir = pantalla.querySelector('#seguir-corte');
@@ -284,6 +324,7 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
 
     if (puedeVerNumeros) pantalla.querySelector('#siguientes').onclick = numerosASacar;
     pantalla.querySelector('#papel-dia').onclick = papelDelDia;
+    verElQueToca();
     if (!puedeRegistrar) return;
 
     pantalla.querySelector('#agua').onclick = () => {
@@ -294,12 +335,66 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
   }
 
   /**
+   * LA LISTA SE ABRE EN EL PAÑO QUE TOCA  (v7.2)
+   *
+   * En un tanque de dieciocho, el que sigue puede ser el doce, y abrir
+   * siempre por el uno obliga a rodar la lista antes de poder trabajar.
+   * La barra de arriba ya dice CUÁL es; esto pone el botón de sacarlo
+   * debajo del dedo.
+   *
+   * Se centra en su caja y no en la página: `scrollIntoView` a secas
+   * arrastraría también la ventana, y la pantalla es fija justamente para
+   * que eso no pase.
+   */
+  function verElQueToca() {
+    const caja = pantalla.querySelector('.prd-panos-lista');
+    const fila = caja?.querySelector('.pano-prod.toca-este');
+    if (!caja || !fila) return;
+    // Por rectángulos y no por `offsetTop`: ése se mide contra el ancestro
+    // POSICIONADO más cercano, que aquí no es la caja que rueda, y la lista
+    // acababa abriéndose tres renglones más abajo de donde debía.
+    const f = fila.getBoundingClientRect();
+    const c = caja.getBoundingClientRect();
+    caja.scrollTop += (f.top - c.top) - (c.height - f.height) / 2;
+  }
+
+  /**
+   * "Paño 3 hace 2 h · Nael · 13 marq" — la última extracción, en una línea.
+   *
+   * Es la pregunta que sigue enseguida a «¿cuál toca?»: saber que el
+   * anterior salió hace veinte minutos o hace ocho horas cambia lo que uno
+   * hace a continuación.
+   */
+  function ultimaFrase(tanque) {
+    const ultimos = tanque.panos
+      .map((p) => p.ultimaSacada ? { ...p.ultimaSacada, numero: p.numero } : null)
+      .filter(Boolean)
+      .sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+    const u = ultimos[0];
+    if (!u) return formatoFecha(tanque.ultimaSalida);
+
+    const partes = [`Paño ${u.numero}`, haceCuanto(u.fecha)];
+    if (u.quienes?.length) partes.push(u.quienes.map(nombreDePila).join(', '));
+    if (u.marquetas) partes.push(`${u.marquetas} marq`);
+    return partes.filter(Boolean).join(' · ');
+  }
+
+  /** "hace 2 h 15 m", como se dice. Nada de fechas cuando fue hoy mismo. */
+  function haceCuanto(fecha) {
+    const minutos = Math.floor((Date.now() - new Date(fecha).getTime()) / 60000);
+    if (!Number.isFinite(minutos) || minutos < 0) return fechaCorta(fecha);
+    if (minutos < 60) return `hace ${minutos} min`;
+    const horas = Math.floor(minutos / 60);
+    if (horas < 24) return `hace ${horas} h ${minutos % 60} min`;
+    return fechaCorta(fecha);
+  }
+  /**
    * EL PANEL DE AL LADO.
    *
    * Los paños de un tanque no llegan al ancho de un monitor, y ese hueco
    * estaba vacío. Aquí va lo que uno viene a mirar de reojo mientras
    * trabaja: cómo está el tanque ahora mismo, cuántos moldes vienen
-   * saliendo mal, y cómo salió el hielo de hoy en toda la fábrica.
+   * saliendo mal, cómo va la salmuera y cómo salió el hielo de hoy.
    *
    * En el celular no hay hueco al lado, así que el panel se va abajo solo
    * (lo resuelve el CSS, no hay dos pantallas que mantener).
@@ -307,75 +402,119 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
   function panelTanque(tanque) {
     const cuenta = (e) => tanque.panos.filter((p) => p.estado === e).length;
     const marcados = tanque.panos.reduce((n, p) => n + (p.moldesMarcados || 0), 0);
-    const m = hoy?.mezcla;
-    const conAlgo = m ? CALIDADES.filter((c) => m[c.clave] > 0) : [];
+    const conMarca = tanque.panos.filter((p) => p.moldesMarcados);
 
     return `
-      <aside class="prod-panel">
-        <div class="tarjeta plana">
-          <h3 class="panel-titulo">${esc(tanque.nombre)} ahora</h3>
-          <div class="panel-cuentas">
-            <span><strong>${cuenta('lista')}</strong><small>listos</small></span>
-            <span><strong>${cuenta('congelando')}</strong><small>congelando</small></span>
-            <span><strong>${cuenta('proceso')}</strong><small>a medias</small></span>
-            <span><strong>${cuenta('fuera')}</strong><small>fuera</small></span>
+      <aside class="prd-panel">
+        <div class="prd-tarjeta">
+          <div class="prd-tarjeta-cabeza">
+            <h3>${esc(tanque.nombre)} ahora</h3>
+            <span class="prd-capacidad">${tanque.panos.length} paños</span>
           </div>
+          <div class="prd-cuentas">
+            <span class="prd-cuenta lista"><strong>${cuenta('lista')}</strong><small>listos</small></span>
+            <span class="prd-cuenta congelando"><strong>${cuenta('congelando')}</strong><small>congelando</small></span>
+            <span class="prd-cuenta proceso"><strong>${cuenta('proceso')}</strong><small>a medias</small></span>
+            <span class="prd-cuenta fuera"><strong>${cuenta('fuera')}</strong><small>fuera</small></span>
+          </div>
+
           ${marcados ? `
-            <p class="panel-aviso">
-              ⚠ ${marcados} ${marcados === 1 ? 'molde viene saliendo' : 'moldes vienen saliendo'}
-              peor que sus vecinos. Toca el ojo del paño para ver cuál.
-            </p>` : ''}
+            <div class="prd-alerta">
+              <strong>⚠ ${marcados} ${marcados === 1
+                ? 'molde viene saliendo peor que sus vecinos'
+                : 'moldes vienen saliendo peor que sus vecinos'}</strong>
+              <small>${conMarca.map((p) => `paño ${p.numero}`).join(', ')}</small>
+              <button class="enlace" data-ficha="${esc(conMarca[0].id)}">
+                Ver cuál en el paño ${conMarca[0].numero} →
+              </button>
+            </div>` : ''}
 
           ${salmueraHTML(tanque)}
         </div>
 
         ${datos.cuartoFrio ? `
-          <div class="tarjeta plana cuarto-frio">
-            <h3 class="panel-titulo">En el cuarto frío</h3>
-            <strong class="cuarto-frio-numero ${datos.cuartoFrio.dieciseisavos < 0 ? 'malo' : ''}">
+          <div class="prd-tarjeta prd-frio">
+            <span class="prd-etiqueta">En el cuarto frío</span>
+            <strong class="prd-frio-numero ${datos.cuartoFrio.dieciseisavos < 0 ? 'malo' : ''}">
               ${esc(datos.cuartoFrio.texto)}
             </strong>
             <small>
               ${datos.cuartoFrio.dieciseisavos < 0
                 ? 'menos que cero: falta capturar producción'
-                : datos.cuartoFrio.desdeConteo
-                  ? `desde el último conteo, ${esc(fechaCorta(datos.cuartoFrio.contadoEn))}`
-                  : 'todavía no se ha contado nunca: es la suma de todo'}
+                : `marquetas de 150 kg · ${datos.cuartoFrio.desdeConteo
+                    ? `desde el conteo del ${esc(fechaCorta(datos.cuartoFrio.contadoEn))}`
+                    : 'nunca se ha contado: es la suma de todo'}`}
             </small>
           </div>` : ''}
 
-        ${hoy ? `
-          <div class="tarjeta plana">
-            <h3 class="panel-titulo">Hoy en la fábrica</h3>
-            <div class="panel-cuentas">
-              <span><strong>${hoy.panos.length}</strong><small>paños</small></span>
-              <span><strong>${hoy.marquetas}</strong><small>al cuarto frío</small></span>
-              <span><strong>${hoy.mezcla.producidas}</strong><small>salieron</small></span>
-            </div>
-            ${conAlgo.length ? `
-              <div class="mezcla-barra" style="margin-top:10px">
-                ${conAlgo.map((c) => `
-                  <span class="mezcla-tramo ${esc(c.clave)}" style="flex:${m[c.clave]}"
-                        title="${esc(c.plural)}: ${m[c.clave]}"></span>`).join('')}
-              </div>
-              <div class="mezcla-lista">
-                ${conAlgo.map((c) => `
-                  <span class="mezcla-parte ${esc(c.clave)}">${m[c.clave]} ${esc(c.corto)}</span>`).join('')}
-                ${m.merma ? `<span class="mezcla-parte merma">${m.merma} se botaron</span>` : ''}
-              </div>` : '<p class="ayuda" style="margin:8px 0 0">Todavía no se ha sacado nada hoy.</p>'}
-          </div>` : ''}
+        ${hoy ? tarjetaHoy() : ''}
 
-        <div class="panel-botones">
-          <button class="secundario chico" id="ver-hoy">📅 Lo de hoy</button>
+        <div class="prd-panel-botones">
+          <button class="secundario" id="ver-hoy">📅 Lo de hoy</button>
           ${estado.permisos.includes('*') || estado.permisos.includes('existencia.ver')
-            ? '<a class="boton secundario chico" href="#/existencia">🧊 El cuarto frío</a>' : ''}
+            ? '<a class="boton secundario" href="#/existencia">🧊 El cuarto frío</a>' : ''}
           ${estado.permisos.includes('*') || estado.permisos.includes('estadisticas.ver')
-            ? '<a class="boton secundario chico" href="#/estadisticas">📊 Los números</a>' : ''}
+            ? '<a class="boton secundario" href="#/estadisticas">📊 Los números</a>' : ''}
         </div>
       </aside>`;
   }
 
+  /**
+   * CÓMO SALIÓ EL HIELO HOY, EN TODA LA FÁBRICA.
+   *
+   * Tres números y una barra. La barra es lo que de verdad se mira: no
+   * importa tanto cuántas salieron como en qué proporción, porque cuando la
+   * mezcla se corre hacia abajo varios días seguidos, algo está pasando con
+   * el frío y hay tiempo de arreglarlo antes de que se note en la venta.
+   *
+   * EL PORCENTAJE ES «lo que entró al cuarto frío entre lo que se abrió», y
+   * no un promedio de los grados: promediar «80-90%» con «40-60%» daría un
+   * número que no significa nada en la vida real.
+   */
+  function tarjetaHoy() {
+    const m = hoy.mezcla;
+    const conAlgo = CALIDADES.filter((c) => m[c.clave] > 0);
+    const noVendible = CALIDADES.filter((c) => !c.vendible && m[c.clave] > 0);
+    const conforme = m.salieron
+      ? Math.round((m.alAlmacen / m.salieron) * 1000) / 10 : null;
+
+    return `
+      <div class="prd-tarjeta">
+        <div class="prd-tarjeta-cabeza">
+          <h3>Hoy en la fábrica</h3>
+        </div>
+        <div class="prd-cuentas">
+          <span class="prd-cuenta"><strong>${hoy.panos.length}</strong><small>paños</small></span>
+          <span class="prd-cuenta"><strong>${m.producidas}</strong><small>salieron</small></span>
+          <span class="prd-cuenta ${m.merma ? 'malo' : ''}">
+            <strong>${m.merma}</strong><small>se botaron</small></span>
+        </div>
+
+        ${conAlgo.length ? `
+          <div class="prd-conforme">
+            <span>Cómo salió el hielo</span>
+            <strong class="${conforme >= 95 ? 'bien' : conforme >= 85 ? '' : 'malo'}">
+              ${conforme}%<small>al cuarto frío</small></strong>
+          </div>
+          <div class="mezcla-barra">
+            ${conAlgo.map((c) => `
+              <span class="mezcla-tramo ${esc(c.clave)}" style="flex:${m[c.clave]}"
+                    title="${esc(c.plural)}: ${m[c.clave]}"></span>`).join('')}
+          </div>
+          <div class="mezcla-lista">
+            ${conAlgo.map((c) => `
+              <span class="mezcla-parte ${esc(c.clave)}">${m[c.clave]} ${esc(c.corto)}</span>`).join('')}
+          </div>
+          ${noVendible.length ? `
+            <p class="prd-nota">
+              ${noVendible.map((c) => `${m[c.clave]} ${c.corto}`).join(' · ')} no entraron al cuarto frío.
+            </p>` : ''}`
+        : '<p class="ayuda" style="margin:10px 0 0">Todavía no se ha sacado nada hoy.</p>'}
+      </div>`;
+  }
+
   function sinTanques() {
+    fijar(false);
     pantalla.innerHTML = `
       <h2>Producción</h2>
       <div class="tarjeta plana" style="text-align:center;padding:34px 20px">
@@ -389,80 +528,84 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
   }
 
   /**
-   * Una fila = un paño, y ahora también su historia.
+  /**
+   * UN RENGLÓN = UN PAÑO, y cuenta su historia sin que haya que entrar.
    *
-   * Debajo de las canastas va lo que uno pregunta mirando la lista: cuándo
-   * se sacó la última vez, quién lo sacó y cuántas horas llevaba
-   * congelando. Antes había que entrar paño por paño para saberlo.
+   * De izquierda a derecha: el número, las canastas con sus moldes, lo que
+   * le pasó la última vez, y a la derecha en qué está —"10 h", "listo",
+   * "a medias"—. Eso es exactamente lo que uno pregunta mirando la lista.
+   *
+   * EL QUE TOCA NO LLEVA UNA ETIQUETA: LLEVA EL BOTÓN.  (v7.2)
+   * Antes se distinguía con un aro verde y había que saber que tocarlo
+   * entraba a sacarlo. Ahora dice «✓ Sacar el paño 5» con todas sus letras
+   * y del tamaño de una mano, que es la única acción que se hace aquí
+   * cincuenta veces al día.
    *
    * Del nombre solo va el DE PILA. En la fábrica nadie dice el apellido, y
    * con tres nombres completos el renglón se parte en dos.
    */
   function filaPano(p, toca) {
     const esElQueToca = toca && toca.id === p.id;
-    const derecha = p.enProceso ? 'a medias'
-                  : p.estado === 'fuera' ? 'fuera'
-                  : p.estado === 'lista' ? 'listo'
-                  : `${Math.floor(p.horas)} h`;
+
+    // ¿Algún molde de este paño viene fallando? Se dice en el renglón y con
+    // el número del molde: "hay un molde marcado" no sirve para nada si hay
+    // que abrir el paño para saber cuál.
+    const fallos = [];
+    for (const c of p.canastas || []) {
+      for (const m of c.moldes || []) {
+        if (m.ultimoFallo) fallos.push(`molde ${m.numero} (canasta ${c.numero})`);
+      }
+    }
+
+    const chip = p.enProceso
+      ? '<span class="prd-chip proceso">a medias</span>'
+      : p.estado === 'fuera' ? '<span class="prd-chip fuera">fuera</span>'
+      : p.estado === 'lista' ? '<span class="prd-chip lista">listo</span>'
+      : `<span class="prd-chip congelando">${Math.floor(p.horas)} h</span>`;
 
     // Un paño a medias enseña lo que falta, no lo que se sacó la vez pasada:
     // es lo único que hay que hacer con él, y quien mira la lista tiene que
     // verlo sin entrar.
-    if (p.enProceso) {
-      const quien = p.empezadoPor ? nombreDePila(p.empezadoPor) : null;
-      // Un paño a medias es siempre el que toca, así que lleva también el
-      // aro verde: si no, el que toca desaparecía de la pantalla justo
-      // cuando hay algo urgente que hacer con él.
-      return `
-      <div class="pano-prod en-proceso ${esElQueToca ? 'toca-este' : ''}">
-        <button class="pano-prod-cuerpo" data-pano="${esc(p.id)}">
-          <span class="pano-prod-num">${p.numero}</span>
-          <span class="pano-prod-medio">
-            <span class="canastas-prod">
-              ${p.canastas.map((c) => `
-                <span class="canasta-prod ${c.yaSacada ? 'sacada' : c.estado}
-                             ${c.tipoAgua === 'potable' ? 'potable' : ''}">
-                  ${c.moldes.map((m) => `<i class="molde"></i>`).join('')}
-                </span>`).join('')}
-            </span>
-            <small class="pano-prod-historia">
-              a medias · faltan ${p.faltan} de ${p.canastas.length} canastas${
-                quien ? ` · lo empezó ${esc(quien)}` : ''}
-            </small>
-          </span>
-          <span class="pano-prod-horas proceso">a medias</span>
-        </button>
-        <button class="pano-prod-ojo" data-ficha="${esc(p.id)}"
-                title="Ver el detalle de este paño (no cambia nada)">👁</button>
-      </div>`;
-    }
+    const historia = p.enProceso
+      ? `a medias · faltan ${p.faltan} de ${p.canastas.length} canastas${
+          p.empezadoPor ? ` · lo empezó ${esc(nombreDePila(p.empezadoPor))}` : ''}`
+      : p.ultimaSacada
+        ? [fechaCorta(p.ultimaSacada.fecha),
+           p.ultimaSacada.quienes?.length
+             ? p.ultimaSacada.quienes.map(nombreDePila).join(', ') : null,
+           p.ultimaSacada.horas != null ? `${Math.round(p.ultimaSacada.horas)} h` : null,
+           p.ultimaSacada.marquetas ? `${p.ultimaSacada.marquetas} marq` : null
+          ].filter(Boolean).map(esc).join(' · ')
+        : 'sin registro previo';
 
-    const u = p.ultimaSacada;
-    const historia = u
-      ? [fechaCorta(u.fecha),
-         u.quienes.length ? u.quienes.map(nombreDePila).join(', ') : null,
-         u.horas != null ? `${Math.round(u.horas)} h` : null,
-         u.marquetas ? `${u.marquetas} marq.` : null
-        ].filter(Boolean).join(' · ')
-      : 'nunca se ha sacado';
+    const canastas = (p.canastas || []).map((c) => `
+      <span class="canasta-prod ${c.yaSacada ? 'sacada' : c.estado}
+                   ${c.tipoAgua === 'potable' ? 'potable' : ''}">
+        ${c.moldes.map((m) => `
+          <i class="molde ${m.ultimoFallo ? 'fallo' : ''}"
+             ${m.rachaFallos > 1 ? 'data-racha="' + m.rachaFallos + '"' : ''}></i>`).join('')}
+      </span>`).join('');
 
     return `
-      <div class="pano-prod ${esElQueToca ? 'toca-este' : ''} ${p.enProceso ? 'en-proceso' : ''}">
+      <div class="pano-prod ${esElQueToca ? 'toca-este' : ''}
+                  ${p.enProceso ? 'en-proceso' : ''} ${fallos.length ? 'con-fallo' : ''}">
+        ${esElQueToca ? '<span class="pano-prod-turno">Siguiente en turno</span>' : ''}
         <button class="pano-prod-cuerpo" data-pano="${esc(p.id)}">
           <span class="pano-prod-num">${p.numero}</span>
           <span class="pano-prod-medio">
-            <span class="canastas-prod">
-              ${p.canastas.map((c) => `
-                <span class="canasta-prod ${c.estado} ${c.tipoAgua === 'potable' ? 'potable' : ''}">
-                  ${c.moldes.map((m) => `
-                    <i class="molde ${m.ultimoFallo ? 'fallo' : ''}"
-                       ${m.rachaFallos > 1 ? 'data-racha="' + m.rachaFallos + '"' : ''}></i>
-                  `).join('')}
-                </span>`).join('')}
-            </span>
-            <small class="pano-prod-historia ${u ? '' : 'nunca'}">${esc(historia)}</small>
+            <span class="canastas-prod">${canastas}</span>
+            <small class="pano-prod-historia ${p.ultimaSacada || p.enProceso ? '' : 'nunca'}">
+              ${fallos.length
+                ? `<b class="pano-prod-fallo">⚠ ${esc(fallos[0])}${
+                    fallos.length > 1 ? ` y ${fallos.length - 1} más` : ''}</b>`
+                : historia}
+            </small>
           </span>
-          <span class="pano-prod-horas ${p.enProceso ? 'proceso' : p.estado}">${derecha}</span>
+          ${esElQueToca && !p.enProceso
+            ? `<span class="pano-prod-sacar">✓ Sacar el paño ${p.numero}</span>`
+            : esElQueToca
+              ? `<span class="pano-prod-sacar">→ Terminar el paño ${p.numero}</span>`
+              : chip}
         </button>
         <button class="pano-prod-ojo" data-ficha="${esc(p.id)}"
                 title="Ver el detalle de este paño (no cambia nada)">👁</button>
@@ -549,6 +692,7 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
   async function detallePano(panoId, opciones = {}) {
     const pano = datos.tanque.panos.find((p) => p.id === panoId);
     if (!pano) return pintar();
+    fijar(false);
 
     const toca = datos.tanque.siguiente;
     const esElQueToca = !toca || toca.id === panoId;
@@ -1562,6 +1706,7 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
    * promedio viejo diciendo otra cosa.
    */
   async function medirSalmuera() {
+    fijar(false);
     const tanque = datos.tanque;
     const { mediciones } = await api.obtener(
       `/clima/salmuera?tanque=${encodeURIComponent(tanque.id)}&limite=20`);
@@ -1822,6 +1967,7 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
    * cada diferencia queda escrita con quién reportó aquella sacada.
    */
   async function revisarTanque(tanque = tanqueActivo) {
+    fijar(false);
     let d;
     try { d = await api.obtener(`/produccion/revision?tanque=${encodeURIComponent(tanque)}`); }
     catch (e) { return avisar(e.message, 'error'); }
@@ -1963,6 +2109,7 @@ export async function vistaProduccion(pantalla, estado, opciones = {}) {
   }
 
   async function verHoy() {
+    fijar(false);
     const r = await api.obtener('/produccion/hoy');
 
     pantalla.innerHTML = `

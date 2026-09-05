@@ -42,7 +42,13 @@ const estado = { usuario: null, permisos: [], configurado: true };
 
 const RUTAS = {
   '#/inicio':    { titulo: 'Inicio',            vista: vistaInicio },
-  '#/tanques':   { titulo: 'Producción de hielo', vista: vistaProduccion, permiso: 'produccion.ver' },
+  // PRODUCCIÓN NO SE DESPLAZA  (v7.2). Como el punto de venta: los tanques
+  // arriba y el paño que toca siempre a la vista. "Los tanques muy largos
+  // que tienen muchos paños, hasta dieciocho, al desplazar de repente me
+  // perdía y no sabía en qué tanque estaba." Lo único que rueda es la lista
+  // de paños, dentro de su propia caja.
+  '#/tanques':   { titulo: 'Producción de hielo', vista: vistaProduccion, permiso: 'produccion.ver',
+                   fija: true },
   // El punto de venta se queda con TODA la pantalla: arma su propio
   // encabezado adentro para no pagar dos veces por la misma franja.
   '#/venta':     { titulo: 'Punto de venta',    vista: vistaVenta,     permiso: 'venta.registrar',
